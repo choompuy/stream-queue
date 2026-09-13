@@ -12,7 +12,8 @@ const isPlaybackSource = location.hostname === 'localhost' || location.hostname 
 
 const dom = {
   playerWrapper: $('playerWrapper'),
-  badge: $('nowPlaying'),
+  badgeWrapper: $('badgeWrapper'),
+  badge: $('badge'),
   currentThumbnail: $('currentThumbnail'),
   currentTitle: $('currentTitle'),
   currentChannel: $('currentChannel'),
@@ -37,7 +38,7 @@ async function fetchPreviewState() {
 
 function updateMediaVisibility(state) {
   dom.playerWrapper.classList.toggle('hidden', !state.showVideo)
-  dom.currentThumbnail.classList.toggle('hidden', state.showVideo)
+  dom.badgeWrapper.classList.toggle('with-video', state.showVideo)
 }
 
 function renderCurrent(state) {
@@ -82,12 +83,9 @@ function renderState(state) {
 
     if (currentVideoId !== state.current.videoId) {
       log(`Loading video: ${state.current.videoId}`)
-
       player.loadVideoById(state.current.videoId)
 
-      if (!settings.showVideo) {
-        player.setPlaybackQuality('tiny')
-      }
+      if (!settings.showVideo) player.setPlaybackQuality('tiny')
     }
   } else if (isPlayerReady && !state.current && !isTransitioning) {
     player.stopVideo()
@@ -165,6 +163,7 @@ if (isPlaybackSource) {
         autoplay: 1,
         controls: 0,
         rel: 0,
+        fs: 0,
         cc_load_policy: 0,
         iv_load_policy: 3,
         disablekb: 1,

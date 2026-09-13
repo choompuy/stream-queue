@@ -41,22 +41,22 @@ body {
 
 .text-lg {
   font-size: 1.25rem;
-  line-height: 1.75rem;
+  line-height: 1.75;
 }
 
 .text-md {
   font-size: 1rem;
-  line-height: 1.5rem;
+  line-height: 1.5;
 }
 
 .text-sm {
   font-size: 0.875rem;
-  line-height: 1.25rem;
+  line-height: 1.25;
 }
 
 .text-xs {
   font-size: 0.75rem;
-  line-height: 1rem;
+  line-height: 1;
 }
 
 .text-bold {
@@ -84,5 +84,5 @@ body {
 }
 
 .box-shadow {
-  box-shadow: rgba(0, 0, 0, 0.15) 0 0.25rem 0.875rem 0;
+  box-shadow: rgba(0, 0, 0, 0.4) 0 0.25rem 0.875rem 0;
 }

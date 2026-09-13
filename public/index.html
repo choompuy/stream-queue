@@ -106,6 +106,14 @@
           <div class="row">
             <input class="input" type="search" id="searchInput" placeholder="YouTube URL or search..." />
             <button class="song-search-btn btn" id="searchBtn" data-action="search">Search</button>
+            <button class="song-search-btn btn btn-danger" id="searchClearBtn" data-action="search-clear">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
+                <path
+                  fill="currentColor"
+                  d="M20.746 3.329a1 1 0 0 0-1.415 0l-7.294 7.294-7.294-7.294a1 1 0 1 0-1.414 1.414l7.294 7.294-7.294 7.294a1 1 0 0 0 1.414 1.415l7.294-7.295 7.294 7.295a1 1 0 0 0 1.415-1.415l-7.295-7.294 7.295-7.294a1 1 0 0 0 0-1.414"
+                />
+              </svg>
+            </button>
           </div>
           <div class="error hidden" id="searchError"></div>
           <div class="row-list-wrapper hidden" id="searchListWrapper" data-list="search">
@@ -302,9 +310,7 @@
                   </button>
                 </div>
 
-                <div class="text-muted text-xs">
-                  Recommended OBS source size: 1920×1080 (match your dashboard resolution). Audio plays through OBS.
-                </div>
+                <div class="text-muted text-xs">Recommended OBS source size: Width: 360, Height: 270</div>
               </div>
 
               <div class="field">
@@ -392,7 +398,6 @@
       </section>
     </main>
 
-    <script src="https://www.youtube.com/iframe_api"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     <script type="module" src="js/control/index.js"></script>

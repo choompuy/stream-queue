@@ -6,6 +6,8 @@ import { loadActivity } from './activity.js'
 
 const YOUTUBE_URL_HINT = /(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com|youtube-nocookie\.com|youtu\.be)\//
 
+let lastSearch = ''
+
 export function showSearchError(message) {
   dom.searchError.textContent = message
   dom.searchError.classList.remove('hidden')
@@ -13,6 +15,7 @@ export function showSearchError(message) {
 
 export function clearSearchResults() {
   views.search.clear()
+  dom.searchInput.value = ''
   dom.searchListWrapper.classList.add('hidden')
   dom.searchError.classList.add('hidden')
 }
@@ -21,7 +24,8 @@ export async function search() {
   const query = dom.searchInput.value.trim()
   if (!query) return
 
-  clearSearchResults()
+  if (lastSearch === query) return
+  lastSearch = query
 
   await withLoading(dom.searchBtn, async () => {
     try {
@@ -43,8 +47,6 @@ export async function search() {
 export async function addSong(query) {
   try {
     await api.requestSong(query)
-    dom.searchInput.value = ''
-    clearSearchResults()
     await refreshState()
     await loadActivity()
   } catch (error) {

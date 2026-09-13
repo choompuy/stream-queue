@@ -105,3 +105,7 @@ window.onYouTubeIframeAPIReady = () => {
     }
   })
 }
+
+const iframeApiTag = document.createElement('script')
+iframeApiTag.src = 'https://www.youtube.com/iframe_api'
+document.head.appendChild(iframeApiTag)

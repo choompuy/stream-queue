@@ -1,7 +1,7 @@
 import { dom } from './state.js'
 import { switchPageTab, switchSection } from './tabs.js'
 import { playPauseCurrent, skipCurrent } from './player.js'
-import { search, addSong } from './search.js'
+import { search, addSong, clearSearchResults } from './search.js'
 import { removeFromQueue, clearQueue } from './queue.js'
 import {
   playFallbackNow,
@@ -19,6 +19,7 @@ const ACTIONS = {
   'play-pause': playPauseCurrent,
   skip: skipCurrent,
   search: search,
+  'search-clear': clearSearchResults,
   'clear-queue': clearQueue,
   'queue-remove': (action) => removeFromQueue(Number(action.dataset.index)),
   'search-add': (action) => addSong(`https://www.youtube.com/watch?v=${action.dataset.videoId}`),

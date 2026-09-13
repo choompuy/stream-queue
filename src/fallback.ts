@@ -229,7 +229,7 @@ export function queueFallbackTrack(videoId: string): QueueItem | null {
   const song = findTrack(videoId)
   if (!song) return null
 
-  return addSong(song, 'Jam', true)
+  return addSong(song, 'Jam', true, true)
 }
 
 export function getFallbackSnapshot(): FallbackSnapshot {

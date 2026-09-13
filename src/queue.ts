@@ -118,7 +118,7 @@ export function getIsPaused(): boolean {
   return isPaused
 }
 
-export function assertCanAddSong(song: Song, requestedBy: string, addToQueue: boolean): void {
+export function assertCanAddSong(song: Song, requestedBy: string, addToQueue: boolean, bypassLimits: boolean = false): void {
   const config = getConfig()
   const normalized = requestedBy.toLowerCase()
 
@@ -134,6 +134,8 @@ export function assertCanAddSong(song: Song, requestedBy: string, addToQueue: bo
     throw new AppError('QUEUE_FULL', 'очередь заполнена')
   }
 
+  if (bypassLimits) return
+
   const activeCount = getUserActiveCount(normalized)
   if (config.maxRequestsPerUser > 0 && activeCount >= config.maxRequestsPerUser) {
     throw new AppError(
@@ -143,10 +145,10 @@ export function assertCanAddSong(song: Song, requestedBy: string, addToQueue: bo
   }
 }
 
-export function addSong(song: Song, requestedBy: string, addToQueue: boolean = true): QueueItem {
+export function addSong(song: Song, requestedBy: string, addToQueue: boolean = true, bypassLimits: boolean = false): QueueItem {
   log(`[REQUEST] ${requestedBy} → "${song.title}"`)
 
-  assertCanAddSong(song, requestedBy, addToQueue)
+  assertCanAddSong(song, requestedBy, addToQueue, bypassLimits)
 
   const item: QueueItem = {
     ...song,
@@ -273,7 +275,7 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
 
     const stateBefore = getState()
     const wasEmpty = stateBefore.current === null
-    const item = addSong(song, requestedBy, !wasEmpty)
+    const item = addSong(song, requestedBy, !wasEmpty, bypassFilters)
 
     if (wasEmpty) {
       setCurrent(item)

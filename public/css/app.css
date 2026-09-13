@@ -56,6 +56,7 @@ a {
 }
 
 .btn {
+  flex-shrink: 0;
   display: inline-flex;
   justify-content: center;
   align-items: center;
@@ -518,7 +519,9 @@ a {
 
 .song-search-btn,
 .playlist-add-btn {
-  border-left: 1px solid var(--border);
+  border-width: 1px;
+  border-color: var(--border);
+  border-style: none none none solid;
 }
 
 .playlist-add-wrapper {
