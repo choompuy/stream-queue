@@ -1,4 +1,4 @@
-import { Response } from 'express'
+import { Response, Request, NextFunction, RequestHandler, ParamsDictionary } from 'express-serve-static-core'
 import { AppError, AppErrorCode, ApiOk, ApiError } from './types.js'
 
 export function ok<T extends object>(res: Response, data: T, status = 200): void {
@@ -33,4 +33,12 @@ export function getErrorInfo(error: unknown): ErrorInfo {
 export function failFromError(res: Response, error: unknown): void {
   const info = getErrorInfo(error)
   fail(res, info.message, info.code, info.status)
+}
+
+export function asyncHandler<P = ParamsDictionary>(
+  handler: (req: Request<P>, res: Response, next: NextFunction) => Promise<void>
+): RequestHandler<P> {
+  return (req, res, next) => {
+    handler(req, res, next).catch(next)
+  }
 }

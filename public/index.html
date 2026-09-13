@@ -105,7 +105,7 @@
 
         <div class="song-search-wrapper panel section-panel">
           <div class="row">
-            <input class="input" type="text" id="searchInput" placeholder="YouTube URL or search..." />
+            <input class="input" type="search" id="searchInput" placeholder="YouTube URL or search..." />
             <button class="song-search-btn btn" id="searchBtn" data-action="search">Search</button>
           </div>
           <div class="error hidden" id="searchError"></div>
@@ -263,123 +263,131 @@
         <div class="tab-header">
           <h1>Settings</h1>
         </div>
-        <div class="grid">
-          <div class="panel">
-            <div class="panel-body">
+        <div class="settings-wrapper">
+          <div class="section-panel panel">
+            <div class="section-panel-header">
               <h2>Preview</h2>
+            </div>
+            <div class="settings-section">
+              <label class="field-row">
+                <div class="checkbox-wrapper">
+                  <input class="checkbox" type="checkbox" id="showVideo" />
+                </div>
+                Show video
+              </label>
+              
+              <div class="field">
+                <label class="field-label" for="badgePosition">Badge position</label>
+                <select class="settings-input input select" id="badgePosition">
+                  <option value="top-left">Top Left</option>
+                  <option value="top-right">Top Right</option>
+                  <option value="bottom-left">Bottom Left</option>
+                  <option value="bottom-right">Bottom Right</option>
+                </select>
+              </div>
 
-              <div class="settings-section" style="padding-top: 0">
-                <label class="row">
-                  <div class="checkbox-wrapper">
-                    <input class="checkbox" type="checkbox" id="showVideo" />
-                  </div>
-                  Show video
-                </label>
-
-                <div class="field">
-                  <label class="field-label" for="badgePosition">Badge position</label>
-                  <select class="input select" id="badgePosition">
-                    <option value="top-left">Top Left</option>
-                    <option value="top-right">Top Right</option>
-                    <option value="bottom-left">Bottom Left</option>
-                    <option value="bottom-right">Bottom Right</option>
-                  </select>
+              <div class="field">
+                <div class="field-label">OBS Browser Source URL</div>
+                <div class="field-row">
+                  <a class="settings-input input text-blue" id="previewUrl" href="/preview" target="_blank" rel="noopener noreferrer">/preview</a>
+                  <button class="btn btn-secondary btn-icon" data-action="copy-preview-url" title="Copy">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
+                      <path
+                        stroke="currentColor"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M8 8h-.8c-1.12 0-1.68 0-2.108.218a2 2 0 0 0-.874.874C4 9.52 4 10.08 4 11.2v5.6c0 1.12 0 1.68.218 2.108a2 2 0 0 0 .874.874C5.52 20 6.08 20 7.2 20h5.6c1.12 0 1.68 0 2.108-.218a2 2 0 0 0 .874-.874C16 18.48 16 17.92 16 16.8V16m-4.8 0h5.6c1.12 0 1.68 0 2.108-.218a2 2 0 0 0 .874-.874C20 14.48 20 13.92 20 12.8V7.2c0-1.12 0-1.68-.218-2.108a2 2 0 0 0-.874-.874C18.48 4 17.92 4 16.8 4h-5.6c-1.12 0-1.68 0-2.108.218a2 2 0 0 0-.874.874C8 5.52 8 6.08 8 7.2v5.6c0 1.12 0 1.68.218 2.108a2 2 0 0 0 .874.874C9.52 16 10.08 16 11.2 16"
+                      />
+                    </svg>
+                  </button>
                 </div>
 
-                <div class="field">
-                  <label class="field-label">OBS Browser Source URL</label>
-                  <div class="field-row">
-                    <a class="input text-blue" id="previewUrl" href="/preview" target="_blank" rel="noopener noreferrer">/preview</a>
-                    <button class="btn btn-secondary btn-icon" data-action="copy-preview-url" title="Copy">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
-                        <path
-                          stroke="currentColor"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M8 8h-.8c-1.12 0-1.68 0-2.108.218a2 2 0 0 0-.874.874C4 9.52 4 10.08 4 11.2v5.6c0 1.12 0 1.68.218 2.108a2 2 0 0 0 .874.874C5.52 20 6.08 20 7.2 20h5.6c1.12 0 1.68 0 2.108-.218a2 2 0 0 0 .874-.874C16 18.48 16 17.92 16 16.8V16m-4.8 0h5.6c1.12 0 1.68 0 2.108-.218a2 2 0 0 0 .874-.874C20 14.48 20 13.92 20 12.8V7.2c0-1.12 0-1.68-.218-2.108a2 2 0 0 0-.874-.874C18.48 4 17.92 4 16.8 4h-5.6c-1.12 0-1.68 0-2.108.218a2 2 0 0 0-.874.874C8 5.52 8 6.08 8 7.2v5.6c0 1.12 0 1.68.218 2.108a2 2 0 0 0 .874.874C9.52 16 10.08 16 11.2 16"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                  <div class="field-row">
-                    <select class="input select hidden" id="selectIp"></select>
-
-                    <button class="btn btn-secondary btn-icon" data-action="toggle-qr" title="QR code">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
-                        <path
-                          fill="currentColor"
-                          d="M23 4a3 3 0 0 0-3-3h-4a1 1 0 1 0 0 2h4a1 1 0 0 1 1 1v4a1 1 0 1 0 2 0zM23 16a1 1 0 1 0-2 0v4a1 1 0 0 1-1 1h-4a1 1 0 1 0 0 2h4a3 3 0 0 0 3-3zM4 21a1 1 0 0 1-1-1v-4a1 1 0 1 0-2 0v4a3 3 0 0 0 3 3h4a1 1 0 1 0 0-2zM1 8a1 1 0 0 0 2 0V4a1 1 0 0 1 1-1h4a1 1 0 0 0 0-2H4a3 3 0 0 0-3 3z"
-                        />
-                        <path
-                          fill="currentColor"
-                          fill-rule="evenodd"
-                          d="M11 6a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1zM9 7.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5zM18 13a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1zm-3 2.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5z"
-                          clip-rule="evenodd"
-                        />
-                        <path fill="currentColor" d="M14 5a1 1 0 1 0 0 2h2.5a.5.5 0 0 1 .5.5V10a1 1 0 1 0 2 0V6a1 1 0 0 0-1-1z" />
-                        <path
-                          fill="currentColor"
-                          d="M14 8a1 1 0 0 0-1 1v1a1 1 0 1 0 2 0V9a1 1 0 0 0-1-1M6 13a1 1 0 0 0-1 1v2a1 1 0 1 0 2 0v-.5a.5.5 0 0 1 .5-.5H10a1 1 0 1 0 0-2zM10 17a1 1 0 1 0 0 2 1 1 0 0 0 0-2"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                  <div id="controlPanelQr" class="contol-panel-qr hidden"></div>
-                  <div class="field-hint">Recommended OBS source size: 1920×1080 (match your dashboard resolution). Audio plays through OBS.</div>
+                <div class="text-muted text-xs">
+                  Recommended OBS source size: 1920×1080 (match your dashboard resolution). Audio plays through OBS.
                 </div>
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="selectIp">IP selector</label>
+                <div class="field-row">
+                  <select class="settings-input input select hidden" id="selectIp"></select>
+                  <button class="btn btn-secondary btn-icon" data-action="toggle-qr" title="QR code">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
+                      <path
+                        fill="currentColor"
+                        d="M23 4a3 3 0 0 0-3-3h-4a1 1 0 1 0 0 2h4a1 1 0 0 1 1 1v4a1 1 0 1 0 2 0zM23 16a1 1 0 1 0-2 0v4a1 1 0 0 1-1 1h-4a1 1 0 1 0 0 2h4a3 3 0 0 0 3-3zM4 21a1 1 0 0 1-1-1v-4a1 1 0 1 0-2 0v4a3 3 0 0 0 3 3h4a1 1 0 1 0 0-2zM1 8a1 1 0 0 0 2 0V4a1 1 0 0 1 1-1h4a1 1 0 0 0 0-2H4a3 3 0 0 0-3 3z"
+                      />
+                      <path
+                        fill="currentColor"
+                        fill-rule="evenodd"
+                        d="M11 6a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1zM9 7.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5zM18 13a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1zm-3 2.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5z"
+                        clip-rule="evenodd"
+                      />
+                      <path fill="currentColor" d="M14 5a1 1 0 1 0 0 2h2.5a.5.5 0 0 1 .5.5V10a1 1 0 1 0 2 0V6a1 1 0 0 0-1-1z" />
+                      <path
+                        fill="currentColor"
+                        d="M14 8a1 1 0 0 0-1 1v1a1 1 0 1 0 2 0V9a1 1 0 0 0-1-1M6 13a1 1 0 0 0-1 1v2a1 1 0 1 0 2 0v-.5a.5.5 0 0 1 .5-.5H10a1 1 0 1 0 0-2zM10 17a1 1 0 1 0 0 2 1 1 0 0 0 0-2"
+                      />
+                    </svg>
+                  </button>
+                </div>
+                <div id="controlPanelQr" class="control-panel-qr hidden"></div>
               </div>
             </div>
           </div>
 
-          <div class="panel">
-            <div class="panel-body">
+          <div class="section-panel panel">
+            <div class="section-panel-header">
               <h2>Bot Settings</h2>
-
-              <div class="settings-section" style="padding-top: 0">
-                <div class="settings-section-title">YouTube API</div>
-                <div class="field">
-                  <label class="field-label" for="secYoutubeKey">API Key</label>
-                  <input class="input" type="password" id="secYoutubeKey" placeholder="оставь пустым, чтобы не менять" autocomplete="off" />
-                  <div id="secretsStatus" class="field-hint"></div>
-                </div>
-              </div>
-
-              <div class="settings-section">
-                <div class="settings-section-title">Track filters</div>
-                <div class="settings-grid">
-                  <div class="field">
-                    <label class="field-label" for="cfgMinViews">Min views</label>
-                    <input class="input" type="number" id="cfgMinViews" min="0" />
-                  </div>
-                  <div class="field">
-                    <label class="field-label" for="cfgMinDuration">Min duration (sec)</label>
-                    <input class="input" type="number" id="cfgMinDuration" min="0" />
-                  </div>
-                  <div class="field">
-                    <label class="field-label" for="cfgMaxDuration">Max duration (sec)</label>
-                    <input class="input" type="number" id="cfgMaxDuration" min="0" />
-                  </div>
-                </div>
-              </div>
-
-              <div class="settings-section">
-                <div class="settings-section-title">Queue limits</div>
-                <div class="settings-grid">
-                  <div class="field">
-                    <label class="field-label" for="cfgMaxQueue">Max queue size</label>
-                    <input class="input" type="number" id="cfgMaxQueue" min="1" />
-                  </div>
-                  <div class="field">
-                    <label class="field-label" for="cfgMaxPerUser">Max requests per user</label>
-                    <input class="input" type="number" id="cfgMaxPerUser" min="0" />
-                  </div>
-                </div>
-                <div class="field-hint">Cooldowns and per-user rate limits are handled in Streamer.bot, not here.</div>
-              </div>
-
-              <button id="saveConfigSettingBtn" class="btn btn-primary" data-action="save-config">Save settings</button>
             </div>
+
+            <div class="settings-section">
+              <div class="field">
+                <label class="field-label" for="secYoutubeKey">API Key</label>
+                <input
+                  class="settings-input input"
+                  type="password"
+                  id="secYoutubeKey"
+                  placeholder="оставь пустым, чтобы не менять"
+                  autocomplete="off"
+                />
+                <div id="secretsStatus" class="text-muted text-xs"></div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-grid">
+                <div class="field">
+                  <label class="field-label" for="cfgMinViews">Min views</label>
+                  <input class="settings-input input" type="number" id="cfgMinViews" min="0" />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="cfgMinDuration">Min duration (sec)</label>
+                  <input class="settings-input input" type="number" id="cfgMinDuration" min="0" />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="cfgMaxDuration">Max duration (sec)</label>
+                  <input class="settings-input input" type="number" id="cfgMaxDuration" min="0" />
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-grid">
+                <div class="field">
+                  <label class="field-label" for="cfgMaxQueue">Max queue size</label>
+                  <input class="settings-input input" type="number" id="cfgMaxQueue" min="1" />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="cfgMaxPerUser">Max requests per user</label>
+                  <input class="settings-input input" type="number" id="cfgMaxPerUser" min="0" />
+                </div>
+              </div>
+              <div class="text-muted text-xs">Cooldowns and per-user rate limits are handled in Streamer.bot, not here.</div>
+            </div>
+
+            <button id="saveConfigSettingBtn" class="btn btn-primary" data-action="save-config">Save settings</button>
           </div>
         </div>
       </section>

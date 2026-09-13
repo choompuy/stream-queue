@@ -1,23 +1,20 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { getConfig, updateConfig } from './config.js'
 import { getSettings, setSettings } from './settings.js'
-import { fetchPlaylistSongs } from './youtube/index.js'
+import { getConfig } from './config.js'
+import { getVideoById, searchSongs, selectBestSong } from './youtube/index.js'
+import { parseYouTubeUrl } from './youtube/url.js'
 import { createFileStore } from './persist.js'
-import { Settings, QueueItem, Song, PlayerState, FallbackStateResponse, FallbackTrackView, AppError, ActivityEntry, ActivityStatus } from './types.js'
+import { logActivity } from './activity.js'
+import { Settings, QueueItem, Song, PlayerState, AppError, QueueRequestResponse } from './types.js'
+import { peekNextFallbackTrack, advanceFallback, getFallbackSnapshot, hydrateFallback, FallbackSnapshot } from './fallback.js'
 
 type StateFile = {
   current: QueueItem | null
   queue: QueueItem[]
   settings: Settings
-  fallback: {
-    sourceTracks: Song[]
-    order: string[]
-    cursor: number
-    playlistId: string | null
-    lastRefreshedAt: number | null
-  }
+  fallback: FallbackSnapshot
 }
 
 const DATA_DIR = join(process.cwd(), 'cache')
@@ -30,31 +27,6 @@ const queueVideoIds = new Set<string>()
 const userQueueCounts = new Map<string, number>()
 
 let isPaused = false
-
-const ACTIVITY_LIMIT = 30
-const activityLog: ActivityEntry[] = []
-
-export function logActivity(entry: Omit<ActivityEntry, 'at'>): void {
-  activityLog.unshift({ ...entry, at: Date.now() })
-  if (activityLog.length > ACTIVITY_LIMIT) {
-    activityLog.length = ACTIVITY_LIMIT
-  }
-}
-
-export function getActivity(): ActivityEntry[] {
-  return [...activityLog]
-}
-
-export function clearActivity(): void {
-  activityLog.length = 0
-  log('[ACTIVITY] cleared')
-}
-
-let fallbackSourceTracks: Song[] = []
-let fallbackOrder: string[] = []
-let fallbackCursor = -1
-let loadedFallbackPlaylistId: string | null = null
-let lastFallbackRefreshAt: number | null = null
 
 function log(message: string): void {
   console.log(`[QUEUE] ${message}`)
@@ -92,13 +64,7 @@ function loadState(): void {
       setSettings(data.settings)
     }
 
-    if (data.fallback) {
-      fallbackSourceTracks = data.fallback.sourceTracks ?? []
-      fallbackOrder = data.fallback.order ?? []
-      fallbackCursor = data.fallback.cursor ?? -1
-      loadedFallbackPlaylistId = data.fallback.playlistId ?? null
-      lastFallbackRefreshAt = data.fallback.lastRefreshedAt ?? null
-    }
+    hydrateFallback(data.fallback)
 
     log('State loaded from disk')
   } catch (error) {
@@ -111,235 +77,17 @@ function stateSnapshot(): StateFile {
     current: currentSong,
     queue: [...queue],
     settings: getSettings(),
-    fallback: {
-      sourceTracks: fallbackSourceTracks,
-      order: fallbackOrder,
-      cursor: fallbackCursor,
-      playlistId: loadedFallbackPlaylistId,
-      lastRefreshedAt: lastFallbackRefreshAt
-    }
+    fallback: getFallbackSnapshot()
   }
 }
 
-function saveState(): void {
+export function saveState(): void {
   store.scheduleSave(stateSnapshot, (error) => {
     console.error('[QUEUE] Failed to save state:', error instanceof Error ? error.message : error)
   })
 }
 
 loadState()
-
-function shuffle<T>(items: T[]): T[] {
-  const array = [...items]
-
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[array[i], array[j]] = [array[j], array[i]]
-  }
-
-  return array
-}
-
-function buildOrder(tracks: Song[], shuffleOn: boolean, currentVideoId: string | null): string[] {
-  const ids = tracks.map((track) => track.videoId)
-
-  if (!shuffleOn) {
-    return ids
-  }
-
-  if (!currentVideoId || !ids.includes(currentVideoId)) {
-    return shuffle(ids)
-  }
-
-  const rest = ids.filter((id) => id !== currentVideoId)
-  return [currentVideoId, ...shuffle(rest)]
-}
-
-function findTrack(videoId: string): Song | undefined {
-  return fallbackSourceTracks.find((track) => track.videoId === videoId)
-}
-
-function activeFallbackVideoId(): string | null {
-  return fallbackOrder[fallbackCursor] ?? null
-}
-
-export async function refreshFallback(): Promise<FallbackStateResponse> {
-  const playlistId = getConfig().fallbackPlaylist.playlistId
-
-  if (!playlistId) {
-    fallbackSourceTracks = []
-    fallbackOrder = []
-    fallbackCursor = -1
-    loadedFallbackPlaylistId = null
-    lastFallbackRefreshAt = null
-    saveState()
-    return getFallbackState()
-  }
-
-  const newTracks = await fetchPlaylistSongs(playlistId)
-  const isFirstLoad = loadedFallbackPlaylistId !== playlistId
-  const config = getConfig()
-  const activeId = activeFallbackVideoId()
-
-  if (isFirstLoad) {
-    fallbackSourceTracks = newTracks
-    fallbackOrder = buildOrder(newTracks, config.fallbackPlaylist.shuffle, null)
-    fallbackCursor = -1
-  } else {
-    const newIds = new Set(newTracks.map((track) => track.videoId))
-    const oldIds = new Set(fallbackSourceTracks.map((track) => track.videoId))
-
-    const addedIds = newTracks.map((track) => track.videoId).filter((id) => !oldIds.has(id))
-    const removedCount = fallbackSourceTracks.filter((track) => !newIds.has(track.videoId)).length
-
-    fallbackSourceTracks = newTracks
-
-    const activeIndexBefore = activeId ? fallbackOrder.indexOf(activeId) : -1
-    fallbackOrder = fallbackOrder.filter((id) => newIds.has(id))
-    fallbackOrder.push(...(config.fallbackPlaylist.shuffle ? shuffle(addedIds) : addedIds))
-
-    if (activeId && newIds.has(activeId)) {
-      fallbackCursor = fallbackOrder.indexOf(activeId)
-    } else if (activeIndexBefore >= 0) {
-      fallbackCursor = Math.min(activeIndexBefore, Math.max(fallbackOrder.length - 1, 0))
-    }
-
-    log(`[FALLBACK] Refreshed: +${addedIds.length} added, -${removedCount} removed, ${fallbackOrder.length} in rotation`)
-  }
-
-  loadedFallbackPlaylistId = playlistId
-  lastFallbackRefreshAt = Date.now()
-
-  log(`[FALLBACK] Loaded ${fallbackSourceTracks.length} tracks from playlist ${playlistId}`)
-  saveState()
-  return getFallbackState()
-}
-
-export function toggleFallbackShuffle(): FallbackStateResponse {
-  const config = getConfig()
-  const shuffleOn = !config.fallbackPlaylist.shuffle
-  updateConfig({ fallbackPlaylist: { ...config.fallbackPlaylist, shuffle: shuffleOn } })
-
-  const activeId = currentSong?.isFallback ? currentSong.videoId : activeFallbackVideoId()
-  fallbackOrder = buildOrder(fallbackSourceTracks, shuffleOn, activeId)
-  fallbackCursor = activeId ? fallbackOrder.indexOf(activeId) : -1
-
-  log(`[FALLBACK] Shuffle: ${shuffleOn}`)
-  saveState()
-  return getFallbackState()
-}
-
-export function toggleFallbackRepeat(): FallbackStateResponse {
-  const config = getConfig()
-  const repeat = !config.fallbackPlaylist.repeat
-  updateConfig({ fallbackPlaylist: { ...config.fallbackPlaylist, repeat } })
-  log(`[FALLBACK] Repeat: ${repeat}`)
-  return getFallbackState()
-}
-
-export function toggleFallbackEnabled(): FallbackStateResponse {
-  const config = getConfig()
-  const enabled = !config.fallbackPlaylist.enabled
-  updateConfig({ fallbackPlaylist: { ...config.fallbackPlaylist, enabled } })
-  log(`[FALLBACK] Enabled: ${enabled}`)
-  return getFallbackState()
-}
-
-export function clearFallback(): FallbackStateResponse {
-  fallbackSourceTracks = []
-  fallbackOrder = []
-  fallbackCursor = -1
-  loadedFallbackPlaylistId = null
-  lastFallbackRefreshAt = null
-
-  const config = getConfig()
-  updateConfig({ fallbackPlaylist: { ...config.fallbackPlaylist, playlistId: null } })
-
-  log('[FALLBACK] cleared')
-  saveState()
-  return getFallbackState()
-}
-
-export function getFallbackState(): FallbackStateResponse {
-  const config = getConfig()
-
-  return {
-    playlistId: loadedFallbackPlaylistId,
-    lastRefreshedAt: lastFallbackRefreshAt,
-    enabled: config.fallbackPlaylist.enabled,
-    shuffle: config.fallbackPlaylist.shuffle,
-    repeat: config.fallbackPlaylist.repeat,
-    sourceCount: fallbackSourceTracks.length,
-    activeVideoId: currentSong?.isFallback ? currentSong.videoId : null,
-    upNext: fallbackOrder
-      .map((videoId, index) => {
-        const track = findTrack(videoId)
-        if (!track) return null
-        return { ...track, isPlayed: index < fallbackCursor }
-      })
-      .filter((track): track is FallbackTrackView => track !== null)
-  }
-}
-
-export function getNextTrack(): QueueItem | null {
-  const queued = queue[0]
-
-  if (queued) {
-    return queued
-  }
-
-  const config = getConfig()
-
-  if (!config.fallbackPlaylist.enabled || !fallbackOrder.length) {
-    return null
-  }
-
-  const nextIndex = fallbackCursor + 1
-  const nextId = nextIndex < fallbackOrder.length ? fallbackOrder[nextIndex] : config.fallbackPlaylist.repeat ? fallbackOrder[0] : null
-
-  const upcoming = nextId ? findTrack(nextId) : undefined
-
-  if (!upcoming) {
-    return null
-  }
-
-  return { ...upcoming, requestedBy: 'Jam', isFallback: true }
-}
-
-function toFallbackQueueItem(song: Song): QueueItem {
-  return {
-    ...song,
-    requestedBy: 'Jam',
-    isFallback: true
-  }
-}
-
-function nextFallbackTrack(): QueueItem | null {
-  const config = getConfig()
-  if (!config.fallbackPlaylist.enabled || !fallbackOrder.length) {
-    return null
-  }
-
-  const nextIndex = fallbackCursor + 1
-
-  if (nextIndex >= fallbackOrder.length) {
-    if (!config.fallbackPlaylist.repeat) {
-      fallbackCursor = fallbackOrder.length
-      return null
-    }
-    fallbackCursor = 0
-  } else {
-    fallbackCursor = nextIndex
-  }
-
-  const song = findTrack(fallbackOrder[fallbackCursor])
-
-  if (!song) {
-    return null
-  }
-
-  return toFallbackQueueItem(song)
-}
 
 function incUserCount(requestedBy: string): void {
   const key = requestedBy.toLowerCase()
@@ -369,6 +117,10 @@ export function getState(): PlayerState & { nextTrack: QueueItem | null } {
   }
 }
 
+export function getNextTrack(): QueueItem | null {
+  return queue[0] ?? peekNextFallbackTrack()
+}
+
 export function getQueue(): QueueItem[] {
   return [...queue]
 }
@@ -383,27 +135,6 @@ export function setPaused(value: boolean): void {
 
 export function getIsPaused(): boolean {
   return isPaused
-}
-
-export function playFallbackTrackNow(videoId: string): QueueItem | null {
-  const index = fallbackOrder.indexOf(videoId)
-  if (index === -1) return null
-
-  const song = findTrack(videoId)
-  if (!song) return null
-
-  fallbackCursor = index
-  const item = toFallbackQueueItem(song)
-  setCurrent(item)
-  log(`[FALLBACK] Play now: "${song.title}"`)
-  return item
-}
-
-export function queueFallbackTrack(videoId: string): QueueItem | null {
-  const song = findTrack(videoId)
-  if (!song) return null
-
-  return addSong(song, 'Jam', true)
 }
 
 export function assertCanAddSong(song: Song, requestedBy: string, addToQueue: boolean): void {
@@ -476,7 +207,7 @@ export function moveToNext(): QueueItem | null {
     setCurrent(next)
     log(`[PLAYER] moved to next: "${next.title}"`)
   } else {
-    const fallback = nextFallbackTrack()
+    const fallback = advanceFallback()
     setCurrent(fallback)
     if (fallback) {
       log(`[PLAYER] started fallback: "${fallback.title}"`)
@@ -525,4 +256,70 @@ export function skipCurrent(): QueueItem | null {
   }
 
   return moveToNext()
+}
+
+export type RequestSongResult =
+  | { outcome: 'invalid-url' }
+  | { outcome: 'not-found' }
+  | { outcome: 'added'; response: QueueRequestResponse }
+  | { outcome: 'error'; error: unknown }
+
+export async function requestSong(query: string, requestedBy: string, bypassFilters: boolean): Promise<RequestSongResult> {
+  try {
+    let song: Song | null = null
+    const { isYouTube, videoId } = parseYouTubeUrl(query)
+
+    if (isYouTube && !videoId) {
+      log(`[REJECT] ${requestedBy} → INVALID_YOUTUBE_URL`)
+      logActivity({ requestedBy, query, title: null, status: 'rejected', reason: 'некорректная ссылка' })
+      return { outcome: 'invalid-url' }
+    }
+
+    if (videoId) {
+      log(`[REQUEST] ${requestedBy} → YouTube URL: ${videoId}`)
+      song = await getVideoById(videoId, bypassFilters)
+    } else {
+      log(`[REQUEST] ${requestedBy} → Search: "${query}"`)
+      const songs = await searchSongs(query, bypassFilters)
+      song = selectBestSong(songs, query)
+    }
+
+    if (!song) {
+      log(`[REJECT] ${requestedBy} → SONG_NOT_FOUND`)
+      logActivity({ requestedBy, query, title: null, status: 'rejected', reason: 'не найдено или не прошло фильтры' })
+      return { outcome: 'not-found' }
+    }
+
+    const stateBefore = getState()
+    const wasEmpty = stateBefore.current === null
+    const item = addSong(song, requestedBy, !wasEmpty)
+
+    if (wasEmpty) {
+      setCurrent(item)
+      log(`[ACCEPT] ${requestedBy} → "${song.title}" - now playing`)
+    } else {
+      log(`[ACCEPT] ${requestedBy} → "${song.title}" - queued`)
+    }
+
+    logActivity({ requestedBy, query, title: song.title, status: 'accepted', reason: null })
+
+    const state = getState()
+    const position = wasEmpty ? 0 : state.queue.length
+
+    return {
+      outcome: 'added',
+      response: {
+        message: wasEmpty ? `добавлено: ${song.title} - сейчас играет` : `добавлено: ${song.title} - позиция #${position}`,
+        song: item,
+        started: wasEmpty,
+        position,
+        state
+      }
+    }
+  } catch (error) {
+    log(`[REJECT] ${requestedBy} → error while adding song`)
+    const reason = error instanceof AppError ? error.message : 'ошибка сервера'
+    logActivity({ requestedBy, query, title: null, status: 'rejected', reason })
+    return { outcome: 'error', error }
+  }
 }

@@ -21,7 +21,6 @@ function dedupInFlight<T>(pending: Map<string, Promise<T>>, key: string, run: ()
   return request.finally(() => pending.delete(key))
 }
 
-/** Ключ версии фильтров - меняется при правке любого из полей, влияющих на isValidSong. Инвалидирует кэш при смене настроек. */
 function filtersVersion(): string {
   const c = getConfig()
   return `${c.minViews}:${c.minDurationSeconds}:${c.maxDurationSeconds}`
@@ -205,6 +204,11 @@ async function performPlaylistFetch(playlistId: string): Promise<Song[]> {
     return songs
   } catch (error) {
     console.error('[ERROR] Playlist fetch:', error instanceof Error ? error.message : error)
-    return []
+
+    if (error instanceof Error && error.message === 'YouTube API quota exceeded') {
+      throw new AppError('YOUTUBE_QUOTA', 'лимит YouTube API исчерпан')
+    }
+
+    throw new AppError('YOUTUBE_ERROR', 'не удалось загрузить плейлист с YouTube')
   }
 }

@@ -6,7 +6,7 @@ import { Config } from './types.js'
 const CONFIG_PATH = path.join('data', 'config.json')
 const store = createFileStore(CONFIG_PATH)
 
-const envDefaults: Config = {
+const configDefaults: Config = {
   minViews: 10000,
   minDurationSeconds: 60,
   maxDurationSeconds: 480,
@@ -24,16 +24,16 @@ function loadFromDisk(): Config | null {
   try {
     const raw = JSON.parse(readFileSync(CONFIG_PATH, 'utf8')) as Partial<Config>
     return {
-      ...envDefaults,
+      ...configDefaults,
       ...raw,
-      fallbackPlaylist: { ...envDefaults.fallbackPlaylist, ...raw.fallbackPlaylist }
+      fallbackPlaylist: { ...configDefaults.fallbackPlaylist, ...raw.fallbackPlaylist }
     }
   } catch {
     return null
   }
 }
 
-let config: Config = loadFromDisk() ?? { ...envDefaults }
+let config: Config = loadFromDisk() ?? { ...configDefaults }
 
 function saveConfig(): void {
   store.scheduleSave(
