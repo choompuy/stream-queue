@@ -57,16 +57,15 @@
     </header>
     <main>
       <section class="container page-tab active" data-page-tab="dashboard">
-        <div class="now-playing-empty hidden" id="noPlaying">Nothing playing</div>
-
-        <div class="now-playing-wrapper panel" id="nowPlaying">
+        <div class="now-playing-wrapper panel">
           <div class="player-wrapper">
             <div id="player"></div>
           </div>
 
           <div class="now-playing-main">
             <div class="now-playing-top">
-              <div class="now-playing-info">
+              <div class="now-playing-empty empty" id="noPlaying">Nothing playing</div>
+              <div class="now-playing-info hidden" id="nowPlaying">
                 <div class="text-lg text-bold" id="currentTitle"></div>
                 <div class="text-secondary text-md" id="currentChannel"></div>
                 <div class="text-muted text-sm"><span id="currentDuration"></span> ▪ <span id="currentViews"></span></div>
@@ -133,7 +132,7 @@
 
           <div class="section-panel section-panel-queue" data-section="queue">
             <div class="section-panel-header">
-              <h2>Queue <span class="text-sm text-secondary" id="queueCount">0</span></h2>
+              <h2>Queue <span class="text-sm text-secondary" id="queueCount">0/0</span></h2>
               <button id="clearQueueBtn" class="btn btn-secondary btn-danger" data-action="clear-queue">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                   <path
@@ -275,7 +274,7 @@
                 </div>
                 Show video
               </label>
-              
+
               <div class="field">
                 <label class="field-label" for="badgePosition">Badge position</label>
                 <select class="settings-input input select" id="badgePosition">

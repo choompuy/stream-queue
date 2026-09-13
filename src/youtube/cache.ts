@@ -1,11 +1,12 @@
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { createFileStore } from '../persist.js'
+import { CACHE_FILE, createFileStore } from '../persist.js'
 import { CacheFile, Song } from '../types.js'
 
-const DATA_DIR = join(process.cwd(), 'cache')
-const CACHE_FILE = join(DATA_DIR, 'youtube-cache.json')
-const store = createFileStore(CACHE_FILE)
+const store = createFileStore<CacheFile>(CACHE_FILE)
+const cache = store.load({
+  searches: {},
+  videos: {},
+  quota: { date: getQuotaDate(), searches: 0 }
+})
 
 export const CACHE_LIMITS = {
   VIDEO_CACHE_TTL: 10 * 60 * 1000,
@@ -23,43 +24,6 @@ function getQuotaDate(): string {
     day: '2-digit'
   }).format(new Date())
 }
-
-function createEmptyCache(): CacheFile {
-  return {
-    searches: {},
-    videos: {},
-    quota: { date: getQuotaDate(), searches: 0 }
-  }
-}
-
-function loadCache(): CacheFile {
-  try {
-    if (!existsSync(DATA_DIR)) {
-      mkdirSync(DATA_DIR, { recursive: true })
-    }
-
-    if (!existsSync(CACHE_FILE)) {
-      return createEmptyCache()
-    }
-
-    const raw = readFileSync(CACHE_FILE, 'utf8')
-    const data = JSON.parse(raw) as Partial<CacheFile>
-
-    return {
-      searches: data.searches ?? {},
-      videos: data.videos ?? {},
-      quota: {
-        date: data.quota?.date ?? getQuotaDate(),
-        searches: data.quota?.searches ?? 0
-      }
-    }
-  } catch (error) {
-    console.error('[CACHE] Failed to load cache:', error instanceof Error ? error.message : error)
-    return createEmptyCache()
-  }
-}
-
-let cache = loadCache()
 
 function saveCache(): void {
   store.scheduleSave(

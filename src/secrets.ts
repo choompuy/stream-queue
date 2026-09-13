@@ -1,23 +1,11 @@
-import fs from 'node:fs'
-import path from 'node:path'
-import { createFileStore } from './persist.js'
+import { SECRETS_PATH, createFileStore } from './persist.js'
 
 export type Secrets = {
   youtubeApiKey: string
 }
 
-const SECRETS_PATH = path.join('data', 'secrets.json')
-const store = createFileStore(SECRETS_PATH)
-
-function loadFromDisk(): Secrets | null {
-  try {
-    return JSON.parse(fs.readFileSync(SECRETS_PATH, 'utf-8'))
-  } catch {
-    return null
-  }
-}
-
-let secrets: Secrets = loadFromDisk() ?? { youtubeApiKey: '' }
+const store = createFileStore<Secrets>(SECRETS_PATH)
+let secrets: Secrets = store.load({ youtubeApiKey: '' })
 
 export function getSecrets(): Secrets {
   return { ...secrets }

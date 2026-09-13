@@ -2,6 +2,7 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  outline-offset: -2px;
 }
 
 body {
@@ -32,6 +33,10 @@ body {
 
 .text-blue {
   color: var(--accent-blue);
+}
+
+.text-red {
+  color: var(--accent-red);
 }
 
 .text-lg {

@@ -1,11 +1,8 @@
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
-
 import { getSettings, setSettings } from './settings.js'
 import { getConfig } from './config.js'
 import { getVideoById, searchSongs, selectBestSong } from './youtube/index.js'
 import { parseYouTubeUrl } from './youtube/url.js'
-import { createFileStore } from './persist.js'
+import { STATE_FILE, createFileStore } from './persist.js'
 import { logActivity } from './activity.js'
 import { Settings, QueueItem, Song, PlayerState, AppError, QueueRequestResponse } from './types.js'
 import { peekNextFallbackTrack, advanceFallback, getFallbackSnapshot, hydrateFallback, FallbackSnapshot } from './fallback.js'
@@ -17,9 +14,7 @@ type StateFile = {
   fallback: FallbackSnapshot
 }
 
-const DATA_DIR = join(process.cwd(), 'cache')
-const STATE_FILE = join(DATA_DIR, 'queue-state.json')
-const store = createFileStore(STATE_FILE)
+const store = createFileStore<Partial<StateFile>>(STATE_FILE)
 
 let currentSong: QueueItem | null = null
 const queue: QueueItem[] = []
@@ -32,23 +27,11 @@ function log(message: string): void {
   console.log(`[QUEUE] ${message}`)
 }
 
-function loadState(): void {
+async function loadState(): Promise<void> {
   try {
-    if (!existsSync(DATA_DIR)) {
-      mkdirSync(DATA_DIR, { recursive: true })
-    }
+    const data = store.load({})
 
-    if (!existsSync(STATE_FILE)) {
-      return
-    }
-
-    const raw = readFileSync(STATE_FILE, 'utf8')
-    const data = JSON.parse(raw) as Partial<StateFile>
-
-    if (data.current) {
-      currentSong = data.current
-    }
-
+    if (data.current) currentSong = data.current
     if (Array.isArray(data.queue)) {
       queue.length = 0
       queueVideoIds.clear()
@@ -60,9 +43,7 @@ function loadState(): void {
       }
     }
 
-    if (data.settings) {
-      setSettings(data.settings)
-    }
+    if (data.settings) setSettings(data.settings)
 
     hydrateFallback(data.fallback)
 

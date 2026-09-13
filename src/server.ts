@@ -1,7 +1,9 @@
 import express from 'express'
 import cors from 'cors'
-import open from 'open'
+import { exec } from 'node:child_process'
 import os from 'node:os'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import {
   StateResponse,
@@ -38,6 +40,8 @@ const app = express()
 const PORT = await findAvailablePort(3000)
 
 const LAN_HOSTNAME_PATTERN = /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[0-1])\.)/
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 app.use(
   cors({
@@ -59,7 +63,7 @@ app.use(
   })
 )
 app.use(express.json({ limit: '50kb' }))
-app.use(express.static('public'))
+app.use(express.static(path.join(__dirname, '../public')))
 
 function log(message: string) {
   console.log(`[SERVER] ${message}`)
@@ -82,7 +86,7 @@ app.get('/api/network-info', (_req, res) => {
 
 app.get('/preview', (_req, res) => {
   res.sendFile('preview.html', {
-    root: 'public'
+    root: path.join(__dirname, '../public')
   })
 })
 
@@ -371,11 +375,25 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   fail(res, 'внутренняя ошибка сервера', 'SERVER_ERROR', 500)
 })
 
+function openBrowser(url: string): void {
+  if (process.platform === 'win32') {
+    exec(`start "" "${url}"`)
+    return
+  }
+
+  if (process.platform === 'darwin') {
+    exec(`open "${url}"`)
+    return
+  }
+
+  exec(`xdg-open "${url}"`)
+}
+
 app.listen(PORT, async () => {
   log(`Server running on http://localhost:${PORT}`)
   await refreshFallback()
   if (!getState().current) {
     moveToNext()
   }
-  open(`http://localhost:${PORT}`).catch(() => {})
+  openBrowser(`http://localhost:${PORT}`)
 })

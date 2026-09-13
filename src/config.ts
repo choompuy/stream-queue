@@ -1,10 +1,5 @@
-import path from 'node:path'
-import { readFileSync } from 'node:fs'
-import { createFileStore } from './persist.js'
+import { CONFIG_PATH, createFileStore } from './persist.js'
 import { Config } from './types.js'
-
-const CONFIG_PATH = path.join('data', 'config.json')
-const store = createFileStore(CONFIG_PATH)
 
 const configDefaults: Config = {
   minViews: 10000,
@@ -20,20 +15,8 @@ const configDefaults: Config = {
   }
 }
 
-function loadFromDisk(): Config | null {
-  try {
-    const raw = JSON.parse(readFileSync(CONFIG_PATH, 'utf8')) as Partial<Config>
-    return {
-      ...configDefaults,
-      ...raw,
-      fallbackPlaylist: { ...configDefaults.fallbackPlaylist, ...raw.fallbackPlaylist }
-    }
-  } catch {
-    return null
-  }
-}
-
-let config: Config = loadFromDisk() ?? { ...configDefaults }
+const store = createFileStore<Config>(CONFIG_PATH)
+let config: Config = store.load(configDefaults)
 
 function saveConfig(): void {
   store.scheduleSave(

@@ -1,6 +1,4 @@
-import path from 'node:path'
-import { readFileSync } from 'node:fs'
-import { createFileStore } from './persist.js'
+import { PLAYLISTS_PATH, createFileStore } from './persist.js'
 
 export type SavedPlaylist = {
   id: string
@@ -10,19 +8,8 @@ export type SavedPlaylist = {
   addedAt: number
 }
 
-const PLAYLISTS_PATH = path.join('data', 'playlists.json')
-const store = createFileStore(PLAYLISTS_PATH)
-
-function loadFromDisk(): SavedPlaylist[] {
-  try {
-    const raw = JSON.parse(readFileSync(PLAYLISTS_PATH, 'utf8'))
-    return Array.isArray(raw) ? raw : []
-  } catch {
-    return []
-  }
-}
-
-let playlists: SavedPlaylist[] = loadFromDisk()
+const store = createFileStore<SavedPlaylist[]>(PLAYLISTS_PATH)
+let playlists: SavedPlaylist[] = store.load([])
 
 function save(): void {
   store.scheduleSave(

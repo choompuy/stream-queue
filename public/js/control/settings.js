@@ -117,6 +117,7 @@ export async function loadSecrets() {
   try {
     const data = await api.getSecrets()
     dom.secretsStatus.textContent = data.hasYoutubeApiKey ? 'YouTube API key is configured' : 'YouTube API key is not configured'
+    dom.secretsStatus.classList.toggle('text-red', !data.hasYoutubeApiKey)
   } catch (error) {
     log('Error loading secrets:', error)
   }
