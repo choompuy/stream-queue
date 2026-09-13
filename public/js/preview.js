@@ -1,3 +1,5 @@
+import { $, formatDuration, createLogger, getErrorMessage } from './shared.js'
+
 let player = null
 let currentState = null
 let isPlayerReady = false
@@ -116,7 +118,7 @@ async function notifyEnded() {
   }
 }
 
-function onPlayerReady(event) {
+function onPlayerReady() {
   log('Player ready')
   isPlayerReady = true
   fetchPreviewState()

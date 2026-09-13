@@ -20,7 +20,7 @@ async function request(url, options = {}) {
   return data
 }
 
-const api = {
+export const api = {
   getSettings: () => request('/api/settings'),
 
   updateSettings: (settings) =>

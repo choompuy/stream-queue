@@ -1,4 +1,4 @@
-function withLoading(button, action) {
+export function withLoading(button, action) {
   if (!button) return action()
 
   button.disabled = true
@@ -9,7 +9,7 @@ function withLoading(button, action) {
     })
 }
 
-function createListView(wrapper, { renderRow, getKey, cache = true }) {
+export function createListView(wrapper, { renderRow, getKey, cache = true }) {
   const list = wrapper?.querySelector('.row-list')
   const empty = wrapper?.querySelector('.empty')
 
@@ -64,15 +64,15 @@ function createListView(wrapper, { renderRow, getKey, cache = true }) {
   }
 }
 
-function setHidden(element, hidden) {
+export function setHidden(element, hidden) {
   element?.classList.toggle('hidden', hidden)
 }
 
-function toggleActive(element, active) {
+export function toggleActive(element, active) {
   element?.classList.toggle('active', Boolean(active))
 }
 
-function formatRelativeTime(timestamp) {
+export function formatRelativeTime(timestamp) {
   const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000))
   if (seconds < 60) return `${seconds}s ago`
 
@@ -83,7 +83,7 @@ function formatRelativeTime(timestamp) {
   return `${hours}h ago`
 }
 
-function formatDateTime(timestamp) {
+export function formatDateTime(timestamp) {
   if (!timestamp) return '-'
 
   return new Intl.DateTimeFormat('ru-RU', {
@@ -91,14 +91,5 @@ function formatDateTime(timestamp) {
     month: '2-digit',
     hour: '2-digit',
     minute: '2-digit'
-  }).format(new Date(timestamp))
-}
-
-function formatDate(timestamp) {
-  if (!timestamp) return '-'
-
-  return new Intl.DateTimeFormat('ru-RU', {
-    day: '2-digit',
-    month: '2-digit'
   }).format(new Date(timestamp))
 }

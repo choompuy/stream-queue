@@ -1,6 +1,6 @@
-const $ = (id) => document.getElementById(id)
+export const $ = (id) => document.getElementById(id)
 
-function escapeHtml(value) {
+export function escapeHtml(value) {
   return String(value).replace(
     /[&<>"']/g,
     (c) =>
@@ -14,19 +14,19 @@ function escapeHtml(value) {
   )
 }
 
-function formatDuration(seconds) {
+export function formatDuration(seconds) {
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
-function formatViews(views) {
+export function formatViews(views) {
   if (views >= 1000000) return `${(views / 1000000).toFixed(1)}M`
   if (views >= 1000) return `${(views / 1000).toFixed(1)}K`
   return views?.toString()
 }
 
-function createLogger(prefix) {
+export function createLogger(prefix) {
   return function (...args) {
     console.log(`[${prefix}]`, ...args)
   }
@@ -40,6 +40,6 @@ const errorMessages = {
   150: 'Embed not allowed'
 }
 
-function getErrorMessage(code) {
+export function getErrorMessage(code) {
   return errorMessages[code] || `Error code ${code}`
 }

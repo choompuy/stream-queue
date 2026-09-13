@@ -1,3 +1,7 @@
+import { escapeHtml, formatDuration } from '../shared.js'
+import { PLUS_ICON, PLAY_ICON, PAUSE_ICON, DELETE_ICON } from '../icons.js'
+import { createListView, formatRelativeTime } from './ui.js'
+
 function row({ index, thumbnail, title, subtitle, meta = '', extra = '', actions = '', className = '', attributes = '' }) {
   return `
     <div class="row-item ${className}" ${attributes}>
@@ -14,7 +18,7 @@ function row({ index, thumbnail, title, subtitle, meta = '', extra = '', actions
   `
 }
 
-function createViews(dom) {
+export function createViews(dom) {
   const search = createListView(dom.searchListWrapper, {
     cache: false,
     renderRow: (song) =>
@@ -64,11 +68,14 @@ function createViews(dom) {
       })
   })
 
+  const fallbackList = dom.fallbackListWrapper.querySelector('.row-list')
   const fallback = createListView(dom.fallbackListWrapper, {
-    getKey: (items) => items.map((item) => `${item.videoId}:${item.isPlayed}`).join('|'),
+    getKey: (items) => {
+      const activeId = fallbackList.dataset.activeVideoId || ''
+      return [activeId, ...items.map((item) => `${item.videoId}:${item.isPlayed}`)].join('|')
+    },
     renderRow: (track) => {
-      const item = dom.fallbackListWrapper.querySelector('.row-list')
-      const isActive = track.videoId === item.dataset.activeVideoId
+      const isActive = track.videoId === fallbackList.dataset.activeVideoId
       const rowClass = isActive ? 'row-active' : track.isPlayed ? 'row-played' : ''
 
       return row({

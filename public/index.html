@@ -74,12 +74,12 @@
               </div>
 
               <div class="now-playing-controls">
-                <button class="btn btn-lg btn-icon btn-primary" id="playPauseBtn" onclick="playPauseCurrent()" title="Pause">
+                <button class="btn btn-lg btn-icon btn-primary" id="playPauseBtn" data-action="play-pause" title="Pause">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
                     <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5v14m8-14v14" />
                   </svg>
                 </button>
-                <button class="btn btn-lg btn-icon btn-secondary" onclick="skipCurrent()" title="Skip">
+                <button class="btn btn-lg btn-icon btn-secondary" data-action="skip" title="Skip">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
                     <path
                       stroke="currentColor"
@@ -106,7 +106,7 @@
         <div class="song-search-wrapper panel section-panel">
           <div class="row">
             <input class="input" type="text" id="searchInput" placeholder="YouTube URL or search..." />
-            <button class="song-search-btn btn" id="searchBtn" onclick="search()">Search</button>
+            <button class="song-search-btn btn" id="searchBtn" data-action="search">Search</button>
           </div>
           <div class="error hidden" id="searchError"></div>
           <div class="row-list-wrapper hidden" id="searchListWrapper" data-list="search">
@@ -134,7 +134,7 @@
           <div class="section-panel section-panel-queue" data-section="queue">
             <div class="section-panel-header">
               <h2>Queue <span class="text-sm text-secondary" id="queueCount">0</span></h2>
-              <button id="clearQueueBtn" class="btn btn-secondary btn-danger" onclick="clearQueue()">
+              <button id="clearQueueBtn" class="btn btn-secondary btn-danger" data-action="clear-queue">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                   <path
                     stroke="currentColor"
@@ -161,7 +161,7 @@
                 <div id="fallbackInfo" class="text-sm text-secondary"></div>
               </div>
               <div class="section-panel-actions">
-                <button id="fallbackRefreshBtn" class="btn btn-icon btn-secondary" onclick="refreshFallback()" title="Refresh">
+                <button id="fallbackRefreshBtn" class="btn btn-icon btn-secondary" data-action="fallback-refresh" title="Refresh">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
                     <path
                       stroke="currentColor"
@@ -172,7 +172,7 @@
                     />
                   </svg>
                 </button>
-                <button id="fallbackShuffleBtn" class="btn btn-icon btn-secondary" onclick="toggleFallbackShuffle()" title="Shuffle">
+                <button id="fallbackShuffleBtn" class="btn btn-icon btn-secondary" data-action="fallback-shuffle" title="Shuffle">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
                     <path
                       stroke="currentColor"
@@ -183,7 +183,7 @@
                     />
                   </svg>
                 </button>
-                <button id="fallbackRepeatBtn" class="btn btn-icon btn-secondary" onclick="toggleFallbackRepeat()" title="Repeat">
+                <button id="fallbackRepeatBtn" class="btn btn-icon btn-secondary" data-action="fallback-repeat" title="Repeat">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
                     <path
                       stroke="currentColor"
@@ -194,7 +194,7 @@
                     />
                   </svg>
                 </button>
-                <button id="fallbackEnabledBtn" class="btn btn-secondary" onclick="toggleFallbackEnabled()" title="Enable playlist">
+                <button id="fallbackEnabledBtn" class="btn btn-secondary" data-action="fallback-enabled" title="Enable playlist">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
                     <path
                       stroke="currentColor"
@@ -217,7 +217,7 @@
           <div class="section-panel section-panel-recent hidden" data-section="recent">
             <div class="section-panel-header">
               <h2>Recent Activity</h2>
-              <button id="clearActivityBtn" class="btn btn-secondary btn-danger" onclick="clearActivity()">
+              <button id="clearActivityBtn" class="btn btn-secondary btn-danger" data-action="clear-activity">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                   <path
                     stroke="currentColor"
@@ -246,7 +246,7 @@
         <div class="playlist-add-wrapper panel section-panel flex-1">
           <div class="row">
             <input id="playlistUrlInput" class="input" type="text" placeholder="Paste YouTube playlist URL or ID..." />
-            <button id="playlistAddBtn" class="btn playlist-add-btn" onclick="addPlaylist()">Add</button>
+            <button id="playlistAddBtn" class="btn playlist-add-btn" data-action="add-playlist">Add</button>
           </div>
           <div class="error hidden" id="playlistError"></div>
           <div class="row-list-wrapper" id="playlistsListWrapper" data-list="playlists">
@@ -271,14 +271,14 @@
               <div class="settings-section" style="padding-top: 0">
                 <label class="row">
                   <div class="checkbox-wrapper">
-                    <input class="checkbox" type="checkbox" id="showVideo" onchange="savePreviewSettings()" />
+                    <input class="checkbox" type="checkbox" id="showVideo" />
                   </div>
                   Show video
                 </label>
 
                 <div class="field">
                   <label class="field-label" for="badgePosition">Badge position</label>
-                  <select class="input select" id="badgePosition" onchange="savePreviewSettings()">
+                  <select class="input select" id="badgePosition">
                     <option value="top-left">Top Left</option>
                     <option value="top-right">Top Right</option>
                     <option value="bottom-left">Bottom Left</option>
@@ -290,7 +290,7 @@
                   <label class="field-label">OBS Browser Source URL</label>
                   <div class="field-row">
                     <a class="input text-blue" id="previewUrl" href="/preview" target="_blank" rel="noopener noreferrer">/preview</a>
-                    <button class="btn btn-secondary btn-icon" onclick="copyPreviewUrl()" title="Copy">
+                    <button class="btn btn-secondary btn-icon" data-action="copy-preview-url" title="Copy">
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                         <path
                           stroke="currentColor"
@@ -303,9 +303,9 @@
                     </button>
                   </div>
                   <div class="field-row">
-                    <select class="input select hidden" id="selectIp" onchange="onIpChange()"></select>
+                    <select class="input select hidden" id="selectIp"></select>
 
-                    <button class="btn btn-secondary btn-icon" onclick="toggleQr()" title="QR code">
+                    <button class="btn btn-secondary btn-icon" data-action="toggle-qr" title="QR code">
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                         <path
                           fill="currentColor"
@@ -378,7 +378,7 @@
                 <div class="field-hint">Cooldowns and per-user rate limits are handled in Streamer.bot, not here.</div>
               </div>
 
-              <button id="saveConfigSettingBtn" class="btn btn-primary" onclick="saveConfigSetting()">Save settings</button>
+              <button id="saveConfigSettingBtn" class="btn btn-primary" data-action="save-config">Save settings</button>
             </div>
           </div>
         </div>
@@ -388,12 +388,6 @@
     <script src="https://www.youtube.com/iframe_api"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-    <script src="js/icons.js"></script>
-    <script src="js/shared.js"></script>
-
-    <script src="js/control/api.js"></script>
-    <script src="js/control/ui.js"></script>
-    <script src="js/control/views.js"></script>
-    <script src="js/control/index.js"></script>
+    <script type="module" src="js/control/index.js"></script>
   </body>
 </html>
