@@ -2,7 +2,8 @@ import { Settings } from './types.js'
 
 const defaultSettings: Settings = {
   showVideo: false,
-  position: 'bottom-right'
+  position: 'bottom-right',
+  locale: 'ru'
 }
 
 let currentSettings: Settings = { ...defaultSettings }
@@ -21,6 +22,15 @@ export function updateSettings(updates: Partial<Settings>): Settings {
   const validPositions: Settings['position'][] = ['top-left', 'top-right', 'bottom-left', 'bottom-right']
   if (typeof updates.position === 'string' && validPositions.includes(updates.position as Settings['position'])) {
     next.position = updates.position as Settings['position']
+  }
+
+  const validLocales: Settings['locale'][] = ['ru', 'en']
+  if (typeof updates.locale === 'string' && validLocales.includes(updates.locale as Settings['locale'])) {
+    next.locale = updates.locale as Settings['locale']
+  }
+
+  if (!next.locale) {
+    next.locale = 'ru'
   }
 
   currentSettings = next

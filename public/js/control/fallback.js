@@ -2,6 +2,7 @@ import { api } from './api.js'
 import { state, dom, views, log, renderStats } from './state.js'
 import { toggleActive, formatDateTime, withLoading } from './ui.js'
 import { refreshState } from './queue.js'
+import { t } from '../i18n.js'
 
 export async function refreshFallbackState() {
   try {
@@ -23,7 +24,7 @@ export function renderFallback() {
   toggleActive(dom.fallbackShuffleBtn, data?.shuffle)
   toggleActive(dom.fallbackRepeatBtn, data?.repeat)
   toggleActive(dom.fallbackEnabledBtn, data?.enabled)
-  dom.fallbackEnabledText.textContent = data?.enabled ? 'Off' : 'On'
+  dom.fallbackEnabledText.textContent = data?.enabled ? t('common.on') : t('common.off')
 
   if (!tracks.length) {
     dom.fallbackInfo.textContent = ''
@@ -32,7 +33,10 @@ export function renderFallback() {
     return
   }
 
-  dom.fallbackInfo.textContent = `${tracks.length} tracks ▪ updated ${formatDateTime(data.lastRefreshedAt)}`
+  dom.fallbackInfo.textContent = t('fallback.info', { 
+    count: tracks.length, 
+    datetime: formatDateTime(data.lastRefreshedAt) 
+  })
   views.fallback.render(tracks)
   scrollToActiveFallback()
   renderStats()

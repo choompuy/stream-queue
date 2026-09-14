@@ -3,6 +3,7 @@ import { dom, views, log } from './state.js'
 import { withLoading } from './ui.js'
 import { refreshState } from './queue.js'
 import { loadActivity } from './activity.js'
+import { t } from '../i18n.js'
 
 const YOUTUBE_URL_HINT = /(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com|youtube-nocookie\.com|youtu\.be)\//
 
@@ -39,7 +40,7 @@ export async function search() {
       dom.searchListWrapper.classList.remove('hidden')
     } catch (error) {
       log('Search error:', error)
-      showSearchError(error.message || 'Error searching')
+      showSearchError(error.message || t('search.errorSearching'))
     }
   })
 }
@@ -51,7 +52,7 @@ export async function addSong(query) {
     await loadActivity()
   } catch (error) {
     log('Error adding song:', error)
-    showSearchError(error.message || 'Error adding video')
+    showSearchError(error.message || t('search.errorAdding'))
     await loadActivity()
   }
 }

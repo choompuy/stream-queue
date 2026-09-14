@@ -3,6 +3,7 @@ import { state, dom, views, log, renderStats } from './state.js'
 import { withLoading } from './ui.js'
 import { renderCurrent, renderNext, renderPlayPause, syncPlayer } from './player.js'
 import { refreshFallbackState } from './fallback.js'
+import { t } from '../i18n.js'
 
 export async function refreshState() {
   try {
@@ -48,7 +49,7 @@ export async function removeFromQueue(index) {
 }
 
 export async function clearQueue() {
-  if (!confirm('Clear entire queue?')) return
+  if (!confirm(t('queue.clearConfirm'))) return
 
   await withLoading(dom.clearQueueBtn, async () => {
     try {

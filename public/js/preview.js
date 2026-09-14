@@ -1,4 +1,5 @@
 import { $, formatDuration, createLogger, getErrorMessage } from './shared.js'
+import { initI18n, t, getCurrentLocale, updateDomTranslations } from './i18n.js'
 
 let player = null
 let currentState = null
@@ -30,6 +31,14 @@ async function fetchPreviewState() {
     const response = await fetch('/api/preview-state')
     const data = await response.json()
     settings = data.settings
+    
+    const serverLocale = settings.locale || 'ru'
+    const currentLocale = getCurrentLocale()
+    if (serverLocale !== currentLocale) {
+      await initI18n()
+      updateDomTranslations()
+    }
+    
     renderState(data.state)
   } catch (error) {
     log('Error fetching settings:', error)
@@ -137,7 +146,7 @@ function onPlayerStateChange(event) {
 }
 
 function onPlayerError(event) {
-  const message = getErrorMessage(event.data)
+  const message = getErrorMessage(event.data, t || ((key) => key))
   log(`Player error: ${message}`)
 
   if (!isTransitioning) {
@@ -185,6 +194,14 @@ if (isPlaybackSource) {
   log('Non-localhost origin: read-only widget, no embedded player')
   dom.playerWrapper.classList.add('hidden')
 }
+
+async function init() {
+  await initI18n()
+  updateDomTranslations()
+  fetchPreviewState()
+}
+
+init()
 
 setInterval(() => {
   fetchPreviewState()

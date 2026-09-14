@@ -57,7 +57,7 @@ function buildOrder(tracks: Song[], shuffleOn: boolean, currentVideoId: string |
 function toFallbackQueueItem(song: Song): QueueItem {
   return {
     ...song,
-    requestedBy: 'Jam',
+    requestedBy: 'Playlist',
     isFallback: true
   }
 }
@@ -229,7 +229,7 @@ export function queueFallbackTrack(videoId: string): QueueItem | null {
   const song = findTrack(videoId)
   if (!song) return null
 
-  return addSong(song, 'Jam', true, true)
+  return addSong(song, 'Playlist', true, true)
 }
 
 export function getFallbackSnapshot(): FallbackSnapshot {

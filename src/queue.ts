@@ -43,7 +43,10 @@ async function loadState(): Promise<void> {
       }
     }
 
-    if (data.settings) setSettings(data.settings)
+    if (data.settings) {
+      const settingsWithLocale = { ...data.settings, locale: data.settings.locale || 'ru' }
+      setSettings(settingsWithLocale)
+    }
 
     hydrateFallback(data.fallback)
 

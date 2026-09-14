@@ -1,0 +1,180 @@
+{
+  "common": {
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "delete": "Удалить",
+    "remove": "Удалить",
+    "clear": "Очистить",
+    "close": "Закрыть",
+    "back": "Назад",
+    "add": "Добавить",
+    "search": "Поиск",
+    "settings": "Настройки",
+    "loading": "Загрузка...",
+    "error": "Ошибка",
+    "success": "Успешно",
+    "confirm": "Подтвердить",
+    "yes": "Да",
+    "no": "Нет",
+    "copy": "Копировать",
+    "refresh": "Обновить",
+    "enabled": "Вкл",
+    "disabled": "Выкл",
+    "on": "Вкл",
+    "off": "Выкл",
+    "play": "Воспроизвести",
+    "pause": "Пауза",
+    "resume": "Продолжить",
+    "skip": "Пропустить",
+    "shuffle": "Перемешать",
+    "repeat": "Повтор",
+    "next": "Следующий",
+    "previous": "Предыдущий"
+  },
+  "nav": {
+    "dashboard": "Панель",
+    "playlists": "Плейлисты",
+    "settings": "Настройки"
+  },
+  "nowPlaying": {
+    "nothingPlaying": "Ничего не воспроизводится",
+    "pause": "Пауза",
+    "resume": "Продолжить",
+    "skip": "Пропустить",
+    "next": "СЛЕД."
+  },
+  "search": {
+    "placeholder": "Ссылка на YouTube или поиск...",
+    "searchBtn": "Поиск",
+    "noResults": "Ничего не найдено",
+    "addToQueue": "Добавить в очередь",
+    "errorSearching": "Ошибка при поиске",
+    "errorAdding": "Ошибка при добавлении видео"
+  },
+  "queue": {
+    "title": "Очередь",
+    "empty": "Очередь пуста",
+    "remove": "Удалить из очереди",
+    "clear": "Очистить",
+    "clearConfirm": "Очистить всю очередь?",
+    "count": "{{current}}/{{max}}"
+  },
+  "fallback": {
+    "title": "Плейлист",
+    "empty": "Плейлист пуст",
+    "refresh": "Обновить",
+    "shuffle": "Перемешать",
+    "repeat": "Повтор",
+    "enable": "Включить плейлист",
+    "info": "{{count}} треков ▪ обновлено {{datetime}}",
+    "addToQueue": "Добавить в очередь",
+    "playNow": "Воспроизвести сейчас"
+  },
+  "activity": {
+    "title": "Активность",
+    "empty": "Нет запросов",
+    "clear": "Очистить",
+    "clearConfirm": "Очистить активность?",
+    "accepted": "Принято",
+    "rejected": "Отклонено"
+  },
+  "playlists": {
+    "title": "Плейлисты",
+    "addPlaceholder": "Вставьте ссылку на плейлист YouTube или ID...",
+    "addBtn": "Добавить",
+    "errorAdding": "Ошибка при добавлении плейлиста",
+    "empty": {
+      "title": "Нет сохранённых плейлистов",
+      "description": "Добавьте плейлист YouTube выше, затем активируйте его для использования в ротации."
+    },
+    "tracks": "{{count}} треков",
+    "activate": "Воспроизвести плейлист",
+    "pause": "Пауза плейлиста",
+    "delete": "Удалить плейлист",
+    "deleteConfirm": "Удалить этот плейлист?"
+  },
+  "settings": {
+    "title": "Настройки",
+    "preview": {
+      "title": "Превью",
+      "showVideo": "Показывать видео",
+      "badgePosition": "Позиция бейджа",
+      "positionTopLeft": "Слева вверху",
+      "positionTopRight": "Справа вверху",
+      "positionBottomLeft": "Слева внизу",
+      "positionBottomRight": "Справа внизу",
+      "obsUrl": "OBS Browser Source URL",
+      "copy": "Копировать",
+      "qrCode": "QR-код",
+      "ipSelector": "Выбор IP",
+      "obsSize": "Рекомендуемый размер источника OBS: Ширина: 360, Высота: 270"
+    },
+    "bot": {
+      "title": "Настройки бота",
+      "apiKey": "API ключ",
+      "apiKeyPlaceholder": "оставьте пустым, чтобы не менять",
+      "apiKeyConfigured": "YouTube API ключ настроен",
+      "apiKeyNotConfigured": "YouTube API ключ не настроен",
+      "limits": {
+        "minViews": "Мин. просмотров",
+        "minDuration": "Мин. длительность (сек)",
+        "maxDuration": "Макс. длительность (сек)",
+        "maxQueue": "Макс. размер очереди",
+        "maxPerUser": "Макс. запросов на пользователя"
+      },
+      "rateLimitNote": "Кулдауны и лимиты на пользователя обрабатываются в Streamer.bot, а не здесь.",
+      "save": "Сохранить настройки"
+    },
+    "language": {
+      "title": "Язык",
+      "description": "Выберите язык интерфейса"
+    },
+    "about": {
+      "title": "О приложении",
+      "description": "Локальное управление музыкальными запросами для стримеров",
+      "developedBy": "Разработано"
+    }
+  },
+  "player": {
+    "error": {
+      "invalidParameter": "Неверный параметр",
+      "html5Error": "Ошибка HTML5 плеера",
+      "videoNotFound": "Видео не найдено",
+      "embedNotAllowed": "Встраивание не разрешено",
+      "errorCode": "Код ошибки {{code}}"
+    }
+  },
+  "api": {
+    "errors": {
+      "invalidPlaylistId": "Некорректный ID или ссылка на плейлист",
+      "playlistNotFound": "Плейлист не найден",
+      "playlistLoadFailed": "Не удалось загрузить плейлист, проверьте ID",
+      "invalidQuery": "Запрос должен содержать минимум 2 символа",
+      "invalidQueryRange": "Запрос должен быть от 2 до 200 символов",
+      "invalidYoutubeUrl": "Некорректная ссылка на YouTube",
+      "songNotFound": "Не удалось найти подходящий трек",
+      "usernameRequired": "Имя пользователя обязательно",
+      "invalidIndex": "Некорректный индекс",
+      "queueItemNotFound": "Элемент очереди не найден",
+      "trackNotFound": "Трек не найден в fallback",
+      "serverError": "Внутренняя ошибка сервера",
+      "notFound": "Не найдено"
+    }
+  },
+  "time": {
+    "secondsAgo": "{{count}}с назад",
+    "minutesAgo": "{{count}}м назад",
+    "hoursAgo": "{{count}}ч назад",
+    "daysAgo": "{{count}}д назад"
+  },
+  "requests": {
+    "one": "запрос",
+    "few": "запроса",
+    "many": "запросов"
+  },
+  "tracks": {
+    "one": "трек",
+    "few": "трека",
+    "many": "треков"
+  }
+}

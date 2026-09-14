@@ -49,9 +49,10 @@ main {
   display: flex;
 }
 
+a,
 button,
 input,
-a {
+select {
   font: inherit;
 }
 
@@ -289,6 +290,8 @@ a {
   padding-inline: 1rem;
   gap: 1rem;
   border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .section-tab {
@@ -494,7 +497,7 @@ a {
   border-style: none solid none solid;
 }
 
-.section-panel-recent .row-item {
+.section-panel-activity .row-item {
   padding-left: 1rem;
 }
 
@@ -561,6 +564,7 @@ a {
 }
 
 .settings-input {
+  margin-top: auto;
   border-color: var(--border);
 }
 

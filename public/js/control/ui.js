@@ -1,3 +1,5 @@
+import { t } from '../i18n.js'
+
 export function withLoading(button, action) {
   if (!button) return action()
 
@@ -74,19 +76,20 @@ export function toggleActive(element, active) {
 
 export function formatRelativeTime(timestamp) {
   const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000))
-  if (seconds < 60) return `${seconds}s ago`
+  if (seconds < 60) return t('time.secondsAgo', { count: seconds })
 
   const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
+  if (minutes < 60) return t('time.minutesAgo', { count: minutes })
 
   const hours = Math.floor(minutes / 60)
-  return `${hours}h ago`
+  return t('time.hoursAgo', { count: hours })
 }
 
 export function formatDateTime(timestamp) {
   if (!timestamp) return '-'
-
-  return new Intl.DateTimeFormat('ru-RU', {
+  
+  const locale = document.documentElement.lang || 'ru'
+  return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',

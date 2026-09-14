@@ -1,0 +1,180 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "remove": "Remove",
+    "clear": "Clear",
+    "close": "Close",
+    "back": "Back",
+    "add": "Add",
+    "search": "Search",
+    "settings": "Settings",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "copy": "Copy",
+    "refresh": "Refresh",
+    "enabled": "On",
+    "disabled": "Off",
+    "on": "On",
+    "off": "Off",
+    "play": "Play",
+    "pause": "Pause",
+    "resume": "Resume",
+    "skip": "Skip",
+    "shuffle": "Shuffle",
+    "repeat": "Repeat",
+    "next": "Next",
+    "previous": "Previous"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "playlists": "Playlists",
+    "settings": "Settings"
+  },
+  "nowPlaying": {
+    "nothingPlaying": "Nothing playing",
+    "pause": "Pause",
+    "resume": "Resume",
+    "skip": "Skip",
+    "next": "NEXT"
+  },
+  "search": {
+    "placeholder": "YouTube URL or search...",
+    "searchBtn": "Search",
+    "noResults": "No results found",
+    "addToQueue": "Add to queue",
+    "errorSearching": "Error searching",
+    "errorAdding": "Error adding video"
+  },
+  "queue": {
+    "title": "Queue",
+    "empty": "Queue is empty",
+    "remove": "Remove from queue",
+    "clear": "Clear",
+    "clearConfirm": "Clear entire queue?",
+    "count": "{{current}}/{{max}}"
+  },
+  "fallback": {
+    "title": "Playlist",
+    "empty": "Playlist is empty",
+    "refresh": "Refresh",
+    "shuffle": "Shuffle",
+    "repeat": "Repeat",
+    "enable": "Enable playlist",
+    "info": "{{count}} tracks ▪ updated {{datetime}}",
+    "addToQueue": "Add to queue",
+    "playNow": "Play now"
+  },
+  "activity": {
+    "title": "Activity",
+    "empty": "No requests yet",
+    "clear": "Clear",
+    "clearConfirm": "Clear Activity?",
+    "accepted": "accepted",
+    "rejected": "rejected"
+  },
+  "playlists": {
+    "title": "Playlists",
+    "addPlaceholder": "Paste YouTube playlist URL or ID...",
+    "addBtn": "Add",
+    "errorAdding": "Error adding playlist",
+    "empty": {
+      "title": "No saved playlists yet",
+      "description": "Add a YouTube playlist above, then activate it to use as your fallback rotation."
+    },
+    "tracks": "{{count}} tracks",
+    "activate": "Play playlist",
+    "pause": "Pause playlist",
+    "delete": "Delete playlist",
+    "deleteConfirm": "Remove this playlist?"
+  },
+  "settings": {
+    "title": "Settings",
+    "preview": {
+      "title": "Preview",
+      "showVideo": "Show video",
+      "badgePosition": "Badge position",
+      "positionTopLeft": "Top Left",
+      "positionTopRight": "Top Right",
+      "positionBottomLeft": "Bottom Left",
+      "positionBottomRight": "Bottom Right",
+      "obsUrl": "OBS Browser Source URL",
+      "copy": "Copy",
+      "qrCode": "QR code",
+      "ipSelector": "IP selector",
+      "obsSize": "Recommended OBS source size: Width: 360, Height: 270"
+    },
+    "bot": {
+      "title": "Bot Settings",
+      "apiKey": "API Key",
+      "apiKeyPlaceholder": "leave empty to keep unchanged",
+      "apiKeyConfigured": "YouTube API key is configured",
+      "apiKeyNotConfigured": "YouTube API key is not configured",
+      "limits": {
+        "minViews": "Min views",
+        "minDuration": "Min duration (sec)",
+        "maxDuration": "Max duration (sec)",
+        "maxQueue": "Max queue size",
+        "maxPerUser": "Max requests per user"
+      },
+      "rateLimitNote": "Cooldowns and per-user rate limits are handled in Streamer.bot, not here.",
+      "save": "Save settings"
+    },
+    "language": {
+      "title": "Language",
+      "description": "Select interface language"
+    },
+    "about": {
+      "title": "About",
+      "description": "Local music request manager for streamers",
+      "developedBy": "Developed by"
+    }
+  },
+  "player": {
+    "error": {
+      "invalidParameter": "Invalid parameter",
+      "html5Error": "HTML5 player error",
+      "videoNotFound": "Video not found",
+      "embedNotAllowed": "Embed not allowed",
+      "errorCode": "Error code {{code}}"
+    }
+  },
+  "api": {
+    "errors": {
+      "invalidPlaylistId": "Invalid playlist ID or URL",
+      "playlistNotFound": "Playlist not found",
+      "playlistLoadFailed": "Failed to load playlist, check the ID",
+      "invalidQuery": "Query must be at least 2 characters",
+      "invalidQueryRange": "Query must be between 2 and 200 characters",
+      "invalidYoutubeUrl": "Invalid YouTube URL",
+      "songNotFound": "Could not find a suitable track",
+      "usernameRequired": "Username is required",
+      "invalidIndex": "Invalid index",
+      "queueItemNotFound": "Queue item not found",
+      "trackNotFound": "Track not found in fallback",
+      "serverError": "Internal server error",
+      "notFound": "Not found"
+    }
+  },
+  "time": {
+    "secondsAgo": "{{count}}s ago",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago"
+  },
+  "requests": {
+    "one": "request",
+    "few": "requests",
+    "many": "requests"
+  },
+  "tracks": {
+    "one": "track",
+    "few": "tracks",
+    "many": "tracks"
+  }
+}

@@ -41,12 +41,12 @@ body {
 
 .text-lg {
   font-size: 1.25rem;
-  line-height: 1.75;
+  line-height: 1.5;
 }
 
 .text-md {
   font-size: 1rem;
-  line-height: 1.5;
+  line-height: 1.375;
 }
 
 .text-sm {

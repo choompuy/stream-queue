@@ -1,6 +1,7 @@
 import { escapeHtml, formatDuration } from '../shared.js'
 import { PLUS_ICON, PLAY_ICON, PAUSE_ICON, DELETE_ICON } from '../icons.js'
 import { createListView, formatRelativeTime } from './ui.js'
+import { t } from '../i18n.js'
 
 function row({ index, thumbnail, title, subtitle, meta = '', extra = '', actions = '', className = '', attributes = '' }) {
   return `
@@ -32,7 +33,7 @@ export function createViews(dom) {
             class="btn btn-sm btn-icon"
             data-action="search-add"
             data-video-id="${escapeHtml(song.videoId)}"
-            title="Add to queue"
+            title="${t('search.addToQueue')}"
           >
             ${PLUS_ICON()}
           </button>
@@ -59,7 +60,7 @@ export function createViews(dom) {
             class="btn btn-sm btn-icon"
             data-action="queue-remove"
             data-index="${index}"
-            title="Remove from queue"
+            title="${t('queue.remove')}"
           >
             ${DELETE_ICON()}
           </button>
@@ -90,7 +91,7 @@ export function createViews(dom) {
             class="btn btn-sm btn-icon"
             data-action="fallback-enqueue"
             data-video-id="${escapeHtml(track.videoId)}"
-            title="Add to queue"
+            title="${t('fallback.addToQueue')}"
           >
             ${PLUS_ICON()}
           </button>
@@ -99,7 +100,7 @@ export function createViews(dom) {
             class="btn btn-sm btn-icon"
             data-action="fallback-play"
             data-video-id="${escapeHtml(track.videoId)}"
-            title="Play now"
+            title="${t('fallback.playNow')}"
           >
             ${PLAY_ICON()}
           </button>
@@ -117,6 +118,7 @@ export function createViews(dom) {
     },
     renderRow: (entry) => {
       const title = entry.title || entry.query
+      const statusKey = entry.status === 'accepted' ? 'activity.accepted' : 'activity.rejected'
       return row({
         title,
         subtitle: entry.reason || '',
@@ -128,7 +130,7 @@ export function createViews(dom) {
             @${escapeHtml(entry.requestedBy)}
           </div>
           <span class="text-xs text-bold status-pill ${escapeHtml(entry.status)}">
-            ${escapeHtml(entry.status)}
+            ${t(statusKey)}
           </span>
         `
       })
@@ -149,13 +151,13 @@ export function createViews(dom) {
         className: isActive ? 'row-active' : '',
         thumbnail: playlist.thumbnail,
         title: playlist.title,
-        subtitle: `${playlist.itemCount} tracks`,
+        subtitle: t('playlists.tracks', { count: playlist.itemCount }),
         actions: `
           <button
             class="btn btn-sm btn-icon btn-secondary ${isActive ? 'active' : ''}"
             data-action="playlist-activate"
             data-id="${escapeHtml(playlist.id)}"
-            title="${isActive ? 'Pause playlist' : 'Play playlist'}"
+            title="${isActive ? t('playlists.pause') : t('playlists.activate')}"
           >
             ${isActive ? PAUSE_ICON() : PLAY_ICON()}
           </button>
@@ -163,7 +165,7 @@ export function createViews(dom) {
             class="btn btn-sm btn-icon btn-secondary btn-danger"
             data-action="playlist-delete"
             data-id="${escapeHtml(playlist.id)}"
-            title="Delete playlist"
+            title="${t('playlists.delete')}"
           >
             ${DELETE_ICON()}
           </button>

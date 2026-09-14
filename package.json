@@ -1,12 +1,17 @@
 {
-  "name": "twitch-song-request",
+  "name": "stream-queue",
+  "author": "choompuy",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/choompuy/stream-queue"
+  },
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "tsx src/server.ts",
     "start": "tsx src/server.ts",
     "build": "tsc",
-    "build:exe": "npm run build && pkg . --targets node22-win-x64 --output dist/twitch-song-request.exe"
+    "build:exe": "npm run build && pkg . --targets node22-win-x64 --output dist/stream-queue.exe"
   },
   "dependencies": {
     "cors": "^2.8.5",

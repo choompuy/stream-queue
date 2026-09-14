@@ -1,6 +1,7 @@
 import { api } from './api.js'
 import { state, views, dom, log, renderStats } from './state.js'
 import { withLoading } from './ui.js'
+import { t } from '../i18n.js'
 
 export async function loadActivity() {
   try {
@@ -14,7 +15,7 @@ export async function loadActivity() {
 }
 
 export async function clearActivity() {
-  if (!confirm('Clear recent activity?')) return
+  if (!confirm(t('activity.clearConfirm'))) return
 
   await withLoading(dom.clearActivityBtn, async () => {
     try {

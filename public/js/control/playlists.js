@@ -2,6 +2,7 @@ import { api } from './api.js'
 import { state, dom, views, log } from './state.js'
 import { withLoading } from './ui.js'
 import { refreshFallbackState } from './fallback.js'
+import { t } from '../i18n.js'
 
 export async function loadPlaylists() {
   try {
@@ -31,7 +32,7 @@ export async function addPlaylist() {
     try {
       const result = await api.addPlaylist(value)
       if (!result.success) {
-        dom.playlistError.textContent = result.error || 'Error adding playlist'
+        dom.playlistError.textContent = result.error || t('playlists.errorAdding')
         dom.playlistError.classList.remove('hidden')
         return
       }
@@ -39,7 +40,7 @@ export async function addPlaylist() {
       dom.playlistUrlInput.value = ''
       await loadPlaylists()
     } catch (error) {
-      dom.playlistError.textContent = error.message || 'Error adding playlist'
+      dom.playlistError.textContent = error.message || t('playlists.errorAdding')
       dom.playlistError.classList.remove('hidden')
     }
   })
@@ -56,7 +57,7 @@ export async function activatePlaylist(id) {
 }
 
 export async function deletePlaylist(id) {
-  if (!confirm('Remove this playlist?')) return
+  if (!confirm(t('playlists.deleteConfirm'))) return
 
   try {
     const result = await api.removePlaylist(id)

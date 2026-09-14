@@ -13,7 +13,7 @@ import {
 } from './fallback.js'
 import { addPlaylist, activatePlaylist, deletePlaylist } from './playlists.js'
 import { clearActivity } from './activity.js'
-import { savePreviewSettings, copyPreviewUrl, onIpChange, toggleQr, saveConfigSetting } from './settings.js'
+import { savePreviewSettings, copyPreviewUrl, onIpChange, toggleQr, saveConfigSetting, changeLocale } from './settings.js'
 
 const ACTIONS = {
   'play-pause': playPauseCurrent,
@@ -69,4 +69,5 @@ export function bindEvents() {
   dom.showVideo?.addEventListener('change', savePreviewSettings)
   dom.badgePosition?.addEventListener('change', savePreviewSettings)
   dom.selectIp?.addEventListener('change', onIpChange)
+  dom.localeSelect?.addEventListener('change', (e) => changeLocale(e.target.value))
 }

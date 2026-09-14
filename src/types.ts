@@ -27,6 +27,7 @@ export type FallbackPlaylist = {
 export type Settings = {
   showVideo: boolean
   position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+  locale: 'ru' | 'en'
 }
 
 export type Song = {

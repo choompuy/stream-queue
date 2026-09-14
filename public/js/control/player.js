@@ -4,6 +4,7 @@ import { api } from './api.js'
 import { state, dom, log } from './state.js'
 import { setHidden } from './ui.js'
 import { refreshState } from './queue.js'
+import { t } from '../i18n.js'
 
 let player = null
 let playerReady = false
@@ -24,7 +25,7 @@ export function renderCurrent() {
   dom.currentChannel.textContent = current.channelTitle
   dom.currentDuration.textContent = formatDuration(current.duration)
   dom.currentViews.textContent = `${formatViews(current.views)} views`
-  dom.currentRequester.textContent = current.requestedBy
+  dom.currentRequester.textContent = `@${current.requestedBy}`
 }
 
 export function renderNext() {
@@ -37,8 +38,8 @@ export function renderNext() {
 }
 
 export function renderPlayPause() {
-  dom.playPauseBtn.title = state.isPaused ? 'Resume' : 'Pause'
-  dom.playPauseBtn.innerHTML = state.isPaused ? PLAY_ICON() : PAUSE_ICON()
+  dom.playPauseBtn.title = state.isPaused ? t('nowPlaying.resume') : t('nowPlaying.pause')
+  dom.playPauseBtn.innerHTML = state.isPaused ? PLAY_ICON(24) : PAUSE_ICON(24)
 }
 
 export function syncPlayer() {
@@ -85,7 +86,7 @@ function onPlayerReady() {
 }
 
 function onPlayerError(event) {
-  log(`Player error: ${getErrorMessage(event.data)}`)
+  log(`Player error: ${getErrorMessage(event.data, t)}`)
 }
 
 window.onYouTubeIframeAPIReady = () => {

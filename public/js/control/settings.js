@@ -4,6 +4,31 @@ import { state, dom, log, CONFIG_FIELDS } from './state.js'
 import { syncPlayer } from './player.js'
 import { renderQueue } from './queue.js'
 import { renderPlaylists } from './playlists.js'
+import { setLocale, getCurrentLocale, updateDomTranslations, t } from '../i18n.js'
+
+export async function syncLocaleFromServer() {
+  try {
+    const data = await api.getLocale()
+    const serverLocale = data.locale || 'ru'
+    const currentLocale = getCurrentLocale()
+
+    if (serverLocale !== currentLocale) {
+      await setLocale(serverLocale)
+    }
+  } catch (error) {
+    log('Error syncing locale from server:', error)
+  }
+}
+
+export async function changeLocale(locale) {
+  try {
+    await api.updateLocale(locale)
+    await setLocale(locale)
+    updateDomTranslations()
+  } catch (error) {
+    log('Error changing locale:', error)
+  }
+}
 
 export async function loadPreviewSettings() {
   try {
@@ -11,6 +36,7 @@ export async function loadPreviewSettings() {
 
     if (dom.showVideo) dom.showVideo.checked = Boolean(state.settings.showVideo)
     if (dom.badgePosition) dom.badgePosition.value = state.settings.position || 'bottom-right'
+    if (dom.localeSelect) dom.localeSelect.value = state.settings.locale || 'ru'
   } catch (error) {
     log('Error loading settings:', error)
   }
@@ -116,7 +142,9 @@ export async function loadConfig() {
 export async function loadSecrets() {
   try {
     const data = await api.getSecrets()
-    dom.secretsStatus.textContent = data.hasYoutubeApiKey ? 'YouTube API key is configured' : 'YouTube API key is not configured'
+    const key = data.hasYoutubeApiKey ? 'settings.bot.apiKeyConfigured' : 'settings.bot.apiKeyNotConfigured'
+    dom.secretsStatus.textContent = t(key)
+    dom.secretsStatus.setAttribute('data-i18n', key)
     dom.secretsStatus.classList.toggle('text-red', !data.hasYoutubeApiKey)
   } catch (error) {
     log('Error loading secrets:', error)

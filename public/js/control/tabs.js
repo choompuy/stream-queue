@@ -30,7 +30,7 @@ export function switchSection(sectionName) {
 
   wrapper.querySelectorAll('.section-panel').forEach((el) => {
     el.classList.toggle('hidden', el.dataset.section !== sectionName)
-    if (el.dataset.section === 'jam') scrollToActiveFallback()
+    if (el.dataset.section === 'playlist') scrollToActiveFallback()
   })
   wrapper.querySelectorAll('.section-tab').forEach((el) => {
     el.classList.toggle('active', el.dataset.sectionTarget === sectionName)

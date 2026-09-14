@@ -29,6 +29,14 @@ export const api = {
       body: JSON.stringify(settings)
     }),
 
+  getLocale: () => request('/api/locale'),
+
+  updateLocale: (locale) =>
+    request('/api/locale', {
+      method: 'PUT',
+      body: JSON.stringify({ locale })
+    }),
+
   getConfig: () => request('/api/config'),
 
   updateConfig: (config) =>

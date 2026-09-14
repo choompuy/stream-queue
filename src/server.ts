@@ -108,6 +108,23 @@ app.get('/api/preview-state', (_req, res) => {
   ok<PreviewStateResponse>(res, { state: getState(), settings: getSettings() })
 })
 
+app.get('/api/locale', (_req, res) => {
+  const settings = getSettings()
+  ok(res, { locale: settings.locale })
+})
+
+app.put('/api/locale', (req, res) => {
+  const { locale } = req.body ?? {}
+  const validLocales = ['ru', 'en']
+  
+  if (typeof locale !== 'string' || !validLocales.includes(locale)) {
+    return fail(res, 'Invalid locale', 'INVALID_LOCALE', 400)
+  }
+  
+  const updated = updateSettings({ locale: locale as 'ru' | 'en' })
+  ok<SettingsResponse>(res, updated)
+})
+
 app.get('/api/config', (_req, res) => {
   ok<ConfigResponse>(res, getConfig())
 })

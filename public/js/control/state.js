@@ -28,6 +28,7 @@ export const dom = {
   previewUrl: $('previewUrl'),
   selectIp: $('selectIp'),
   controlPanelQr: $('controlPanelQr'),
+  localeSelect: $('localeSelect'),
 
   cfgMinViews: $('cfgMinViews'),
   cfgMinDuration: $('cfgMinDuration'),
@@ -65,8 +66,8 @@ export const dom = {
 
   sectionTabs: $('sectionTabs'),
   tabQueueCount: $('tabQueueCount'),
-  tabJamCount: $('tabJamCount'),
-  tabRecentCount: $('tabRecentCount'),
+  tabPlaylistCount: $('tabPlaylistCount'),
+  tabActivityCount: $('tabActivityCount'),
 
   queueListWrapper: $('queueListWrapper'),
   queueCount: $('queueCount'),
@@ -100,6 +101,6 @@ export const CONFIG_FIELDS = [
 ]
 
 export function renderStats() {
-  if (dom.tabJamCount) dom.tabJamCount.textContent = state.fallback?.sourceCount ?? 0
-  if (dom.tabRecentCount) dom.tabRecentCount.textContent = state.activity.length
+  if (dom.tabPlaylistCount) dom.tabPlaylistCount.textContent = state.fallback?.sourceCount ?? 0
+  if (dom.tabActivityCount) dom.tabActivityCount.textContent = state.activity.length
 }
