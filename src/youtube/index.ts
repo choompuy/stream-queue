@@ -68,11 +68,9 @@ async function fetchVideoById(videoId: string, bypassFilters: boolean): Promise<
   } catch (error) {
     console.error('[ERROR] YouTube API:', error instanceof Error ? error.message : error)
 
-    if (error instanceof Error && error.message === 'YouTube API quota exceeded') {
-      throw new AppError('YOUTUBE_QUOTA', 'лимит YouTube API исчерпан')
-    }
+    if (error instanceof AppError) throw error
 
-    throw new AppError('YOUTUBE_ERROR', 'не удалось получить видео с YouTube')
+    throw new AppError('YOUTUBE_ERROR', 'failed to fetch video from YouTube')
   }
 }
 
@@ -95,7 +93,7 @@ export async function searchSongs(query: string, bypassFilters = false): Promise
 
   if (!canSearch()) {
     console.warn(`[QUOTA] Daily search limit reached: ${CACHE_LIMITS.MAX_DAILY_SEARCHES}`)
-    throw new AppError('YOUTUBE_QUOTA', 'дневной лимит поиска YouTube исчерпан, используйте ссылку.')
+    throw new AppError('YOUTUBE_QUOTA', 'daily YouTube search quota exceeded, use a direct link instead')
   }
 
   return dedupInFlight(pendingSearches, cacheKey, () => performSearch(normalizedQuery, bypassFilters))
@@ -148,11 +146,9 @@ async function performSearch(query: string, bypassFilters: boolean): Promise<Son
   } catch (error) {
     console.error('[ERROR] YouTube search:', error instanceof Error ? error.message : error)
 
-    if (error instanceof Error && error.message === 'YouTube API quota exceeded') {
-      throw new AppError('YOUTUBE_QUOTA', 'лимит YouTube API исчерпан. Попробуйте позже или используйте YouTube-ссылку.')
-    }
+    if (error instanceof AppError) throw error
 
-    throw new AppError('YOUTUBE_ERROR', 'не удалось выполнить поиск YouTube')
+    throw new AppError('YOUTUBE_ERROR', 'YouTube search failed')
   }
 }
 
@@ -205,10 +201,8 @@ async function performPlaylistFetch(playlistId: string): Promise<Song[]> {
   } catch (error) {
     console.error('[ERROR] Playlist fetch:', error instanceof Error ? error.message : error)
 
-    if (error instanceof Error && error.message === 'YouTube API quota exceeded') {
-      throw new AppError('YOUTUBE_QUOTA', 'лимит YouTube API исчерпан')
-    }
+    if (error instanceof AppError) throw error
 
-    throw new AppError('YOUTUBE_ERROR', 'не удалось загрузить плейлист с YouTube')
+    throw new AppError('YOUTUBE_ERROR', 'failed to load YouTube playlist')
   }
 }

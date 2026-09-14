@@ -15,7 +15,12 @@ async function request(url, options = {}) {
     // Empty/non-JSON response
   }
 
-  if (!response.ok) throw new Error(data?.error || `Request failed: ${response.status}`)
+  if (!response.ok) {
+    const error = new Error(data?.error || `Request failed: ${response.status}`)
+    error.code = data?.code
+    error.params = data?.params
+    throw error
+  }
 
   return data
 }

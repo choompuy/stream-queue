@@ -3,6 +3,7 @@ import { state, dom, views, log } from './state.js'
 import { withLoading } from './ui.js'
 import { refreshFallbackState } from './fallback.js'
 import { t } from '../i18n.js'
+import { translateErrorCode } from '../shared.js'
 
 export async function loadPlaylists() {
   try {
@@ -30,17 +31,11 @@ export async function addPlaylist() {
 
   await withLoading(dom.playlistAddBtn, async () => {
     try {
-      const result = await api.addPlaylist(value)
-      if (!result.success) {
-        dom.playlistError.textContent = result.error || t('playlists.errorAdding')
-        dom.playlistError.classList.remove('hidden')
-        return
-      }
-
+      await api.addPlaylist(value)
       dom.playlistUrlInput.value = ''
       await loadPlaylists()
     } catch (error) {
-      dom.playlistError.textContent = error.message || t('playlists.errorAdding')
+      dom.playlistError.textContent = translateErrorCode(t, error.code, error.params, error.message) || t('playlists.errorAdding')
       dom.playlistError.classList.remove('hidden')
     }
   })

@@ -146,6 +146,7 @@
   },
   "api": {
     "errors": {
+      "invalidLocale": "Некорректный язык",
       "invalidPlaylistId": "Некорректный ID или ссылка на плейлист",
       "playlistNotFound": "Плейлист не найден",
       "playlistLoadFailed": "Не удалось загрузить плейлист, проверьте ID",
@@ -158,7 +159,13 @@
       "queueItemNotFound": "Элемент очереди не найден",
       "trackNotFound": "Трек не найден в fallback",
       "serverError": "Внутренняя ошибка сервера",
-      "notFound": "Не найдено"
+      "notFound": "Не найдено",
+      "duplicate": "Этот трек уже находится в очереди",
+      "queueFull": "Очередь заполнена",
+      "userLimit": "Можно добавить максимум {{count}} трек(ов) одновременно",
+      "youtubeQuota": "Лимит YouTube API исчерпан",
+      "youtubeError": "Не удалось выполнить запрос к YouTube",
+      "noApiKey": "YouTube API ключ не настроен, добавьте его в панели управления"
     }
   },
   "time": {

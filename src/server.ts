@@ -55,7 +55,7 @@ app.use(
 
         if (isLocalHost || isLan) return callback(null, true)
       } catch {
-        // не валидный origin - падаем в отказ ниже
+        // not a valid origin - fall through to rejection below
       }
 
       callback(new Error('Not allowed by CORS'))
@@ -140,7 +140,7 @@ app.put(
       if (rawPlaylistId) {
         const parsedId = parsePlaylistId(rawPlaylistId)
         if (!parsedId) {
-          return fail(res, 'некорректный ID или ссылка на плейлист', 'INVALID_PLAYLIST_ID', 400)
+          return fail(res, 'invalid playlist ID or URL', 'INVALID_PLAYLIST_ID', 400)
         }
         body.fallbackPlaylist = { ...body.fallbackPlaylist, playlistId: parsedId }
       } else {
@@ -158,7 +158,7 @@ app.put(
         log(`[ERROR] Failed to refresh fallback playlist: ${error instanceof Error ? error.message : error}`)
         return ok<ConfigResponse>(res, {
           ...updated,
-          fallbackPlaylistWarning: 'не удалось загрузить плейлист, проверьте ID'
+          fallbackPlaylistWarning: 'failed to load playlist, check the ID'
         })
       }
     } else if (updated.fallbackPlaylist.shuffle !== previous.fallbackPlaylist.shuffle) {
@@ -180,13 +180,13 @@ app.post(
     const parsedId = parsePlaylistId(raw)
 
     if (!parsedId) {
-      return fail(res, 'некорректный ID или ссылка на плейлист', 'INVALID_PLAYLIST_ID', 400)
+      return fail(res, 'invalid playlist ID or URL', 'INVALID_PLAYLIST_ID', 400)
     }
 
     try {
       const meta = await fetchPlaylistMeta(parsedId)
       if (!meta) {
-        return fail(res, 'плейлист не найден', 'PLAYLIST_NOT_FOUND', 404)
+        return fail(res, 'playlist not found', 'PLAYLIST_NOT_FOUND', 404)
       }
       const saved = upsertPlaylist(meta)
       ok(res, { playlist: saved }, 201)
@@ -199,7 +199,7 @@ app.post(
 app.delete('/api/playlists/:id', (req, res) => {
   const removed = removePlaylist(req.params.id)
   if (!removed) {
-    return fail(res, 'плейлист не найден', 'PLAYLIST_NOT_FOUND', 404)
+    return fail(res, 'playlist not found', 'PLAYLIST_NOT_FOUND', 404)
   }
 
   const wasActive = getConfig().fallbackPlaylist.playlistId === req.params.id
@@ -229,7 +229,7 @@ app.post(
       await refreshFallback()
     } catch (error) {
       log(`[ERROR] Failed to activate playlist: ${error instanceof Error ? error.message : error}`)
-      return ok<ConfigResponse>(res, { ...updated, fallbackPlaylistWarning: 'не удалось загрузить плейлист' })
+      return ok<ConfigResponse>(res, { ...updated, fallbackPlaylistWarning: 'failed to load playlist' })
     }
 
     ok<ConfigResponse>(res, updated)
@@ -243,7 +243,7 @@ app.get(
     const bypassFilters = req.query.admin === '1'
 
     if (query.length < 2) {
-      return fail(res, 'запрос должен содержать минимум 2 символа', 'INVALID_QUERY', 400)
+      return fail(res, 'query must be at least 2 characters', 'INVALID_QUERY', 400)
     }
 
     try {
@@ -272,20 +272,20 @@ app.post(
     const bypassFilters = admin === true
 
     if (typeof query !== 'string' || query.trim().length < 2 || query.trim().length > 200) {
-      return fail(res, 'запрос должен быть от 2 до 200 символов', 'INVALID_QUERY', 400)
+      return fail(res, 'query must be between 2 and 200 characters', 'INVALID_QUERY', 400)
     }
 
     if (typeof requestedBy !== 'string' || requestedBy.trim().length === 0) {
-      return fail(res, 'имя пользователя обязательно', 'INVALID_REQUEST', 400)
+      return fail(res, 'username is required', 'INVALID_REQUEST', 400)
     }
 
     const result = await requestSong(query.trim(), requestedBy.trim(), bypassFilters)
 
     switch (result.outcome) {
       case 'invalid-url':
-        return fail(res, 'некорректная ссылка на YouTube', 'INVALID_YOUTUBE_URL', 400)
+        return fail(res, 'invalid YouTube URL', 'INVALID_YOUTUBE_URL', 400)
       case 'not-found':
-        return fail(res, 'не удалось найти подходящий трек', 'SONG_NOT_FOUND', 404)
+        return fail(res, 'could not find a suitable track', 'SONG_NOT_FOUND', 404)
       case 'error':
         return failFromError(res, result.error)
       case 'added':
@@ -339,14 +339,14 @@ app.post('/api/fallback/enabled', (_req, res) => {
 
 app.post('/api/fallback/play/:videoId', (req, res) => {
   const item = playFallbackTrackNow(req.params.videoId)
-  if (!item) return fail(res, 'трек не найден в fallback', 'NOT_FOUND', 404)
+  if (!item) return fail(res, 'track not found in fallback', 'NOT_FOUND', 404)
   ok<StateResponse>(res, getState())
 })
 
 app.post('/api/fallback/enqueue/:videoId', (req, res) => {
   try {
     const item = queueFallbackTrack(req.params.videoId)
-    if (!item) return fail(res, 'трек не найден в fallback', 'NOT_FOUND', 404)
+    if (!item) return fail(res, 'track not found in fallback', 'NOT_FOUND', 404)
     ok(res, { song: item, state: getState() }, 201)
   } catch (error) {
     failFromError(res, error)
@@ -357,13 +357,13 @@ app.delete('/api/queue/:index', (req, res) => {
   const index = Number(req.params.index)
 
   if (!Number.isInteger(index) || index < 0) {
-    return fail(res, 'некорректный индекс', 'INVALID_INDEX', 400)
+    return fail(res, 'invalid index', 'INVALID_INDEX', 400)
   }
 
   const removed = removeAt(index)
 
   if (!removed) {
-    return fail(res, 'элемент очереди не найден', 'QUEUE_ITEM_NOT_FOUND', 404)
+    return fail(res, 'queue item not found', 'QUEUE_ITEM_NOT_FOUND', 404)
   }
 
   ok<QueueRemoveResponse>(res, { removed, state: getState() })
@@ -389,7 +389,7 @@ app.use('/api', (_req, res) => {
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   log(`[ERROR] ${err.message}`)
-  fail(res, 'внутренняя ошибка сервера', 'SERVER_ERROR', 500)
+  fail(res, 'internal server error', 'SERVER_ERROR', 500)
 })
 
 function openBrowser(url: string): void {

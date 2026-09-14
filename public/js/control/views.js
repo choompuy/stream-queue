@@ -1,4 +1,4 @@
-import { escapeHtml, formatDuration } from '../shared.js'
+import { escapeHtml, formatDuration, translateErrorCode } from '../shared.js'
 import { PLUS_ICON, PLAY_ICON, PAUSE_ICON, DELETE_ICON } from '../icons.js'
 import { createListView, formatRelativeTime } from './ui.js'
 import { t } from '../i18n.js'
@@ -112,16 +112,17 @@ export function createViews(dom) {
   const activity = createListView(dom.activityListWrapper, {
     getKey: (items) => {
       const minute = Math.floor(Date.now() / 60000)
-      return [minute, ...items.map((entry) => [entry.at, entry.status, entry.title, entry.query, entry.requestedBy, entry.reason].join(':'))].join(
-        '|'
-      )
+      return [
+        minute,
+        ...items.map((entry) => [entry.at, entry.status, entry.title, entry.query, entry.requestedBy, entry.reasonCode].join(':'))
+      ].join('|')
     },
     renderRow: (entry) => {
       const title = entry.title || entry.query
       const statusKey = entry.status === 'accepted' ? 'activity.accepted' : 'activity.rejected'
       return row({
         title,
-        subtitle: entry.reason || '',
+        subtitle: translateErrorCode(t, entry.reasonCode, entry.reasonParams),
         extra: `
           <div class="text-sm text-secondary">
             ${formatRelativeTime(entry.at)}

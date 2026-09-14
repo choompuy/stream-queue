@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
-import { readFile, rename, writeFile } from 'node:fs/promises'
+import { rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 declare global {
@@ -14,7 +14,12 @@ const isPackaged = Boolean(process.pkg)
 const SAVE_DEBOUNCE_MS = 250
 
 function getDir(dir: string): string {
-  return isPackaged ? join(dirname(process.execPath), dir) : join(process.cwd(), dir)
+  if (!isPackaged) return join(process.cwd(), dir)
+
+  const appData = process.env.LOCALAPPDATA
+  if (!appData) return join(dirname(process.execPath), dir)
+
+  return join(appData, 'StreamQueue', dir)
 }
 
 export const DATA_DIR = getDir('data')

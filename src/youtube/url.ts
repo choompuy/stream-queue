@@ -51,7 +51,7 @@ export function parsePlaylistId(input: string): string | null {
     }
     return null
   } catch {
-    // не URL - считаем, что это уже голый ID
+    // not a URL - assume it's already a bare ID
   }
 
   return PLAYLIST_ID_PATTERN.test(trimmed) ? trimmed : null

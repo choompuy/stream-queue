@@ -126,25 +126,24 @@ export function assertCanAddSong(song: Song, requestedBy: string, addToQueue: bo
   const normalized = requestedBy.toLowerCase()
 
   if (currentSong?.videoId === song.videoId && !currentSong.isFallback) {
-    throw new AppError('DUPLICATE', 'этот трек уже находится в очереди')
+    throw new AppError('DUPLICATE', 'this track is already in the queue')
   }
 
   if (queueVideoIds.has(song.videoId)) {
-    throw new AppError('DUPLICATE', 'этот трек уже находится в очереди')
+    throw new AppError('DUPLICATE', 'this track is already in the queue')
   }
 
   if (addToQueue && queue.length >= config.maxQueueSize) {
-    throw new AppError('QUEUE_FULL', 'очередь заполнена')
+    throw new AppError('QUEUE_FULL', 'the queue is full')
   }
 
   if (bypassLimits) return
 
   const activeCount = getUserActiveCount(normalized)
   if (config.maxRequestsPerUser > 0 && activeCount >= config.maxRequestsPerUser) {
-    throw new AppError(
-      'USER_LIMIT',
-      `вы можете заказать только ${config.maxRequestsPerUser} трек${config.maxRequestsPerUser > 1 ? 'а' : ''} одновременно`
-    )
+    throw new AppError('USER_LIMIT', `you can only queue ${config.maxRequestsPerUser} track(s) at a time`, {
+      count: config.maxRequestsPerUser
+    })
   }
 }
 
@@ -257,7 +256,7 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
 
     if (isYouTube && !videoId) {
       log(`[REJECT] ${requestedBy} → INVALID_YOUTUBE_URL`)
-      logActivity({ requestedBy, query, title: null, status: 'rejected', reason: 'некорректная ссылка' })
+      logActivity({ requestedBy, query, title: null, status: 'rejected', reasonCode: 'INVALID_YOUTUBE_URL' })
       return { outcome: 'invalid-url' }
     }
 
@@ -272,7 +271,7 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
 
     if (!song) {
       log(`[REJECT] ${requestedBy} → SONG_NOT_FOUND`)
-      logActivity({ requestedBy, query, title: null, status: 'rejected', reason: 'не найдено или не прошло фильтры' })
+      logActivity({ requestedBy, query, title: null, status: 'rejected', reasonCode: 'SONG_NOT_FOUND' })
       return { outcome: 'not-found' }
     }
 
@@ -287,7 +286,7 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
       log(`[ACCEPT] ${requestedBy} → "${song.title}" - queued`)
     }
 
-    logActivity({ requestedBy, query, title: song.title, status: 'accepted', reason: null })
+    logActivity({ requestedBy, query, title: song.title, status: 'accepted', reasonCode: null })
 
     const state = getState()
     const position = wasEmpty ? 0 : state.queue.length
@@ -295,7 +294,7 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
     return {
       outcome: 'added',
       response: {
-        message: wasEmpty ? `добавлено: ${song.title} - сейчас играет` : `добавлено: ${song.title} - позиция #${position}`,
+        message: wasEmpty ? `added: ${song.title} - now playing` : `added: ${song.title} - position #${position}`,
         song: item,
         started: wasEmpty,
         position,
@@ -304,8 +303,9 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
     }
   } catch (error) {
     log(`[REJECT] ${requestedBy} → error while adding song`)
-    const reason = error instanceof AppError ? error.message : 'ошибка сервера'
-    logActivity({ requestedBy, query, title: null, status: 'rejected', reason })
+    const reasonCode = error instanceof AppError ? error.code : 'SERVER_ERROR'
+    const reasonParams = error instanceof AppError ? error.params : undefined
+    logActivity({ requestedBy, query, title: null, status: 'rejected', reasonCode, reasonParams })
     return { outcome: 'error', error }
   }
 }

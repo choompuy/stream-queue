@@ -146,6 +146,7 @@
   },
   "api": {
     "errors": {
+      "invalidLocale": "Invalid locale",
       "invalidPlaylistId": "Invalid playlist ID or URL",
       "playlistNotFound": "Playlist not found",
       "playlistLoadFailed": "Failed to load playlist, check the ID",
@@ -158,7 +159,13 @@
       "queueItemNotFound": "Queue item not found",
       "trackNotFound": "Track not found in fallback",
       "serverError": "Internal server error",
-      "notFound": "Not found"
+      "notFound": "Not found",
+      "duplicate": "This track is already in the queue",
+      "queueFull": "The queue is full",
+      "userLimit": "You can only queue {{count}} track(s) at a time",
+      "youtubeQuota": "YouTube API quota exceeded",
+      "youtubeError": "YouTube request failed",
+      "noApiKey": "YouTube API key is not configured, add it in the control panel"
     }
   },
   "time": {

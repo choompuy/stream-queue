@@ -4,7 +4,8 @@ export type ActivityEntry = {
   query: string
   title: string | null
   status: ActivityStatus
-  reason: string | null
+  reasonCode: string | null
+  reasonParams?: Record<string, string | number>
   at: number
 }
 
@@ -72,15 +73,16 @@ export type CacheFile = {
   }
 }
 
-export type ApiError = { success: false; error: string; code: string }
+export type ApiError = { success: false; error: string; code: string; params?: Record<string, string | number> }
 export type ApiOk<T> = { success: true } & T
 export type ApiResult<T> = ApiOk<T> | ApiError
 
-export type AppErrorCode = 'DUPLICATE' | 'QUEUE_FULL' | 'USER_LIMIT' | 'YOUTUBE_QUOTA' | 'YOUTUBE_ERROR'
+export type AppErrorCode = 'DUPLICATE' | 'QUEUE_FULL' | 'USER_LIMIT' | 'YOUTUBE_QUOTA' | 'YOUTUBE_ERROR' | 'NO_API_KEY'
 export class AppError extends Error {
   constructor(
     public code: AppErrorCode,
-    message: string
+    message: string,
+    public params?: Record<string, string | number>
   ) {
     super(message)
   }

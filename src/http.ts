@@ -6,8 +6,8 @@ export function ok<T extends object>(res: Response, data: T, status = 200): void
   res.status(status).json(body)
 }
 
-export function fail(res: Response, error: string, code: string, status: number): void {
-  const body: ApiError = { success: false, error, code }
+export function fail(res: Response, error: string, code: string, status: number, params?: Record<string, string | number>): void {
+  const body: ApiError = { success: false, error, code, params }
   res.status(status).json(body)
 }
 
@@ -16,23 +16,24 @@ const STATUS_BY_CODE: Record<AppErrorCode, number> = {
   QUEUE_FULL: 409,
   USER_LIMIT: 409,
   YOUTUBE_QUOTA: 503,
-  YOUTUBE_ERROR: 503
+  YOUTUBE_ERROR: 503,
+  NO_API_KEY: 400
 }
 
-export type ErrorInfo = { code: string; status: number; message: string }
+export type ErrorInfo = { code: string; status: number; message: string; params?: Record<string, string | number> }
 
 export function getErrorInfo(error: unknown): ErrorInfo {
   if (error instanceof AppError) {
-    return { code: error.code, status: STATUS_BY_CODE[error.code], message: error.message }
+    return { code: error.code, status: STATUS_BY_CODE[error.code], message: error.message, params: error.params }
   }
 
-  const message = error instanceof Error ? error.message : 'не удалось выполнить запрос'
+  const message = error instanceof Error ? error.message : 'failed to process request'
   return { code: 'SERVER_ERROR', status: 500, message }
 }
 
 export function failFromError(res: Response, error: unknown): void {
   const info = getErrorInfo(error)
-  fail(res, info.message, info.code, info.status)
+  fail(res, info.message, info.code, info.status, info.params)
 }
 
 export function asyncHandler<P = ParamsDictionary>(

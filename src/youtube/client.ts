@@ -1,6 +1,6 @@
 import { getSecrets } from '../secrets.js'
 import { getConfig } from '../config.js'
-import { AppError, Song } from '../types.js'
+import { Song, AppError } from '../types.js'
 import { VideoItem } from './types.js'
 import { isoDurationToSeconds } from './scoring.js'
 
@@ -16,7 +16,7 @@ export async function youtube<T>(path: string, params: Record<string, string>): 
   const { youtubeApiKey } = getSecrets()
 
   if (!youtubeApiKey) {
-    throw new AppError('YOUTUBE_ERROR', 'YouTube API key not configured')
+    throw new AppError('NO_API_KEY', 'YouTube API key is not configured, add it in the control panel')
   }
 
   const url = new URL(`https://www.googleapis.com/youtube/v3/${path}`)

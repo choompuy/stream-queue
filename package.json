@@ -1,6 +1,7 @@
 {
   "name": "stream-queue",
   "author": "choompuy",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/choompuy/stream-queue"
@@ -30,6 +31,9 @@
   },
   "bin": "dist/server.js",
   "pkg": {
+    "scripts": [
+      "dist/**/*.js"
+    ],
     "assets": [
       "public/**/*"
     ]

@@ -53,3 +53,28 @@ export function getErrorMessage(code, t) {
   }
   return `Error code ${code}`
 }
+
+export const ERROR_CODE_I18N_KEYS = {
+  INVALID_LOCALE: 'api.errors.invalidLocale',
+  INVALID_PLAYLIST_ID: 'api.errors.invalidPlaylistId',
+  PLAYLIST_NOT_FOUND: 'api.errors.playlistNotFound',
+  INVALID_QUERY: 'api.errors.invalidQuery',
+  INVALID_REQUEST: 'api.errors.usernameRequired',
+  INVALID_YOUTUBE_URL: 'api.errors.invalidYoutubeUrl',
+  SONG_NOT_FOUND: 'api.errors.songNotFound',
+  NOT_FOUND: 'api.errors.notFound',
+  INVALID_INDEX: 'api.errors.invalidIndex',
+  QUEUE_ITEM_NOT_FOUND: 'api.errors.queueItemNotFound',
+  SERVER_ERROR: 'api.errors.serverError',
+  DUPLICATE: 'api.errors.duplicate',
+  QUEUE_FULL: 'api.errors.queueFull',
+  USER_LIMIT: 'api.errors.userLimit',
+  YOUTUBE_QUOTA: 'api.errors.youtubeQuota',
+  YOUTUBE_ERROR: 'api.errors.youtubeError',
+  NO_API_KEY: 'api.errors.noApiKey'
+}
+
+export function translateErrorCode(t, code, params, fallback = '') {
+  const key = code && ERROR_CODE_I18N_KEYS[code]
+  return key ? t(key, params) : fallback
+}
