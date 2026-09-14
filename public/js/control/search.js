@@ -27,7 +27,6 @@ export async function search() {
   if (!query) return
 
   if (lastSearch === query) return
-  lastSearch = query
 
   await withLoading(dom.searchBtn, async () => {
     try {
@@ -39,6 +38,7 @@ export async function search() {
       const data = await api.search(query)
       views.search.render(data.results)
       dom.searchListWrapper.classList.remove('hidden')
+      lastSearch = query
     } catch (error) {
       log('Search error:', error)
       showSearchError(translateErrorCode(t, error.code, error.params, error.message) || t('search.errorSearching'))

@@ -8,6 +8,9 @@ import { getConfig } from '../config.js'
 const pendingSearches = new Map<string, Promise<Song[]>>()
 const pendingVideos = new Map<string, Promise<Song | null>>()
 const pendingPlaylists = new Map<string, Promise<Song[]>>()
+const YOUTUBE_ID_BATCH_SIZE = 50
+const PLAYLIST_PAGE_SIZE = 50
+const MAX_PLAYLIST_PAGES = 3
 
 function dedupInFlight<T>(pending: Map<string, Promise<T>>, key: string, run: () => Promise<T>): Promise<T> {
   const existing = pending.get(key)
@@ -174,35 +177,106 @@ export async function fetchPlaylistSongs(playlistId: string): Promise<Song[]> {
   return dedupInFlight(pendingPlaylists, playlistId, () => performPlaylistFetch(playlistId))
 }
 
+function chunk<T>(items: T[], size: number): T[][] {
+  const result: T[][] = []
+  for (let i = 0; i < items.length; i += size) {
+    result.push(items.slice(i, i + size))
+  }
+  return result
+}
+
 async function performPlaylistFetch(playlistId: string): Promise<Song[]> {
   try {
     console.log(`[PLAYLIST] Fetching playlist: ${playlistId}`)
-    const playlist = await youtube<{ items: PlaylistItem[] }>('playlistItems', {
-      part: 'snippet',
-      playlistId,
-      maxResults: '50'
-    })
-    const videoIds = (playlist.items ?? []).map((item) => item.snippet?.resourceId?.videoId).filter((id): id is string => Boolean(id))
+
+    const videoIds: string[] = []
+    const seenVideoIds = new Set<string>()
+    const seenPageTokens = new Set<string>()
+
+    let pageToken: string | undefined
+    let page = 0
+
+    do {
+      page++
+
+      if (page >= MAX_PLAYLIST_PAGES) {
+        console.warn(`[PLAYLIST] Maximum page limit reached (${MAX_PLAYLIST_PAGES}), stopping`)
+        break
+      }
+
+      if (pageToken) {
+        if (seenPageTokens.has(pageToken)) {
+          console.warn(`[PLAYLIST] Repeated page token detected, stopping pagination`)
+          break
+        }
+        seenPageTokens.add(pageToken)
+      }
+
+      console.log(`[PLAYLIST] Loading page ${page}${pageToken ? `, token=${pageToken.slice(0, 10)}...` : ''}`)
+      const playlist = await youtube<{ items: PlaylistItem[]; nextPageToken?: string }>('playlistItems', {
+        part: 'snippet',
+        playlistId,
+        maxResults: String(PLAYLIST_PAGE_SIZE),
+        ...(pageToken ? { pageToken } : {})
+      })
+
+      const items = playlist.items ?? []
+      let newItems = 0
+      let duplicateItems = 0
+
+      for (const item of items) {
+        const id = item.snippet?.resourceId?.videoId
+
+        if (!id) continue
+        if (seenVideoIds.has(id)) {
+          duplicateItems++
+          continue
+        }
+
+        seenVideoIds.add(id)
+        videoIds.push(id)
+        newItems++
+      }
+
+      console.log(
+        `[PLAYLIST] Page ${page}: ${items.length} items, ${newItems} new, ${duplicateItems} duplicates, total unique IDs: ${videoIds.length}`
+      )
+
+      const nextPageToken = playlist.nextPageToken
+      if (nextPageToken && seenPageTokens.has(nextPageToken)) {
+        console.warn(`[PLAYLIST] YouTube returned a repeated page token, stopping pagination`)
+        break
+      }
+
+      pageToken = nextPageToken
+    } while (pageToken)
 
     if (!videoIds.length) {
       console.log(`[PLAYLIST] No videos in playlist: ${playlistId}`)
       return []
     }
 
-    const details = await youtube<{ items: VideoItem[] }>('videos', {
-      part: 'snippet,contentDetails,statistics,status',
-      id: videoIds.join(',')
-    })
+    console.log(`[PLAYLIST] Collected ${videoIds.length} unique video IDs, loading video details`)
+    const allVideoItems: VideoItem[] = []
+    const batches = chunk(videoIds, YOUTUBE_ID_BATCH_SIZE)
 
-    const songs = mapValidSongs(details.items ?? [])
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i]
+      console.log(`[PLAYLIST] Loading video batch ${i + 1}/${batches.length} (${batch.length} videos)`)
+      const details = await youtube<{ items: VideoItem[] }>('videos', {
+        part: 'snippet,contentDetails,statistics,status',
+        id: batch.join(',')
+      })
+      allVideoItems.push(...(details.items ?? []))
+      console.log(`[PLAYLIST] Video batch ${i + 1}/${batches.length} complete, total details: ${allVideoItems.length}`)
+    }
 
-    console.log(`[PLAYLIST] Fetched ${songs.length} valid songs from playlist: ${playlistId}`)
+    const songs = mapValidSongs(allVideoItems)
+    console.log(`[PLAYLIST] Fetched ${songs.length} valid unique songs from playlist: ${playlistId}`)
     return songs
   } catch (error) {
     console.error('[ERROR] Playlist fetch:', error instanceof Error ? error.message : error)
-
     if (error instanceof AppError) throw error
-
     throw new AppError('YOUTUBE_ERROR', 'failed to load YouTube playlist')
   }
 }

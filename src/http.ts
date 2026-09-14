@@ -27,8 +27,8 @@ export function getErrorInfo(error: unknown): ErrorInfo {
     return { code: error.code, status: STATUS_BY_CODE[error.code], message: error.message, params: error.params }
   }
 
-  const message = error instanceof Error ? error.message : 'failed to process request'
-  return { code: 'SERVER_ERROR', status: 500, message }
+  console.error('[UNEXPECTED ERROR]', error)
+  return { code: 'SERVER_ERROR', status: 500, message: 'internal server error' }
 }
 
 export function failFromError(res: Response, error: unknown): void {

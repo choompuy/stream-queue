@@ -108,8 +108,14 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
   }
 
   const newTracks = await fetchPlaylistSongs(playlistId)
-  const isFirstLoad = loadedFallbackPlaylistId !== playlistId
   const config = getConfig()
+
+  if (config.fallbackPlaylist.playlistId !== playlistId) {
+    log(`Refresh for "${playlistId}" discarded - playlist changed during load`)
+    return getFallbackState()
+  }
+
+  const isFirstLoad = loadedFallbackPlaylistId !== playlistId
   const activeId = activeFallbackVideoId()
 
   if (isFirstLoad) {
