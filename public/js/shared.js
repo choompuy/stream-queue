@@ -53,14 +53,3 @@ export function getErrorMessage(code, t) {
   }
   return `Error code ${code}`
 }
-
-export function formatDateTime(timestamp, locale = 'ru') {
-  if (!timestamp) return '-'
-
-  return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(new Date(timestamp))
-}

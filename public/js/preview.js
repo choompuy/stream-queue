@@ -31,14 +31,14 @@ async function fetchPreviewState() {
     const response = await fetch('/api/preview-state')
     const data = await response.json()
     settings = data.settings
-    
+
     const serverLocale = settings.locale || 'ru'
     const currentLocale = getCurrentLocale()
     if (serverLocale !== currentLocale) {
       await initI18n()
       updateDomTranslations()
     }
-    
+
     renderState(data.state)
   } catch (error) {
     log('Error fetching settings:', error)
@@ -92,7 +92,10 @@ function renderState(state) {
 
     if (currentVideoId !== state.current.videoId) {
       log(`Loading video: ${state.current.videoId}`)
+
       player.loadVideoById(state.current.videoId)
+      player.setOption('captions', 'fontSize', 0)
+      player.unloadModule('captions')
 
       if (!settings.showVideo) player.setPlaybackQuality('tiny')
     }
@@ -125,9 +128,10 @@ async function notifyEnded() {
   }
 }
 
-function onPlayerReady() {
+function onPlayerReady(event) {
   log('Player ready')
   isPlayerReady = true
+  event.target.setVolume(100)
   fetchPreviewState()
 }
 

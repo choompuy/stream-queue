@@ -25,6 +25,7 @@ export async function changeLocale(locale) {
     await api.updateLocale(locale)
     await setLocale(locale)
     updateDomTranslations()
+    location.reload()
   } catch (error) {
     log('Error changing locale:', error)
   }

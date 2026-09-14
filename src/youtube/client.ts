@@ -1,6 +1,6 @@
 import { getSecrets } from '../secrets.js'
 import { getConfig } from '../config.js'
-import { Song } from '../types.js'
+import { AppError, Song } from '../types.js'
 import { VideoItem } from './types.js'
 import { isoDurationToSeconds } from './scoring.js'
 
@@ -16,7 +16,7 @@ export async function youtube<T>(path: string, params: Record<string, string>): 
   const { youtubeApiKey } = getSecrets()
 
   if (!youtubeApiKey) {
-    throw new Error('YouTube API ключ не настроен, добавь его в панели управления')
+    throw new AppError('YOUTUBE_ERROR', 'YouTube API key not configured')
   }
 
   const url = new URL(`https://www.googleapis.com/youtube/v3/${path}`)
@@ -32,10 +32,10 @@ export async function youtube<T>(path: string, params: Record<string, string>): 
     const reason = data.error?.errors?.[0]?.reason
 
     if (reason === 'quotaExceeded') {
-      throw new Error('YouTube API quota exceeded')
+      throw new AppError('YOUTUBE_QUOTA', 'YouTube API quota exceeded')
     }
 
-    throw new Error(data.error?.message || `YouTube API error ${response.status}`)
+    throw new AppError('YOUTUBE_ERROR', data.error?.message || `YouTube API error ${response.status}`)
   }
 
   return data

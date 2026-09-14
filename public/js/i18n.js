@@ -135,11 +135,4 @@ export function updateDomTranslations() {
       el.title = t(key)
     }
   })
-
-  document.querySelectorAll('option[data-i18n]').forEach((el) => {
-    const key = el.getAttribute('data-i18n')
-    if (key) {
-      el.textContent = t(key)
-    }
-  })
 }

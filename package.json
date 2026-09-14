@@ -11,7 +11,7 @@
     "dev": "tsx src/server.ts",
     "start": "tsx src/server.ts",
     "build": "tsc",
-    "build:exe": "npm run build && pkg . --targets node22-win-x64 --output dist/stream-queue.exe"
+    "build:exe": "npm run build && pkg . --targets node22-win-x64 --output dist/StreamQueue.exe"
   },
   "dependencies": {
     "cors": "^2.8.5",
