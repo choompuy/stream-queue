@@ -1,11 +1,12 @@
 import { $, formatDuration, createLogger, getErrorMessage } from './shared.js'
-import { initI18n, t, getCurrentLocale, updateDomTranslations } from './i18n.js'
+import { initI18n, t, getCurrentLocale } from './i18n.js'
 
 let player = null
 let currentState = null
 let isPlayerReady = false
 let isTransitioning = false
 let settings = {}
+let localeLoaded = false
 
 const log = createLogger('PREVIEW')
 
@@ -33,10 +34,9 @@ async function fetchPreviewState() {
     settings = data.settings
 
     const serverLocale = settings.locale || 'ru'
-    const currentLocale = getCurrentLocale()
-    if (serverLocale !== currentLocale) {
-      await initI18n()
-      updateDomTranslations()
+    if (!localeLoaded || serverLocale !== getCurrentLocale()) {
+      await initI18n(serverLocale)
+      localeLoaded = true
     }
 
     renderState(data.state)
@@ -200,9 +200,7 @@ if (isPlaybackSource) {
 }
 
 async function init() {
-  await initI18n()
-  updateDomTranslations()
-  fetchPreviewState()
+  await fetchPreviewState()
 }
 
 init()

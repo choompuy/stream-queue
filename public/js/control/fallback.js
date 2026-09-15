@@ -34,9 +34,9 @@ export function renderFallback() {
     return
   }
 
-  dom.fallbackInfo.textContent = t('fallback.info', { 
-    count: tracks.length, 
-    datetime: formatDateTime(data.lastRefreshedAt) 
+  dom.fallbackInfo.textContent = t('fallback.info', {
+    count: tracks.length,
+    datetime: formatDateTime(data.lastRefreshedAt)
   })
   views.fallback.render(tracks)
   scrollToActiveFallback()
@@ -103,18 +103,22 @@ export async function toggleFallbackEnabled() {
 }
 
 export async function playFallbackNow(videoId) {
+  const title = state.fallback?.upNext?.find((track) => track.videoId === videoId)?.title
   try {
     await api.playFallback(videoId)
     await refreshState()
+    if (title) toastSuccess(t('toast.nowPlaying', { title }))
   } catch (error) {
     log('Error playing fallback track:', error)
   }
 }
 
 export async function enqueueFallbackTrack(videoId) {
+  const title = state.fallback?.upNext?.find((track) => track.videoId === videoId)?.title
   try {
     await api.enqueueFallback(videoId)
     await refreshState()
+    if (title) toastSuccess(t('toast.addedToQueue', { title, position: state.queue.length }))
   } catch (error) {
     log('Error queueing fallback track:', error)
   }

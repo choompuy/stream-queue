@@ -57,7 +57,6 @@ export async function clearQueue() {
     try {
       await api.clearQueue()
       await refreshState()
-      toastSuccess(t('toast.queueCleared'))
     } catch (error) {
       log('Error clearing queue:', error)
     }

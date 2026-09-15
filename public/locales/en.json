@@ -188,12 +188,15 @@
     "many": "tracks"
   },
   "toast": {
-    "queueCleared": "Queue cleared",
     "removedFromQueue": "Removed from queue",
     "playlistAdded": "Playlist added",
     "playlistActivated": "Playlist activated",
     "playlistDeleted": "Playlist deleted",
     "fallbackRefreshed": "Playlist refreshed",
-    "settingsSaved": "Settings saved"
+    "settingsSaved": "Settings saved",
+    "nowPlaying": "Now playing: {{title}}",
+    "addedToQueue": "Added to queue: {{title}} [#{{position}}]",
+    "viewerRequest": "🎵 {{user}} added: {{title}}",
+    "viewerRequestsMany": "🎵 {{count}} new tracks added by viewers"
   }
 }

@@ -37,7 +37,7 @@ main {
   max-width: 1400px;
   min-height: 100%;
   margin: 0 auto;
-  padding-inline: 1rem;
+  padding-inline: 0.5rem;
 }
 
 .page-tab {
@@ -398,9 +398,16 @@ select {
   background-color: var(--bg-elevated);
 }
 
+.row-list .row-item > :first-child {
+  margin-left: 1rem;
+}
+
+.row-list .row-item > img.thumbnail:first-child {
+  margin-left: 0;
+}
+
 .row-list .row-index {
   min-width: 2ch;
-  margin-left: 1rem;
   text-align: center;
 }
 
@@ -498,10 +505,6 @@ select {
 
 .section-panel-queue .row-item .thumbnail {
   border-style: none solid none solid;
-}
-
-.section-panel-activity .row-item:first-child .row-info {
-  margin-left: 1rem;
 }
 
 .status-pill {
@@ -603,6 +606,12 @@ select {
 
 #saveConfigSettingBtn {
   margin-top: auto;
+}
+
+@media (min-width: 480px) {
+  .container {
+    padding-inline: 1rem;
+  }
 }
 
 @media (min-width: 900px) {

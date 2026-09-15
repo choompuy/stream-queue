@@ -188,12 +188,15 @@
     "many": "треков"
   },
   "toast": {
-    "queueCleared": "Очередь очищена",
     "removedFromQueue": "Удалено из очереди",
     "playlistAdded": "Плейлист добавлен",
     "playlistActivated": "Плейлист активирован",
     "playlistDeleted": "Плейлист удалён",
     "fallbackRefreshed": "Плейлист обновлён",
-    "settingsSaved": "Настройки сохранены"
+    "settingsSaved": "Настройки сохранены",
+    "nowPlaying": "Сейчас играет: {{title}}",
+    "addedToQueue": "Добавлено в очередь: {{title}} [#{{position}}]",
+    "viewerRequest": "🎵 {{user}} добавил(а): {{title}}",
+    "viewerRequestsMany": "🎵 Добавлено {{count}} новых треков от зрителей"
   }
 }

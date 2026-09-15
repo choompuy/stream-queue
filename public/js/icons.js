@@ -27,24 +27,6 @@ export const PAUSE_ICON = (size) => `
   </svg>
 `
 
-export const CHECK_ICON = (size) => `
-  <svg xmlns="http://www.w3.org/2000/svg" width="${size || 20}" height="${size || 20}" fill="none" viewBox="0 0 24 24">
-    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-  </svg>
-`
-
-export const ALERT_ICON = (size) => `
-  <svg xmlns="http://www.w3.org/2000/svg" width="${size || 20}" height="${size || 20}" fill="none" viewBox="0 0 24 24">
-    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-  </svg>
-`
-
-export const INFO_ICON = (size) => `
-  <svg xmlns="http://www.w3.org/2000/svg" width="${size || 20}" height="${size || 20}" fill="none" viewBox="0 0 24 24">
-    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16v-4m0-4h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z" />
-  </svg>
-`
-
 export const CLOSE_ICON = (size) => `
   <svg xmlns="http://www.w3.org/2000/svg" width="${size || 20}" height="${size || 20}" fill="none" viewBox="0 0 24 24">
     <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6 6 18M6 6l12 12" />

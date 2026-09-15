@@ -4,27 +4,12 @@ import { state, dom, log, CONFIG_FIELDS } from './state.js'
 import { syncPlayer } from './player.js'
 import { renderQueue } from './queue.js'
 import { renderPlaylists } from './playlists.js'
-import { setLocale, getCurrentLocale, t } from '../i18n.js'
+import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
-
-export async function syncLocaleFromServer() {
-  try {
-    const data = await api.getLocale()
-    const serverLocale = data.locale || 'ru'
-    const currentLocale = getCurrentLocale()
-
-    if (serverLocale !== currentLocale) {
-      await setLocale(serverLocale)
-    }
-  } catch (error) {
-    log('Error syncing locale from server:', error)
-  }
-}
 
 export async function changeLocale(locale) {
   try {
     await api.updateLocale(locale)
-    await setLocale(locale)
     location.reload()
   } catch (error) {
     log('Error changing locale:', error)
@@ -37,7 +22,6 @@ export async function loadPreviewSettings() {
 
     if (dom.showVideo) dom.showVideo.checked = Boolean(state.settings.showVideo)
     if (dom.badgePosition) dom.badgePosition.value = state.settings.position || 'bottom-right'
-    if (dom.localeSelect) dom.localeSelect.value = state.settings.locale || 'ru'
   } catch (error) {
     log('Error loading settings:', error)
   }

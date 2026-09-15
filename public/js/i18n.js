@@ -1,6 +1,5 @@
 const DEFAULT_LOCALE = 'ru'
 const SUPPORTED_LOCALES = ['ru', 'en']
-const STORAGE_KEY = 'app-locale'
 
 let currentLocale = DEFAULT_LOCALE
 let translations = {}
@@ -75,23 +74,7 @@ export function getCurrentLocale() {
 }
 
 export function setLocale(locale) {
-  if (SUPPORTED_LOCALES.includes(locale)) {
-    localStorage.setItem(STORAGE_KEY, locale)
-    return loadTranslations(locale)
-  }
-  return Promise.resolve(false)
-}
-
-export function getSavedLocale() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved && SUPPORTED_LOCALES.includes(saved)) {
-      return saved
-    }
-  } catch {
-    // localStorage might not be available
-  }
-  return DEFAULT_LOCALE
+  return loadTranslations(locale)
 }
 
 export function getSupportedLocales() {
@@ -106,9 +89,8 @@ export function getLocaleName(locale) {
   return names[locale] || locale
 }
 
-export async function initI18n() {
-  const savedLocale = getSavedLocale()
-  await loadTranslations(savedLocale)
+export async function initI18n(locale = DEFAULT_LOCALE) {
+  await loadTranslations(locale)
   document.documentElement.lang = currentLocale
   updateDomTranslations()
   return currentLocale

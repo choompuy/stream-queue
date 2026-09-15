@@ -1,4 +1,5 @@
-import { log } from './state.js'
+import { api } from './api.js'
+import { dom, log } from './state.js'
 import { initI18n } from '../i18n.js'
 import './player.js'
 import { bindEvents } from './events.js'
@@ -6,12 +7,13 @@ import { refreshState } from './queue.js'
 import { refreshFallbackState } from './fallback.js'
 import { loadPlaylists } from './playlists.js'
 import { loadActivity } from './activity.js'
-import { loadSecrets, loadConfig, loadPreviewSettings, loadNetworkInfo, syncLocaleFromServer } from './settings.js'
+import { loadSecrets, loadConfig, loadPreviewSettings, loadNetworkInfo } from './settings.js'
 import { activeTab } from './tabs.js'
 
 async function init() {
-  await initI18n()
-  await syncLocaleFromServer()
+  const { locale } = await api.getLocale()
+  await initI18n(locale)
+  if (dom.localeSelect) dom.localeSelect.value = locale
 
   bindEvents()
 
