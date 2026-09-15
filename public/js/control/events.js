@@ -12,7 +12,7 @@ import {
   toggleFallbackEnabled
 } from './fallback.js'
 import { addPlaylist, activatePlaylist, deletePlaylist } from './playlists.js'
-import { clearActivity } from './activity.js'
+import { clearActivity, setActivityFilter } from './activity.js'
 import { savePreviewSettings, copyPreviewUrl, onIpChange, toggleQr, saveConfigSetting, changeLocale } from './settings.js'
 
 const ACTIONS = {
@@ -33,6 +33,7 @@ const ACTIONS = {
   'playlist-activate': (action) => activatePlaylist(action.dataset.id),
   'playlist-delete': (action) => deletePlaylist(action.dataset.id),
   'clear-activity': clearActivity,
+  'activity-filter': (action) => setActivityFilter(action.dataset.filter),
   'copy-preview-url': copyPreviewUrl,
   'toggle-qr': toggleQr,
   'save-config': saveConfigSetting

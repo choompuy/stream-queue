@@ -1,3 +1,7 @@
+import { t } from '../i18n.js'
+import { translateErrorCode } from '../shared.js'
+import { toastError } from './toast.js'
+
 async function request(url, options = {}) {
   const response = await fetch(url, {
     ...options,
@@ -19,6 +23,7 @@ async function request(url, options = {}) {
     const error = new Error(data?.error || `Request failed: ${response.status}`)
     error.code = data?.code
     error.params = data?.params
+    toastError(translateErrorCode(t, error.code, error.params, error.message))
     throw error
   }
 

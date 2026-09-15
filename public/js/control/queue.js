@@ -4,6 +4,7 @@ import { withLoading } from './ui.js'
 import { renderCurrent, renderNext, renderPlayPause, syncPlayer } from './player.js'
 import { refreshFallbackState } from './fallback.js'
 import { t } from '../i18n.js'
+import { toastSuccess } from './toast.js'
 
 export async function refreshState() {
   try {
@@ -43,6 +44,7 @@ export async function removeFromQueue(index) {
   try {
     await api.removeFromQueue(index)
     await refreshState()
+    toastSuccess(t('toast.removedFromQueue'))
   } catch (error) {
     log('Error removing from queue:', error)
   }
@@ -55,6 +57,7 @@ export async function clearQueue() {
     try {
       await api.clearQueue()
       await refreshState()
+      toastSuccess(t('toast.queueCleared'))
     } catch (error) {
       log('Error clearing queue:', error)
     }

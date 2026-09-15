@@ -76,7 +76,10 @@
     "clear": "Очистить",
     "clearConfirm": "Очистить активность?",
     "accepted": "Принято",
-    "rejected": "Отклонено"
+    "rejected": "Отклонено",
+    "filterAll": "Все",
+    "filterAccepted": "Принятые",
+    "filterRejected": "Отклонённые"
   },
   "playlists": {
     "title": "Плейлисты",
@@ -183,5 +186,14 @@
     "one": "трек",
     "few": "трека",
     "many": "треков"
+  },
+  "toast": {
+    "queueCleared": "Очередь очищена",
+    "removedFromQueue": "Удалено из очереди",
+    "playlistAdded": "Плейлист добавлен",
+    "playlistActivated": "Плейлист активирован",
+    "playlistDeleted": "Плейлист удалён",
+    "fallbackRefreshed": "Плейлист обновлён",
+    "settingsSaved": "Настройки сохранены"
   }
 }

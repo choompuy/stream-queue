@@ -3,6 +3,7 @@ export type ActivityEntry = {
   requestedBy: string
   query: string
   title: string | null
+  videoId: string | null
   status: ActivityStatus
   reasonCode: string | null
   reasonParams?: Record<string, string | number>

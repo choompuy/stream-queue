@@ -114,13 +114,14 @@ export function createViews(dom) {
       const minute = Math.floor(Date.now() / 60000)
       return [
         minute,
-        ...items.map((entry) => [entry.at, entry.status, entry.title, entry.query, entry.requestedBy, entry.reasonCode].join(':'))
+        ...items.map((entry) => [entry.at, entry.status, entry.title, entry.videoId, entry.query, entry.requestedBy, entry.reasonCode].join(':'))
       ].join('|')
     },
     renderRow: (entry) => {
       const title = entry.title || entry.query
       const statusKey = entry.status === 'accepted' ? 'activity.accepted' : 'activity.rejected'
       return row({
+        thumbnail: entry.videoId ? `https://i.ytimg.com/vi/${entry.videoId}/mqdefault.jpg` : '',
         title,
         subtitle: translateErrorCode(t, entry.reasonCode, entry.reasonParams),
         extra: `

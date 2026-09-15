@@ -76,7 +76,10 @@
     "clear": "Clear",
     "clearConfirm": "Clear Activity?",
     "accepted": "accepted",
-    "rejected": "rejected"
+    "rejected": "rejected",
+    "filterAll": "All",
+    "filterAccepted": "Accepted",
+    "filterRejected": "Rejected"
   },
   "playlists": {
     "title": "Playlists",
@@ -183,5 +186,14 @@
     "one": "track",
     "few": "tracks",
     "many": "tracks"
+  },
+  "toast": {
+    "queueCleared": "Queue cleared",
+    "removedFromQueue": "Removed from queue",
+    "playlistAdded": "Playlist added",
+    "playlistActivated": "Playlist activated",
+    "playlistDeleted": "Playlist deleted",
+    "fallbackRefreshed": "Playlist refreshed",
+    "settingsSaved": "Settings saved"
   }
 }

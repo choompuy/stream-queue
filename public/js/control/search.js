@@ -3,23 +3,15 @@ import { dom, views, log } from './state.js'
 import { withLoading } from './ui.js'
 import { refreshState } from './queue.js'
 import { loadActivity } from './activity.js'
-import { t } from '../i18n.js'
-import { translateErrorCode } from '../shared.js'
 
 const YOUTUBE_URL_HINT = /(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com|youtube-nocookie\.com|youtu\.be)\//
 
 let lastSearch = ''
 
-export function showSearchError(message) {
-  dom.searchError.textContent = message
-  dom.searchError.classList.remove('hidden')
-}
-
 export function clearSearchResults() {
   views.search.clear()
   dom.searchInput.value = ''
   dom.searchListWrapper.classList.add('hidden')
-  dom.searchError.classList.add('hidden')
 }
 
 export async function search() {
@@ -41,7 +33,6 @@ export async function search() {
       lastSearch = query
     } catch (error) {
       log('Search error:', error)
-      showSearchError(translateErrorCode(t, error.code, error.params, error.message) || t('search.errorSearching'))
     }
   })
 }
@@ -53,7 +44,6 @@ export async function addSong(query) {
     await loadActivity()
   } catch (error) {
     log('Error adding song:', error)
-    showSearchError(translateErrorCode(t, error.code, error.params, error.message) || t('search.errorAdding'))
     await loadActivity()
   }
 }

@@ -3,6 +3,7 @@ import { state, dom, views, log, renderStats } from './state.js'
 import { toggleActive, formatDateTime, withLoading } from './ui.js'
 import { refreshState } from './queue.js'
 import { t } from '../i18n.js'
+import { toastSuccess } from './toast.js'
 
 export async function refreshFallbackState() {
   try {
@@ -66,6 +67,7 @@ export async function refreshFallback() {
     try {
       await api.refreshFallback()
       await refreshFallbackState()
+      toastSuccess(t('toast.fallbackRefreshed'))
     } catch (error) {
       log('Error refreshing fallback:', error)
     }

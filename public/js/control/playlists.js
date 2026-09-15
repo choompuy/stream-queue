@@ -3,7 +3,7 @@ import { state, dom, views, log } from './state.js'
 import { withLoading } from './ui.js'
 import { refreshFallbackState } from './fallback.js'
 import { t } from '../i18n.js'
-import { translateErrorCode } from '../shared.js'
+import { toastSuccess } from './toast.js'
 
 export async function loadPlaylists() {
   try {
@@ -26,7 +26,6 @@ export function renderPlaylists() {
 
 export async function addPlaylist() {
   const value = dom.playlistUrlInput.value.trim()
-  dom.playlistError.classList.add('hidden')
   if (!value) return
 
   await withLoading(dom.playlistAddBtn, async () => {
@@ -34,9 +33,9 @@ export async function addPlaylist() {
       await api.addPlaylist(value)
       dom.playlistUrlInput.value = ''
       await loadPlaylists()
+      toastSuccess(t('toast.playlistAdded'))
     } catch (error) {
-      dom.playlistError.textContent = translateErrorCode(t, error.code, error.params, error.message) || t('playlists.errorAdding')
-      dom.playlistError.classList.remove('hidden')
+      log('Error adding playlist:', error)
     }
   })
 }
@@ -46,6 +45,7 @@ export async function activatePlaylist(id) {
     state.config = await api.activatePlaylist(id)
     renderPlaylists()
     await refreshFallbackState()
+    toastSuccess(t('toast.playlistActivated'))
   } catch (error) {
     log('Error activating playlist:', error)
   }
@@ -57,6 +57,7 @@ export async function deletePlaylist(id) {
   try {
     const result = await api.removePlaylist(id)
     await loadPlaylists()
+    toastSuccess(t('toast.playlistDeleted'))
     if (result?.fallbackCleared) {
       state.config = await api.getConfig()
       await refreshFallbackState()

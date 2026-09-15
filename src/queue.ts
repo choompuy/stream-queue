@@ -250,13 +250,14 @@ export type RequestSongResult =
   | { outcome: 'error'; error: unknown }
 
 export async function requestSong(query: string, requestedBy: string, bypassFilters: boolean): Promise<RequestSongResult> {
+  let song: Song | null = null
+
   try {
-    let song: Song | null = null
     const { isYouTube, videoId } = parseYouTubeUrl(query)
 
     if (isYouTube && !videoId) {
       log(`[REJECT] ${requestedBy} → INVALID_YOUTUBE_URL`)
-      logActivity({ requestedBy, query, title: null, status: 'rejected', reasonCode: 'INVALID_YOUTUBE_URL' })
+      logActivity({ requestedBy, query, title: null, videoId: null, status: 'rejected', reasonCode: 'INVALID_YOUTUBE_URL' })
       return { outcome: 'invalid-url' }
     }
 
@@ -271,7 +272,7 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
 
     if (!song) {
       log(`[REJECT] ${requestedBy} → SONG_NOT_FOUND`)
-      logActivity({ requestedBy, query, title: null, status: 'rejected', reasonCode: 'SONG_NOT_FOUND' })
+      logActivity({ requestedBy, query, title: null, videoId: null, status: 'rejected', reasonCode: 'SONG_NOT_FOUND' })
       return { outcome: 'not-found' }
     }
 
@@ -286,7 +287,7 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
       log(`[ACCEPT] ${requestedBy} → "${song.title}" - queued`)
     }
 
-    logActivity({ requestedBy, query, title: song.title, status: 'accepted', reasonCode: null })
+    logActivity({ requestedBy, query, title: song.title, videoId: song.videoId, status: 'accepted', reasonCode: null })
 
     const state = getState()
     const position = wasEmpty ? 0 : state.queue.length
@@ -305,7 +306,12 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
     log(`[REJECT] ${requestedBy} → error while adding song`)
     const reasonCode = error instanceof AppError ? error.code : 'SERVER_ERROR'
     const reasonParams = error instanceof AppError ? error.params : undefined
-    logActivity({ requestedBy, query, title: null, status: 'rejected', reasonCode, reasonParams })
+    logActivity({
+      requestedBy, query,
+      title: song?.title ?? null,
+      videoId: song?.videoId ?? null,
+      status: 'rejected', reasonCode, reasonParams
+    })
     return { outcome: 'error', error }
   }
 }

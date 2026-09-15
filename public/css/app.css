@@ -1,5 +1,6 @@
 @import url('variables.css');
 @import url('components.css');
+@import url('toast.css');
 
 body {
   display: grid;
@@ -341,6 +342,8 @@ select {
 
 .section-panel-actions {
   display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: 0.5rem;
 }
@@ -497,8 +500,8 @@ select {
   border-style: none solid none solid;
 }
 
-.section-panel-activity .row-item {
-  padding-left: 1rem;
+.section-panel-activity .row-item:first-child .row-info {
+  margin-left: 1rem;
 }
 
 .status-pill {

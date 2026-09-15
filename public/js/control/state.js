@@ -19,7 +19,8 @@ export const state = {
   playlists: [],
   network: null,
   selectedIp: null,
-  activity: []
+  activity: [],
+  activityFilter: 'all'
 }
 
 export const dom = {
@@ -56,7 +57,6 @@ export const dom = {
 
   searchInput: $('searchInput'),
   searchListWrapper: $('searchListWrapper'),
-  searchError: $('searchError'),
   searchBtn: $('searchBtn'),
 
   statQueueLength: $('statQueueLength'),
@@ -82,12 +82,14 @@ export const dom = {
 
   activityListWrapper: $('activityListWrapper'),
   clearActivityBtn: $('clearActivityBtn'),
+  activityFilterAllBtn: $('activityFilterAllBtn'),
+  activityFilterAcceptedBtn: $('activityFilterAcceptedBtn'),
+  activityFilterRejectedBtn: $('activityFilterRejectedBtn'),
 
   playlistsListWrapper: $('playlistsListWrapper'),
   playlistUrlInput: $('playlistUrlInput'),
   playlistAddBtn: $('playlistAddBtn'),
-  playlistsCount: $('playlistsCount'),
-  playlistError: $('playlistError')
+  playlistsCount: $('playlistsCount')
 }
 
 export const views = createViews(dom)

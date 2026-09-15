@@ -5,6 +5,7 @@ import { syncPlayer } from './player.js'
 import { renderQueue } from './queue.js'
 import { renderPlaylists } from './playlists.js'
 import { setLocale, getCurrentLocale, t } from '../i18n.js'
+import { toastSuccess } from './toast.js'
 
 export async function syncLocaleFromServer() {
   try {
@@ -181,6 +182,7 @@ export async function saveConfigSetting() {
 
     renderQueue()
     renderPlaylists()
+    toastSuccess(t('toast.settingsSaved'))
   } catch (error) {
     log('Error saving settings:', error)
   }
