@@ -29,7 +29,7 @@ export type FallbackPlaylist = {
 export type Settings = {
   showVideo: boolean
   position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
-  locale: 'ru' | 'en'
+  locale: 'en' | 'ru'
 }
 
 export type Song = {
@@ -91,7 +91,7 @@ export class AppError extends Error {
 
 export type StateResponse = PlayerState & { nextTrack: QueueItem | null }
 export type SettingsResponse = Settings
-export type PreviewStateResponse = { state: PlayerState; settings: Settings }
+export type OverlayStateResponse = { state: PlayerState; settings: Settings }
 export type ConfigResponse = Config & { fallbackPlaylistWarning?: string }
 export type SearchResponse = { results: Song[] }
 export type QueueRequestResponse = {

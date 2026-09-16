@@ -87,9 +87,9 @@ export function formatRelativeTime(timestamp) {
 
 export function formatDateTime(timestamp) {
   if (!timestamp) return '-'
-  
-  const locale = document.documentElement.lang || 'ru'
-  return new Intl.DateTimeFormat(locale === 'ru' ? 'ru-RU' : 'en-US', {
+
+  const locale = document.documentElement.lang || 'en'
+  return new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'ru-RU', {
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',

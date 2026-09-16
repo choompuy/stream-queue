@@ -98,8 +98,8 @@
   },
   "settings": {
     "title": "Settings",
-    "preview": {
-      "title": "Preview",
+    "overlay": {
+      "title": "Overlay",
       "showVideo": "Show video",
       "badgePosition": "Badge position",
       "positionTopLeft": "Top Left",
@@ -110,7 +110,7 @@
       "copy": "Copy",
       "qrCode": "QR code",
       "ipSelector": "IP selector",
-      "obsSize": "Recommended OBS source size: Width: 360, Height: 270"
+      "obsSize": "Recommended OBS source size: Width: 362, Height: 283"
     },
     "bot": {
       "title": "Bot Settings",

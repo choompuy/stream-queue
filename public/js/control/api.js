@@ -2,7 +2,7 @@ import { t } from '../i18n.js'
 import { translateErrorCode } from '../shared.js'
 import { toastError } from './toast.js'
 
-async function request(url, options = {}) {
+async function request(url, options = {}, silent = false) {
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -23,7 +23,7 @@ async function request(url, options = {}) {
     const error = new Error(data?.error || `Request failed: ${response.status}`)
     error.code = data?.code
     error.params = data?.params
-    toastError(translateErrorCode(t, error.code, error.params, error.message))
+    if (!silent) toastError(translateErrorCode(t, error.code, error.params, error.message))
     throw error
   }
 
@@ -63,7 +63,7 @@ export const api = {
       body: JSON.stringify(secrets)
     }),
 
-  getState: () => request('/api/state'),
+  getState: (silent) => request('/api/state', {}, silent),
 
   search: (query) => request(`/api/search?q=${encodeURIComponent(query)}&admin=1`),
 
@@ -102,7 +102,7 @@ export const api = {
       method: 'POST'
     }),
 
-  getFallback: () => request('/api/fallback'),
+  getFallback: (silent) => request('/api/fallback', {}, silent),
 
   refreshFallback: () =>
     request('/api/fallback/refresh', {
@@ -154,7 +154,7 @@ export const api = {
       method: 'POST'
     }),
 
-  getActivity: () => request('/api/activity'),
+  getActivity: (silent) => request('/api/activity', {}, silent),
 
   clearActivity: () =>
     request('/api/activity/clear', {

@@ -7,8 +7,8 @@ Viewers request songs in Twitch chat (via Streamer.bot), StreamQueue searches Yo
 ## Features
 
 - 🎵 **Queue management** - search or paste a YouTube link/URL, duplicate detection, per-user request limits, admin bypass from the control panel
-- 🎛 **Web control panel** - dashboard with live queue, play/pause/skip, all settings editable from the UI (API key, filters, preview options) - nothing to configure by hand
-- 📺 **OBS overlay** - a `/preview` Browser Source that plays the queue and shows a "Now Playing" badge (position + size configurable), with a read-only view for any other device on the network
+- 🎛 **Web control panel** - dashboard with live queue, play/pause/skip, all settings editable from the UI (API key, filters, overlay options) - nothing to configure by hand
+- 📺 **OBS overlay** - a `/overlay` Browser Source that plays the queue and shows a "Now Playing" badge (position + size configurable), with a read-only view for any other device on the network
 - 🔁 **Fallback playlist** - pick any YouTube playlist as background/filler music with shuffle and repeat, auto-refreshes to pick up new/removed tracks
 - 🤖 **Streamer.bot ready** - a single REST endpoint handles `!sr <query>`; skip/pause/resume/mod actions hit existing endpoints too
 - 📋 **Saved playlists** - keep a library of playlists and switch the active fallback playlist with one click
@@ -29,7 +29,7 @@ Twitch chat "!sr never gonna give you up"
                                                      added to the queue
                                                               │
                                                               ▼
-                                              OBS Browser Source (/preview) plays it
+                                              OBS Browser Source (/overlay) plays it
 ```
 
 ## Getting started
@@ -61,8 +61,8 @@ Produces `dist/StreamQueue.exe` - a single file a non-technical streamer can jus
 ## OBS setup
 
 1. Add a **Browser Source** in OBS.
-2. Copy the URL from **Settings → Preview → OBS Browser Source URL** (or scan the QR code from another device on the same network).
-3. Recommended size: **360×270**.
+2. Copy the URL from **Settings → Overlay → OBS Browser Source URL** (or scan the QR code from another device on the same network).
+3. Recommended size: **362×283**.
 
 The overlay shows the video (optional, toggle in Settings) plus a "Now Playing" badge with title, requester, and progress - position is configurable (all four corners).
 

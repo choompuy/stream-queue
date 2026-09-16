@@ -1,10 +1,13 @@
-const DEFAULT_LOCALE = 'ru'
-const SUPPORTED_LOCALES = ['ru', 'en']
+const DEFAULT_LOCALE = 'en'
+const SUPPORTED_LOCALES = ['en', 'ru']
 
 let currentLocale = DEFAULT_LOCALE
 let translations = {}
 
 const pluralRules = {
+  en: (n) => {
+    return n === 1 ? 'one' : 'many'
+  },
   ru: (n) => {
     const lastTwo = n % 100
     const lastOne = n % 10
@@ -12,9 +15,6 @@ const pluralRules = {
     if (lastOne === 1) return 'one'
     if (lastOne >= 2 && lastOne <= 4) return 'few'
     return 'many'
-  },
-  en: (n) => {
-    return n === 1 ? 'one' : 'many'
   }
 }
 
@@ -83,8 +83,8 @@ export function getSupportedLocales() {
 
 export function getLocaleName(locale) {
   const names = {
-    ru: 'Русский',
-    en: 'English'
+    en: 'English',
+    ru: 'Русский'
   }
   return names[locale] || locale
 }

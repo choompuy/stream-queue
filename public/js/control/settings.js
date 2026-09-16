@@ -16,7 +16,7 @@ export async function changeLocale(locale) {
   }
 }
 
-export async function loadPreviewSettings() {
+export async function loadOverlaySettings() {
   try {
     state.settings = await api.getSettings()
 
@@ -27,7 +27,7 @@ export async function loadPreviewSettings() {
   }
 }
 
-export async function savePreviewSettings() {
+export async function saveOverlaySettings() {
   try {
     state.settings.showVideo = dom.showVideo.checked
     state.settings.position = dom.badgePosition ? dom.badgePosition.value : state.settings.position
@@ -38,10 +38,10 @@ export async function savePreviewSettings() {
   }
 }
 
-export function copyPreviewUrl() {
-  if (!dom.previewUrl) return
+export function copyOverlayUrl() {
+  if (!dom.overlayUrl) return
 
-  navigator.clipboard?.writeText(dom.previewUrl.href).catch((error) => {
+  navigator.clipboard?.writeText(dom.overlayUrl.href).catch((error) => {
     log('Copy failed:', error)
   })
 }

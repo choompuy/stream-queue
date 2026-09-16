@@ -1,5 +1,7 @@
 import { Response, Request, NextFunction, RequestHandler, ParamsDictionary } from 'express-serve-static-core'
 import { AppError, AppErrorCode, ApiOk, ApiError } from './types.js'
+import { getSettings } from './settings.js'
+import { translateErrorCode } from './i18n.js'
 
 export function ok<T extends object>(res: Response, data: T, status = 200): void {
   const body: ApiOk<T> = { success: true, ...data }
@@ -7,7 +9,9 @@ export function ok<T extends object>(res: Response, data: T, status = 200): void
 }
 
 export function fail(res: Response, error: string, code: string, status: number, params?: Record<string, string | number>): void {
-  const body: ApiError = { success: false, error, code, params }
+  const locale = getSettings().locale
+  const localized = translateErrorCode(locale, code, params)
+  const body: ApiError = { success: false, error: localized ?? error, code, params }
   res.status(status).json(body)
 }
 

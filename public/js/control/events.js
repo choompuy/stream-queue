@@ -13,7 +13,7 @@ import {
 } from './fallback.js'
 import { addPlaylist, activatePlaylist, deletePlaylist } from './playlists.js'
 import { clearActivity, setActivityFilter } from './activity.js'
-import { savePreviewSettings, copyPreviewUrl, onIpChange, toggleQr, saveConfigSetting, changeLocale } from './settings.js'
+import { saveOverlaySettings, copyOverlayUrl, onIpChange, toggleQr, saveConfigSetting, changeLocale } from './settings.js'
 
 const ACTIONS = {
   'play-pause': playPauseCurrent,
@@ -34,7 +34,7 @@ const ACTIONS = {
   'playlist-delete': (action) => deletePlaylist(action.dataset.id),
   'clear-activity': clearActivity,
   'activity-filter': (action) => setActivityFilter(action.dataset.filter),
-  'copy-preview-url': copyPreviewUrl,
+  'copy-overlay-url': copyOverlayUrl,
   'toggle-qr': toggleQr,
   'save-config': saveConfigSetting
 }
@@ -67,8 +67,8 @@ export function bindEvents() {
     if (event.key === 'Enter') addPlaylist()
   })
 
-  dom.showVideo?.addEventListener('change', savePreviewSettings)
-  dom.badgePosition?.addEventListener('change', savePreviewSettings)
+  dom.showVideo?.addEventListener('change', saveOverlaySettings)
+  dom.badgePosition?.addEventListener('change', saveOverlaySettings)
   dom.selectIp?.addEventListener('change', onIpChange)
   dom.localeSelect?.addEventListener('change', (e) => changeLocale(e.target.value))
 }

@@ -6,6 +6,7 @@ import { STATE_FILE, createFileStore } from './persist.js'
 import { logActivity } from './activity.js'
 import { Settings, QueueItem, Song, PlayerState, AppError, QueueRequestResponse } from './types.js'
 import { peekNextFallbackTrack, advanceFallback, getFallbackSnapshot, hydrateFallback, FallbackSnapshot } from './fallback.js'
+import { t } from './i18n.js'
 
 type StateFile = {
   current: QueueItem | null
@@ -44,7 +45,7 @@ async function loadState(): Promise<void> {
     }
 
     if (data.settings) {
-      const settingsWithLocale = { ...data.settings, locale: data.settings.locale || 'ru' }
+      const settingsWithLocale = { ...data.settings, locale: data.settings.locale || 'en' }
       setSettings(settingsWithLocale)
     }
 
@@ -121,17 +122,8 @@ export function getIsPaused(): boolean {
   return isPaused
 }
 
-export function assertCanAddSong(song: Song, requestedBy: string, addToQueue: boolean, bypassLimits: boolean = false): void {
+function assertCanRequestSong(requestedBy: string, addToQueue: boolean, bypassLimits: boolean): void {
   const config = getConfig()
-  const normalized = requestedBy.toLowerCase()
-
-  if (currentSong?.videoId === song.videoId && !currentSong.isFallback) {
-    throw new AppError('DUPLICATE', 'this track is already in the queue')
-  }
-
-  if (queueVideoIds.has(song.videoId)) {
-    throw new AppError('DUPLICATE', 'this track is already in the queue')
-  }
 
   if (addToQueue && queue.length >= config.maxQueueSize) {
     throw new AppError('QUEUE_FULL', 'the queue is full')
@@ -139,12 +131,27 @@ export function assertCanAddSong(song: Song, requestedBy: string, addToQueue: bo
 
   if (bypassLimits) return
 
-  const activeCount = getUserActiveCount(normalized)
+  const activeCount = getUserActiveCount(requestedBy.toLowerCase())
   if (config.maxRequestsPerUser > 0 && activeCount >= config.maxRequestsPerUser) {
     throw new AppError('USER_LIMIT', `you can only queue ${config.maxRequestsPerUser} track(s) at a time`, {
       count: config.maxRequestsPerUser
     })
   }
+}
+
+function assertNotDuplicate(videoId: string): void {
+  if (currentSong?.videoId === videoId && !currentSong.isFallback) {
+    throw new AppError('DUPLICATE', 'this track is already in the queue')
+  }
+
+  if (queueVideoIds.has(videoId)) {
+    throw new AppError('DUPLICATE', 'this track is already in the queue')
+  }
+}
+
+export function assertCanAddSong(song: Song, requestedBy: string, addToQueue: boolean, bypassLimits: boolean = false): void {
+  assertNotDuplicate(song.videoId)
+  assertCanRequestSong(requestedBy, addToQueue, bypassLimits)
 }
 
 export function addSong(song: Song, requestedBy: string, addToQueue: boolean = true, bypassLimits: boolean = false): QueueItem {
@@ -253,6 +260,8 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
   let song: Song | null = null
 
   try {
+    assertCanRequestSong(requestedBy, getState().current !== null, bypassFilters)
+
     const { isYouTube, videoId } = parseYouTubeUrl(query)
 
     if (isYouTube && !videoId) {
@@ -262,6 +271,7 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
     }
 
     if (videoId) {
+      assertNotDuplicate(videoId)
       log(`[REQUEST] ${requestedBy} → YouTube URL: ${videoId}`)
       song = await getVideoById(videoId, bypassFilters)
     } else {
@@ -291,11 +301,15 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
 
     const state = getState()
     const position = wasEmpty ? 0 : state.queue.length
+    const locale = getSettings().locale
+    const message = wasEmpty
+      ? (t(locale, 'toast.nowPlaying', { title: song.title }) ?? `Now playing: ${song.title}`)
+      : (t(locale, 'toast.addedToQueue', { title: song.title, position }) ?? `Added to queue: ${song.title} [#${position}]`)
 
     return {
       outcome: 'added',
       response: {
-        message: wasEmpty ? `added: ${song.title} - now playing` : `added: ${song.title} - position #${position}`,
+        message,
         song: item,
         started: wasEmpty,
         position,
@@ -307,10 +321,13 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
     const reasonCode = error instanceof AppError ? error.code : 'SERVER_ERROR'
     const reasonParams = error instanceof AppError ? error.params : undefined
     logActivity({
-      requestedBy, query,
+      requestedBy,
+      query,
       title: song?.title ?? null,
       videoId: song?.videoId ?? null,
-      status: 'rejected', reasonCode, reasonParams
+      status: 'rejected',
+      reasonCode,
+      reasonParams
     })
     return { outcome: 'error', error }
   }

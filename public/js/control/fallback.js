@@ -5,9 +5,9 @@ import { refreshState } from './queue.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 
-export async function refreshFallbackState() {
+export async function refreshFallbackState(silent = false) {
   try {
-    state.fallback = await api.getFallback()
+    state.fallback = await api.getFallback(silent)
     renderFallback()
   } catch (error) {
     log('Error fetching fallback playlist:', error)

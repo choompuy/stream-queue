@@ -41,7 +41,8 @@ export function showToast(message, options = {}) {
   enforceMaxToasts(root)
 
   const toast = document.createElement('div')
-  toast.className = `toast-wrapper toast-${type} toast-entering`
+  toast.className = `toast-wrapper toast-${type} toast-entering${duration > 0 ? '' : ' toast-persistent'}`
+  toast.style.setProperty('--toast-duration', `${duration > 0 ? duration : DEFAULT_DURATION}ms`)
   toast.innerHTML = `
     <div class="toast-bg"></div>
     <div class="toast">

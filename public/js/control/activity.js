@@ -41,9 +41,9 @@ function updateFilterButtons(filter) {
   dom.activityFilterRejectedBtn?.classList.toggle('active', filter === 'rejected')
 }
 
-export async function loadActivity() {
+export async function loadActivity(silent = false) {
   try {
-    const data = await api.getActivity()
+    const data = await api.getActivity(silent)
     const entries = data.entries ?? []
     notifyNewViewerRequests(entries)
     state.activity = entries

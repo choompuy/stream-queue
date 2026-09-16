@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import {
   StateResponse,
   SettingsResponse,
-  PreviewStateResponse,
+  OverlayStateResponse,
   ConfigResponse,
   SearchResponse,
   QueueRemoveResponse,
@@ -84,8 +84,8 @@ app.get('/api/network-info', (_req, res) => {
   ok(res, { port: PORT, ips })
 })
 
-app.get('/preview', (_req, res) => {
-  res.sendFile('preview.html', {
+app.get('/overlay', (_req, res) => {
+  res.sendFile('overlay.html', {
     root: path.join(__dirname, '../public')
   })
 })
@@ -104,8 +104,8 @@ app.put('/api/settings', (req, res) => {
   ok<SettingsResponse>(res, updated)
 })
 
-app.get('/api/preview-state', (_req, res) => {
-  ok<PreviewStateResponse>(res, { state: getState(), settings: getSettings() })
+app.get('/api/overlay-state', (_req, res) => {
+  ok<OverlayStateResponse>(res, { state: getState(), settings: getSettings() })
 })
 
 app.get('/api/locale', (_req, res) => {
@@ -115,13 +115,13 @@ app.get('/api/locale', (_req, res) => {
 
 app.put('/api/locale', (req, res) => {
   const { locale } = req.body ?? {}
-  const validLocales = ['ru', 'en']
-  
+  const validLocales = ['en', 'ru']
+
   if (typeof locale !== 'string' || !validLocales.includes(locale)) {
     return fail(res, 'Invalid locale', 'INVALID_LOCALE', 400)
   }
-  
-  const updated = updateSettings({ locale: locale as 'ru' | 'en' })
+
+  const updated = updateSettings({ locale: locale as 'en' | 'ru' })
   ok<SettingsResponse>(res, updated)
 })
 

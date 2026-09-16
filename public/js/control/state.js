@@ -26,7 +26,7 @@ export const state = {
 export const dom = {
   showVideo: $('showVideo'),
   badgePosition: $('badgePosition'),
-  previewUrl: $('previewUrl'),
+  overlayUrl: $('overlayUrl'),
   selectIp: $('selectIp'),
   controlPanelQr: $('controlPanelQr'),
   localeSelect: $('localeSelect'),

@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="css/preview.css" />
-    <title>Song Preview</title>
+    <link rel="stylesheet" href="css/overlay.css" />
+    <title>StreamQueue - Overlay</title>
   </head>
   <body>
     <div class="container">
@@ -26,6 +26,10 @@
               </div>
             </div>
 
+            <div class="now-playing-video video-collapsed" id="nowPlayingVideo">
+              <div id="player"></div>
+            </div>
+
             <div class="next-playing" id="nextPlaying">
               <div class="prefix text-secondary text-xs" data-i18n="nowPlaying.next">NEXT</div>
               <div class="flex-1 text-xs truncate" id="nextTitle"></div>
@@ -34,13 +38,9 @@
           </div>
         </div>
       </div>
-
-      <div class="player-wrapper hidden" id="playerWrapper">
-        <div id="player"></div>
-      </div>
     </div>
 
     <script type="module" src="js/i18n.js"></script>
-    <script type="module" src="js/preview.js"></script>
+    <script type="module" src="js/overlay.js"></script>
   </body>
 </html>

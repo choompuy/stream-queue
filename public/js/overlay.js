@@ -13,7 +13,7 @@ const log = createLogger('PREVIEW')
 const isPlaybackSource = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
 
 const dom = {
-  playerWrapper: $('playerWrapper'),
+  nowPlayingVideo: $('nowPlayingVideo'),
   badgeWrapper: $('badgeWrapper'),
   badge: $('badge'),
   currentThumbnail: $('currentThumbnail'),
@@ -27,13 +27,13 @@ const dom = {
   nextElapsedTime: $('nextElapsedTime')
 }
 
-async function fetchPreviewState() {
+async function fetchOverlayState() {
   try {
-    const response = await fetch('/api/preview-state')
+    const response = await fetch('/api/overlay-state')
     const data = await response.json()
     settings = data.settings
 
-    const serverLocale = settings.locale || 'ru'
+    const serverLocale = settings.locale || 'en'
     if (!localeLoaded || serverLocale !== getCurrentLocale()) {
       await initI18n(serverLocale)
       localeLoaded = true
@@ -46,7 +46,7 @@ async function fetchPreviewState() {
 }
 
 function updateMediaVisibility(state) {
-  dom.playerWrapper.classList.toggle('hidden', !state.showVideo)
+  dom.nowPlayingVideo.classList.toggle('video-collapsed', !state.showVideo)
   dom.badgeWrapper.classList.toggle('with-video', state.showVideo)
 }
 
@@ -96,8 +96,6 @@ function renderState(state) {
       player.loadVideoById(state.current.videoId)
       player.setOption('captions', 'fontSize', 0)
       player.unloadModule('captions')
-
-      if (!settings.showVideo) player.setPlaybackQuality('tiny')
     }
   } else if (isPlayerReady && !state.current && !isTransitioning) {
     player.stopVideo()
@@ -122,7 +120,7 @@ function updateProgress() {
 async function notifyEnded() {
   try {
     await fetch('/api/player/ended', { method: 'POST' })
-    await fetchPreviewState()
+    await fetchOverlayState()
   } catch (error) {
     log('Error notifying ended:', error)
   }
@@ -132,7 +130,7 @@ function onPlayerReady(event) {
   log('Player ready')
   isPlayerReady = true
   event.target.setVolume(100)
-  fetchPreviewState()
+  fetchOverlayState()
 }
 
 function onPlayerStateChange(event) {
@@ -157,7 +155,7 @@ function onPlayerError(event) {
     isTransitioning = true
 
     fetch('/api/player/skip', { method: 'POST' })
-      .then(() => fetchPreviewState())
+      .then(() => fetchOverlayState())
       .finally(() => {
         setTimeout(() => {
           isTransitioning = false
@@ -196,16 +194,16 @@ if (isPlaybackSource) {
   firstScriptTag.parentNode.insertBefore(tag, firstScriptTag)
 } else {
   log('Non-localhost origin: read-only widget, no embedded player')
-  dom.playerWrapper.classList.add('hidden')
+  dom.nowPlayingVideo.classList.add('hidden')
 }
 
 async function init() {
-  await fetchPreviewState()
+  await fetchOverlayState()
 }
 
 init()
 
 setInterval(() => {
-  fetchPreviewState()
+  fetchOverlayState()
   updateProgress()
 }, 1000)

@@ -11,7 +11,7 @@
     />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="stylesheet" href="css/app.css" />
-    <title>Song Control Panel</title>
+    <title>StreamQueue - Control Panel</title>
   </head>
   <body>
     <header class="box-shadow">
@@ -315,31 +315,31 @@
         <div class="settings-wrapper">
           <div class="section-panel panel">
             <div class="section-panel-header">
-              <h2 data-i18n="settings.preview.title">Preview</h2>
+              <h2 data-i18n="settings.overlay.title">Overlay</h2>
             </div>
             <div class="settings-section">
               <label class="field-row">
                 <div class="checkbox-wrapper">
                   <input class="checkbox" type="checkbox" id="showVideo" />
                 </div>
-                <span data-i18n="settings.preview.showVideo">Show video</span>
+                <span data-i18n="settings.overlay.showVideo">Show video</span>
               </label>
 
               <div class="field">
-                <label class="field-label" for="badgePosition" data-i18n="settings.preview.badgePosition">Badge position</label>
+                <label class="field-label" for="badgePosition" data-i18n="settings.overlay.badgePosition">Badge position</label>
                 <select class="settings-input input select" id="badgePosition">
-                  <option value="top-left" data-i18n="settings.preview.positionTopLeft">Top Left</option>
-                  <option value="top-right" data-i18n="settings.preview.positionTopRight">Top Right</option>
-                  <option value="bottom-left" data-i18n="settings.preview.positionBottomLeft">Bottom Left</option>
-                  <option value="bottom-right" data-i18n="settings.preview.positionBottomRight">Bottom Right</option>
+                  <option value="top-left" data-i18n="settings.overlay.positionTopLeft">Top Left</option>
+                  <option value="top-right" data-i18n="settings.overlay.positionTopRight">Top Right</option>
+                  <option value="bottom-left" data-i18n="settings.overlay.positionBottomLeft">Bottom Left</option>
+                  <option value="bottom-right" data-i18n="settings.overlay.positionBottomRight">Bottom Right</option>
                 </select>
               </div>
 
               <div class="field">
-                <div class="field-label" data-i18n="settings.preview.obsUrl">OBS Browser Source URL</div>
+                <div class="field-label" data-i18n="settings.overlay.obsUrl">OBS Browser Source URL</div>
                 <div class="field-row">
-                  <a class="settings-input input text-blue" id="previewUrl" href="/preview" target="_blank" rel="noopener noreferrer">/preview</a>
-                  <button class="btn btn-secondary btn-icon" data-action="copy-preview-url" title="Copy" data-i18n-title="settings.preview.copy">
+                  <a class="settings-input input text-blue" id="overlayUrl" href="/overlay" target="_blank" rel="noopener noreferrer">/overlay</a>
+                  <button class="btn btn-secondary btn-icon" data-action="copy-overlay-url" title="Copy" data-i18n-title="settings.overlay.copy">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                       <path
                         stroke="currentColor"
@@ -352,14 +352,14 @@
                   </button>
                 </div>
 
-                <div class="text-muted text-xs" data-i18n="settings.preview.obsSize">Recommended OBS source size: Width: 360, Height: 270</div>
+                <div class="text-muted text-xs" data-i18n="settings.overlay.obsSize">Recommended OBS source size: Width: 362, Height: 283</div>
               </div>
 
               <div class="field">
-                <label class="field-label" for="selectIp" data-i18n="settings.preview.ipSelector">IP selector</label>
+                <label class="field-label" for="selectIp" data-i18n="settings.overlay.ipSelector">IP selector</label>
                 <div class="field-row">
                   <select class="settings-input input select hidden" id="selectIp"></select>
-                  <button class="btn btn-secondary btn-icon" data-action="toggle-qr" title="QR code" data-i18n-title="settings.preview.qrCode">
+                  <button class="btn btn-secondary btn-icon" data-action="toggle-qr" title="QR code" data-i18n-title="settings.overlay.qrCode">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                       <path
                         fill="currentColor"
@@ -448,8 +448,8 @@
               <div class="field">
                 <label class="field-label" for="localeSelect" data-i18n="settings.language.description">Select interface language</label>
                 <select class="settings-input input select" id="localeSelect">
-                  <option value="ru">Русский</option>
                   <option value="en">English</option>
+                  <option value="ru">Русский</option>
                 </select>
               </div>
             </div>

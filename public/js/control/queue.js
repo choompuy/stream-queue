@@ -6,9 +6,9 @@ import { refreshFallbackState } from './fallback.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 
-export async function refreshState() {
+export async function refreshState(silent = false) {
   try {
-    const nextState = await api.getState()
+    const nextState = await api.getState(silent)
     const trackChanged = state.current?.videoId !== nextState.current?.videoId
     state.current = nextState.current
     state.queue = nextState.queue ?? []
@@ -16,7 +16,7 @@ export async function refreshState() {
     state.nextTrack = nextState.nextTrack ?? null
     renderState()
 
-    if (trackChanged) await refreshFallbackState()
+    if (trackChanged) await refreshFallbackState(silent)
   } catch (error) {
     log('Error fetching state:', error)
   }
