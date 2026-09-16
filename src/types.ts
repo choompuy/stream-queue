@@ -90,6 +90,7 @@ export class AppError extends Error {
 }
 
 export type StateResponse = PlayerState & { nextTrack: QueueItem | null }
+export type PlayerActionResponse = StateResponse & { message: string }
 export type SettingsResponse = Settings
 export type OverlayStateResponse = { state: PlayerState; settings: Settings }
 export type ConfigResponse = Config & { fallbackPlaylistWarning?: string }

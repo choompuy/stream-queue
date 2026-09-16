@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 import {
   StateResponse,
+  PlayerActionResponse,
   SettingsResponse,
   OverlayStateResponse,
   ConfigResponse,
@@ -20,6 +21,7 @@ import { ok, fail, failFromError, asyncHandler } from './http.js'
 import { getPublicSecretsView, updateSecrets } from './secrets.js'
 import { getConfig, updateConfig } from './config.js'
 import { getSettings, updateSettings } from './settings.js'
+import { t } from './i18n.js'
 import { searchSongs, fetchPlaylistMeta } from './youtube/index.js'
 import { parsePlaylistId } from './youtube/url.js'
 import { getPlaylists, upsertPlaylist, removePlaylist } from './playlists.js'
@@ -301,17 +303,26 @@ app.post('/api/player/ended', (_req, res) => {
 
 app.post('/api/player/skip', (_req, res) => {
   skipCurrent()
-  ok<StateResponse>(res, getState())
+  const state = getState()
+  const locale = getSettings().locale
+  const message = state.current?.title
+    ? (t(locale, 'chat.skippedNowPlaying', { title: state.current.title }) ?? `Track skipped. Now playing: ${state.current.title}`)
+    : (t(locale, 'chat.skipped') ?? 'Track skipped')
+  ok<PlayerActionResponse>(res, { ...state, message })
 })
 
 app.post('/api/player/pause', (_req, res) => {
   setPaused(true)
-  ok<StateResponse>(res, getState())
+  const locale = getSettings().locale
+  const message = t(locale, 'chat.paused') ?? 'Player paused'
+  ok<PlayerActionResponse>(res, { ...getState(), message })
 })
 
 app.post('/api/player/resume', (_req, res) => {
   setPaused(false)
-  ok<StateResponse>(res, getState())
+  const locale = getSettings().locale
+  const message = t(locale, 'chat.resumed') ?? 'Playback resumed'
+  ok<PlayerActionResponse>(res, { ...getState(), message })
 })
 
 app.get('/api/fallback', (_req, res) => {
@@ -372,6 +383,42 @@ app.delete('/api/queue/:index', (req, res) => {
 app.post('/api/queue/clear', (_req, res) => {
   clearQueue()
   ok<StateResponse>(res, getState())
+})
+
+app.get('/api/chat/now-playing', (_req, res) => {
+  const state = getState()
+  const locale = getSettings().locale
+
+  if (!state.current) {
+    return ok(res, { message: t(locale, 'chat.nothingPlaying') ?? 'Nothing is playing right now' })
+  }
+
+  const base =
+    t(locale, 'chat.nowPlayingWithRequester', { title: state.current.title, requestedBy: state.current.requestedBy }) ??
+    `Now playing: ${state.current.title} (requested by ${state.current.requestedBy})`
+  const pausedSuffix = state.isPaused ? (t(locale, 'chat.pausedSuffix') ?? ' (paused)') : ''
+  ok(res, { message: base + pausedSuffix })
+})
+
+app.get('/api/chat/queue', (_req, res) => {
+  const state = getState()
+  const locale = getSettings().locale
+
+  if (state.queue.length === 0) {
+    return ok(res, { message: t(locale, 'chat.queueEmpty') ?? 'The queue is empty' })
+  }
+
+  const maxShown = 4
+  const list = state.queue
+    .slice(0, maxShown)
+    .map((item, index) => `${index + 1}. ${item.title}`)
+    .join(' | ')
+  const base = t(locale, 'chat.queueList', { count: state.queue.length, list }) ?? `Queue [${state.queue.length}]: ${list}`
+  const more =
+    state.queue.length > maxShown
+      ? (t(locale, 'chat.queueMore', { count: state.queue.length - maxShown }) ?? ` [+${state.queue.length - maxShown}]`)
+      : ''
+  ok(res, { message: base + more })
 })
 
 app.get('/api/secrets', (_req, res) => {

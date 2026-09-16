@@ -1,4 +1,16 @@
 {
+  "chat": {
+    "skipped": "Track skipped",
+    "skippedNowPlaying": "Track skipped. Now playing: {{title}}",
+    "paused": "Player paused",
+    "resumed": "Playback resumed",
+    "nothingPlaying": "Nothing is playing right now",
+    "nowPlayingWithRequester": "Now playing: {{title}} (requested by {{requestedBy}})",
+    "pausedSuffix": " (paused)",
+    "queueEmpty": "The queue is empty",
+    "queueList": "Queue [{{count}}]: {{list}}",
+    "queueMore": " [+{{count}}]"
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",
@@ -88,7 +100,7 @@
     "errorAdding": "Error adding playlist",
     "empty": {
       "title": "No saved playlists yet",
-      "description": "Add a YouTube playlist above, then activate it to use as your fallback rotation."
+      "description": "Add a YouTube playlist above, then activate it to use as your fallback rotation"
     },
     "tracks": "{{count}} tracks",
     "activate": "Play playlist",
@@ -125,7 +137,7 @@
         "maxQueue": "Max queue size",
         "maxPerUser": "Max requests per user"
       },
-      "rateLimitNote": "Cooldowns and per-user rate limits are handled in Streamer.bot, not here.",
+      "rateLimitNote": "Cooldowns and per-user rate limits are handled in Streamer.bot, not here",
       "save": "Save settings"
     },
     "language": {
