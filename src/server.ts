@@ -3,7 +3,6 @@ import cors from 'cors'
 import { exec } from 'node:child_process'
 import os from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import {
   StateResponse,
@@ -22,10 +21,12 @@ import { getPublicSecretsView, updateSecrets } from './secrets.js'
 import { getConfig, updateConfig } from './config.js'
 import { getSettings, updateSettings } from './settings.js'
 import { t } from './i18n.js'
+import { getAppRoot } from './runtime.js'
 import { searchSongs, fetchPlaylistMeta } from './youtube/index.js'
 import { parsePlaylistId } from './youtube/url.js'
 import { getPlaylists, upsertPlaylist, removePlaylist } from './playlists.js'
 import { getState, removeAt, clearQueue, moveToNext, skipCurrent, setPaused, requestSong } from './queue.js'
+import { flushAllStores } from './persist.js'
 import {
   refreshFallback,
   getFallbackState,
@@ -40,11 +41,10 @@ import { getActivity, clearActivity } from './activity.js'
 import { getBlockedTracks, blockTrack, unblockTrack } from './blocklist.js'
 
 const app = express()
-const PORT = await findAvailablePort(3000)
+let PORT: number
 
 const LAN_HOSTNAME_PATTERN = /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[0-1])\.)/
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+const PUBLIC_DIR = path.join(getAppRoot(), 'public')
 
 app.use(
   cors({
@@ -66,7 +66,7 @@ app.use(
   })
 )
 app.use(express.json({ limit: '50kb' }))
-app.use(express.static(path.join(__dirname, '../public')))
+app.use(express.static(PUBLIC_DIR))
 
 function log(message: string) {
   console.log(`[SERVER] ${message}`)
@@ -89,7 +89,7 @@ app.get('/api/network-info', (_req, res) => {
 
 app.get('/overlay', (_req, res) => {
   res.sendFile('overlay.html', {
-    root: path.join(__dirname, '../public')
+    root: PUBLIC_DIR
   })
 })
 
@@ -455,6 +455,15 @@ app.put('/api/secrets', (req, res) => {
   ok<SecretsResponse>(res, getPublicSecretsView())
 })
 
+app.post('/api/shutdown', (_req, res) => {
+  res.on('finish', () => {
+    flushAllStores()
+      .catch((error) => console.error('[SHUTDOWN] Flush failed:', error instanceof Error ? error.message : error))
+      .finally(() => process.exit(0))
+  })
+  ok(res, {})
+})
+
 app.use('/api', (_req, res) => {
   fail(res, 'API endpoint not found', 'NOT_FOUND', 404)
 })
@@ -478,11 +487,22 @@ function openBrowser(url: string): void {
   exec(`xdg-open "${url}"`)
 }
 
-app.listen(PORT, async () => {
-  log(`Server running on http://localhost:${PORT}`)
-  await refreshFallback()
-  if (!getState().current) {
-    moveToNext()
-  }
-  openBrowser(`http://localhost:${PORT}`)
+async function main() {
+  PORT = await findAvailablePort(3000)
+
+  app.listen(PORT, async () => {
+    log(`Server running on http://localhost:${PORT}`)
+    await refreshFallback()
+    if (!getState().current) {
+      moveToNext()
+    }
+    if (!process.env.STREAMQUEUE_NO_AUTO_OPEN) {
+      openBrowser(`http://localhost:${PORT}`)
+    }
+  })
+}
+
+main().catch((error) => {
+  console.error('[FATAL]', error instanceof Error ? error.message : error)
+  process.exit(1)
 })

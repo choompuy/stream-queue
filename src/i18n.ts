@@ -1,10 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { getAppRoot } from './runtime.js'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const LOCALES_DIR = path.join(__dirname, '../public/locales')
+const LOCALES_DIR = path.join(getAppRoot(), 'public/locales')
 const DEFAULT_LOCALE = 'en'
 
 type Dict = { [key: string]: Dict | string }
