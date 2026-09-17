@@ -87,11 +87,17 @@
     "empty": "Нет запросов",
     "clear": "Очистить",
     "clearConfirm": "Очистить активность?",
+    "ban": "Заблокировать трек",
     "accepted": "Принято",
     "rejected": "Отклонено",
     "filterAll": "Все",
     "filterAccepted": "Принятые",
     "filterRejected": "Отклонённые"
+  },
+  "blocklist": {
+    "title": "Блоклист",
+    "empty": "Нет заблокированных треков",
+    "unblock": "Разблокировать"
   },
   "playlists": {
     "title": "Плейлисты",
@@ -176,6 +182,7 @@
       "serverError": "Внутренняя ошибка сервера",
       "notFound": "Не найдено",
       "duplicate": "Этот трек уже находится в очереди",
+      "blocked": "Этот трек заблокирован стримером",
       "queueFull": "Очередь заполнена",
       "userLimit": "Можно добавить максимум {{count}} трек(ов) одновременно",
       "youtubeQuota": "Лимит YouTube API исчерпан",
@@ -205,6 +212,8 @@
     "playlistActivated": "Плейлист активирован",
     "playlistDeleted": "Плейлист удалён",
     "fallbackRefreshed": "Плейлист обновлён",
+    "trackBlocked": "Трек заблокирован",
+    "trackUnblocked": "Трек разблокирован",
     "settingsSaved": "Настройки сохранены",
     "nowPlaying": "Сейчас играет: {{title}}",
     "addedToQueue": "Добавлено в очередь: {{title}} [#{{position}}]",

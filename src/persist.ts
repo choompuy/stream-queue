@@ -29,6 +29,7 @@ export const CONFIG_PATH = join(DATA_DIR, 'config.json')
 export const PLAYLISTS_PATH = join(DATA_DIR, 'playlists.json')
 export const SECRETS_PATH = join(DATA_DIR, 'secrets.json')
 export const ACTIVITY_PATH = join(DATA_DIR, 'activity.json')
+export const BLOCKLIST_PATH = join(DATA_DIR, 'blocklist.json')
 
 export const STATE_FILE = join(CACHE_DIR, 'queue-state.json')
 export const CACHE_FILE = join(CACHE_DIR, 'youtube-cache.json')

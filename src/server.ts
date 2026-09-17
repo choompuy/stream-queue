@@ -37,6 +37,7 @@ import {
   queueFallbackTrack
 } from './fallback.js'
 import { getActivity, clearActivity } from './activity.js'
+import { getBlockedTracks, blockTrack, unblockTrack } from './blocklist.js'
 
 const app = express()
 const PORT = await findAvailablePort(3000)
@@ -238,6 +239,27 @@ app.post(
   })
 )
 
+app.get('/api/blocklist', (_req, res) => {
+  ok(res, { entries: getBlockedTracks() })
+})
+
+app.post('/api/blocklist', (req, res) => {
+  const { videoId, title } = req.body ?? {}
+
+  if (typeof videoId !== 'string' || !videoId) {
+    return fail(res, 'videoId is required', 'INVALID_REQUEST', 400)
+  }
+
+  const entry = blockTrack(videoId, typeof title === 'string' && title ? title : videoId)
+  ok(res, { entry }, 201)
+})
+
+app.delete('/api/blocklist/:videoId', (req, res) => {
+  const removed = unblockTrack(req.params.videoId)
+  if (!removed) return fail(res, 'not found', 'NOT_FOUND', 404)
+  ok(res, { removed: true })
+})
+
 app.get(
   '/api/search',
   asyncHandler(async (req, res) => {
@@ -400,6 +422,8 @@ app.get('/api/chat/now-playing', (_req, res) => {
   ok(res, { message: base + pausedSuffix })
 })
 
+const truncate = (s: string, max = 40) => (s.length > max ? s.slice(0, max - 1) + '…' : s)
+
 app.get('/api/chat/queue', (_req, res) => {
   const state = getState()
   const locale = getSettings().locale
@@ -409,9 +433,10 @@ app.get('/api/chat/queue', (_req, res) => {
   }
 
   const maxShown = 4
+
   const list = state.queue
     .slice(0, maxShown)
-    .map((item, index) => `${index + 1}. ${item.title}`)
+    .map((item, i) => `${i + 1}. ${truncate(item.title)}`)
     .join(' | ')
   const base = t(locale, 'chat.queueList', { count: state.queue.length, list }) ?? `Queue [${state.queue.length}]: ${list}`
   const more =

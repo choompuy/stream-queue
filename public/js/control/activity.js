@@ -2,7 +2,8 @@ import { api } from './api.js'
 import { state, views, dom, log, renderStats } from './state.js'
 import { withLoading } from './ui.js'
 import { t } from '../i18n.js'
-import { toastInfo } from './toast.js'
+import { toastInfo, toastSuccess } from './toast.js'
+import { loadBlocklist } from './blocklist.js'
 
 let knownActivityKeys = null
 
@@ -77,4 +78,14 @@ export async function clearActivity() {
       log('Error clearing activity:', error)
     }
   })
+}
+
+export async function banTrack(videoId, title) {
+  try {
+    await api.blockTrack(videoId, title)
+    await loadBlocklist()
+    toastSuccess(t('toast.trackBlocked'))
+  } catch (error) {
+    log('Error blocking track:', error)
+  }
 }

@@ -14,11 +14,9 @@ const isPlaybackSource = location.hostname === 'localhost' || location.hostname 
 
 const dom = {
   nowPlayingVideo: $('nowPlayingVideo'),
-  badgeWrapper: $('badgeWrapper'),
   badge: $('badge'),
   currentThumbnail: $('currentThumbnail'),
   currentTitle: $('currentTitle'),
-  currentChannel: $('currentChannel'),
   currentRequester: $('currentRequester'),
   progressBar: $('progressBar'),
   elapsedTime: $('elapsedTime'),
@@ -32,73 +30,91 @@ async function fetchOverlayState() {
     const response = await fetch('/api/overlay-state')
     const data = await response.json()
     settings = data.settings
-
+    currentState = data.state
     const serverLocale = settings.locale || 'en'
     if (!localeLoaded || serverLocale !== getCurrentLocale()) {
       await initI18n(serverLocale)
       localeLoaded = true
     }
 
-    renderState(data.state)
+    renderState()
   } catch (error) {
     log('Error fetching settings:', error)
   }
 }
 
-function updateMediaVisibility(state) {
-  dom.nowPlayingVideo.classList.toggle('video-collapsed', !state.showVideo)
-  dom.badgeWrapper.classList.toggle('with-video', state.showVideo)
+function updateMediaVisibility() {
+  if (!currentState.current || currentState.isPaused) {
+    dom.badge.classList.remove('visible')
+  } else {
+    if (settings.showVideo) {
+      dom.badge.classList.add('with-video')
+    } else {
+      dom.badge.classList.remove('with-video')
+    }
+    dom.badge.classList.add('visible')
+  }
 }
 
-function renderCurrent(state) {
-  if (!state.current) {
-    dom.badge.classList.remove('visible')
+function renderCurrent() {
+  if (!currentState.current) {
+    updateMediaVisibility()
     return
   }
 
   dom.badge.dataset.position = settings.position
-  dom.currentThumbnail.src = state.current.thumbnail
-  dom.currentTitle.textContent = state.current.title
-  dom.currentRequester.textContent = `@${state.current.requestedBy}`
+  dom.currentThumbnail.src = currentState.current.thumbnail
+  dom.currentTitle.textContent = currentState.current.title
+  dom.currentRequester.textContent = `@${currentState.current.requestedBy}`
 
-  if (state.nextTrack) {
-    dom.nextTitle.textContent = state.nextTrack.title
-    dom.nextElapsedTime.textContent = formatDuration(Math.floor(state.nextTrack.duration))
-    dom.nextPlaying.classList.add('visible')
+  if (currentState.nextTrack) {
+    dom.nextTitle.textContent = currentState.nextTrack.title
+    dom.nextElapsedTime.textContent = formatDuration(Math.floor(currentState.nextTrack.duration))
+    dom.nextPlaying.classList.remove('hidden')
   } else {
-    dom.nextPlaying.classList.remove('visible')
+    dom.nextPlaying.classList.add('hidden')
   }
-
-  dom.badge.classList.add('visible')
+  updateMediaVisibility()
 }
 
-function renderState(state) {
-  currentState = state
-  renderCurrent(state)
-  updateMediaVisibility(settings)
+function renderState() {
+  renderCurrent()
 
-  if (!isPlaybackSource) return
-
-  if (isPlayerReady) {
-    if (state.isPaused) {
-      player.pauseVideo()
-    } else if (player.getPlayerState() === YT.PlayerState.PAUSED) {
-      player.playVideo()
-    }
+  if (!isPlaybackSource || !isPlayerReady || !currentState) return
+  if (!currentState.current) {
+    if (!isTransitioning) player.stopVideo()
+    return
   }
 
-  if (isPlayerReady && state.current) {
-    const currentVideoId = player.getVideoData()?.video_id
+  const videoId = currentState.current.videoId
+  const currentVideoId = player.getVideoData()?.video_id
+  const playerState = player.getPlayerState()
 
-    if (currentVideoId !== state.current.videoId) {
-      log(`Loading video: ${state.current.videoId}`)
-
-      player.loadVideoById(state.current.videoId)
-      player.setOption('captions', 'fontSize', 0)
-      player.unloadModule('captions')
+  if (currentVideoId !== videoId) {
+    if (currentState.isPaused) {
+      log(`Cueing video while paused: ${videoId}`)
+      player.cueVideoById(videoId)
+    } else {
+      log(`Loading video: ${videoId}`)
+      player.loadVideoById(videoId)
     }
-  } else if (isPlayerReady && !state.current && !isTransitioning) {
-    player.stopVideo()
+
+    player.setOption('captions', 'fontSize', 0)
+    player.unloadModule('captions')
+    return
+  }
+
+  if (currentState.isPaused) {
+    if (playerState === YT.PlayerState.PLAYING || playerState === YT.PlayerState.BUFFERING) {
+      log('Pausing video')
+      player.pauseVideo()
+    }
+    return
+  }
+
+  if (playerState === YT.PlayerState.PAUSED || playerState === YT.PlayerState.CUED) {
+    log('Resuming video')
+    player.playVideo()
   }
 }
 
@@ -171,7 +187,7 @@ if (isPlaybackSource) {
       width: '100%',
       height: '100%',
       playerVars: {
-        autoplay: 1,
+        autoplay: 0,
         controls: 0,
         rel: 0,
         fs: 0,

@@ -7,6 +7,7 @@ import { logActivity } from './activity.js'
 import { Settings, QueueItem, Song, PlayerState, AppError, QueueRequestResponse } from './types.js'
 import { peekNextFallbackTrack, advanceFallback, getFallbackSnapshot, hydrateFallback, FallbackSnapshot } from './fallback.js'
 import { t } from './i18n.js'
+import { isBlocked } from './blocklist.js'
 
 type StateFile = {
   current: QueueItem | null
@@ -149,7 +150,14 @@ function assertNotDuplicate(videoId: string): void {
   }
 }
 
+function assertNotBlocked(videoId: string): void {
+  if (isBlocked(videoId)) {
+    throw new AppError('BLOCKED', 'this track is blocked')
+  }
+}
+
 export function assertCanAddSong(song: Song, requestedBy: string, addToQueue: boolean, bypassLimits: boolean = false): void {
+  assertNotBlocked(song.videoId)
   assertNotDuplicate(song.videoId)
   assertCanRequestSong(requestedBy, addToQueue, bypassLimits)
 }
@@ -271,6 +279,7 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
     }
 
     if (videoId) {
+      assertNotBlocked(videoId)
       assertNotDuplicate(videoId)
       log(`[REQUEST] ${requestedBy} → YouTube URL: ${videoId}`)
       song = await getVideoById(videoId, bypassFilters)

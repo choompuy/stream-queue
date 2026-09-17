@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "tsx src/server.ts",
     "start": "tsx src/server.ts",
+    "test": "tsx --test src/**/*.test.ts",
     "build": "tsc",
     "build:exe": "npm run build && pkg . --targets node22-win-x64 --output dist/StreamQueue.exe"
   },

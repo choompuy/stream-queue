@@ -67,6 +67,7 @@ export const ERROR_CODE_I18N_KEYS = {
   QUEUE_ITEM_NOT_FOUND: 'api.errors.queueItemNotFound',
   SERVER_ERROR: 'api.errors.serverError',
   DUPLICATE: 'api.errors.duplicate',
+  BLOCKED: 'api.errors.blocked',
   QUEUE_FULL: 'api.errors.queueFull',
   USER_LIMIT: 'api.errors.userLimit',
   YOUTUBE_QUOTA: 'api.errors.youtubeQuota',

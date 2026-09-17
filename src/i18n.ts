@@ -43,7 +43,7 @@ export function t(locale: string, key: string, params: Record<string, string | n
     return null
   }
 
-  return Object.entries(params).reduce((acc, [param, replacement]) => acc.replace(new RegExp(`{{${param}}}`, 'g'), String(replacement)), value)
+  return Object.entries(params).reduce((acc, [param, replacement]) => acc.replace(new RegExp(`{{${param}}}`, 'g'), () => String(replacement)), value)
 }
 
 const ERROR_CODE_KEYS: Record<string, string> = {
@@ -59,6 +59,7 @@ const ERROR_CODE_KEYS: Record<string, string> = {
   QUEUE_ITEM_NOT_FOUND: 'api.errors.queueItemNotFound',
   SERVER_ERROR: 'api.errors.serverError',
   DUPLICATE: 'api.errors.duplicate',
+  BLOCKED: 'api.errors.blocked',
   QUEUE_FULL: 'api.errors.queueFull',
   USER_LIMIT: 'api.errors.userLimit',
   YOUTUBE_QUOTA: 'api.errors.youtubeQuota',

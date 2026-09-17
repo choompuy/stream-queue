@@ -5,8 +5,9 @@ import './player.js'
 import { bindEvents } from './events.js'
 import { refreshState } from './queue.js'
 import { refreshFallbackState } from './fallback.js'
-import { loadPlaylists } from './playlists.js'
 import { loadActivity } from './activity.js'
+import { loadBlocklist } from './blocklist.js'
+import { loadPlaylists } from './playlists.js'
 import { loadSecrets, loadConfig, loadOverlaySettings, loadNetworkInfo } from './settings.js'
 import { activeTab } from './tabs.js'
 
@@ -28,8 +29,9 @@ async function init() {
     loadConfig(),
     loadOverlaySettings(),
     loadNetworkInfo(),
-    loadPlaylists(),
     loadActivity(),
+    loadBlocklist(),
+    loadPlaylists(),
     refreshState(),
     refreshFallbackState()
   ])

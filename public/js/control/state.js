@@ -20,7 +20,8 @@ export const state = {
   network: null,
   selectedIp: null,
   activity: [],
-  activityFilter: 'all'
+  activityFilter: 'all',
+  blocklist: []
 }
 
 export const dom = {
@@ -59,19 +60,13 @@ export const dom = {
   searchListWrapper: $('searchListWrapper'),
   searchBtn: $('searchBtn'),
 
-  statQueueLength: $('statQueueLength'),
-  statAcceptedToday: $('statAcceptedToday'),
-  statRejectedToday: $('statRejectedToday'),
-  statFallbackCount: $('statFallbackCount'),
-
   sectionTabs: $('sectionTabs'),
-  tabQueueCount: $('tabQueueCount'),
-  tabPlaylistCount: $('tabPlaylistCount'),
-  tabActivityCount: $('tabActivityCount'),
 
+  tabQueueCount: $('tabQueueCount'),
   queueListWrapper: $('queueListWrapper'),
   queueCount: $('queueCount'),
 
+  tabPlaylistCount: $('tabPlaylistCount'),
   fallbackListWrapper: $('fallbackListWrapper'),
   fallbackInfo: $('fallbackInfo'),
   fallbackRefreshBtn: $('fallbackRefreshBtn'),
@@ -80,11 +75,17 @@ export const dom = {
   fallbackEnabledBtn: $('fallbackEnabledBtn'),
   fallbackEnabledText: $('fallbackEnabledText'),
 
+  tabActivityCount: $('tabActivityCount'),
+  statAcceptedToday: $('statAcceptedToday'),
+  statRejectedToday: $('statRejectedToday'),
   activityListWrapper: $('activityListWrapper'),
   clearActivityBtn: $('clearActivityBtn'),
   activityFilterAllBtn: $('activityFilterAllBtn'),
   activityFilterAcceptedBtn: $('activityFilterAcceptedBtn'),
   activityFilterRejectedBtn: $('activityFilterRejectedBtn'),
+
+  tabBlocklistCount: $('tabBlocklistCount'),
+  blocklistListWrapper: $('blocklistListWrapper'),
 
   playlistsListWrapper: $('playlistsListWrapper'),
   playlistUrlInput: $('playlistUrlInput'),
@@ -105,4 +106,5 @@ export const CONFIG_FIELDS = [
 export function renderStats() {
   if (dom.tabPlaylistCount) dom.tabPlaylistCount.textContent = state.fallback?.sourceCount ?? 0
   if (dom.tabActivityCount) dom.tabActivityCount.textContent = state.activity.length
+  if (dom.tabBlocklistCount) dom.tabBlocklistCount.textContent = state.blocklist.length
 }

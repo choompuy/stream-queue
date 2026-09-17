@@ -142,6 +142,10 @@
               <span data-i18n="activity.title">Activity</span>
               <span class="count-badge" id="tabActivityCount">0</span>
             </button>
+            <button class="section-tab btn btn-lg" data-section-target="blocklist">
+              <span data-i18n="blocklist.title">Blocklist</span>
+              <span class="count-badge" id="tabBlocklistCount">0</span>
+            </button>
           </div>
 
           <div class="section-panel section-panel-queue" data-section="queue">
@@ -255,9 +259,33 @@
             <div class="section-panel-header">
               <h2 data-i18n="activity.title">Activity</h2>
               <div class="section-panel-actions">
-                <button id="activityFilterAllBtn" class="btn btn-secondary btn-sm active" data-action="activity-filter" data-filter="all" data-i18n="activity.filterAll">All</button>
-                <button id="activityFilterAcceptedBtn" class="btn btn-secondary btn-sm" data-action="activity-filter" data-filter="accepted" data-i18n="activity.filterAccepted">Accepted</button>
-                <button id="activityFilterRejectedBtn" class="btn btn-secondary btn-sm" data-action="activity-filter" data-filter="rejected" data-i18n="activity.filterRejected">Rejected</button>
+                <button
+                  id="activityFilterAllBtn"
+                  class="btn btn-secondary btn-sm active"
+                  data-action="activity-filter"
+                  data-filter="all"
+                  data-i18n="activity.filterAll"
+                >
+                  All
+                </button>
+                <button
+                  id="activityFilterAcceptedBtn"
+                  class="btn btn-secondary btn-sm"
+                  data-action="activity-filter"
+                  data-filter="accepted"
+                  data-i18n="activity.filterAccepted"
+                >
+                  Accepted
+                </button>
+                <button
+                  id="activityFilterRejectedBtn"
+                  class="btn btn-secondary btn-sm"
+                  data-action="activity-filter"
+                  data-filter="rejected"
+                  data-i18n="activity.filterRejected"
+                >
+                  Rejected
+                </button>
                 <button id="clearActivityBtn" class="btn btn-secondary btn-danger" data-action="clear-activity" data-i18n-title="activity.clear">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                     <path
@@ -275,6 +303,16 @@
             <div class="row-list-wrapper" id="activityListWrapper" data-list="activity">
               <div class="row-list"></div>
               <div class="empty" data-i18n="activity.empty">No requests yet</div>
+            </div>
+          </div>
+
+          <div class="section-panel section-panel-blocklist hidden" data-section="blocklist">
+            <div class="section-panel-header">
+              <h2 data-i18n="blocklist.title">Blocklist</h2>
+            </div>
+            <div class="row-list-wrapper" id="blocklistListWrapper" data-list="blocklist">
+              <div class="row-list"></div>
+              <div class="empty" data-i18n="blocklist.empty">No blocked tracks</div>
             </div>
           </div>
         </div>

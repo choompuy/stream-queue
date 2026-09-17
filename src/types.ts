@@ -78,7 +78,7 @@ export type ApiError = { success: false; error: string; code: string; params?: R
 export type ApiOk<T> = { success: true } & T
 export type ApiResult<T> = ApiOk<T> | ApiError
 
-export type AppErrorCode = 'DUPLICATE' | 'QUEUE_FULL' | 'USER_LIMIT' | 'YOUTUBE_QUOTA' | 'YOUTUBE_ERROR' | 'NO_API_KEY'
+export type AppErrorCode = 'DUPLICATE' | 'BLOCKED' | 'QUEUE_FULL' | 'USER_LIMIT' | 'YOUTUBE_QUOTA' | 'YOUTUBE_ERROR' | 'NO_API_KEY'
 export class AppError extends Error {
   constructor(
     public code: AppErrorCode,

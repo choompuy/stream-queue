@@ -134,9 +134,42 @@ export function createViews(dom) {
           <span class="text-xs text-bold status-pill ${escapeHtml(entry.status)}">
             ${t(statusKey)}
           </span>
-        `
+        `,
+        actions: entry.videoId
+          ? `
+            <button
+              class="btn btn-sm btn-icon"
+              data-action="ban-track"
+              data-video-id="${escapeHtml(entry.videoId)}"
+              data-title="${escapeHtml(title)}"
+              title="${t('activity.ban')}"
+            >
+              ${DELETE_ICON()}
+            </button>
+          `
+          : ''
       })
     }
+  })
+
+  const blocklist = createListView(dom.blocklistListWrapper, {
+    getKey: (items) => items.map((entry) => [entry.videoId, entry.title, entry.blockedAt].join(':')).join('|'),
+    renderRow: (entry) =>
+      row({
+        thumbnail: `https://i.ytimg.com/vi/${entry.videoId}/mqdefault.jpg`,
+        title: entry.title,
+        subtitle: formatRelativeTime(entry.blockedAt),
+        actions: `
+          <button
+            class="btn btn-sm btn-icon"
+            data-action="unblock-track"
+            data-video-id="${escapeHtml(entry.videoId)}"
+            title="${t('blocklist.unblock')}"
+          >
+            ${DELETE_ICON()}
+          </button>
+        `
+      })
   })
 
   const playlists = createListView(dom.playlistsListWrapper, {
@@ -181,6 +214,7 @@ export function createViews(dom) {
     fallback,
     search,
     activity,
+    blocklist,
     playlists
   }
 }

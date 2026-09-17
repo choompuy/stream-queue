@@ -55,8 +55,6 @@ export function syncPlayer() {
 
   log(`Loading video: ${state.current.videoId}`)
   player.cueVideoById(state.current.videoId)
-
-  if (!state.settings.showVideo) player.setPlaybackQuality('tiny')
 }
 
 export async function playPauseCurrent() {

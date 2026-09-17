@@ -159,5 +159,18 @@ export const api = {
   clearActivity: () =>
     request('/api/activity/clear', {
       method: 'POST'
+    }),
+
+  getBlocklist: () => request('/api/blocklist'),
+
+  blockTrack: (videoId, title) =>
+    request('/api/blocklist', {
+      method: 'POST',
+      body: JSON.stringify({ videoId, title })
+    }),
+
+  unblockTrack: (videoId) =>
+    request(`/api/blocklist/${encodeURIComponent(videoId)}`, {
+      method: 'DELETE'
     })
 }

@@ -11,8 +11,9 @@ import {
   toggleFallbackRepeat,
   toggleFallbackEnabled
 } from './fallback.js'
+import { clearActivity, setActivityFilter, banTrack } from './activity.js'
+import { unblockTrack } from './blocklist.js'
 import { addPlaylist, activatePlaylist, deletePlaylist } from './playlists.js'
-import { clearActivity, setActivityFilter } from './activity.js'
 import { saveOverlaySettings, copyOverlayUrl, onIpChange, toggleQr, saveConfigSetting, changeLocale } from './settings.js'
 
 const ACTIONS = {
@@ -34,6 +35,8 @@ const ACTIONS = {
   'playlist-delete': (action) => deletePlaylist(action.dataset.id),
   'clear-activity': clearActivity,
   'activity-filter': (action) => setActivityFilter(action.dataset.filter),
+  'ban-track': (action) => banTrack(action.dataset.videoId, action.dataset.title),
+  'unblock-track': (action) => unblockTrack(action.dataset.videoId),
   'copy-overlay-url': copyOverlayUrl,
   'toggle-qr': toggleQr,
   'save-config': saveConfigSetting

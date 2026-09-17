@@ -87,11 +87,17 @@
     "empty": "No requests yet",
     "clear": "Clear",
     "clearConfirm": "Clear Activity?",
+    "ban": "Block this track",
     "accepted": "accepted",
     "rejected": "rejected",
     "filterAll": "All",
     "filterAccepted": "Accepted",
     "filterRejected": "Rejected"
+  },
+  "blocklist": {
+    "title": "Blocklist",
+    "empty": "No blocked tracks",
+    "unblock": "Unblock"
   },
   "playlists": {
     "title": "Playlists",
@@ -176,6 +182,7 @@
       "serverError": "Internal server error",
       "notFound": "Not found",
       "duplicate": "This track is already in the queue",
+      "blocked": "This track has been blocked by the streamer",
       "queueFull": "The queue is full",
       "userLimit": "You can only queue {{count}} track(s) at a time",
       "youtubeQuota": "YouTube API quota exceeded",
@@ -205,6 +212,8 @@
     "playlistActivated": "Playlist activated",
     "playlistDeleted": "Playlist deleted",
     "fallbackRefreshed": "Playlist refreshed",
+    "trackBlocked": "Track blocked",
+    "trackUnblocked": "Track unblocked",
     "settingsSaved": "Settings saved",
     "nowPlaying": "Now playing: {{title}}",
     "addedToQueue": "Added to queue: {{title}} [#{{position}}]",
