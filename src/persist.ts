@@ -7,11 +7,7 @@ const SAVE_DEBOUNCE_MS = 250
 
 function getDir(dir: string): string {
   if (!isPackaged()) return join(process.cwd(), dir)
-
-  const appData = process.env.LOCALAPPDATA
-  if (!appData) return join(getAppRoot(), dir)
-
-  return join(appData, 'StreamQueue', dir)
+  return join(getAppRoot(), dir)
 }
 
 export const DATA_DIR = getDir('data')

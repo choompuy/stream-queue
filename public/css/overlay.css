@@ -14,13 +14,6 @@ body {
   height: 100%;
 }
 
-.badge-mask {
-  position: absolute;
-  width: 20rem;
-  height: 5rem;
-  clip-path: inset(0);
-}
-
 .badge {
   position: absolute;
   display: flex;
@@ -39,40 +32,34 @@ body {
   top: 0;
   left: 0;
   clip-path: inset(0 100% 0 0);
-
-  &::after {
-    margin-left: auto;
-  }
 }
-
 .badge[data-position='top-right'] {
   top: 0;
   right: 0;
   clip-path: inset(0 0 0 100%);
-
-  &::after {
-    margin-right: auto;
-  }
 }
-
 .badge[data-position='bottom-left'] {
   bottom: 0;
   left: 0;
   clip-path: inset(0 100% 0 0);
-
-  &::after {
-    margin-left: auto;
-  }
 }
-
 .badge[data-position='bottom-right'] {
   bottom: 0;
   right: 0;
   clip-path: inset(0 0 0 100%);
+}
 
-  &::after {
-    margin-right: auto;
-  }
+.badge[data-position='top-left']::after {
+  margin-left: auto;
+}
+.badge[data-position='top-right'] ::after {
+  margin-right: auto;
+}
+.badge[data-position='bottom-left'] ::after {
+  margin-left: auto;
+}
+.badge[data-position='bottom-right'] ::after {
+  margin-right: auto;
 }
 
 .badge::after {

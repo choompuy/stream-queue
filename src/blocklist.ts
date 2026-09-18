@@ -6,6 +6,9 @@ export type BlockedTrack = {
   blockedAt: number
 }
 
+const BLOCKLIST_LIMIT = 100
+const TITLE_MAX_LENGTH = 200
+
 const store = createFileStore<BlockedTrack[]>(BLOCKLIST_PATH)
 let blocked: BlockedTrack[] = store.load([])
 const blockedIds = new Set(blocked.map((t) => t.videoId))
@@ -27,8 +30,16 @@ export function isBlocked(videoId: string): boolean {
 
 export function blockTrack(videoId: string, title: string): BlockedTrack {
   if (!blockedIds.has(videoId)) {
-    blocked.unshift({ videoId, title, blockedAt: Date.now() })
+    const safeTitle = title.trim().slice(0, TITLE_MAX_LENGTH) || videoId
+    blocked.unshift({ videoId, title: safeTitle, blockedAt: Date.now() })
     blockedIds.add(videoId)
+
+    if (blocked.length > BLOCKLIST_LIMIT) {
+      for (const removed of blocked.splice(BLOCKLIST_LIMIT)) {
+        blockedIds.delete(removed.videoId)
+      }
+    }
+
     save()
   }
   return blocked.find((t) => t.videoId === videoId)!

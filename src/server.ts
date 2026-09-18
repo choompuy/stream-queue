@@ -23,7 +23,7 @@ import { getSettings, updateSettings } from './settings.js'
 import { t } from './i18n.js'
 import { getAppRoot } from './runtime.js'
 import { searchSongs, fetchPlaylistMeta } from './youtube/index.js'
-import { parsePlaylistId } from './youtube/url.js'
+import { parsePlaylistId, isValidVideoId } from './youtube/url.js'
 import { getPlaylists, upsertPlaylist, removePlaylist } from './playlists.js'
 import { getState, removeAt, clearQueue, moveToNext, skipCurrent, setPaused, requestSong } from './queue.js'
 import { flushAllStores } from './persist.js'
@@ -246,11 +246,11 @@ app.get('/api/blocklist', (_req, res) => {
 app.post('/api/blocklist', (req, res) => {
   const { videoId, title } = req.body ?? {}
 
-  if (typeof videoId !== 'string' || !videoId) {
-    return fail(res, 'videoId is required', 'INVALID_REQUEST', 400)
+  if (!isValidVideoId(videoId)) {
+    return fail(res, 'a valid videoId is required', 'INVALID_REQUEST', 400)
   }
 
-  const entry = blockTrack(videoId, typeof title === 'string' && title ? title : videoId)
+  const entry = blockTrack(videoId, typeof title === 'string' ? title : videoId)
   ok(res, { entry }, 201)
 })
 
@@ -422,7 +422,10 @@ app.get('/api/chat/now-playing', (_req, res) => {
   ok(res, { message: base + pausedSuffix })
 })
 
-const truncate = (s: string, max = 40) => (s.length > max ? s.slice(0, max - 1) + '…' : s)
+const truncate = (s: string, max = 40) => {
+  const chars = Array.from(s)
+  return chars.length > max ? chars.slice(0, max - 1).join('') + '…' : s
+}
 
 app.get('/api/chat/queue', (_req, res) => {
   const state = getState()
@@ -495,9 +498,6 @@ async function main() {
     await refreshFallback()
     if (!getState().current) {
       moveToNext()
-    }
-    if (!process.env.STREAMQUEUE_NO_AUTO_OPEN) {
-      openBrowser(`http://localhost:${PORT}`)
     }
   })
 }

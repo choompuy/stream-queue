@@ -16,26 +16,33 @@ internal sealed class ServerStartException : Exception
 internal sealed class ServerManager : IDisposable
 {
     private static readonly Regex PortRegex = new(@"Server running on http://localhost:(\d+)", RegexOptions.Compiled);
-    private const long MaxLogBytes = 5 * 1024 * 1024; // rotate past 5MB so this never grows unbounded
+    private const long MaxLogBytes = 5 * 1024 * 1024;
+
+    private sealed class ProcessState
+    {
+        public Process Process { get; }
+        public bool StoppingIntentionally { get; set; }
+
+        public ProcessState(Process process)
+        {
+            Process = process;
+        }
+    }
 
     private readonly string _exePath;
     private readonly string _logPath;
     private readonly object _logLock = new();
-
-    private Process? _process;
-    private bool _stoppingIntentionally;
-
+    private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
+    private ProcessState? _processState;
+    private bool _disposed;
     public int? Port { get; private set; }
     public event Action<int>? PortDiscovered;
-    public event Action<int>? Crashed; // exit code
+    public event Action<int>? Crashed;
 
     public ServerManager()
     {
         _exePath = Path.Combine(AppContext.BaseDirectory, "Service.exe");
-
-        var logDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "StreamQueue", "logs");
+        var logDir = Path.Combine(AppContext.BaseDirectory, "logs");
         Directory.CreateDirectory(logDir);
         _logPath = Path.Combine(logDir, "tray.log");
     }
@@ -45,6 +52,37 @@ internal sealed class ServerManager : IDisposable
 
     public void Start()
     {
+        _lifecycleLock.Wait();
+
+        try
+        {
+            ThrowIfDisposed();
+            if (IsProcessRunning(_processState)) return;
+            StartCore();
+        }
+        finally
+        {
+            _lifecycleLock.Release();
+        }
+    }
+
+    public async Task StopAsync()
+    {
+        await _lifecycleLock.WaitAsync().ConfigureAwait(false);
+
+        try
+        {
+            if (_disposed) return;
+            await StopCoreAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _lifecycleLock.Release();
+        }
+    }
+
+    private void StartCore()
+    {
         if (!File.Exists(_exePath))
         {
             throw new ServerStartException(
@@ -53,9 +91,8 @@ internal sealed class ServerManager : IDisposable
         }
 
         Port = null;
-        _stoppingIntentionally = false;
 
-        var info = new ProcessStartInfo
+        var startInfo = new ProcessStartInfo
         {
             FileName = _exePath,
             WorkingDirectory = AppContext.BaseDirectory,
@@ -65,19 +102,114 @@ internal sealed class ServerManager : IDisposable
             RedirectStandardError = true
         };
 
-        info.Environment["STREAMQUEUE_NO_AUTO_OPEN"] = "1";
+        var process = new Process
+        {
+            StartInfo = startInfo,
+            EnableRaisingEvents = true
+        };
 
-        var process = new Process { StartInfo = info, EnableRaisingEvents = true };
+        var state = new ProcessState(process);
+
         process.OutputDataReceived += (_, e) => HandleLine(e.Data);
         process.ErrorDataReceived += (_, e) => HandleLine(e.Data);
-        process.Exited += (_, _) => HandleExit(process);
+        process.Exited += (_, _) => HandleExit(state);
 
-        process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-        _process = process;
+        try
+        {
+            process.Start();
+            _processState = state;
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            WriteLog("--- StreamQueue starting ---");
+        }
+        catch
+        {
+            process.Dispose();
+            throw;
+        }
+    }
 
-        WriteLog("--- StreamQueue starting ---");
+    private async Task StopCoreAsync()
+    {
+        var state = _processState;
+        if (state is null) return;
+
+        var process = state.Process;
+        if (IsProcessExited(process))
+        {
+            CleanupProcessState(state);
+            return;
+        }
+
+        state.StoppingIntentionally = true;
+        var stoppedGracefully = false;
+
+        if (Port is { } port)
+        {
+            try
+            {
+                using var client = new HttpClient
+                {
+                    Timeout = TimeSpan.FromSeconds(3)
+                };
+
+                await client.PostAsync($"http://localhost:{port}/api/shutdown", null).ConfigureAwait(false);
+
+                stoppedGracefully = await WaitForExitAsync(process, TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Server unreachable/unresponsive.
+                // Fall through to Kill().
+            }
+        }
+
+        if (!stoppedGracefully)
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // Process already exited, is no longer associated, or was disposed.
+            }
+        }
+
+        await WaitForExitAsync(process, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        CleanupProcessState(state);
+    }
+
+    private void HandleExit(ProcessState state)
+    {
+        var process = state.Process;
+        var exitCode = SafeExitCode(process);
+        var stoppedIntentionally = state.StoppingIntentionally;
+
+        WriteLog($"--- StreamQueue exited (code {exitCode}) ---");
+
+        if (ReferenceEquals(_processState, state))
+        {
+            _processState = null;
+            Port = null;
+        }
+
+        if (!stoppedIntentionally)
+        {
+            try
+            {
+                Crashed?.Invoke(exitCode);
+            }
+            catch
+            {
+                // Event handlers must never break process cleanup.
+            }
+        }
+
+        process.Dispose();
     }
 
     private void HandleLine(string? line)
@@ -85,25 +217,51 @@ internal sealed class ServerManager : IDisposable
         if (line is null) return;
         WriteLog(line);
 
-        if (Port is null)
+        if (Port is not null) return;
+
+        var match = PortRegex.Match(line);
+
+        if (!match.Success) return;
+        if (!int.TryParse(match.Groups[1].Value, out var port))
         {
-            var match = PortRegex.Match(line);
-            if (match.Success && int.TryParse(match.Groups[1].Value, out var port))
-            {
-                Port = port;
-                PortDiscovered?.Invoke(port);
-            }
+            return;
+        }
+
+        Port = port;
+        PortDiscovered?.Invoke(port);
+    }
+
+    private void CleanupProcessState(ProcessState state)
+    {
+        if (!ReferenceEquals(_processState, state)) return;
+        _processState = null;
+        Port = null;
+
+        try
+        {
+            state.Process.Dispose();
+        }
+        catch
+        {
+            // Process cleanup is best-effort.
         }
     }
 
-    private void HandleExit(Process process)
+    private static bool IsProcessRunning(ProcessState? state)
     {
-        var exitCode = SafeExitCode(process);
-        WriteLog($"--- StreamQueue exited (code {exitCode}) ---");
+        if (state is null) return false;
+        return !IsProcessExited(state.Process);
+    }
 
-        if (!_stoppingIntentionally)
+    private static bool IsProcessExited(Process process)
+    {
+        try
         {
-            Crashed?.Invoke(exitCode);
+            return process.HasExited;
+        }
+        catch (InvalidOperationException)
+        {
+            return true;
         }
     }
 
@@ -119,54 +277,22 @@ internal sealed class ServerManager : IDisposable
         }
     }
 
-    public async Task StopAsync()
-    {
-        var process = _process;
-        if (process is null || process.HasExited) return;
-
-        _stoppingIntentionally = true;
-
-        var stoppedGracefully = false;
-        if (Port is { } port)
-        {
-            try
-            {
-                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
-                await client.PostAsync($"http://localhost:{port}/api/shutdown", null);
-                stoppedGracefully = await WaitForExitAsync(process, TimeSpan.FromSeconds(3));
-            }
-            catch
-            {
-                // server unreachable/unresponsive - fall through to Kill()
-            }
-        }
-
-        if (!stoppedGracefully && !process.HasExited)
-        {
-            try
-            {
-                process.Kill(entireProcessTree: true);
-            }
-            catch
-            {
-                // already gone
-            }
-        }
-
-        await WaitForExitAsync(process, TimeSpan.FromSeconds(5));
-    }
-
     private static async Task<bool> WaitForExitAsync(Process process, TimeSpan timeout)
     {
         using var cts = new CancellationTokenSource(timeout);
+
         try
         {
-            await process.WaitForExitAsync(cts.Token);
+            await process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
             return true;
         }
         catch (OperationCanceledException)
         {
             return false;
+        }
+        catch (InvalidOperationException)
+        {
+            return true;
         }
     }
 
@@ -186,13 +312,46 @@ internal sealed class ServerManager : IDisposable
             }
             catch
             {
-                // logging is best-effort - never let it take the app down
+                // Logging is best-effort - never let the app take down the tray.
             }
         }
     }
 
+    private void ThrowIfDisposed()
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(ServerManager));
+    }
+
     public void Dispose()
     {
-        _process?.Dispose();
+        if (_disposed) return;
+
+        _lifecycleLock.Wait();
+
+        try
+        {
+            if (_disposed) return;
+
+            _disposed = true;
+            var state = _processState;
+            _processState = null;
+            Port = null;
+
+            try
+            {
+                state?.Process.Dispose();
+            }
+            catch
+            {
+                // Cleanup is best-effort.
+            }
+        }
+        finally
+        {
+            _lifecycleLock.Release();
+            _lifecycleLock.Dispose();
+        }
+
+        GC.SuppressFinalize(this);
     }
 }

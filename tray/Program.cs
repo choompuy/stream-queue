@@ -16,7 +16,7 @@ internal static class Program
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
             MessageBox.Show($"Unexpected error:\n\n{e.ExceptionObject}", "StreamQueue", MessageBoxButtons.OK, MessageBoxIcon.Error);
 
-        using var mutex = new Mutex(true, "Global\\StreamQueue", out var isNew);
+        using var mutex = new Mutex(true, "Local\\StreamQueue", out var isNew);
         if (!isNew)
         {
             MessageBox.Show("StreamQueue is already running - check the system tray.", "StreamQueue",

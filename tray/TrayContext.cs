@@ -129,7 +129,6 @@ internal sealed class TrayContext : ApplicationContext
     {
         if (_exiting) return;
         _exiting = true;
-
         _trayIcon.Visible = false;
         await _server.StopAsync();
         Cleanup();
