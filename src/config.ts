@@ -7,6 +7,9 @@ const configDefaults: Config = {
   maxDurationSeconds: 480,
   maxQueueSize: 20,
   maxRequestsPerUser: 4,
+  regionCode: '',
+  allowShorts: false,
+  allowLiveStreams: false,
   fallbackPlaylist: {
     playlistId: null,
     enabled: true,
@@ -50,8 +53,38 @@ function sanitizeNumericUpdates(updates: Partial<Config>): Partial<Config> {
   return clean
 }
 
+const REGION_CODE_PATTERN = /^[A-Z]{2}$/
+const BOOLEAN_FIELDS: (keyof Config)[] = ['allowShorts', 'allowLiveStreams']
+
+function sanitizeBooleanUpdates(updates: Partial<Config>): Partial<Config> {
+  const clean: Partial<Config> = { ...updates }
+  for (const key of BOOLEAN_FIELDS) {
+    if (key in updates && typeof updates[key] !== 'boolean') delete clean[key]
+  }
+  return clean
+}
+
+function sanitizeRegionCode(updates: Partial<Config>): Partial<Config> {
+  const clean: Partial<Config> = { ...updates }
+
+  if ('regionCode' in updates) {
+    const raw = updates.regionCode
+    const normalized = typeof raw === 'string' ? raw.trim().toUpperCase() : ''
+
+    if (normalized === '') {
+      clean.regionCode = ''
+    } else if (REGION_CODE_PATTERN.test(normalized)) {
+      clean.regionCode = normalized
+    } else {
+      delete clean.regionCode
+    }
+  }
+
+  return clean
+}
+
 export function updateConfig(updates: Partial<Config>): Config {
-  const safeUpdates = sanitizeNumericUpdates(updates)
+  const safeUpdates = { ...sanitizeNumericUpdates(updates), ...sanitizeRegionCode(updates), ...sanitizeBooleanUpdates(updates) }
 
   config = {
     ...config,

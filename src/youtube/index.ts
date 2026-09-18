@@ -1,5 +1,5 @@
 import { Song, AppError } from '../types.js'
-import { youtube, videoToSong, isValidSong, fetchPlaylistMeta, PlaylistMeta } from './client.js'
+import { youtube, videoToSong, isValidSong, getFilterFailureReason, throwFilterError, fetchPlaylistMeta, PlaylistMeta } from './client.js'
 import { normalize, combinedScore, formatViews } from './scoring.js'
 import { getSearchCache, setSearchCache, getVideoCache, setVideoCache, canSearch, consumeSearchQuota, CACHE_LIMITS } from './cache.js'
 import { VideoItem, SearchItem, PlaylistItem } from './types.js'
@@ -26,7 +26,7 @@ function dedupInFlight<T>(pending: Map<string, Promise<T>>, key: string, run: ()
 
 function filtersVersion(): string {
   const c = getConfig()
-  return `${c.minViews}:${c.minDurationSeconds}:${c.maxDurationSeconds}`
+  return `${c.minViews}:${c.minDurationSeconds}:${c.maxDurationSeconds}:${c.regionCode}:${c.allowShorts}:${c.allowLiveStreams}`
 }
 
 export async function getVideoById(videoId: string, bypassFilters = false): Promise<Song | null> {
@@ -35,7 +35,10 @@ export async function getVideoById(videoId: string, bypassFilters = false): Prom
 
   if (cached !== undefined) {
     console.log(`[CACHE] Video ${videoId}`)
-    return cached
+    if (cached.song === null && cached.reason) {
+      throwFilterError(cached.reason, getConfig())
+    }
+    return cached.song
   }
 
   return dedupInFlight(pendingVideos, `${bypassFilters ? 'raw:' : ''}${videoId}`, () => fetchVideoById(videoId, bypassFilters))
@@ -58,10 +61,13 @@ async function fetchVideoById(videoId: string, bypassFilters: boolean): Promise<
 
     const song = videoToSong(video)
 
-    if (!bypassFilters && !isValidSong(song, video)) {
-      console.log(`[VIDEO] Video rejected: "${song.title}"`)
-      setVideoCache(videoId, null, filtersVersion())
-      return null
+    if (!bypassFilters) {
+      const reason = getFilterFailureReason(song, video)
+      if (reason) {
+        console.log(`[VIDEO] Video rejected (${reason}): "${song.title}"`)
+        setVideoCache(videoId, null, filtersVersion(), reason)
+        throwFilterError(reason, getConfig())
+      }
     }
 
     console.log(`[VIDEO] Valid: "${song.title}" - ${formatViews(song.views)} views`)

@@ -22,7 +22,17 @@ const STATUS_BY_CODE: Record<AppErrorCode, number> = {
   BLOCKED: 409,
   YOUTUBE_QUOTA: 503,
   YOUTUBE_ERROR: 503,
-  NO_API_KEY: 400
+  NO_API_KEY: 400,
+  NOT_MUSIC: 404,
+  NOT_EMBEDDABLE: 404,
+  DURATION_OUT_OF_RANGE: 404,
+  VIEWS_TOO_LOW: 404,
+  REGION_BLOCKED: 404,
+  NOT_PUBLIC: 404,
+  AGE_RESTRICTED: 404,
+  NOT_PLAYABLE: 404,
+  IS_LIVE: 404,
+  IS_SHORT: 404
 }
 
 export type ErrorInfo = { code: string; status: number; message: string; params?: Record<string, string | number> }

@@ -47,9 +47,6 @@ internal sealed class ServerManager : IDisposable
         _logPath = Path.Combine(logDir, "tray.log");
     }
 
-    public string LogDirectory => Path.GetDirectoryName(_logPath)!;
-    public string LogPath => _logPath;
-
     public void Start()
     {
         _lifecycleLock.Wait();

@@ -170,7 +170,11 @@ function onPlayerError(event) {
   if (!isTransitioning) {
     isTransitioning = true
 
-    fetch('/api/player/skip', { method: 'POST' })
+    fetch('/api/player/report-failure', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ errorCode: event.data })
+    })
       .then(() => fetchOverlayState())
       .finally(() => {
         setTimeout(() => {

@@ -37,6 +37,9 @@ export const dom = {
   cfgMaxDuration: $('cfgMaxDuration'),
   cfgMaxQueue: $('cfgMaxQueue'),
   cfgMaxPerUser: $('cfgMaxPerUser'),
+  cfgRegionCode: $('cfgRegionCode'),
+  cfgAllowShorts: $('allowShorts'),
+  cfgAllowLiveStreams: $('allowLiveStreams'),
 
   secYoutubeKey: $('secYoutubeKey'),
   secretsStatus: $('secretsStatus'),
@@ -100,7 +103,10 @@ export const CONFIG_FIELDS = [
   { key: 'minDurationSeconds', dom: 'cfgMinDuration', type: 'number' },
   { key: 'maxDurationSeconds', dom: 'cfgMaxDuration', type: 'number' },
   { key: 'maxQueueSize', dom: 'cfgMaxQueue', type: 'number' },
-  { key: 'maxRequestsPerUser', dom: 'cfgMaxPerUser', type: 'number' }
+  { key: 'maxRequestsPerUser', dom: 'cfgMaxPerUser', type: 'number' },
+  { key: 'regionCode', dom: 'cfgRegionCode', type: 'text' },
+  { key: 'allowShorts', dom: 'cfgAllowShorts', type: 'checkbox' },
+  { key: 'allowLiveStreams', dom: 'cfgAllowLiveStreams', type: 'checkbox' }
 ]
 
 export function renderStats() {

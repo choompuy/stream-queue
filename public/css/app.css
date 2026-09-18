@@ -524,6 +524,11 @@ select {
   color: var(--accent-red);
 }
 
+.status-pill.failed {
+  background-color: var(--accent-blue-bg);
+  color: var(--accent-blue);
+}
+
 /* Playlists tab */
 
 .song-search-btn,

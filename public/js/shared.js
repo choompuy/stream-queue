@@ -72,7 +72,18 @@ export const ERROR_CODE_I18N_KEYS = {
   USER_LIMIT: 'api.errors.userLimit',
   YOUTUBE_QUOTA: 'api.errors.youtubeQuota',
   YOUTUBE_ERROR: 'api.errors.youtubeError',
-  NO_API_KEY: 'api.errors.noApiKey'
+  NO_API_KEY: 'api.errors.noApiKey',
+  NOT_MUSIC: 'api.errors.notMusic',
+  NOT_EMBEDDABLE: 'api.errors.notEmbeddable',
+  DURATION_OUT_OF_RANGE: 'api.errors.durationOutOfRange',
+  VIEWS_TOO_LOW: 'api.errors.viewsTooLow',
+  REGION_BLOCKED: 'api.errors.regionBlocked',
+  NOT_PUBLIC: 'api.errors.notPublic',
+  AGE_RESTRICTED: 'api.errors.ageRestricted',
+  NOT_PLAYABLE: 'api.errors.notPlayable',
+  IS_LIVE: 'api.errors.isLive',
+  IS_SHORT: 'api.errors.isShort',
+  PLAYBACK_FAILED: 'api.errors.playbackFailed'
 }
 
 export function translateErrorCode(t, code, params, fallback = '') {

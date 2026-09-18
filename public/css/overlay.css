@@ -91,7 +91,7 @@ body {
   height: 5rem;
   aspect-ratio: 1;
   object-fit: cover;
-  border: 1px solid var(--text-muted);
+  border-right: 1px solid var(--text-muted);
 }
 
 .now-playing-info {
@@ -166,6 +166,7 @@ body {
   position: absolute;
   width: 2px;
   height: 2px;
+  opacity: 0;
   pointer-events: none;
   overflow: hidden;
 }
@@ -186,6 +187,7 @@ body {
   position: relative;
   width: 100%;
   height: auto;
+  opacity: 1;
   aspect-ratio: 16 / 9;
   pointer-events: auto;
 }

@@ -1,4 +1,4 @@
-export type ActivityStatus = 'accepted' | 'rejected'
+export type ActivityStatus = 'accepted' | 'rejected' | 'failed'
 export type ActivityEntry = {
   requestedBy: string
   query: string
@@ -16,6 +16,9 @@ export type Config = {
   maxDurationSeconds: number
   maxQueueSize: number
   maxRequestsPerUser: number
+  regionCode: string
+  allowShorts: boolean
+  allowLiveStreams: boolean
   fallbackPlaylist: FallbackPlaylist
 }
 
@@ -61,6 +64,7 @@ type SearchCacheEntry = {
 
 type VideoCacheEntry = {
   song: Song | null
+  reason: FilterFailureReason | null
   expiresAt: number
   filtersVersion: string
 }
@@ -78,7 +82,27 @@ export type ApiError = { success: false; error: string; code: string; params?: R
 export type ApiOk<T> = { success: true } & T
 export type ApiResult<T> = ApiOk<T> | ApiError
 
-export type AppErrorCode = 'DUPLICATE' | 'BLOCKED' | 'QUEUE_FULL' | 'USER_LIMIT' | 'YOUTUBE_QUOTA' | 'YOUTUBE_ERROR' | 'NO_API_KEY'
+export type FilterFailureReason =
+  | 'NOT_MUSIC'
+  | 'NOT_PUBLIC'
+  | 'NOT_EMBEDDABLE'
+  | 'AGE_RESTRICTED'
+  | 'REGION_BLOCKED'
+  | 'NOT_PLAYABLE'
+  | 'IS_LIVE'
+  | 'IS_SHORT'
+  | 'DURATION_OUT_OF_RANGE'
+  | 'VIEWS_TOO_LOW'
+
+export type AppErrorCode =
+  | 'DUPLICATE'
+  | 'BLOCKED'
+  | 'QUEUE_FULL'
+  | 'USER_LIMIT'
+  | 'YOUTUBE_QUOTA'
+  | 'YOUTUBE_ERROR'
+  | 'NO_API_KEY'
+  | FilterFailureReason
 export class AppError extends Error {
   constructor(
     public code: AppErrorCode,

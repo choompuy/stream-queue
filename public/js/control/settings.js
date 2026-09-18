@@ -117,7 +117,9 @@ export async function loadConfig() {
       if (!input) continue
 
       const value = field.path ? state.config[field.path]?.[field.key] : state.config[field.key]
-      input.value = value ?? ''
+
+      if (field.type === 'checkbox') input.checked = Boolean(value)
+      else input.value = value ?? ''
     }
   } catch (error) {
     log('Error loading config:', error)
@@ -143,7 +145,11 @@ export async function saveConfigSetting() {
     const input = dom[field.dom]
     if (!input) continue
 
-    const value = field.type === 'number' ? Number(input.value) : input.value.trim()
+    let value
+
+    if (field.type === 'checkbox') value = input.checked
+    else if (field.type === 'number') value = Number(input.value)
+    else value = input.value.trim()
 
     if (field.path) {
       config[field.path] ??= {}

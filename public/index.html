@@ -475,6 +475,31 @@
               </div>
             </div>
 
+            <div class="settings-section">
+              <label class="field-row">
+                <div class="checkbox-wrapper">
+                  <input class="checkbox" type="checkbox" id="allowShorts" />
+                </div>
+                <span data-i18n="settings.bot.limits.allowShorts">Shorts</span>
+              </label>
+
+              <label class="field-row">
+                <div class="checkbox-wrapper">
+                  <input class="checkbox" type="checkbox" id="allowLiveStreams" />
+                </div>
+                <span data-i18n="settings.bot.limits.allowLiveStreams">Live Streams</span>
+              </label>
+
+              <div class="field">
+                <label class="field-label" for="cfgRegionCode" data-i18n="settings.bot.limits.regionCode">Region code</label>
+                <input class="settings-input input" type="text" id="cfgRegionCode" maxlength="2" placeholder="US" style="text-transform: uppercase" />
+              </div>
+              <div class="text-muted text-xs" data-i18n="settings.bot.regionCodeNote">
+                Two-letter country code (ISO 3166-1, e.g. US, RU, DE). Tracks not licensed for this region are skipped instead of being queued. Leave
+                empty to disable.
+              </div>
+            </div>
+
             <button id="saveConfigSettingBtn" class="btn btn-primary" data-action="save-config" data-i18n="settings.bot.save">Save settings</button>
           </div>
 

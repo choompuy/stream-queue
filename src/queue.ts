@@ -258,6 +258,37 @@ export function skipCurrent(): QueueItem | null {
   return moveToNext()
 }
 
+function playbackFailureReasonCode(errorCode?: number): string {
+  switch (errorCode) {
+    case 100:
+      return 'PLAYBACK_VIDEO_UNAVAILABLE'
+    case 101:
+    case 150:
+      return 'PLAYBACK_EMBED_DISALLOWED'
+    default:
+      return 'PLAYBACK_FAILED'
+  }
+}
+
+export function reportPlaybackFailure(errorCode?: number): QueueItem | null {
+  const failed = currentSong
+
+  if (failed) {
+    log(`[PLAYER] playback failed: "${failed.title}" (error ${errorCode ?? 'unknown'})`)
+    logActivity({
+      requestedBy: failed.requestedBy,
+      query: failed.title,
+      title: failed.title,
+      videoId: failed.videoId,
+      status: 'failed',
+      reasonCode: playbackFailureReasonCode(errorCode),
+      reasonParams: errorCode !== undefined ? { errorCode } : undefined
+    })
+  }
+
+  return moveToNext()
+}
+
 export type RequestSongResult =
   | { outcome: 'invalid-url' }
   | { outcome: 'not-found' }

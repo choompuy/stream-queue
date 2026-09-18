@@ -119,7 +119,7 @@ export function createViews(dom) {
     },
     renderRow: (entry) => {
       const title = entry.title || entry.query
-      const statusKey = entry.status === 'accepted' ? 'activity.accepted' : 'activity.rejected'
+      const statusKey = entry.status === 'accepted' ? 'activity.accepted' : entry.status === 'failed' ? 'activity.failed' : 'activity.rejected'
       return row({
         thumbnail: entry.videoId ? `https://i.ytimg.com/vi/${entry.videoId}/mqdefault.jpg` : '',
         title,

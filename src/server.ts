@@ -25,7 +25,7 @@ import { getAppRoot } from './runtime.js'
 import { searchSongs, fetchPlaylistMeta } from './youtube/index.js'
 import { parsePlaylistId, isValidVideoId } from './youtube/url.js'
 import { getPlaylists, upsertPlaylist, removePlaylist } from './playlists.js'
-import { getState, removeAt, clearQueue, moveToNext, skipCurrent, setPaused, requestSong } from './queue.js'
+import { getState, removeAt, clearQueue, moveToNext, skipCurrent, setPaused, requestSong, reportPlaybackFailure } from './queue.js'
 import { flushAllStores } from './persist.js'
 import {
   refreshFallback,
@@ -136,6 +136,7 @@ app.put(
   '/api/config',
   asyncHandler(async (req, res) => {
     const body = { ...(req.body ?? {}) }
+    console.log(body)
 
     if (body.fallbackPlaylist && typeof body.fallbackPlaylist.playlistId === 'string') {
       const rawPlaylistId = body.fallbackPlaylist.playlistId.trim()
@@ -345,6 +346,17 @@ app.post('/api/player/resume', (_req, res) => {
   const locale = getSettings().locale
   const message = t(locale, 'chat.resumed') ?? 'Playback resumed'
   ok<PlayerActionResponse>(res, { ...getState(), message })
+})
+
+app.post('/api/player/report-failure', (req, res) => {
+  const errorCode = typeof req.body?.errorCode === 'number' ? req.body.errorCode : undefined
+  reportPlaybackFailure(errorCode)
+  const state = getState()
+  const locale = getSettings().locale
+  const message = state.current?.title
+    ? (t(locale, 'chat.skippedNowPlaying', { title: state.current.title }) ?? `Track skipped. Now playing: ${state.current.title}`)
+    : (t(locale, 'chat.skipped') ?? 'Track skipped')
+  ok<PlayerActionResponse>(res, { ...state, message })
 })
 
 app.get('/api/fallback', (_req, res) => {

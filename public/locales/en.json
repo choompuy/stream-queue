@@ -90,6 +90,7 @@
     "ban": "Block this track",
     "accepted": "accepted",
     "rejected": "rejected",
+    "failed": "Playback failed",
     "filterAll": "All",
     "filterAccepted": "Accepted",
     "filterRejected": "Rejected"
@@ -141,9 +142,13 @@
         "minDuration": "Min duration (sec)",
         "maxDuration": "Max duration (sec)",
         "maxQueue": "Max queue size",
-        "maxPerUser": "Max requests per user"
+        "maxPerUser": "Max requests per user",
+        "regionCode": "Region code",
+        "allowShorts": "Shorts",
+        "allowLiveStreams": "Live streams"
       },
       "rateLimitNote": "Cooldowns and per-user rate limits are handled in Streamer.bot, not here",
+      "regionCodeNote": "Two-letter country code (ISO 3166-1, e.g. US, RU, DE). Tracks not licensed for this region are skipped instead of being queued. Leave empty to disable",
       "save": "Save settings"
     },
     "language": {
@@ -187,7 +192,18 @@
       "userLimit": "You can only queue {{count}} track(s) at a time",
       "youtubeQuota": "YouTube API quota exceeded",
       "youtubeError": "YouTube request failed",
-      "noApiKey": "YouTube API key is not configured, add it in the control panel"
+      "noApiKey": "YouTube API key is not configured, add it in the control panel",
+      "notMusic": "This video isn't in the YouTube Music category",
+      "notEmbeddable": "This video can't be embedded",
+      "durationOutOfRange": "Track duration must be between {{min}} and {{max}} seconds",
+      "viewsTooLow": "Track needs at least {{min}} views",
+      "regionBlocked": "This track isn't available in the configured region",
+      "notPublic": "This video is not public",
+      "ageRestricted": "This video is age-restricted",
+      "notPlayable": "This video is not playable",
+      "isLive": "Live streams are not allowed",
+      "isShort": "Shorts are not allowed",
+      "playbackFailed": "Playback failed in the player (error {{errorCode}})"
     }
   },
   "time": {

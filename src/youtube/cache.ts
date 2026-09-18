@@ -1,5 +1,5 @@
 import { CACHE_FILE, createFileStore } from '../persist.js'
-import { CacheFile, Song } from '../types.js'
+import { CacheFile, Song, FilterFailureReason } from '../types.js'
 
 const store = createFileStore<CacheFile>(CACHE_FILE)
 const cache = store.load({
@@ -88,19 +88,22 @@ export function setSearchCache(query: string, results: Song[], filtersVersion: s
   saveCache()
 }
 
-export function getVideoCache(videoId: string, filtersVersion: string): Song | null | undefined {
+export type VideoCacheResult = { song: Song | null; reason: FilterFailureReason | null }
+
+export function getVideoCache(videoId: string, filtersVersion: string): VideoCacheResult | undefined {
   const entry = cache.videos[videoId]
 
   if (!entry || entry.expiresAt <= Date.now() || entry.filtersVersion !== filtersVersion) {
     return undefined
   }
 
-  return entry.song
+  return { song: entry.song, reason: entry.reason ?? null }
 }
 
-export function setVideoCache(videoId: string, song: Song | null, filtersVersion: string): void {
+export function setVideoCache(videoId: string, song: Song | null, filtersVersion: string, reason: FilterFailureReason | null = null): void {
   cache.videos[videoId] = {
     song,
+    reason,
     expiresAt: Date.now() + CACHE_LIMITS.VIDEO_CACHE_TTL,
     filtersVersion
   }

@@ -28,7 +28,7 @@ internal sealed class TrayContext : ApplicationContext
         menu.Items.Add(_statusItem);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Open panel", null, (_, _) => OpenPanel());
-        menu.Items.Add("Open logs folder", null, (_, _) => OpenLogsFolder());
+        menu.Items.Add("Open app folder", null, (_, _) => OpenAppFolder());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Restart server", null, async (_, _) => await RestartServerAsync());
         menu.Items.Add(new ToolStripSeparator());
@@ -89,20 +89,23 @@ internal sealed class TrayContext : ApplicationContext
         OpenUrl($"http://localhost:{port}");
     }
 
-    private void OpenLogsFolder()
+    private static void OpenAppFolder()
     {
         try
         {
             Process.Start(new ProcessStartInfo
             {
-                FileName = _server.LogDirectory,
+                FileName = AppContext.BaseDirectory,
                 UseShellExecute = true
             });
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Couldn't open the logs folder:\n{ex.Message}", "StreamQueue",
-                MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show(
+                $"Couldn't open the app folder:\n{ex.Message}",
+                "StreamQueue",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
         }
     }
 
