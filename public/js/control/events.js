@@ -11,7 +11,7 @@ import {
   toggleFallbackRepeat,
   toggleFallbackEnabled
 } from './fallback.js'
-import { clearActivity, setActivityFilter, blockTrack } from './activity.js'
+import { clearActivity, blockTrack } from './activity.js'
 import { unblockTrack } from './blocklist.js'
 import { addPlaylist, activatePlaylist, deletePlaylist } from './playlists.js'
 import { saveOverlaySettings, copyOverlayUrl, onIpChange, toggleQr, saveConfigSetting, changeLocale } from './settings.js'
@@ -34,7 +34,6 @@ const ACTIONS = {
   'playlist-activate': (action) => activatePlaylist(action.dataset.id),
   'playlist-delete': (action) => deletePlaylist(action.dataset.id),
   'clear-activity': clearActivity,
-  'activity-filter': (action) => setActivityFilter(action.dataset.filter),
   'block-track': (action) => blockTrack(action.dataset.videoId, action.dataset.title),
   'unblock-track': (action) => unblockTrack(action.dataset.videoId),
   'copy-overlay-url': copyOverlayUrl,
@@ -61,7 +60,13 @@ export function bindEvents() {
       const dropdown = menuToggle.closest('.row-menu')?.querySelector('.row-menu-dropdown')
       const wasOpen = dropdown && !dropdown.classList.contains('hidden')
       closeAllMenus()
-      if (dropdown && !wasOpen) dropdown.classList.remove('hidden')
+      if (dropdown && !wasOpen) {
+        dropdown.classList.remove('hidden')
+        menuToggle.setAttribute('aria-expanded', 'true')
+
+        if (event.detail === 0) dropdown.querySelector('[role="menuitem"]')?.focus()
+      }
+
       return
     }
 
@@ -86,8 +91,19 @@ export function bindEvents() {
   dom.badgePosition?.addEventListener('change', saveOverlaySettings)
   dom.selectIp?.addEventListener('change', onIpChange)
   dom.localeSelect?.addEventListener('change', (e) => changeLocale(e.target.value))
+  
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeAllMenus({ restoreFocus: true })
+  })
 }
 
-function closeAllMenus() {
-  document.querySelectorAll('.row-menu-dropdown').forEach((el) => el.classList.add('hidden'))
+function closeAllMenus({ restoreFocus = false } = {}) {
+  document.querySelectorAll('.row-menu').forEach((menu) => {
+    const dropdown = menu.querySelector('.row-menu-dropdown')
+    const toggle = menu.querySelector('[data-action="toggle-menu"]')
+    const wasOpen = dropdown && !dropdown.classList.contains('hidden')
+    dropdown?.classList.add('hidden')
+    toggle?.setAttribute('aria-expanded', 'false')
+    if (wasOpen && restoreFocus) toggle?.focus()
+  })
 }

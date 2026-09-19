@@ -5,8 +5,11 @@ let player = null
 let currentState = null
 let isPlayerReady = false
 let isTransitioning = false
+let reportedFailureVideoId = null
+let renderedVideoId = null
 let settings = {}
 let localeLoaded = false
+let playerGeneration = 0
 
 const log = createLogger('PREVIEW')
 
@@ -44,7 +47,7 @@ async function fetchOverlayState() {
 }
 
 function updateMediaVisibility() {
-  if (!currentState.current || currentState.isPaused) {
+  if (!currentState?.current || currentState.isPaused) {
     dom.badge.classList.remove('visible')
   } else {
     if (settings.showVideo) {
@@ -57,7 +60,7 @@ function updateMediaVisibility() {
 }
 
 function renderCurrent() {
-  if (!currentState.current) {
+  if (!currentState?.current) {
     updateMediaVisibility()
     return
   }
@@ -80,15 +83,26 @@ function renderCurrent() {
 function renderState() {
   renderCurrent()
 
-  if (!isPlaybackSource || !isPlayerReady || !currentState) return
-  if (isPlayerReady) dom.badge.classList.remove('hidden')
+  if (currentState && (!isPlaybackSource || isPlayerReady)) dom.badge.classList.remove('hidden')
+  if (!isPlaybackSource || !isPlayerReady || !currentState || !player) return
 
   if (!currentState.current) {
-    if (!isTransitioning) player.stopVideo()
+    renderedVideoId = null
+    reportedFailureVideoId = null
+
+    if (!isTransitioning) {
+      player.stopVideo()
+    }
+
     return
   }
 
   const videoId = currentState.current.videoId
+  if (renderedVideoId !== videoId) {
+    renderedVideoId = videoId
+    reportedFailureVideoId = null
+  }
+
   const currentVideoId = player.getVideoData()?.video_id
   const playerState = player.getPlayerState()
 
@@ -101,8 +115,7 @@ function renderState() {
       player.loadVideoById(videoId)
     }
 
-    player.setOption('captions', 'fontSize', 0)
-    player.unloadModule('captions')
+    configurePlayer()
     return
   }
 
@@ -120,6 +133,17 @@ function renderState() {
   }
 }
 
+function configurePlayer() {
+  if (!player) return
+
+  try {
+    player.setOption('captions', 'fontSize', 0)
+    player.unloadModule('captions')
+  } catch (error) {
+    log('Error configuring player:', error)
+  }
+}
+
 function updateProgress() {
   if (!isPlaybackSource || !player || !currentState?.current) {
     dom.progressBar.style.width = '0%'
@@ -129,8 +153,7 @@ function updateProgress() {
 
   const currentTime = player.getCurrentTime() || 0
   const duration = currentState.current.duration
-  const progress = ((currentTime / duration) * 100).toFixed(2)
-
+  const progress = duration > 0 ? ((currentTime / duration) * 100).toFixed(2) : 0
   dom.progressBar.style.width = `${progress}%`
   dom.elapsedTime.textContent = `${formatDuration(Math.floor(currentTime))} / ${formatDuration(duration)}`
 }
@@ -144,10 +167,28 @@ async function notifyEnded() {
   }
 }
 
+async function reportFailure(errorCode, videoId) {
+  try {
+    await fetch('/api/player/report-failure', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ errorCode })
+    })
+
+    await fetchOverlayState()
+    log(`Playback failure reported for ${videoId}`)
+  } catch (error) {
+    log('Error reporting playback failure:', error)
+  }
+}
+
 function onPlayerReady(event) {
   log('Player ready')
   isPlayerReady = true
   event.target.setVolume(100)
+  configurePlayer()
   fetchOverlayState()
 }
 
@@ -158,9 +199,7 @@ function onPlayerStateChange(event) {
     log('Video ended, requesting next')
     isTransitioning = true
     notifyEnded().finally(() => {
-      setTimeout(() => {
-        isTransitioning = false
-      }, 1000)
+      isTransitioning = false
     })
   }
 }
@@ -168,46 +207,103 @@ function onPlayerStateChange(event) {
 function onPlayerError(event) {
   const message = getErrorMessage(event.data, t || ((key) => key))
   log(`Player error: ${message}`)
+  const videoId = currentState?.current?.videoId
 
-  if (!isTransitioning) {
-    isTransitioning = true
-
-    fetch('/api/player/report-failure', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ errorCode: event.data })
-    })
-      .then(() => fetchOverlayState())
-      .finally(() => {
-        setTimeout(() => {
-          isTransitioning = false
-        }, 1000)
-      })
+  if (!videoId) {
+    log('Player error without current video')
+    return
   }
+
+  if (reportedFailureVideoId === videoId) {
+    log(`Ignoring duplicate error for video: ${videoId}`)
+    return
+  }
+
+  reportedFailureVideoId = videoId
+  const generation = playerGeneration
+  resetPlayer().then(() => {
+    if (generation !== playerGeneration - 1) return
+
+    reportFailure(event.data, videoId)
+  })
+}
+
+function createPlayer() {
+  if (!isPlaybackSource || typeof YT === 'undefined' || !YT.Player) return
+
+  playerGeneration += 1
+  const generation = playerGeneration
+  player = new YT.Player('player', {
+    width: '100%',
+    height: '100%',
+
+    playerVars: {
+      autoplay: 0,
+      controls: 0,
+      rel: 0,
+      fs: 0,
+      cc_load_policy: 0,
+      iv_load_policy: 3,
+      disablekb: 1,
+      playsinline: 1
+    },
+
+    events: {
+      onReady: (event) => {
+        if (generation !== playerGeneration) return
+        onPlayerReady(event)
+      },
+
+      onStateChange: (event) => {
+        if (generation !== playerGeneration) return
+        onPlayerStateChange(event)
+      },
+
+      onError: (event) => {
+        if (generation !== playerGeneration) return
+        onPlayerError(event)
+      }
+    }
+  })
+
+  log(`YouTube player created: generation ${generation}`)
+}
+
+async function resetPlayer() {
+  const oldPlayer = player
+
+  player = null
+  isPlayerReady = false
+  renderedVideoId = null
+
+  if (oldPlayer) {
+    try {
+      oldPlayer.destroy()
+      log('YouTube player destroyed')
+    } catch (error) {
+      log('Error destroying YouTube player:', error)
+    }
+  }
+
+  const oldElement = $('player')
+
+  if (oldElement) {
+    const newElement = document.createElement('div')
+    newElement.id = 'player'
+    oldElement.replaceWith(newElement)
+  }
+
+  await new Promise((resolve) => requestAnimationFrame(resolve))
+
+  if (!isPlaybackSource || typeof YT === 'undefined' || !YT.Player) return
+
+  createPlayer()
 }
 
 if (isPlaybackSource) {
   window.onYouTubeIframeAPIReady = () => {
     log('YouTube API ready')
-    player = new YT.Player('player', {
-      width: '100%',
-      height: '100%',
-      playerVars: {
-        autoplay: 0,
-        controls: 0,
-        rel: 0,
-        fs: 0,
-        cc_load_policy: 0,
-        iv_load_policy: 3,
-        disablekb: 1,
-        playsinline: 1
-      },
-      events: {
-        onReady: onPlayerReady,
-        onStateChange: onPlayerStateChange,
-        onError: onPlayerError
-      }
-    })
+    createPlayer()
   }
 
   const tag = document.createElement('script')

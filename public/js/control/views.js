@@ -1,8 +1,7 @@
 import { escapeHtml, formatDuration, translateErrorCode } from '../shared.js'
-import { PLUS_ICON, PLAY_ICON, PAUSE_ICON, DELETE_ICON, BLOCK_ICON } from '../icons.js'
+import { PLUS_ICON, PLAY_ICON, PAUSE_ICON, DELETE_ICON, BLOCK_ICON, MORE_ICON } from '../icons.js'
 import { createListView, formatRelativeTime } from './ui.js'
 import { t } from '../i18n.js'
-import { MORE_ICON } from '../icons.js'
 
 function row({ index, thumbnail, title, subtitle, meta = '', extra = '', actions = '', className = '', attributes = '' }) {
   return `
@@ -15,7 +14,7 @@ function row({ index, thumbnail, title, subtitle, meta = '', extra = '', actions
       </div>
       ${extra}
       ${meta ? `<span class="text-sm text-secondary">${meta}</span>` : ''}
-      ${actions ? `<div class="row-ctrl">${actions}</div>` : ''}
+      ${actions ? actions : ''}
     </div>
   `
 }
@@ -23,14 +22,20 @@ function row({ index, thumbnail, title, subtitle, meta = '', extra = '', actions
 function rowMenu(items) {
   return `
     <div class="row-menu">
-      <button class="btn btn-sm btn-icon" data-action="toggle-menu" title="${t('common.more')}">
+      <button
+        class="btn btn-sm btn-icon"
+        data-action="toggle-menu"
+        aria-haspopup="menu"
+        aria-expanded="false"
+        title="${t('common.more')}"
+      >
         ${MORE_ICON()}
       </button>
-      <div class="row-menu-dropdown hidden">
+      <div class="row-menu-dropdown hidden" role="menu">
         ${items
           .map(
             (item) => `
-          <button class="row-menu-item btn btn-secondary${item.danger ? ' btn-danger' : ''}" data-action="${item.action}"${item.attrs || ''}>
+          <button class="row-menu-item btn btn-sm btn-secondary${item.danger ? ' btn-danger' : ''}" data-action="${item.action}"${item.attrs || ''}>
             <span>${item.label}</span>
             <span class="row-menu-icon">${item.icon ? item.icon(20) : ''}</span>
           </button>
@@ -69,7 +74,6 @@ export function createViews(dom) {
       items.map((item) => [item.videoId, item.requestedBy, item.title, item.thumbnail, item.duration, item.isBlocked].join(':')).join('|'),
     renderRow: (item, index) =>
       row({
-        className: item.isBlocked ? 'row-blocked' : '',
         index,
         thumbnail: item.thumbnail,
         title: item.title,
@@ -127,7 +131,7 @@ export function createViews(dom) {
     },
     renderRow: (track) => {
       const isActive = track.videoId === fallbackList.dataset.activeVideoId
-      const rowClass = [isActive ? 'row-active' : '', track.isBlocked ? 'row-blocked' : ''].filter(Boolean).join(' ')
+      const rowClass = [isActive ? 'row-active' : ''].filter(Boolean).join(' ')
 
       return row({
         className: rowClass,
@@ -221,14 +225,16 @@ export function createViews(dom) {
         thumbnail: `https://i.ytimg.com/vi/${entry.videoId}/mqdefault.jpg`,
         title: entry.title,
         subtitle: formatRelativeTime(entry.blockedAt),
-        actions: rowMenu([
-          {
-            action: 'unblock-track',
-            attrs: ` data-video-id="${escapeHtml(entry.videoId)}"`,
-            icon: PLUS_ICON,
-            label: t('blocklist.unblock')
-          }
-        ])
+        actions: `
+          <button
+            class="btn btn-sm btn-icon"
+            data-action="unblock-track"
+            data-video-id="${escapeHtml(entry.videoId)}"
+            title="${t('blocklist.unblock')}"
+          >
+            ${PLUS_ICON()}
+          </button>
+        `
       })
   })
 

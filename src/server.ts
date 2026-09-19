@@ -25,7 +25,7 @@ import { getAppRoot } from './runtime.js'
 import { searchSongs, fetchPlaylistMeta } from './youtube/index.js'
 import { parsePlaylistId, isValidVideoId } from './youtube/url.js'
 import { getPlaylists, upsertPlaylist, removePlaylist } from './playlists.js'
-import { getState, removeAt, clearQueue, moveToNext, skipCurrent, setPaused, requestSong, reportPlaybackFailure } from './queue.js'
+import { getState, removeAt, clearQueue, moveToNext, skipCurrent, setPaused, requestSong, reportPlaybackFailure, skipIfCurrent } from './queue.js'
 import { flushAllStores } from './persist.js'
 import {
   refreshFallback,
@@ -251,7 +251,8 @@ app.post('/api/blocklist', (req, res) => {
   }
 
   const entry = blockTrack(videoId, typeof title === 'string' ? title : videoId)
-  ok(res, { entry }, 201)
+  const skipped = skipIfCurrent(videoId)
+  ok(res, { entry, skipped }, 201)
 })
 
 app.delete('/api/blocklist/:videoId', (req, res) => {
@@ -382,9 +383,13 @@ app.post('/api/fallback/enabled', (_req, res) => {
 })
 
 app.post('/api/fallback/play/:videoId', (req, res) => {
-  const item = playFallbackTrackNow(req.params.videoId)
-  if (!item) return fail(res, 'track not found in fallback', 'NOT_FOUND', 404)
-  ok<StateResponse>(res, getState())
+  try {
+    const item = playFallbackTrackNow(req.params.videoId)
+    if (!item) return fail(res, 'track not found in fallback', 'NOT_FOUND', 404)
+    ok<StateResponse>(res, getState())
+  } catch (error) {
+    failFromError(res, error)
+  }
 })
 
 app.post('/api/fallback/enqueue/:videoId', (req, res) => {

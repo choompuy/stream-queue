@@ -1,6 +1,6 @@
 import { getConfig, updateConfig } from './config.js'
 import { fetchPlaylistSongs } from './youtube/index.js'
-import { Song, QueueItem, Config, FallbackStateResponse } from './types.js'
+import { Song, QueueItem, Config, FallbackStateResponse, AppError } from './types.js'
 import { addSong, saveState, getCurrent, setCurrent } from './queue.js'
 import { isBlocked } from './blocklist.js'
 
@@ -243,6 +243,10 @@ export function playFallbackTrackNow(videoId: string): QueueItem | null {
 
   const song = findTrack(videoId)
   if (!song) return null
+
+  if (isBlocked(videoId)) {
+    throw new AppError('BLOCKED', 'this track is blocked')
+  }
 
   fallbackCursor = index
   const item = toFallbackQueueItem(song)

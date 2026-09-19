@@ -90,10 +90,7 @@
     "clearConfirm": "Очистить активность?",
     "accepted": "Принято",
     "rejected": "Отклонено",
-    "failed": "Ошибка воспроизведения",
-    "filterAll": "Все",
-    "filterAccepted": "Принятые",
-    "filterRejected": "Отклонённые"
+    "failed": "Ошибка воспроизведения"
   },
   "blocklist": {
     "title": "Блоклист",

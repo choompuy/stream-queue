@@ -4,6 +4,7 @@ import { withLoading } from './ui.js'
 import { t } from '../i18n.js'
 import { toastInfo, toastSuccess } from './toast.js'
 import { loadBlocklist } from './blocklist.js'
+import { refreshState } from './queue.js'
 
 let knownActivityKeys = null
 
@@ -36,12 +37,6 @@ function renderActivity() {
   views.activity.render(entries)
 }
 
-function updateFilterButtons(filter) {
-  dom.activityFilterAllBtn?.classList.toggle('active', filter === 'all')
-  dom.activityFilterAcceptedBtn?.classList.toggle('active', filter === 'accepted')
-  dom.activityFilterRejectedBtn?.classList.toggle('active', filter === 'rejected')
-}
-
 export async function loadActivity(silent = false) {
   try {
     const data = await api.getActivity(silent)
@@ -53,15 +48,6 @@ export async function loadActivity(silent = false) {
   } catch (error) {
     log('Error loading activity:', error)
   }
-}
-
-export function setActivityFilter(filter) {
-  if (!['all', 'accepted', 'rejected'].includes(filter) || filter === state.activityFilter) return
-
-  state.activityFilter = filter
-  updateFilterButtons(filter)
-  views.activity.invalidate()
-  renderActivity()
 }
 
 export async function clearActivity() {
@@ -84,6 +70,7 @@ export async function blockTrack(videoId, title) {
   try {
     await api.blockTrack(videoId, title)
     await loadBlocklist()
+    await refreshState(true)
     toastSuccess(t('toast.trackBlocked'))
   } catch (error) {
     log('Error blocking track:', error)

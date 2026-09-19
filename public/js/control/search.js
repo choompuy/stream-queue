@@ -12,6 +12,7 @@ let lastSearch = ''
 
 export function clearSearchResults() {
   views.search.clear()
+  lastSearch = ''
   dom.searchInput.value = ''
   dom.searchListWrapper.classList.add('hidden')
 }

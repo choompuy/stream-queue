@@ -90,10 +90,7 @@
     "clearConfirm": "Clear Activity?",
     "accepted": "accepted",
     "rejected": "rejected",
-    "failed": "Playback failed",
-    "filterAll": "All",
-    "filterAccepted": "Accepted",
-    "filterRejected": "Rejected"
+    "failed": "Playback failed"
   },
   "blocklist": {
     "title": "Blocklist",

@@ -83,9 +83,6 @@ export const dom = {
   statRejectedToday: $('statRejectedToday'),
   activityListWrapper: $('activityListWrapper'),
   clearActivityBtn: $('clearActivityBtn'),
-  activityFilterAllBtn: $('activityFilterAllBtn'),
-  activityFilterAcceptedBtn: $('activityFilterAcceptedBtn'),
-  activityFilterRejectedBtn: $('activityFilterRejectedBtn'),
 
   tabBlocklistCount: $('tabBlocklistCount'),
   blocklistListWrapper: $('blocklistListWrapper'),

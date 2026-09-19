@@ -104,7 +104,7 @@ export function getState(): PlayerState & { nextTrack: QueueItem | null } {
 }
 
 export function getNextTrack(): QueueItem | null {
-  return queue[0] ?? peekNextFallbackTrack()
+  return queue.find((item) => !isBlocked(item.videoId)) ?? peekNextFallbackTrack()
 }
 
 export function getQueue(): QueueItem[] {
@@ -198,11 +198,28 @@ export function setCurrent(item: QueueItem | null): void {
   saveState()
 }
 
+export function skipIfCurrent(videoId: string): boolean {
+  if (currentSong?.videoId !== videoId) return false
+
+  log(`[PLAYER] current track was blocked, skipping: "${currentSong.title}"`)
+  moveToNext()
+  return true
+}
+
 export function moveToNext(): QueueItem | null {
   let next = queue.shift() ?? null
 
   while (next && isBlocked(next.videoId)) {
     log(`[PLAYER] skipped blocked track in queue: "${next.title}"`)
+    logActivity({
+      requestedBy: next.requestedBy,
+      query: next.title,
+      title: next.title,
+      videoId: next.videoId,
+      status: 'rejected',
+      reasonCode: 'BLOCKED'
+    })
+
     queueVideoIds.delete(next.videoId)
     decUserCount(next.requestedBy)
     next = queue.shift() ?? null
@@ -216,9 +233,8 @@ export function moveToNext(): QueueItem | null {
   } else {
     const fallback = advanceFallback()
     setCurrent(fallback)
-    if (fallback) {
-      log(`[PLAYER] started fallback: "${fallback.title}"`)
-    }
+
+    if (fallback) log(`[PLAYER] started fallback: "${fallback.title}"`)
   }
 
   return currentSong
@@ -292,6 +308,8 @@ export function reportPlaybackFailure(errorCode?: number) {
       reasonParams: errorCode !== undefined ? { errorCode } : undefined
     })
   }
+
+  moveToNext()
 }
 
 export type RequestSongResult =

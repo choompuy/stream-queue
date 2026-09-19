@@ -16,6 +16,8 @@ body {
 
 .badge {
   position: absolute;
+  bottom: 0;
+  right: 0;
   display: flex;
   flex-direction: row;
   width: 100%;
@@ -24,8 +26,22 @@ body {
   border: 1px solid var(--text-muted);
   z-index: 0;
   pointer-events: none;
+  clip-path: inset(0 0 0 100%);
   transition: clip-path 0.4s ease-in-out;
   transition-delay: 0.2s;
+}
+
+.badge::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  max-width: 100%;
+  margin-right: auto;
+  background: var(--text-muted);
+  transition: 0.4s ease-in-out;
+  transition-property: max-width, clip-path;
+  z-index: 2;
 }
 
 .badge[data-position='top-left'] {
@@ -60,18 +76,6 @@ body {
 }
 .badge[data-position='bottom-right'] ::after {
   margin-right: auto;
-}
-
-.badge::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  max-width: 100%;
-  background: var(--text-muted);
-  transition: 0.4s ease-in-out;
-  transition-property: max-width, clip-path;
-  z-index: 2;
 }
 
 .badge.visible {
