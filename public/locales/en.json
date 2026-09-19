@@ -203,7 +203,9 @@
       "notPlayable": "This video is not playable",
       "isLive": "Live streams are not allowed",
       "isShort": "Shorts are not allowed",
-      "playbackFailed": "Playback failed in the player (error {{errorCode}})"
+      "playbackFailed": "Playback failed in the player (error {{errorCode}})",
+      "playbackVideoUnavailable": "Video became unavailable (removed, made private, or deleted)",
+      "playbackEmbedDisallowed": "YouTube refused embedded playback (often age-restriction or an owner-side embed block not visible via the API)"
     }
   },
   "time": {

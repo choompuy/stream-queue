@@ -38,8 +38,8 @@ export const dom = {
   cfgMaxQueue: $('cfgMaxQueue'),
   cfgMaxPerUser: $('cfgMaxPerUser'),
   cfgRegionCode: $('cfgRegionCode'),
-  cfgAllowShorts: $('allowShorts'),
-  cfgAllowLiveStreams: $('allowLiveStreams'),
+  cfgAllowShorts: $('cfgAllowShorts'),
+  cfgAllowLiveStreams: $('cfgAllowLiveStreams'),
 
   secYoutubeKey: $('secYoutubeKey'),
   secretsStatus: $('secretsStatus'),

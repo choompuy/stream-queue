@@ -19,7 +19,69 @@ type YouTubeErrorResponse = {
   }
 }
 
+type FilterRule = {
+  reason: FilterFailureReason
+  check: (song: Song, video: VideoItem, config: Config) => boolean
+  message: string
+  params?: (config: Config) => Record<string, string | number> | undefined
+}
+
 const SHORTS_MAX_DURATION_SECONDS = 60
+
+const FILTER_RULES: FilterRule[] = [
+  {
+    reason: 'NOT_MUSIC',
+    check: (_s, v) => v.snippet?.categoryId !== '10',
+    message: 'this video is not categorized as Music'
+  },
+  {
+    reason: 'NOT_PUBLIC',
+    check: (_s, v) => Boolean(v.status?.privacyStatus) && v.status!.privacyStatus !== 'public',
+    message: 'this video is not public'
+  },
+  {
+    reason: 'NOT_EMBEDDABLE',
+    check: (_s, v) => v.status?.embeddable === false,
+    message: 'this video cannot be embedded'
+  },
+  {
+    reason: 'REGION_BLOCKED',
+    check: (_s, v, c) => !isAvailableInRegion(v, c.regionCode),
+    message: 'this track is not available in the configured region'
+  },
+  {
+    reason: 'AGE_RESTRICTED',
+    check: (_s, v) => v.contentDetails?.contentRating?.ytRating === 'ytAgeRestricted',
+    message: 'this video is age-restricted'
+  },
+  {
+    reason: 'NOT_PLAYABLE',
+    check: (_s, v) => Boolean(v.status?.uploadStatus) && v.status!.uploadStatus !== 'processed',
+    message: 'this video is not playable'
+  },
+  {
+    reason: 'VIEWS_TOO_LOW',
+    check: (s, _v, c) => s.views < c.minViews,
+    message: 'this track does not have enough views',
+    params: (c) => ({ min: c.minViews })
+  },
+  {
+    reason: 'DURATION_OUT_OF_RANGE',
+    check: (s, _v, c) => s.duration < c.minDurationSeconds || s.duration > c.maxDurationSeconds,
+    message: "this track's duration is outside the allowed range",
+    params: (c) => ({ min: c.minDurationSeconds, max: c.maxDurationSeconds })
+  },
+  {
+    reason: 'IS_LIVE',
+    check: (_s, v, c) => !c.allowLiveStreams && Boolean(v.snippet?.liveBroadcastContent) && v.snippet!.liveBroadcastContent !== 'none',
+    message: 'live streams are not allowed'
+  },
+  {
+    reason: 'IS_SHORT',
+    check: (s, _v, c) => !c.allowShorts && isLikelyShort(s.duration),
+    message: 'shorts are not allowed'
+  }
+]
 
 export async function youtube<T>(path: string, params: Record<string, string>): Promise<T> {
   const { youtubeApiKey } = getSecrets()
@@ -96,22 +158,7 @@ function isLikelyShort(durationSeconds: number): boolean {
 
 export function getFilterFailureReason(song: Song, video: VideoItem): FilterFailureReason | null {
   const config = getConfig()
-
-  // Required
-  if (video.snippet?.categoryId !== '10') return 'NOT_MUSIC'
-  if (video.status?.privacyStatus && video.status.privacyStatus !== 'public') return 'NOT_PUBLIC'
-  if (video.status?.embeddable === false) return 'NOT_EMBEDDABLE'
-  if (!isAvailableInRegion(video, config.regionCode)) return 'REGION_BLOCKED'
-  if (video.contentDetails?.contentRating?.ytRating === 'ytAgeRestricted') return 'AGE_RESTRICTED'
-  if (video.status?.uploadStatus && video.status.uploadStatus !== 'processed') return 'NOT_PLAYABLE'
-
-  // Optional
-  if (song.views < config.minViews) return 'VIEWS_TOO_LOW'
-  if (song.duration < config.minDurationSeconds || song.duration > config.maxDurationSeconds) return 'DURATION_OUT_OF_RANGE'
-  if (!config.allowLiveStreams && video.snippet?.liveBroadcastContent && video.snippet.liveBroadcastContent !== 'none') return 'IS_LIVE'
-  if (!config.allowShorts && isLikelyShort(song.duration)) return 'IS_SHORT'
-
-  return null
+  return FILTER_RULES.find((rule) => rule.check(song, video, config))?.reason ?? null
 }
 
 export function isValidSong(song: Song, video: VideoItem): boolean {
@@ -119,31 +166,6 @@ export function isValidSong(song: Song, video: VideoItem): boolean {
 }
 
 export function throwFilterError(reason: FilterFailureReason, config: Config): never {
-  switch (reason) {
-    case 'NOT_MUSIC':
-      throw new AppError('NOT_MUSIC', 'this video is not categorized as Music')
-    case 'NOT_EMBEDDABLE':
-      throw new AppError('NOT_EMBEDDABLE', 'this video cannot be embedded')
-    case 'DURATION_OUT_OF_RANGE':
-      throw new AppError('DURATION_OUT_OF_RANGE', "this track's duration is outside the allowed range", {
-        min: config.minDurationSeconds,
-        max: config.maxDurationSeconds
-      })
-    case 'VIEWS_TOO_LOW':
-      throw new AppError('VIEWS_TOO_LOW', 'this track does not have enough views', {
-        min: config.minViews
-      })
-    case 'REGION_BLOCKED':
-      throw new AppError('REGION_BLOCKED', 'this track is not available in the configured region')
-    case 'NOT_PUBLIC':
-      throw new AppError('NOT_PUBLIC', 'this video is not public')
-    case 'AGE_RESTRICTED':
-      throw new AppError('AGE_RESTRICTED', 'this video is age-restricted')
-    case 'NOT_PLAYABLE':
-      throw new AppError('NOT_PLAYABLE', 'this video is not playable')
-    case 'IS_LIVE':
-      throw new AppError('IS_LIVE', 'live streams are not allowed')
-    case 'IS_SHORT':
-      throw new AppError('IS_SHORT', 'shorts are not allowed')
-  }
+  const rule = FILTER_RULES.find((r) => r.reason === reason)!
+  throw new AppError(reason, rule.message, rule.params?.(config))
 }

@@ -258,7 +258,7 @@ export function skipCurrent(): QueueItem | null {
   return moveToNext()
 }
 
-function playbackFailureReasonCode(errorCode?: number): string {
+export function playbackFailureReasonCode(errorCode?: number): string {
   switch (errorCode) {
     case 100:
       return 'PLAYBACK_VIDEO_UNAVAILABLE'

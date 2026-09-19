@@ -1,6 +1,11 @@
 import { CONFIG_PATH, createFileStore } from './persist.js'
 import { Config } from './types.js'
 
+type FieldRule = {
+  normalize?: (value: unknown) => unknown
+  validate: (value: unknown) => boolean
+}
+
 const configDefaults: Config = {
   minViews: 10000,
   minDurationSeconds: 60,
@@ -32,59 +37,51 @@ export function getConfig(): Config {
   return { ...config }
 }
 
-const NUMERIC_FIELDS: { key: keyof Config; min: number }[] = [
-  { key: 'minViews', min: 0 },
-  { key: 'minDurationSeconds', min: 0 },
-  { key: 'maxDurationSeconds', min: 1 },
-  { key: 'maxQueueSize', min: 1 },
-  { key: 'maxRequestsPerUser', min: 0 }
-]
-
-function sanitizeNumericUpdates(updates: Partial<Config>): Partial<Config> {
-  const clean: Partial<Config> = { ...updates }
-
-  for (const { key, min } of NUMERIC_FIELDS) {
-    const value = updates[key]
-    if (typeof value !== 'number' || !Number.isFinite(value) || value < min) {
-      delete clean[key]
-    }
+const FIELD_RULES: Partial<Record<keyof Config, FieldRule>> = {
+  minViews: {
+    validate: (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0
+  },
+  minDurationSeconds: {
+    validate: (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0
+  },
+  maxDurationSeconds: {
+    validate: (v) => typeof v === 'number' && Number.isFinite(v) && v >= 1
+  },
+  maxQueueSize: {
+    validate: (v) => typeof v === 'number' && Number.isFinite(v) && v >= 1
+  },
+  maxRequestsPerUser: {
+    validate: (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0
+  },
+  regionCode: {
+    normalize: (v) => (typeof v === 'string' ? v.trim().toUpperCase() : ''),
+    validate: (v) => v === '' || /^[A-Z]{2}$/.test(v as string)
+  },
+  allowShorts: {
+    validate: (v) => typeof v === 'boolean'
+  },
+  allowLiveStreams: {
+    validate: (v) => typeof v === 'boolean'
   }
-
-  return clean
 }
 
-const REGION_CODE_PATTERN = /^[A-Z]{2}$/
-const BOOLEAN_FIELDS: (keyof Config)[] = ['allowShorts', 'allowLiveStreams']
-
-function sanitizeBooleanUpdates(updates: Partial<Config>): Partial<Config> {
-  const clean: Partial<Config> = { ...updates }
-  for (const key of BOOLEAN_FIELDS) {
-    if (key in updates && typeof updates[key] !== 'boolean') delete clean[key]
-  }
-  return clean
-}
-
-function sanitizeRegionCode(updates: Partial<Config>): Partial<Config> {
+function sanitizeUpdates(updates: Partial<Config>): Partial<Config> {
   const clean: Partial<Config> = { ...updates }
 
-  if ('regionCode' in updates) {
-    const raw = updates.regionCode
-    const normalized = typeof raw === 'string' ? raw.trim().toUpperCase() : ''
+  for (const key of Object.keys(updates) as (keyof Config)[]) {
+    const rule = FIELD_RULES[key]
+    if (!rule) continue
 
-    if (normalized === '') {
-      clean.regionCode = ''
-    } else if (REGION_CODE_PATTERN.test(normalized)) {
-      clean.regionCode = normalized
-    } else {
-      delete clean.regionCode
-    }
+    const value = rule.normalize ? rule.normalize(clean[key]) : clean[key]
+    if (rule.validate(value)) (clean as Record<string, unknown>)[key] = value
+    else delete clean[key]
   }
 
   return clean
 }
 
 export function updateConfig(updates: Partial<Config>): Config {
-  const safeUpdates = { ...sanitizeNumericUpdates(updates), ...sanitizeRegionCode(updates), ...sanitizeBooleanUpdates(updates) }
+  const safeUpdates = { ...sanitizeUpdates(updates) }
 
   config = {
     ...config,

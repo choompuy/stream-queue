@@ -54,39 +54,17 @@ export function getErrorMessage(code, t) {
   return `Error code ${code}`
 }
 
-export const ERROR_CODE_I18N_KEYS = {
-  INVALID_LOCALE: 'api.errors.invalidLocale',
-  INVALID_PLAYLIST_ID: 'api.errors.invalidPlaylistId',
-  PLAYLIST_NOT_FOUND: 'api.errors.playlistNotFound',
-  INVALID_QUERY: 'api.errors.invalidQuery',
-  INVALID_REQUEST: 'api.errors.usernameRequired',
-  INVALID_YOUTUBE_URL: 'api.errors.invalidYoutubeUrl',
-  SONG_NOT_FOUND: 'api.errors.songNotFound',
-  NOT_FOUND: 'api.errors.notFound',
-  INVALID_INDEX: 'api.errors.invalidIndex',
-  QUEUE_ITEM_NOT_FOUND: 'api.errors.queueItemNotFound',
-  SERVER_ERROR: 'api.errors.serverError',
-  DUPLICATE: 'api.errors.duplicate',
-  BLOCKED: 'api.errors.blocked',
-  QUEUE_FULL: 'api.errors.queueFull',
-  USER_LIMIT: 'api.errors.userLimit',
-  YOUTUBE_QUOTA: 'api.errors.youtubeQuota',
-  YOUTUBE_ERROR: 'api.errors.youtubeError',
-  NO_API_KEY: 'api.errors.noApiKey',
-  NOT_MUSIC: 'api.errors.notMusic',
-  NOT_EMBEDDABLE: 'api.errors.notEmbeddable',
-  DURATION_OUT_OF_RANGE: 'api.errors.durationOutOfRange',
-  VIEWS_TOO_LOW: 'api.errors.viewsTooLow',
-  REGION_BLOCKED: 'api.errors.regionBlocked',
-  NOT_PUBLIC: 'api.errors.notPublic',
-  AGE_RESTRICTED: 'api.errors.ageRestricted',
-  NOT_PLAYABLE: 'api.errors.notPlayable',
-  IS_LIVE: 'api.errors.isLive',
-  IS_SHORT: 'api.errors.isShort',
-  PLAYBACK_FAILED: 'api.errors.playbackFailed'
+const ERROR_CODE_KEY_OVERRIDES = {
+  INVALID_REQUEST: 'api.errors.usernameRequired'
 }
 
-export function translateErrorCode(t, code, params, fallback = '') {
-  const key = code && ERROR_CODE_I18N_KEYS[code]
-  return key ? t(key, params) : fallback
+function codeToI18nKey(code) {
+  if (ERROR_CODE_KEY_OVERRIDES[code]) return ERROR_CODE_KEY_OVERRIDES[code]
+  const camel = code.toLowerCase().replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase())
+  return `api.errors.${camel}`
+}
+
+export function translateErrorCode(locale, code, params, fallback = '') {
+  const key = code && codeToI18nKey(code)
+  return key ? t(locale, key, params) : fallback
 }

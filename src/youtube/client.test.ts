@@ -102,11 +102,11 @@ test('getFilterFailureReason', async (t) => {
 })
 
 test('throwFilterError', async (t) => {
-  await t.test('REGION_BLOCKED carries the configured region as a param', () => {
+  await t.test('REGION_BLOCKED does not leak the configured region', () => {
     const config = { regionCode: 'RU' } as Parameters<typeof throwFilterError>[1]
     assert.throws(
       () => throwFilterError('REGION_BLOCKED', config),
-      (error: unknown) => error instanceof AppError && error.code === 'REGION_BLOCKED' && error.params?.region === 'RU'
+      (error: unknown) => error instanceof AppError && error.code === 'REGION_BLOCKED' && error.params === undefined
     )
   })
 

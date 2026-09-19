@@ -136,7 +136,6 @@ app.put(
   '/api/config',
   asyncHandler(async (req, res) => {
     const body = { ...(req.body ?? {}) }
-    console.log(body)
 
     if (body.fallbackPlaylist && typeof body.fallbackPlaylist.playlistId === 'string') {
       const rawPlaylistId = body.fallbackPlaylist.playlistId.trim()
