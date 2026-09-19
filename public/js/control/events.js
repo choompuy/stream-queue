@@ -11,7 +11,7 @@ import {
   toggleFallbackRepeat,
   toggleFallbackEnabled
 } from './fallback.js'
-import { clearActivity, setActivityFilter, banTrack } from './activity.js'
+import { clearActivity, setActivityFilter, blockTrack } from './activity.js'
 import { unblockTrack } from './blocklist.js'
 import { addPlaylist, activatePlaylist, deletePlaylist } from './playlists.js'
 import { saveOverlaySettings, copyOverlayUrl, onIpChange, toggleQr, saveConfigSetting, changeLocale } from './settings.js'
@@ -35,7 +35,7 @@ const ACTIONS = {
   'playlist-delete': (action) => deletePlaylist(action.dataset.id),
   'clear-activity': clearActivity,
   'activity-filter': (action) => setActivityFilter(action.dataset.filter),
-  'ban-track': (action) => banTrack(action.dataset.videoId, action.dataset.title),
+  'block-track': (action) => blockTrack(action.dataset.videoId, action.dataset.title),
   'unblock-track': (action) => unblockTrack(action.dataset.videoId),
   'copy-overlay-url': copyOverlayUrl,
   'toggle-qr': toggleQr,
@@ -56,10 +56,22 @@ export function bindEvents() {
       return
     }
 
+    const menuToggle = event.target.closest('[data-action="toggle-menu"]')
+    if (menuToggle) {
+      const dropdown = menuToggle.closest('.row-menu')?.querySelector('.row-menu-dropdown')
+      const wasOpen = dropdown && !dropdown.classList.contains('hidden')
+      closeAllMenus()
+      if (dropdown && !wasOpen) dropdown.classList.remove('hidden')
+      return
+    }
+
+    if (!event.target.closest('.row-menu')) closeAllMenus()
+
     const action = event.target.closest('[data-action]')
     if (!action) return
 
     ACTIONS[action.dataset.action]?.(action)
+    closeAllMenus()
   })
 
   dom.searchInput?.addEventListener('keydown', (event) => {
@@ -74,4 +86,8 @@ export function bindEvents() {
   dom.badgePosition?.addEventListener('change', saveOverlaySettings)
   dom.selectIp?.addEventListener('change', onIpChange)
   dom.localeSelect?.addEventListener('change', (e) => changeLocale(e.target.value))
+}
+
+function closeAllMenus() {
+  document.querySelectorAll('.row-menu-dropdown').forEach((el) => el.classList.add('hidden'))
 }

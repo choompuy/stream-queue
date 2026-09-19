@@ -81,6 +81,8 @@ function renderState() {
   renderCurrent()
 
   if (!isPlaybackSource || !isPlayerReady || !currentState) return
+  if (isPlayerReady) dom.badge.classList.remove('hidden')
+
   if (!currentState.current) {
     if (!isTransitioning) player.stopVideo()
     return

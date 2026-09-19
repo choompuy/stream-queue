@@ -32,3 +32,23 @@ export const CLOSE_ICON = (size) => `
     <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 6 6 18M6 6l12 12" />
   </svg>
 `
+
+export const BLOCK_ICON = (size) => `
+  <svg xmlns="http://www.w3.org/2000/svg" width="${size || 20}" height="${size || 20}" fill="none" viewBox="0 0 24 24">
+    <path
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      d="M18.364 18.364A9 9 0 1 0 5.636 5.636m12.728 12.728A9 9 0 1 1 5.636 5.636m12.728 12.728L5.636 5.636"
+    />
+  </svg>
+`
+
+export const MORE_ICON = (size) => `
+  <svg xmlns="http://www.w3.org/2000/svg" width="${size || 20}" height="${size || 20}" fill="currentColor" viewBox="0 0 24 24">
+    <circle cx="12" cy="5" r="1.75" />
+    <circle cx="12" cy="12" r="1.75" />
+    <circle cx="12" cy="19" r="1.75" />
+  </svg>
+`

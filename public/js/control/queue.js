@@ -37,7 +37,8 @@ export function renderQueue() {
 
   if (dom.tabQueueCount) dom.tabQueueCount.textContent = state.queue.length
 
-  views.queue.render(state.queue)
+  const blockedIds = new Set(state.blocklist.map((entry) => entry.videoId))
+  views.queue.render(state.queue.map((item) => ({ ...item, isBlocked: blockedIds.has(item.videoId) })))
 }
 
 export async function removeFromQueue(index) {

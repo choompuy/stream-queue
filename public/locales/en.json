@@ -41,7 +41,8 @@
     "shuffle": "Shuffle",
     "repeat": "Repeat",
     "next": "Next",
-    "previous": "Previous"
+    "previous": "Previous",
+    "more": "More actions"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -87,7 +88,6 @@
     "empty": "No requests yet",
     "clear": "Clear",
     "clearConfirm": "Clear Activity?",
-    "ban": "Block this track",
     "accepted": "accepted",
     "rejected": "rejected",
     "failed": "Playback failed",
@@ -98,7 +98,9 @@
   "blocklist": {
     "title": "Blocklist",
     "empty": "No blocked tracks",
-    "unblock": "Unblock"
+    "block": "Block this track",
+    "unblock": "Unblock",
+    "blockedLabel": "Blocked"
   },
   "playlists": {
     "title": "Playlists",

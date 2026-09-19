@@ -38,7 +38,8 @@ export function renderFallback() {
     count: tracks.length,
     datetime: formatDateTime(data.lastRefreshedAt)
   })
-  views.fallback.render(tracks)
+  const blockedIds = new Set(state.blocklist.map((entry) => entry.videoId))
+  views.fallback.render(tracks.map((track) => ({ ...track, isBlocked: blockedIds.has(track.videoId) })))
   scrollToActiveFallback()
   renderStats()
 }

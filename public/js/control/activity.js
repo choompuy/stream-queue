@@ -80,7 +80,7 @@ export async function clearActivity() {
   })
 }
 
-export async function banTrack(videoId, title) {
+export async function blockTrack(videoId, title) {
   try {
     await api.blockTrack(videoId, title)
     await loadBlocklist()

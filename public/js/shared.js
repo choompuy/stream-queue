@@ -64,7 +64,7 @@ function codeToI18nKey(code) {
   return `api.errors.${camel}`
 }
 
-export function translateErrorCode(locale, code, params, fallback = '') {
+export function translateErrorCode(t, code, params, fallback = '') {
   const key = code && codeToI18nKey(code)
-  return key ? t(locale, key, params) : fallback
+  return key ? t(key, params) : fallback
 }

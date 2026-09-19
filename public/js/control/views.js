@@ -1,7 +1,8 @@
 import { escapeHtml, formatDuration, translateErrorCode } from '../shared.js'
-import { PLUS_ICON, PLAY_ICON, PAUSE_ICON, DELETE_ICON } from '../icons.js'
+import { PLUS_ICON, PLAY_ICON, PAUSE_ICON, DELETE_ICON, BLOCK_ICON } from '../icons.js'
 import { createListView, formatRelativeTime } from './ui.js'
 import { t } from '../i18n.js'
+import { MORE_ICON } from '../icons.js'
 
 function row({ index, thumbnail, title, subtitle, meta = '', extra = '', actions = '', className = '', attributes = '' }) {
   return `
@@ -15,6 +16,28 @@ function row({ index, thumbnail, title, subtitle, meta = '', extra = '', actions
       ${extra}
       ${meta ? `<span class="text-sm text-secondary">${meta}</span>` : ''}
       ${actions ? `<div class="row-ctrl">${actions}</div>` : ''}
+    </div>
+  `
+}
+
+function rowMenu(items) {
+  return `
+    <div class="row-menu">
+      <button class="btn btn-sm btn-icon" data-action="toggle-menu" title="${t('common.more')}">
+        ${MORE_ICON()}
+      </button>
+      <div class="row-menu-dropdown hidden">
+        ${items
+          .map(
+            (item) => `
+          <button class="row-menu-item btn btn-secondary${item.danger ? ' btn-danger' : ''}" data-action="${item.action}"${item.attrs || ''}>
+            <span>${item.label}</span>
+            <span class="row-menu-icon">${item.icon ? item.icon(20) : ''}</span>
+          </button>
+        `
+          )
+          .join('')}
+      </div>
     </div>
   `
 }
@@ -42,9 +65,11 @@ export function createViews(dom) {
   })
 
   const queue = createListView(dom.queueListWrapper, {
-    getKey: (items) => items.map((item) => [item.videoId, item.requestedBy, item.title, item.thumbnail, item.duration].join(':')).join('|'),
+    getKey: (items) =>
+      items.map((item) => [item.videoId, item.requestedBy, item.title, item.thumbnail, item.duration, item.isBlocked].join(':')).join('|'),
     renderRow: (item, index) =>
       row({
+        className: item.isBlocked ? 'row-blocked' : '',
         index,
         thumbnail: item.thumbnail,
         title: item.title,
@@ -53,18 +78,43 @@ export function createViews(dom) {
           <span class="text-sm text-green">
             @${escapeHtml(item.requestedBy)}
           </span>
+          ${item.isBlocked ? `<span class="text-xs text-bold status-pill rejected">${t('blocklist.blockedLabel')}</span>` : ''}
         `,
         meta: formatDuration(item.duration),
-        actions: `
-          <button
-            class="btn btn-sm btn-icon"
-            data-action="queue-remove"
-            data-index="${index}"
-            title="${t('queue.remove')}"
-          >
-            ${DELETE_ICON()}
-          </button>
-        `,
+        actions: rowMenu(
+          item.isBlocked
+            ? [
+                {
+                  action: 'unblock-track',
+                  attrs: ` data-video-id="${escapeHtml(item.videoId)}"`,
+                  icon: PLUS_ICON,
+                  label: t('blocklist.unblock')
+                },
+                {
+                  action: 'queue-remove',
+                  attrs: ` data-index="${index}"`,
+                  icon: DELETE_ICON,
+                  label: t('queue.remove'),
+                  danger: true
+                }
+              ]
+            : [
+                {
+                  action: 'block-track',
+                  attrs: ` data-video-id="${escapeHtml(item.videoId)}" data-title="${escapeHtml(item.title)}"`,
+                  icon: BLOCK_ICON,
+                  label: t('blocklist.block'),
+                  danger: true
+                },
+                {
+                  action: 'queue-remove',
+                  attrs: ` data-index="${index}"`,
+                  icon: DELETE_ICON,
+                  label: t('queue.remove'),
+                  danger: true
+                }
+              ]
+        ),
         attributes: `data-queue-index="${index}"`
       })
   })
@@ -73,11 +123,11 @@ export function createViews(dom) {
   const fallback = createListView(dom.fallbackListWrapper, {
     getKey: (items) => {
       const activeId = fallbackList.dataset.activeVideoId || ''
-      return [activeId, ...items.map((item) => `${item.videoId}:${item.isPlayed}`)].join('|')
+      return [activeId, ...items.map((item) => `${item.videoId}:${item.isBlocked}`)].join('|')
     },
     renderRow: (track) => {
       const isActive = track.videoId === fallbackList.dataset.activeVideoId
-      const rowClass = isActive ? 'row-active' : track.isPlayed ? 'row-played' : ''
+      const rowClass = [isActive ? 'row-active' : '', track.isBlocked ? 'row-blocked' : ''].filter(Boolean).join(' ')
 
       return row({
         className: rowClass,
@@ -86,25 +136,39 @@ export function createViews(dom) {
         title: track.title,
         subtitle: track.channelTitle,
         meta: formatDuration(track.duration),
-        actions: `
-          <button
-            class="btn btn-sm btn-icon"
-            data-action="fallback-enqueue"
-            data-video-id="${escapeHtml(track.videoId)}"
-            title="${t('fallback.addToQueue')}"
-          >
-            ${PLUS_ICON()}
-          </button>
-
-          <button
-            class="btn btn-sm btn-icon"
-            data-action="fallback-play"
-            data-video-id="${escapeHtml(track.videoId)}"
-            title="${t('fallback.playNow')}"
-          >
-            ${PLAY_ICON()}
-          </button>
-        `
+        extra: track.isBlocked ? `<span class="text-xs text-bold status-pill rejected">${t('blocklist.blockedLabel')}</span>` : '',
+        actions: rowMenu(
+          track.isBlocked
+            ? [
+                {
+                  action: 'unblock-track',
+                  attrs: ` data-video-id="${escapeHtml(track.videoId)}"`,
+                  icon: PLUS_ICON,
+                  label: t('blocklist.unblock')
+                }
+              ]
+            : [
+                {
+                  action: 'fallback-enqueue',
+                  attrs: ` data-video-id="${escapeHtml(track.videoId)}"`,
+                  icon: PLUS_ICON,
+                  label: t('fallback.addToQueue')
+                },
+                {
+                  action: 'fallback-play',
+                  attrs: ` data-video-id="${escapeHtml(track.videoId)}"`,
+                  icon: PLAY_ICON,
+                  label: t('fallback.playNow')
+                },
+                {
+                  action: 'block-track',
+                  attrs: ` data-video-id="${escapeHtml(track.videoId)}" data-title="${escapeHtml(track.title)}"`,
+                  icon: BLOCK_ICON,
+                  label: t('blocklist.block'),
+                  danger: true
+                }
+              ]
+        )
       })
     }
   })
@@ -136,17 +200,15 @@ export function createViews(dom) {
           </span>
         `,
         actions: entry.videoId
-          ? `
-            <button
-              class="btn btn-sm btn-icon"
-              data-action="ban-track"
-              data-video-id="${escapeHtml(entry.videoId)}"
-              data-title="${escapeHtml(title)}"
-              title="${t('activity.ban')}"
-            >
-              ${DELETE_ICON()}
-            </button>
-          `
+          ? rowMenu([
+              {
+                action: 'block-track',
+                attrs: ` data-video-id="${escapeHtml(entry.videoId)}" data-title="${escapeHtml(title)}"`,
+                icon: BLOCK_ICON,
+                label: t('blocklist.block'),
+                danger: true
+              }
+            ])
           : ''
       })
     }
@@ -159,16 +221,14 @@ export function createViews(dom) {
         thumbnail: `https://i.ytimg.com/vi/${entry.videoId}/mqdefault.jpg`,
         title: entry.title,
         subtitle: formatRelativeTime(entry.blockedAt),
-        actions: `
-          <button
-            class="btn btn-sm btn-icon"
-            data-action="unblock-track"
-            data-video-id="${escapeHtml(entry.videoId)}"
-            title="${t('blocklist.unblock')}"
-          >
-            ${DELETE_ICON()}
-          </button>
-        `
+        actions: rowMenu([
+          {
+            action: 'unblock-track',
+            attrs: ` data-video-id="${escapeHtml(entry.videoId)}"`,
+            icon: PLUS_ICON,
+            label: t('blocklist.unblock')
+          }
+        ])
       })
   })
 
@@ -187,24 +247,21 @@ export function createViews(dom) {
         thumbnail: playlist.thumbnail,
         title: playlist.title,
         subtitle: t('playlists.tracks', { count: playlist.itemCount }),
-        actions: `
-          <button
-            class="btn btn-sm btn-icon btn-secondary ${isActive ? 'active' : ''}"
-            data-action="playlist-activate"
-            data-id="${escapeHtml(playlist.id)}"
-            title="${isActive ? t('playlists.pause') : t('playlists.activate')}"
-          >
-            ${isActive ? PAUSE_ICON() : PLAY_ICON()}
-          </button>
-          <button
-            class="btn btn-sm btn-icon btn-secondary btn-danger"
-            data-action="playlist-delete"
-            data-id="${escapeHtml(playlist.id)}"
-            title="${t('playlists.delete')}"
-          >
-            ${DELETE_ICON()}
-          </button>
-        `
+        actions: rowMenu([
+          {
+            action: 'playlist-activate',
+            attrs: ` data-id="${escapeHtml(playlist.id)}"`,
+            icon: isActive ? PAUSE_ICON : PLAY_ICON,
+            label: isActive ? t('playlists.pause') : t('playlists.activate')
+          },
+          {
+            action: 'playlist-delete',
+            attrs: ` data-id="${escapeHtml(playlist.id)}"`,
+            icon: DELETE_ICON,
+            label: t('playlists.delete'),
+            danger: true
+          }
+        ])
       })
     }
   })

@@ -126,12 +126,9 @@ export type QueueRequestResponse = {
   position: number
   state: PlayerState
 }
-export type FallbackTrackView = Song & {
-  isPlayed: boolean
-}
 export type FallbackStateResponse = FallbackPlaylist & {
   lastRefreshedAt: number | null
-  upNext: FallbackTrackView[]
+  upNext: Song[]
   sourceCount: number
   activeVideoId: string | null
 }

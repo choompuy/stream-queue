@@ -199,7 +199,14 @@ export function setCurrent(item: QueueItem | null): void {
 }
 
 export function moveToNext(): QueueItem | null {
-  const next = queue.shift() ?? null
+  let next = queue.shift() ?? null
+
+  while (next && isBlocked(next.videoId)) {
+    log(`[PLAYER] skipped blocked track in queue: "${next.title}"`)
+    queueVideoIds.delete(next.videoId)
+    decUserCount(next.requestedBy)
+    next = queue.shift() ?? null
+  }
 
   if (next) {
     queueVideoIds.delete(next.videoId)
@@ -270,7 +277,7 @@ export function playbackFailureReasonCode(errorCode?: number): string {
   }
 }
 
-export function reportPlaybackFailure(errorCode?: number): QueueItem | null {
+export function reportPlaybackFailure(errorCode?: number) {
   const failed = currentSong
 
   if (failed) {
@@ -285,8 +292,6 @@ export function reportPlaybackFailure(errorCode?: number): QueueItem | null {
       reasonParams: errorCode !== undefined ? { errorCode } : undefined
     })
   }
-
-  return moveToNext()
 }
 
 export type RequestSongResult =
