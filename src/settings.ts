@@ -1,4 +1,5 @@
 import { Settings } from './types.js'
+import { notifyStateChange } from './state-events.js'
 
 const defaultSettings: Settings = {
   showVideo: false,
@@ -35,6 +36,7 @@ export function updateSettings(updates: Partial<Settings>): Settings {
 
   currentSettings = next
   console.log('[SETTINGS] Updated:', currentSettings)
+  notifyStateChange()
   return { ...currentSettings }
 }
 
@@ -46,5 +48,6 @@ export function setSettings(settings: Settings): void {
 export function resetSettings(): Settings {
   currentSettings = { ...defaultSettings }
   console.log('[SETTINGS] Reset to defaults')
+  notifyStateChange()
   return { ...currentSettings }
 }

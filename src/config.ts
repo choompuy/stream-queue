@@ -65,29 +65,52 @@ const FIELD_RULES: Partial<Record<keyof Config, FieldRule>> = {
   }
 }
 
-function sanitizeUpdates(updates: Partial<Config>): Partial<Config> {
+function sanitizeUpdates(updates: Partial<Config>): { clean: Partial<Config>; rejected: string[] } {
   const clean: Partial<Config> = { ...updates }
+  const rejected: string[] = []
 
   for (const key of Object.keys(updates) as (keyof Config)[]) {
     const rule = FIELD_RULES[key]
     if (!rule) continue
 
     const value = rule.normalize ? rule.normalize(clean[key]) : clean[key]
-    if (rule.validate(value)) (clean as Record<string, unknown>)[key] = value
-    else delete clean[key]
+    if (rule.validate(value)) {
+      ;(clean as Record<string, unknown>)[key] = value
+    } else {
+      delete clean[key]
+      rejected.push(key)
+    }
   }
 
-  return clean
+  return { clean, rejected }
 }
 
-export function updateConfig(updates: Partial<Config>): Config {
-  const safeUpdates = { ...sanitizeUpdates(updates) }
+function sanitizeFallbackPlaylist(
+  updates: Partial<Config['fallbackPlaylist']> | undefined,
+  current: Config['fallbackPlaylist']
+): Config['fallbackPlaylist'] {
+  if (!updates) return current
+
+  const next = { ...current }
+
+  if ('playlistId' in updates) {
+    next.playlistId = typeof updates.playlistId === 'string' || updates.playlistId === null ? updates.playlistId : current.playlistId
+  }
+  if (typeof updates.enabled === 'boolean') next.enabled = updates.enabled
+  if (typeof updates.shuffle === 'boolean') next.shuffle = updates.shuffle
+  if (typeof updates.repeat === 'boolean') next.repeat = updates.repeat
+
+  return next
+}
+
+export function updateConfig(updates: Partial<Config>): { config: Config; rejected: string[] } {
+  const { clean, rejected } = sanitizeUpdates(updates)
 
   config = {
     ...config,
-    ...safeUpdates,
-    fallbackPlaylist: { ...config.fallbackPlaylist, ...updates.fallbackPlaylist }
+    ...clean,
+    fallbackPlaylist: sanitizeFallbackPlaylist(updates.fallbackPlaylist, config.fallbackPlaylist)
   }
   saveConfig()
-  return { ...config }
+  return { config: { ...config }, rejected }
 }

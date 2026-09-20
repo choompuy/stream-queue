@@ -1,22 +1,31 @@
-import { getSettings, setSettings } from './settings.js'
 import { getConfig } from './config.js'
 import { getVideoById, searchSongs, selectBestSong } from './youtube/index.js'
 import { parseYouTubeUrl } from './youtube/url.js'
-import { STATE_FILE, createFileStore } from './persist.js'
 import { logActivity } from './activity.js'
-import { Settings, QueueItem, Song, PlayerState, AppError, QueueRequestResponse } from './types.js'
-import { peekNextFallbackTrack, advanceFallback, getFallbackSnapshot, hydrateFallback, FallbackSnapshot } from './fallback.js'
-import { t } from './i18n.js'
+import { QueueItem, Song, PlayerState, AppError, QueueRequestResponse, ActivityReasonCode } from './types.js'
 import { isBlocked } from './blocklist.js'
+import { notifyStateChange } from './state-events.js'
 
-type StateFile = {
-  current: QueueItem | null
-  queue: QueueItem[]
-  settings: Settings
-  fallback: FallbackSnapshot
+function logRejection(
+  requestedBy: string,
+  query: string,
+  reasonCode: ActivityReasonCode,
+  options: { title?: string | null; videoId?: string | null; reasonParams?: Record<string, string | number> } = {}
+): void {
+  logActivity({
+    requestedBy,
+    query,
+    title: options.title ?? null,
+    videoId: options.videoId ?? null,
+    status: 'rejected',
+    reasonCode,
+    reasonParams: options.reasonParams
+  })
 }
 
-const store = createFileStore<Partial<StateFile>>(STATE_FILE)
+function logAcceptance(requestedBy: string, query: string, title: string, videoId: string): void {
+  logActivity({ requestedBy, query, title, videoId, status: 'accepted', reasonCode: null })
+}
 
 let currentSong: QueueItem | null = null
 const queue: QueueItem[] = []
@@ -28,52 +37,6 @@ let isPaused = false
 function log(message: string): void {
   console.log(`[QUEUE] ${message}`)
 }
-
-async function loadState(): Promise<void> {
-  try {
-    const data = store.load({})
-
-    if (data.current) currentSong = data.current
-    if (Array.isArray(data.queue)) {
-      queue.length = 0
-      queueVideoIds.clear()
-      userQueueCounts.clear()
-      for (const item of data.queue) {
-        queue.push(item)
-        queueVideoIds.add(item.videoId)
-        incUserCount(item.requestedBy)
-      }
-    }
-
-    if (data.settings) {
-      const settingsWithLocale = { ...data.settings, locale: data.settings.locale || 'en' }
-      setSettings(settingsWithLocale)
-    }
-
-    hydrateFallback(data.fallback)
-
-    log('State loaded from disk')
-  } catch (error) {
-    console.error('[QUEUE] Failed to load state:', error instanceof Error ? error.message : error)
-  }
-}
-
-function stateSnapshot(): StateFile {
-  return {
-    current: currentSong,
-    queue: [...queue],
-    settings: getSettings(),
-    fallback: getFallbackSnapshot()
-  }
-}
-
-export function saveState(): void {
-  store.scheduleSave(stateSnapshot, (error) => {
-    console.error('[QUEUE] Failed to save state:', error instanceof Error ? error.message : error)
-  })
-}
-
-loadState()
 
 function incUserCount(requestedBy: string): void {
   const key = requestedBy.toLowerCase()
@@ -94,17 +57,19 @@ function getUserActiveCount(username: string): number {
   return userQueueCounts.get(username.toLowerCase()) ?? 0
 }
 
-export function getState(): PlayerState & { nextTrack: QueueItem | null } {
-  return {
-    current: currentSong,
-    queue: [...queue],
-    isPaused,
-    nextTrack: getNextTrack()
-  }
-}
+export function hydrateQueue(data: { current?: QueueItem | null; queue?: QueueItem[] }): void {
+  if (data.current) currentSong = data.current
 
-export function getNextTrack(): QueueItem | null {
-  return queue.find((item) => !isBlocked(item.videoId)) ?? peekNextFallbackTrack()
+  if (Array.isArray(data.queue)) {
+    queue.length = 0
+    queueVideoIds.clear()
+    userQueueCounts.clear()
+    for (const item of data.queue) {
+      queue.push(item)
+      queueVideoIds.add(item.videoId)
+      incUserCount(item.requestedBy)
+    }
+  }
 }
 
 export function getQueue(): QueueItem[] {
@@ -117,10 +82,20 @@ export function getCurrent(): QueueItem | null {
 
 export function setPaused(value: boolean): void {
   isPaused = value
+  notifyStateChange()
 }
 
 export function getIsPaused(): boolean {
   return isPaused
+}
+
+export function shiftQueue(): QueueItem | null {
+  const next = queue.shift() ?? null
+  if (next) {
+    queueVideoIds.delete(next.videoId)
+    decUserCount(next.requestedBy)
+  }
+  return next
 }
 
 function assertCanRequestSong(requestedBy: string, addToQueue: boolean, bypassLimits: boolean): void {
@@ -181,7 +156,7 @@ export function addSong(song: Song, requestedBy: string, addToQueue: boolean = t
     log(`[QUEUE] "${song.title}" will be set as current (not added to queue)`)
   }
 
-  saveState()
+  notifyStateChange()
 
   return item
 }
@@ -195,49 +170,7 @@ export function setCurrent(item: QueueItem | null): void {
     log(`[PLAYER] stopped`)
   }
 
-  saveState()
-}
-
-export function skipIfCurrent(videoId: string): boolean {
-  if (currentSong?.videoId !== videoId) return false
-
-  log(`[PLAYER] current track was blocked, skipping: "${currentSong.title}"`)
-  moveToNext()
-  return true
-}
-
-export function moveToNext(): QueueItem | null {
-  let next = queue.shift() ?? null
-
-  while (next && isBlocked(next.videoId)) {
-    log(`[PLAYER] skipped blocked track in queue: "${next.title}"`)
-    logActivity({
-      requestedBy: next.requestedBy,
-      query: next.title,
-      title: next.title,
-      videoId: next.videoId,
-      status: 'rejected',
-      reasonCode: 'BLOCKED'
-    })
-
-    queueVideoIds.delete(next.videoId)
-    decUserCount(next.requestedBy)
-    next = queue.shift() ?? null
-  }
-
-  if (next) {
-    queueVideoIds.delete(next.videoId)
-    decUserCount(next.requestedBy)
-    setCurrent(next)
-    log(`[PLAYER] moved to next: "${next.title}"`)
-  } else {
-    const fallback = advanceFallback()
-    setCurrent(fallback)
-
-    if (fallback) log(`[PLAYER] started fallback: "${fallback.title}"`)
-  }
-
-  return currentSong
+  notifyStateChange()
 }
 
 export function removeAt(index: number): QueueItem | null {
@@ -253,7 +186,7 @@ export function removeAt(index: number): QueueItem | null {
     log(`[QUEUE] removed "${item.title}" at position ${index + 1}`)
   }
 
-  saveState()
+  notifyStateChange()
 
   return item ?? null
 }
@@ -266,50 +199,9 @@ export function clearQueue(): QueueItem[] {
 
   log(`[QUEUE] cleared ${cleared.length} songs`)
 
-  saveState()
+  notifyStateChange()
 
   return cleared
-}
-
-export function skipCurrent(): QueueItem | null {
-  const skipped = currentSong
-
-  if (skipped) {
-    log(`[PLAYER] skipped "${skipped.title}"`)
-  }
-
-  return moveToNext()
-}
-
-export function playbackFailureReasonCode(errorCode?: number): string {
-  switch (errorCode) {
-    case 100:
-      return 'PLAYBACK_VIDEO_UNAVAILABLE'
-    case 101:
-    case 150:
-      return 'PLAYBACK_EMBED_DISALLOWED'
-    default:
-      return 'PLAYBACK_FAILED'
-  }
-}
-
-export function reportPlaybackFailure(errorCode?: number) {
-  const failed = currentSong
-
-  if (failed) {
-    log(`[PLAYER] playback failed: "${failed.title}" (error ${errorCode ?? 'unknown'})`)
-    logActivity({
-      requestedBy: failed.requestedBy,
-      query: failed.title,
-      title: failed.title,
-      videoId: failed.videoId,
-      status: 'failed',
-      reasonCode: playbackFailureReasonCode(errorCode),
-      reasonParams: errorCode !== undefined ? { errorCode } : undefined
-    })
-  }
-
-  moveToNext()
 }
 
 export type RequestSongResult =
@@ -322,13 +214,13 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
   let song: Song | null = null
 
   try {
-    assertCanRequestSong(requestedBy, getState().current !== null, bypassFilters)
+    assertCanRequestSong(requestedBy, currentSong !== null, bypassFilters)
 
     const { isYouTube, videoId } = parseYouTubeUrl(query)
 
     if (isYouTube && !videoId) {
       log(`[REJECT] ${requestedBy} → INVALID_YOUTUBE_URL`)
-      logActivity({ requestedBy, query, title: null, videoId: null, status: 'rejected', reasonCode: 'INVALID_YOUTUBE_URL' })
+      logRejection(requestedBy, query, 'INVALID_YOUTUBE_URL')
       return { outcome: 'invalid-url' }
     }
 
@@ -345,12 +237,11 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
 
     if (!song) {
       log(`[REJECT] ${requestedBy} → SONG_NOT_FOUND`)
-      logActivity({ requestedBy, query, title: null, videoId: null, status: 'rejected', reasonCode: 'SONG_NOT_FOUND' })
+      logRejection(requestedBy, query, 'SONG_NOT_FOUND')
       return { outcome: 'not-found' }
     }
 
-    const stateBefore = getState()
-    const wasEmpty = stateBefore.current === null
+    const wasEmpty = currentSong === null
     const item = addSong(song, requestedBy, !wasEmpty, bypassFilters)
 
     if (wasEmpty) {
@@ -360,38 +251,20 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
       log(`[ACCEPT] ${requestedBy} → "${song.title}" - queued`)
     }
 
-    logActivity({ requestedBy, query, title: song.title, videoId: song.videoId, status: 'accepted', reasonCode: null })
+    logAcceptance(requestedBy, query, song.title, song.videoId)
 
-    const state = getState()
-    const position = wasEmpty ? 0 : state.queue.length
-    const locale = getSettings().locale
-    const message = wasEmpty
-      ? (t(locale, 'toast.nowPlaying', { title: song.title }) ?? `Now playing: ${song.title}`)
-      : (t(locale, 'toast.addedToQueue', { title: song.title, position }) ?? `Added to queue: ${song.title} [#${position}]`)
+    const position = wasEmpty ? 0 : queue.length
+    const state: PlayerState = { current: currentSong, queue: getQueue(), isPaused }
 
     return {
       outcome: 'added',
-      response: {
-        message,
-        song: item,
-        started: wasEmpty,
-        position,
-        state
-      }
+      response: { song: item, started: wasEmpty, position, state }
     }
   } catch (error) {
     log(`[REJECT] ${requestedBy} → error while adding song`)
     const reasonCode = error instanceof AppError ? error.code : 'SERVER_ERROR'
     const reasonParams = error instanceof AppError ? error.params : undefined
-    logActivity({
-      requestedBy,
-      query,
-      title: song?.title ?? null,
-      videoId: song?.videoId ?? null,
-      status: 'rejected',
-      reasonCode,
-      reasonParams
-    })
+    logRejection(requestedBy, query, reasonCode, { title: song?.title ?? null, videoId: song?.videoId ?? null, reasonParams })
     return { outcome: 'error', error }
   }
 }

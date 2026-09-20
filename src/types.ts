@@ -1,3 +1,12 @@
+export type ActivityReasonCode =
+  | AppErrorCode
+  | 'INVALID_YOUTUBE_URL'
+  | 'SONG_NOT_FOUND'
+  | 'SERVER_ERROR'
+  | 'PLAYBACK_VIDEO_UNAVAILABLE'
+  | 'PLAYBACK_EMBED_DISALLOWED'
+  | 'PLAYBACK_FAILED'
+
 export type ActivityStatus = 'accepted' | 'rejected' | 'failed'
 export type ActivityEntry = {
   requestedBy: string
@@ -5,7 +14,7 @@ export type ActivityEntry = {
   title: string | null
   videoId: string | null
   status: ActivityStatus
-  reasonCode: string | null
+  reasonCode: ActivityReasonCode | null
   reasonParams?: Record<string, string | number>
   at: number
 }
@@ -117,10 +126,9 @@ export type StateResponse = PlayerState & { nextTrack: QueueItem | null }
 export type PlayerActionResponse = StateResponse & { message: string }
 export type SettingsResponse = Settings
 export type OverlayStateResponse = { state: PlayerState; settings: Settings }
-export type ConfigResponse = Config & { fallbackPlaylistWarning?: string }
+export type ConfigResponse = Config & { fallbackPlaylistWarning?: string; rejectedFields?: string[] }
 export type SearchResponse = { results: Song[] }
 export type QueueRequestResponse = {
-  message: string
   song: QueueItem
   started: boolean
   position: number

@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { getAppRoot } from './runtime.js'
+import { getSettings } from './settings.js'
 
 const LOCALES_DIR = path.join(getAppRoot(), 'public/locales')
 const DEFAULT_LOCALE = 'en'
@@ -42,6 +43,10 @@ export function t(locale: string, key: string, params: Record<string, string | n
   }
 
   return Object.entries(params).reduce((acc, [param, replacement]) => acc.replace(new RegExp(`{{${param}}}`, 'g'), () => String(replacement)), value)
+}
+
+export function translateWithFallback(key: string, params: Record<string, string | number> | undefined, fallback: string): string {
+  return t(getSettings().locale, key, params) ?? fallback
 }
 
 const ERROR_CODE_KEY_OVERRIDES: Record<string, string> = {

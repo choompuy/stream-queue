@@ -13,19 +13,22 @@ import {
   SearchResponse,
   QueueRemoveResponse,
   SecretsResponse,
-  ActivityResponse
+  ActivityResponse,
+  PlayerState,
+  QueueItem
 } from './types.js'
 import { findAvailablePort } from './port.js'
 import { ok, fail, failFromError, asyncHandler } from './http.js'
 import { getPublicSecretsView, updateSecrets } from './secrets.js'
 import { getConfig, updateConfig } from './config.js'
 import { getSettings, updateSettings } from './settings.js'
-import { t } from './i18n.js'
+import { translateWithFallback } from './i18n.js'
 import { getAppRoot } from './runtime.js'
 import { searchSongs, fetchPlaylistMeta } from './youtube/index.js'
 import { parsePlaylistId, isValidVideoId } from './youtube/url.js'
 import { getPlaylists, upsertPlaylist, removePlaylist } from './playlists.js'
-import { getState, removeAt, clearQueue, moveToNext, skipCurrent, setPaused, requestSong, reportPlaybackFailure, skipIfCurrent } from './queue.js'
+import { removeAt, clearQueue, setPaused, requestSong } from './queue.js'
+import { getState, moveToNext, skipCurrent, skipIfCurrent, reportPlaybackFailure } from './player.js'
 import { flushAllStores } from './persist.js'
 import {
   refreshFallback,
@@ -152,7 +155,7 @@ app.put(
     }
 
     const previous = getConfig()
-    const updated = updateConfig(body ?? {})
+    const { config: updated, rejected } = updateConfig(body ?? {})
 
     if (updated.fallbackPlaylist.playlistId !== previous.fallbackPlaylist.playlistId) {
       try {
@@ -161,14 +164,15 @@ app.put(
         log(`[ERROR] Failed to refresh fallback playlist: ${error instanceof Error ? error.message : error}`)
         return ok<ConfigResponse>(res, {
           ...updated,
-          fallbackPlaylistWarning: 'failed to load playlist, check the ID'
+          fallbackPlaylistWarning: 'failed to load playlist, check the ID',
+          rejectedFields: rejected.length ? rejected : undefined
         })
       }
     } else if (updated.fallbackPlaylist.shuffle !== previous.fallbackPlaylist.shuffle) {
       toggleFallbackShuffle()
     }
 
-    ok<ConfigResponse>(res, updated)
+    ok<ConfigResponse>(res, { ...updated, rejectedFields: rejected.length ? rejected : undefined })
   })
 )
 
@@ -226,7 +230,7 @@ app.post(
       return ok<ConfigResponse>(res, getConfig())
     }
 
-    const updated = updateConfig({ fallbackPlaylist: { ...config.fallbackPlaylist, playlistId: req.params.id } })
+    const { config: updated } = updateConfig({ fallbackPlaylist: { ...config.fallbackPlaylist, playlistId: req.params.id } })
 
     try {
       await refreshFallback()
@@ -313,11 +317,26 @@ app.post(
         return fail(res, 'could not find a suitable track', 'SONG_NOT_FOUND', 404)
       case 'error':
         return failFromError(res, result.error)
-      case 'added':
-        return ok(res, result.response, 201)
+      case 'added': {
+        const { response } = result
+        const message = response.started
+          ? translateWithFallback('toast.nowPlaying', { title: response.song.title }, `Now playing: ${response.song.title}`)
+          : translateWithFallback(
+              'toast.addedToQueue',
+              { title: response.song.title, position: response.position },
+              `Added to queue: ${response.song.title} [#${response.position}]`
+            )
+        return ok(res, { ...response, message }, 201)
+      }
     }
   })
 )
+
+function buildSkipMessage(state: PlayerState): string {
+  return state.current?.title
+    ? translateWithFallback('chat.skippedNowPlaying', { title: state.current.title }, `Track skipped. Now playing: ${state.current.title}`)
+    : translateWithFallback('chat.skipped', undefined, 'Track skipped')
+}
 
 app.post('/api/player/ended', (_req, res) => {
   moveToNext()
@@ -327,36 +346,24 @@ app.post('/api/player/ended', (_req, res) => {
 app.post('/api/player/skip', (_req, res) => {
   skipCurrent()
   const state = getState()
-  const locale = getSettings().locale
-  const message = state.current?.title
-    ? (t(locale, 'chat.skippedNowPlaying', { title: state.current.title }) ?? `Track skipped. Now playing: ${state.current.title}`)
-    : (t(locale, 'chat.skipped') ?? 'Track skipped')
-  ok<PlayerActionResponse>(res, { ...state, message })
+  ok<PlayerActionResponse>(res, { ...state, message: buildSkipMessage(state) })
 })
 
 app.post('/api/player/pause', (_req, res) => {
   setPaused(true)
-  const locale = getSettings().locale
-  const message = t(locale, 'chat.paused') ?? 'Player paused'
-  ok<PlayerActionResponse>(res, { ...getState(), message })
+  ok<PlayerActionResponse>(res, { ...getState(), message: translateWithFallback('chat.paused', undefined, 'Player paused') })
 })
 
 app.post('/api/player/resume', (_req, res) => {
   setPaused(false)
-  const locale = getSettings().locale
-  const message = t(locale, 'chat.resumed') ?? 'Playback resumed'
-  ok<PlayerActionResponse>(res, { ...getState(), message })
+  ok<PlayerActionResponse>(res, { ...getState(), message: translateWithFallback('chat.resumed', undefined, 'Playback resumed') })
 })
 
 app.post('/api/player/report-failure', (req, res) => {
   const errorCode = typeof req.body?.errorCode === 'number' ? req.body.errorCode : undefined
   reportPlaybackFailure(errorCode)
   const state = getState()
-  const locale = getSettings().locale
-  const message = state.current?.title
-    ? (t(locale, 'chat.skippedNowPlaying', { title: state.current.title }) ?? `Track skipped. Now playing: ${state.current.title}`)
-    : (t(locale, 'chat.skipped') ?? 'Track skipped')
-  ok<PlayerActionResponse>(res, { ...state, message })
+  ok<PlayerActionResponse>(res, { ...state, message: buildSkipMessage(state) })
 })
 
 app.get('/api/fallback', (_req, res) => {
@@ -382,10 +389,18 @@ app.post('/api/fallback/enabled', (_req, res) => {
   ok(res, toggleFallbackEnabled())
 })
 
+function fallbackTrackOrNotFound(res: express.Response, item: QueueItem | null): item is QueueItem {
+  if (!item) {
+    fail(res, 'track not found in fallback', 'NOT_FOUND', 404)
+    return false
+  }
+  return true
+}
+
 app.post('/api/fallback/play/:videoId', (req, res) => {
   try {
     const item = playFallbackTrackNow(req.params.videoId)
-    if (!item) return fail(res, 'track not found in fallback', 'NOT_FOUND', 404)
+    if (!fallbackTrackOrNotFound(res, item)) return
     ok<StateResponse>(res, getState())
   } catch (error) {
     failFromError(res, error)
@@ -395,7 +410,7 @@ app.post('/api/fallback/play/:videoId', (req, res) => {
 app.post('/api/fallback/enqueue/:videoId', (req, res) => {
   try {
     const item = queueFallbackTrack(req.params.videoId)
-    if (!item) return fail(res, 'track not found in fallback', 'NOT_FOUND', 404)
+    if (!fallbackTrackOrNotFound(res, item)) return
     ok(res, { song: item, state: getState() }, 201)
   } catch (error) {
     failFromError(res, error)
@@ -425,16 +440,17 @@ app.post('/api/queue/clear', (_req, res) => {
 
 app.get('/api/chat/now-playing', (_req, res) => {
   const state = getState()
-  const locale = getSettings().locale
 
   if (!state.current) {
-    return ok(res, { message: t(locale, 'chat.nothingPlaying') ?? 'Nothing is playing right now' })
+    return ok(res, { message: translateWithFallback('chat.nothingPlaying', undefined, 'Nothing is playing right now') })
   }
 
-  const base =
-    t(locale, 'chat.nowPlayingWithRequester', { title: state.current.title, requestedBy: state.current.requestedBy }) ??
+  const base = translateWithFallback(
+    'chat.nowPlayingWithRequester',
+    { title: state.current.title, requestedBy: state.current.requestedBy },
     `Now playing: ${state.current.title} (requested by ${state.current.requestedBy})`
-  const pausedSuffix = state.isPaused ? (t(locale, 'chat.pausedSuffix') ?? ' (paused)') : ''
+  )
+  const pausedSuffix = state.isPaused ? translateWithFallback('chat.pausedSuffix', undefined, ' (paused)') : ''
   ok(res, { message: base + pausedSuffix })
 })
 
@@ -445,10 +461,9 @@ const truncate = (s: string, max = 40) => {
 
 app.get('/api/chat/queue', (_req, res) => {
   const state = getState()
-  const locale = getSettings().locale
 
   if (state.queue.length === 0) {
-    return ok(res, { message: t(locale, 'chat.queueEmpty') ?? 'The queue is empty' })
+    return ok(res, { message: translateWithFallback('chat.queueEmpty', undefined, 'The queue is empty') })
   }
 
   const maxShown = 4
@@ -457,10 +472,10 @@ app.get('/api/chat/queue', (_req, res) => {
     .slice(0, maxShown)
     .map((item, i) => `${i + 1}. ${truncate(item.title)}`)
     .join(' | ')
-  const base = t(locale, 'chat.queueList', { count: state.queue.length, list }) ?? `Queue [${state.queue.length}]: ${list}`
+  const base = translateWithFallback('chat.queueList', { count: state.queue.length, list }, `Queue [${state.queue.length}]: ${list}`)
   const more =
     state.queue.length > maxShown
-      ? (t(locale, 'chat.queueMore', { count: state.queue.length - maxShown }) ?? ` [+${state.queue.length - maxShown}]`)
+      ? translateWithFallback('chat.queueMore', { count: state.queue.length - maxShown }, ` [+${state.queue.length - maxShown}]`)
       : ''
   ok(res, { message: base + more })
 })

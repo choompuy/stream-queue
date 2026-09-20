@@ -1,7 +1,8 @@
 import { getConfig, updateConfig } from './config.js'
 import { fetchPlaylistSongs } from './youtube/index.js'
 import { Song, QueueItem, Config, FallbackStateResponse, AppError } from './types.js'
-import { addSong, saveState, getCurrent, setCurrent } from './queue.js'
+import { addSong, getCurrent, setCurrent } from './queue.js'
+import { notifyStateChange } from './state-events.js'
 import { isBlocked } from './blocklist.js'
 
 export type FallbackSnapshot = {
@@ -63,10 +64,10 @@ function toFallbackQueueItem(song: Song): QueueItem {
   }
 }
 
-function computeNextIndex(config: Config): number | null {
+function computeNextIndex(config: Config, cursor: number): number | null {
   if (!config.fallbackPlaylist.enabled || !fallbackOrder.length) return null
 
-  const nextIndex = fallbackCursor + 1
+  const nextIndex = cursor + 1
   if (nextIndex < fallbackOrder.length) return nextIndex
 
   return config.fallbackPlaylist.repeat ? 0 : null
@@ -74,22 +75,19 @@ function computeNextIndex(config: Config): number | null {
 
 export function peekNextFallbackTrack(): QueueItem | null {
   const config = getConfig()
-  const originalCursor = fallbackCursor
   const attempts = fallbackOrder.length || 1
+  let cursor = fallbackCursor
 
-  try {
-    for (let i = 0; i < attempts; i++) {
-      const nextIndex = computeNextIndex(config)
-      if (nextIndex === null) return null
+  for (let i = 0; i < attempts; i++) {
+    const nextIndex = computeNextIndex(config, cursor)
+    if (nextIndex === null) return null
 
-      fallbackCursor = nextIndex
-      const song = findTrack(fallbackOrder[nextIndex])
-      if (song && !isBlocked(song.videoId)) return toFallbackQueueItem(song)
-    }
-    return null
-  } finally {
-    fallbackCursor = originalCursor
+    cursor = nextIndex
+    const song = findTrack(fallbackOrder[cursor])
+    if (song && !isBlocked(song.videoId)) return toFallbackQueueItem(song)
   }
+
+  return null
 }
 
 export function advanceFallback(): QueueItem | null {
@@ -97,7 +95,7 @@ export function advanceFallback(): QueueItem | null {
   const attempts = fallbackOrder.length || 1
 
   for (let i = 0; i < attempts; i++) {
-    const nextIndex = computeNextIndex(config)
+    const nextIndex = computeNextIndex(config, fallbackCursor)
 
     if (nextIndex === null) {
       if (config.fallbackPlaylist.enabled && fallbackOrder.length) fallbackCursor = fallbackOrder.length
@@ -123,7 +121,7 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
     fallbackCursor = -1
     loadedFallbackPlaylistId = null
     lastFallbackRefreshAt = null
-    saveState()
+    notifyStateChange()
     return getFallbackState()
   }
 
@@ -168,7 +166,7 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
   lastFallbackRefreshAt = Date.now()
 
   log(`Loaded ${fallbackTracksById.size} tracks from playlist ${playlistId}`)
-  saveState()
+  notifyStateChange()
   return getFallbackState()
 }
 
