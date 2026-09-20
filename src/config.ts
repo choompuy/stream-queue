@@ -33,8 +33,12 @@ function saveConfig(): void {
   )
 }
 
+function cloneConfig(source: Config): Config {
+  return { ...source, fallbackPlaylist: { ...source.fallbackPlaylist } }
+}
+
 export function getConfig(): Config {
-  return { ...config }
+  return cloneConfig(config)
 }
 
 const FIELD_RULES: Partial<Record<keyof Config, FieldRule>> = {
@@ -65,52 +69,79 @@ const FIELD_RULES: Partial<Record<keyof Config, FieldRule>> = {
   }
 }
 
-function sanitizeUpdates(updates: Partial<Config>): { clean: Partial<Config>; rejected: string[] } {
-  const clean: Partial<Config> = { ...updates }
+export type FallbackPlaylistUpdates = Partial<Config['fallbackPlaylist']>
+export type ConfigUpdates = Partial<Omit<Config, 'fallbackPlaylist'>> & { fallbackPlaylist?: FallbackPlaylistUpdates }
+export type ConfigValidation = { clean: ConfigUpdates; rejected: string[] }
+
+const FALLBACK_PLAYLIST_RULES: Record<keyof Config['fallbackPlaylist'], (value: unknown) => boolean> = {
+  playlistId: (v) => v === null || typeof v === 'string',
+  enabled: (v) => typeof v === 'boolean',
+  shuffle: (v) => typeof v === 'boolean',
+  repeat: (v) => typeof v === 'boolean'
+}
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+function validateFallbackPlaylistUpdates(raw: unknown, rejected: string[]): FallbackPlaylistUpdates | undefined {
+  if (!isPlainObject(raw)) {
+    rejected.push('fallbackPlaylist')
+    return undefined
+  }
+
+  const clean: Record<string, unknown> = {}
+
+  for (const [key, value] of Object.entries(raw)) {
+    const rule = Object.hasOwn(FALLBACK_PLAYLIST_RULES, key) ? FALLBACK_PLAYLIST_RULES[key as keyof Config['fallbackPlaylist']] : undefined
+
+    if (rule?.(value)) clean[key] = value
+    else rejected.push(`fallbackPlaylist.${key}`)
+  }
+
+  return clean as FallbackPlaylistUpdates
+}
+
+/**
+ * Pure validation of a config update: returns the part that is safe to apply and the names of everything
+ * that was refused (invalid values, unknown fields, malformed nested objects). Nested names are dotted.
+ */
+export function validateConfigUpdates(updates: unknown): ConfigValidation {
+  const clean: Record<string, unknown> = {}
   const rejected: string[] = []
 
-  for (const key of Object.keys(updates) as (keyof Config)[]) {
-    const rule = FIELD_RULES[key]
-    if (!rule) continue
+  if (!isPlainObject(updates)) return { clean: {}, rejected: ['body'] }
 
-    const value = rule.normalize ? rule.normalize(clean[key]) : clean[key]
-    if (rule.validate(value)) {
-      ;(clean as Record<string, unknown>)[key] = value
-    } else {
-      delete clean[key]
-      rejected.push(key)
+  for (const [key, raw] of Object.entries(updates)) {
+    if (key === 'fallbackPlaylist') {
+      const nested = validateFallbackPlaylistUpdates(raw, rejected)
+      if (nested) clean.fallbackPlaylist = nested
+      continue
     }
+
+    const rule = Object.hasOwn(FIELD_RULES, key) ? FIELD_RULES[key as keyof Config] : undefined
+    if (!rule) {
+      rejected.push(key)
+      continue
+    }
+
+    const value = rule.normalize ? rule.normalize(raw) : raw
+    if (rule.validate(value)) clean[key] = value
+    else rejected.push(key)
   }
 
-  return { clean, rejected }
+  return { clean: clean as ConfigUpdates, rejected }
 }
 
-function sanitizeFallbackPlaylist(
-  updates: Partial<Config['fallbackPlaylist']> | undefined,
-  current: Config['fallbackPlaylist']
-): Config['fallbackPlaylist'] {
-  if (!updates) return current
-
-  const next = { ...current }
-
-  if ('playlistId' in updates) {
-    next.playlistId = typeof updates.playlistId === 'string' || updates.playlistId === null ? updates.playlistId : current.playlistId
-  }
-  if (typeof updates.enabled === 'boolean') next.enabled = updates.enabled
-  if (typeof updates.shuffle === 'boolean') next.shuffle = updates.shuffle
-  if (typeof updates.repeat === 'boolean') next.repeat = updates.repeat
-
-  return next
-}
-
-export function updateConfig(updates: Partial<Config>): { config: Config; rejected: string[] } {
-  const { clean, rejected } = sanitizeUpdates(updates)
+/** Applies the valid part of `updates` and reports what was refused; the caller decides whether that is an error. */
+export function updateConfig(updates: ConfigUpdates): { config: Config; rejected: string[] } {
+  const { clean, rejected } = validateConfigUpdates(updates)
+  const { fallbackPlaylist, ...rest } = clean
 
   config = {
     ...config,
-    ...clean,
-    fallbackPlaylist: sanitizeFallbackPlaylist(updates.fallbackPlaylist, config.fallbackPlaylist)
+    ...rest,
+    fallbackPlaylist: { ...config.fallbackPlaylist, ...fallbackPlaylist }
   }
   saveConfig()
-  return { config: { ...config }, rejected }
+
+  return { config: cloneConfig(config), rejected }
 }

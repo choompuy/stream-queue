@@ -1,7 +1,7 @@
 import express from 'express'
 import { ConfigResponse, SettingsResponse, SecretsResponse } from '../types.js'
 import { ok, fail, asyncHandler } from '../http.js'
-import { getConfig, updateConfig } from '../config.js'
+import { getConfig, updateConfig, validateConfigUpdates } from '../config.js'
 import { getSettings, updateSettings } from '../settings.js'
 import { getPublicSecretsView, updateSecrets } from '../secrets.js'
 import { parsePlaylistId } from '../youtube/url.js'
@@ -63,25 +63,27 @@ router.put(
       }
     }
 
+    // all-or-nothing: a request with any invalid field changes nothing, and says which fields were wrong
+    const { rejected } = validateConfigUpdates(body)
+    if (rejected.length) {
+      return fail(res, 'invalid config fields', 'INVALID_CONFIG', 400, { fields: rejected.join(', ') })
+    }
+
     const previous = getConfig()
-    const { config: updated, rejected } = updateConfig(body ?? {})
+    const { config: updated } = updateConfig(body)
 
     if (updated.fallbackPlaylist.playlistId !== previous.fallbackPlaylist.playlistId) {
       try {
         await refreshFallback()
       } catch (error) {
         log(`[ERROR] Failed to refresh fallback playlist: ${error instanceof Error ? error.message : error}`)
-        return ok<ConfigResponse>(res, {
-          ...updated,
-          fallbackPlaylistWarning: 'failed to load playlist, check the ID',
-          rejectedFields: rejected.length ? rejected : undefined
-        })
+        return ok<ConfigResponse>(res, { ...updated, fallbackPlaylistWarning: 'failed to load playlist, check the ID' })
       }
     } else if (updated.fallbackPlaylist.shuffle !== previous.fallbackPlaylist.shuffle) {
       toggleFallbackShuffle()
     }
 
-    ok<ConfigResponse>(res, { ...updated, rejectedFields: rejected.length ? rejected : undefined })
+    ok<ConfigResponse>(res, updated)
   })
 )
 
