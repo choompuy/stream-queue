@@ -7,6 +7,7 @@ import { join } from 'node:path'
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
 const queue = await import('./queue.js')
+const player = await import('./player.js')
 const fallback = await import('./fallback.js')
 const blocklist = await import('./blocklist.js')
 const { updateConfig } = await import('./config.js')
@@ -39,25 +40,25 @@ beforeEach(() => {
   setFallback([])
 })
 
-test('moveToNext() пропускает заблокированные и пишет BLOCKED', () => {
+test('moveToNext() skips blocked tracks and logs BLOCKED', () => {
   enqueue('a', 'b', 'c')
   block('a', 'b')
-  assert.equal(queue.moveToNext()?.videoId, 'c')
+  assert.equal(player.moveToNext()?.videoId, 'c')
   const blocked = getActivity().filter((e) => e.reasonCode === 'BLOCKED')
   assert.deepEqual(blocked.map((e) => e.videoId).sort(), ['a', 'b'])
 })
 
-test('всё заблокировано + repeat: peek и advance возвращают null', () => {
+test('all tracks blocked + repeat: peek and advance return null', () => {
   setFallback(['f1', 'f2'], true)
   block('f1', 'f2')
   assert.equal(fallback.peekNextFallbackTrack(), null)
   assert.equal(fallback.advanceFallback(), null)
 })
 
-test('reportPlaybackFailure() пишет failed и переходит к следующему', () => {
+test('reportPlaybackFailure() logs failure and moves to the next track', () => {
   enqueue('b')
   queue.setCurrent({ ...song('a'), requestedBy: 'viewer' })
-  queue.reportPlaybackFailure(101)
-  assert.equal(queue.getState().current?.videoId, 'b')
+  player.reportPlaybackFailure(101)
+  assert.equal(player.getState().current?.videoId, 'b')
   assert.equal(getActivity().find((e) => e.videoId === 'a')?.reasonCode, 'PLAYBACK_EMBED_DISALLOWED')
 })

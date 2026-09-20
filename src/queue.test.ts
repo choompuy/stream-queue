@@ -1,6 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { playbackFailureReasonCode } from './queue.js'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
+
+const { playbackFailureReasonCode } = await import('./player.js')
 
 test('playbackFailureReasonCode', async (t) => {
   await t.test('100 -> video unavailable', () => {
