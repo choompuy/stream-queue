@@ -26,8 +26,8 @@ const song = (videoId: string) => ({
 const IDS = ['a', 'b', 'c', 'f1', 'f2', 'f3']
 
 function setFallback(ids: string[], repeat = false) {
-  fallback.hydrateFallback({ sourceTracks: ids.map(song), order: ids, cursor: -1, playlistId: 'test', lastRefreshedAt: null })
-  updateConfig({ fallbackPlaylist: { playlistId: 'test', enabled: true, shuffle: false, repeat } })
+  fallback.hydrateFallback({ sourceTracks: ids.map(song), order: ids, cursor: -1, playlistId: 'PLtest0000001', lastRefreshedAt: null })
+  updateConfig({ fallbackPlaylist: { playlistId: 'PLtest0000001', enabled: true, shuffle: false, repeat } })
 }
 const enqueue = (...ids: string[]) => ids.forEach((id) => queue.addSong(song(id), 'viewer', true, true))
 const block = (...ids: string[]) => ids.forEach((id) => blocklist.blockTrack(id, `Track ${id}`))

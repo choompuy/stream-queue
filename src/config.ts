@@ -1,5 +1,6 @@
 import { CONFIG_PATH, createFileStore } from './persist.js'
 import { Config } from './types.js'
+import { isValidPlaylistId } from './youtube/url.js'
 
 type FieldRule = {
   normalize?: (value: unknown) => unknown
@@ -74,7 +75,7 @@ export type ConfigUpdates = Partial<Omit<Config, 'fallbackPlaylist'>> & { fallba
 export type ConfigValidation = { clean: ConfigUpdates; rejected: string[] }
 
 const FALLBACK_PLAYLIST_RULES: Record<keyof Config['fallbackPlaylist'], (value: unknown) => boolean> = {
-  playlistId: (v) => v === null || typeof v === 'string',
+  playlistId: (v) => v === null || isValidPlaylistId(v),
   enabled: (v) => typeof v === 'boolean',
   shuffle: (v) => typeof v === 'boolean',
   repeat: (v) => typeof v === 'boolean'
@@ -129,6 +130,12 @@ export function validateConfigUpdates(updates: unknown): ConfigValidation {
   }
 
   return { clean: clean as ConfigUpdates, rejected }
+}
+
+/** Puts back a snapshot taken earlier (e.g. before an operation that failed half-way); bypasses validation on purpose. */
+export function restoreConfig(snapshot: Config): void {
+  config = cloneConfig(snapshot)
+  saveConfig()
 }
 
 /** Applies the valid part of `updates` and reports what was refused; the caller decides whether that is an error. */

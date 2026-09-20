@@ -36,6 +36,10 @@ export function parseYouTubeUrl(input: string): { isYouTube: boolean; videoId: s
 
 const PLAYLIST_ID_PATTERN = /^(PL|RD|UU|LL|FL|OL)[A-Za-z0-9_-]+$/
 
+export function isValidPlaylistId(value: unknown): value is string {
+  return typeof value === 'string' && PLAYLIST_ID_PATTERN.test(value)
+}
+
 export function parsePlaylistId(input: string): string | null {
   const trimmed = input.trim()
 

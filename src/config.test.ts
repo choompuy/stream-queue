@@ -58,10 +58,10 @@ test('validateConfigUpdates()', async (t) => {
 
 test('updateConfig()', async (t) => {
   await t.test('applies valid fields and merges a partial fallbackPlaylist into the existing one', () => {
-    updateConfig({ fallbackPlaylist: { playlistId: 'PL1', repeat: true } })
+    updateConfig({ fallbackPlaylist: { playlistId: 'PLconfigtest01', repeat: true } })
     const { config } = updateConfig({ fallbackPlaylist: { shuffle: true } })
 
-    assert.deepEqual(config.fallbackPlaylist, { playlistId: 'PL1', enabled: true, shuffle: true, repeat: true })
+    assert.deepEqual(config.fallbackPlaylist, { playlistId: 'PLconfigtest01', enabled: true, shuffle: true, repeat: true })
   })
 
   await t.test('does not store unknown fields', () => {

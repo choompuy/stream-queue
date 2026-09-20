@@ -170,15 +170,18 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
   return getFallbackState()
 }
 
-export function toggleFallbackShuffle(): FallbackStateResponse {
-  const config = getConfig()
-  const shuffleOn = !config.fallbackPlaylist.shuffle
-  updateConfig({ fallbackPlaylist: { ...config.fallbackPlaylist, shuffle: shuffleOn } })
-
+/** Re-orders the rotation for the given shuffle mode, keeping the playing track in place. Does not touch the config. */
+export function reorderFallback(shuffleOn: boolean): void {
   const current = getCurrent()
   const activeId = current?.isFallback ? current.videoId : activeFallbackVideoId()
   fallbackOrder = buildOrder([...fallbackTracksById.values()], shuffleOn, activeId)
   fallbackCursor = activeId ? fallbackOrder.indexOf(activeId) : -1
+}
+
+export function toggleFallbackShuffle(): FallbackStateResponse {
+  const shuffleOn = !getConfig().fallbackPlaylist.shuffle
+  updateConfig({ fallbackPlaylist: { shuffle: shuffleOn } })
+  reorderFallback(shuffleOn)
 
   log(`Shuffle: ${shuffleOn}`)
   return getFallbackState()

@@ -1,8 +1,8 @@
 import express from 'express'
 import { ConfigResponse } from '../types.js'
 import { ok, fail, failFromError, asyncHandler } from '../http.js'
-import { getConfig, updateConfig } from '../config.js'
-import { parsePlaylistId } from '../youtube/url.js'
+import { getConfig, updateConfig, restoreConfig } from '../config.js'
+import { parsePlaylistId, isValidPlaylistId } from '../youtube/url.js'
 import { fetchPlaylistMeta } from '../youtube/index.js'
 import { getPlaylists, upsertPlaylist, removePlaylist } from '../playlists.js'
 import { refreshFallback, clearFallback } from '../fallback.js'
@@ -59,23 +59,34 @@ router.delete('/:id', (req, res) => {
 router.post(
   '/:id/activate',
   asyncHandler<{ id: string }>(async (req, res) => {
-    const config = getConfig()
+    const { id } = req.params
 
-    if (config.fallbackPlaylist.playlistId === req.params.id) {
+    if (!isValidPlaylistId(id)) {
+      return fail(res, 'invalid playlist ID or URL', 'INVALID_PLAYLIST_ID', 400)
+    }
+
+    if (!getPlaylists().some((playlist) => playlist.id === id)) {
+      return fail(res, 'playlist not found', 'PLAYLIST_NOT_FOUND', 404)
+    }
+
+    const previous = getConfig()
+
+    if (previous.fallbackPlaylist.playlistId === id) {
       clearFallback()
-      log(`[PLAYLISTS] deactivated playlist "${req.params.id}"`)
+      log(`[PLAYLISTS] deactivated playlist "${id}"`)
       return ok<ConfigResponse>(res, getConfig())
     }
 
-    const { config: updated } = updateConfig({ fallbackPlaylist: { ...config.fallbackPlaylist, playlistId: req.params.id } })
+    updateConfig({ fallbackPlaylist: { playlistId: id } })
 
     try {
       await refreshFallback()
     } catch (error) {
       log(`[ERROR] Failed to activate playlist: ${error instanceof Error ? error.message : error}`)
-      return ok<ConfigResponse>(res, { ...updated, fallbackPlaylistWarning: 'failed to load playlist' })
+      restoreConfig(previous)
+      return failFromError(res, error)
     }
 
-    ok<ConfigResponse>(res, updated)
+    ok<ConfigResponse>(res, getConfig())
   })
 )

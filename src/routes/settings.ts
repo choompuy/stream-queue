@@ -1,11 +1,11 @@
 import express from 'express'
 import { ConfigResponse, SettingsResponse, SecretsResponse } from '../types.js'
-import { ok, fail, asyncHandler } from '../http.js'
-import { getConfig, updateConfig, validateConfigUpdates } from '../config.js'
-import { getSettings, updateSettings } from '../settings.js'
+import { ok, fail, failFromError, asyncHandler } from '../http.js'
+import { getConfig, updateConfig, restoreConfig, validateConfigUpdates } from '../config.js'
+import { getSettings, updateSettings, validateSettingsUpdates } from '../settings.js'
 import { getPublicSecretsView, updateSecrets } from '../secrets.js'
 import { parsePlaylistId } from '../youtube/url.js'
-import { refreshFallback, toggleFallbackShuffle } from '../fallback.js'
+import { refreshFallback, reorderFallback } from '../fallback.js'
 
 function log(message: string): void {
   console.log(`[SERVER] ${message}`)
@@ -19,8 +19,13 @@ router.get('/settings', (_req, res) => {
 
 router.put('/settings', (req, res) => {
   const updates = req.body ?? {}
-  const updated = updateSettings(updates)
-  ok<SettingsResponse>(res, updated)
+
+  const { rejected } = validateSettingsUpdates(updates)
+  if (rejected.length) {
+    return fail(res, 'invalid settings fields', 'INVALID_SETTINGS', 400, { fields: rejected.join(', ') })
+  }
+
+  ok<SettingsResponse>(res, updateSettings(updates))
 })
 
 router.get('/locale', (_req, res) => {
@@ -76,11 +81,14 @@ router.put(
       try {
         await refreshFallback()
       } catch (error) {
+        // the playlist could not be loaded: keep the previous config as a whole, like any other refused update
         log(`[ERROR] Failed to refresh fallback playlist: ${error instanceof Error ? error.message : error}`)
-        return ok<ConfigResponse>(res, { ...updated, fallbackPlaylistWarning: 'failed to load playlist, check the ID' })
+        restoreConfig(previous)
+        return failFromError(res, error)
       }
     } else if (updated.fallbackPlaylist.shuffle !== previous.fallbackPlaylist.shuffle) {
-      toggleFallbackShuffle()
+      // updateConfig() already stored the new value: only the order has to follow it
+      reorderFallback(updated.fallbackPlaylist.shuffle)
     }
 
     ok<ConfigResponse>(res, updated)

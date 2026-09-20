@@ -126,7 +126,7 @@ export type StateResponse = PlayerState & { nextTrack: QueueItem | null }
 export type PlayerActionResponse = StateResponse & { message: string }
 export type SettingsResponse = Settings
 export type OverlayStateResponse = { state: PlayerState; settings: Settings }
-export type ConfigResponse = Config & { fallbackPlaylistWarning?: string }
+export type ConfigResponse = Config
 export type SearchResponse = { results: Song[] }
 export type QueueRequestResponse = {
   song: QueueItem
