@@ -158,9 +158,15 @@ function updateProgress() {
   dom.elapsedTime.textContent = `${formatDuration(Math.floor(currentTime))} / ${formatDuration(duration)}`
 }
 
-async function notifyEnded() {
+async function notifyEnded(videoId) {
   try {
-    await fetch('/api/player/ended', { method: 'POST' })
+    await fetch('/api/player/ended', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ videoId })
+    })
     await fetchOverlayState()
   } catch (error) {
     log('Error notifying ended:', error)
@@ -174,7 +180,7 @@ async function reportFailure(errorCode, videoId) {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ errorCode })
+      body: JSON.stringify({ errorCode, videoId })
     })
 
     await fetchOverlayState()
@@ -198,7 +204,9 @@ function onPlayerStateChange(event) {
   if (event.data === YT.PlayerState.ENDED && !isTransitioning) {
     log('Video ended, requesting next')
     isTransitioning = true
-    notifyEnded().finally(() => {
+    // the track that actually finished in the player, which may differ from what the server considers current now
+    const endedVideoId = event.target.getVideoData?.().video_id || currentState?.current?.videoId
+    notifyEnded(endedVideoId).finally(() => {
       isTransitioning = false
     })
   }

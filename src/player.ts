@@ -88,7 +88,28 @@ export function playbackFailureReasonCode(errorCode?: number): ActivityReasonCod
   }
 }
 
-export function reportPlaybackFailure(errorCode?: number): void {
+function isAboutCurrent(videoId?: string): boolean {
+  return videoId === undefined || getCurrent()?.videoId === videoId
+}
+
+// The player reports that `videoId` finished. Returns false if that was not the current track and nothing changed
+export function endCurrent(videoId?: string): boolean {
+  if (!isAboutCurrent(videoId)) {
+    log(`ignored "ended" for ${videoId}: it is not the current track`)
+    return false
+  }
+
+  moveToNext()
+  return true
+}
+
+// The player reports that `videoId` failed. Returns false if that was not the current track and nothing changed
+export function reportPlaybackFailure(errorCode?: number, videoId?: string): boolean {
+  if (!isAboutCurrent(videoId)) {
+    log(`ignored playback failure for ${videoId}: it is not the current track`)
+    return false
+  }
+
   const failed = getCurrent()
 
   if (failed) {
@@ -97,6 +118,7 @@ export function reportPlaybackFailure(errorCode?: number): void {
   }
 
   moveToNext()
+  return true
 }
 
 // --- Combined-state persistence: this is the one place that knows the on-disk

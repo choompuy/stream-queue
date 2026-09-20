@@ -176,6 +176,7 @@ export function reorderFallback(shuffleOn: boolean): void {
   const activeId = current?.isFallback ? current.videoId : activeFallbackVideoId()
   fallbackOrder = buildOrder([...fallbackTracksById.values()], shuffleOn, activeId)
   fallbackCursor = activeId ? fallbackOrder.indexOf(activeId) : -1
+  notifyStateChange()
 }
 
 export function toggleFallbackShuffle(): FallbackStateResponse {
@@ -212,6 +213,7 @@ export function clearFallback(): FallbackStateResponse {
 
   const config = getConfig()
   updateConfig({ fallbackPlaylist: { ...config.fallbackPlaylist, playlistId: null } })
+  notifyStateChange()
   log('cleared')
   return getFallbackState()
 }
