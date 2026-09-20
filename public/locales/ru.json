@@ -171,6 +171,7 @@
   },
   "api": {
     "errors": {
+      "networkError": "Нет связи с сервером",
       "invalidLocale": "Некорректный язык",
       "invalidPlaylistId": "Некорректный ID или ссылка на плейлист",
       "playlistNotFound": "Плейлист не найден",

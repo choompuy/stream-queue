@@ -171,6 +171,7 @@
   },
   "api": {
     "errors": {
+      "networkError": "Can't reach the server",
       "invalidLocale": "Invalid locale",
       "invalidPlaylistId": "Invalid playlist ID or URL",
       "playlistNotFound": "Playlist not found",

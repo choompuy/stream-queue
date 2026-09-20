@@ -1,6 +1,6 @@
 export class ApiError extends Error {
-  constructor(message, { status, code, params } = {}) {
-    super(message)
+  constructor(message, { status, code, params, cause } = {}) {
+    super(message, { cause })
     this.name = 'ApiError'
     this.status = status
     this.code = code
@@ -9,13 +9,20 @@ export class ApiError extends Error {
 }
 
 async function request(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers
-    }
-  })
+  let response
+
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
+    })
+  } catch (cause) {
+    // fetch rejects only when the server cannot be reached at all
+    throw new ApiError('Network error', { code: 'NETWORK_ERROR', cause })
+  }
 
   let data = null
 

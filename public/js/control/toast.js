@@ -33,11 +33,18 @@ function enforceMaxToasts(root) {
   }
 }
 
+function isShowing(root, message) {
+  return Array.from(root.querySelectorAll('.toast-wrapper:not(.toast-leaving) .toast-message')).some((node) => node.textContent === message)
+}
+
 export function showToast(message, options = {}) {
   const root = getContainer()
   if (!root || !message) return () => {}
 
   const { type = 'info', duration = DEFAULT_DURATION } = options
+
+  if (type === 'error' && isShowing(root, message)) return () => {}
+
   enforceMaxToasts(root)
 
   const toast = document.createElement('div')

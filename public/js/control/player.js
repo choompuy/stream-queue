@@ -1,10 +1,7 @@
 import { formatDuration, formatViews, getErrorMessage } from '../shared.js'
 import { PLAY_ICON, PAUSE_ICON } from '../icons.js'
-import { api } from './api.js'
 import { state, dom, log } from './state.js'
-import { run } from './run.js'
 import { setHidden } from './ui.js'
-import { refreshState } from './queue.js'
 import { t } from '../i18n.js'
 
 let player = null
@@ -56,27 +53,6 @@ export function syncPlayer() {
 
   log(`Loading video: ${state.current.videoId}`)
   player.cueVideoById(state.current.videoId)
-}
-
-export function playPauseCurrent() {
-  return run('toggling play/pause', async () => {
-    if (state.isPaused) await api.resume()
-    else await api.pause()
-
-    await refreshState()
-  })
-}
-
-export function skipCurrent() {
-  return run('skipping', async () => {
-    await api.skip()
-    await refreshState()
-  })
-}
-
-export const playerActions = {
-  'play-pause': playPauseCurrent,
-  skip: skipCurrent
 }
 
 function onPlayerReady() {
