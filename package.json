@@ -13,7 +13,8 @@
     "start": "tsx src/server.ts",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "build": "tsc",
-    "build:sea": "node scripts/build-sea.mjs"
+    "build:sea": "node scripts/build-sea.mjs",
+    "test:smoke": "node scripts/smoke-frontend.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -24,6 +25,7 @@
     "@types/express": "^5.0.3",
     "@types/node": "^24.13.5",
     "esbuild": "^0.28.2",
+    "jsdom": "^30.1.0",
     "postject": "^1.0.0-alpha.6",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
