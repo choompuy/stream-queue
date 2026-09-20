@@ -20,6 +20,10 @@ export function formatDuration(seconds) {
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
+export function youtubeThumbnail(videoId, quality = 'mqdefault') {
+  return `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/${quality}.jpg`
+}
+
 export function formatViews(views) {
   if (views >= 1000000) return `${(views / 1000000).toFixed(1)}M`
   if (views >= 1000) return `${(views / 1000).toFixed(1)}K`
@@ -65,6 +69,10 @@ function codeToI18nKey(code) {
 }
 
 export function translateErrorCode(t, code, params, fallback = '') {
-  const key = code && codeToI18nKey(code)
-  return key ? t(key, params) : fallback
+  if (!code) return fallback
+
+  const key = codeToI18nKey(code)
+  const text = t(key, params)
+
+  return text === key ? fallback : text
 }

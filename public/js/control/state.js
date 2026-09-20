@@ -1,5 +1,4 @@
 import { $, createLogger } from '../shared.js'
-import { createViews } from './views.js'
 
 export const log = createLogger('CONTROL')
 
@@ -93,8 +92,6 @@ export const dom = {
   playlistsCount: $('playlistsCount')
 }
 
-export const views = createViews(dom)
-
 export const CONFIG_FIELDS = [
   { key: 'minViews', dom: 'cfgMinViews', type: 'number' },
   { key: 'minDurationSeconds', dom: 'cfgMinDuration', type: 'number' },
@@ -105,6 +102,15 @@ export const CONFIG_FIELDS = [
   { key: 'allowShorts', dom: 'cfgAllowShorts', type: 'checkbox' },
   { key: 'allowLiveStreams', dom: 'cfgAllowLiveStreams', type: 'checkbox' }
 ]
+
+export const selectors = {
+  blockedIds: () => new Set(state.blocklist.map((entry) => entry.videoId)),
+
+  markBlocked(items) {
+    const blocked = selectors.blockedIds()
+    return items.map((item) => ({ ...item, isBlocked: blocked.has(item.videoId) }))
+  }
+}
 
 export function renderStats() {
   if (dom.tabPlaylistCount) dom.tabPlaylistCount.textContent = state.fallback?.sourceCount ?? 0

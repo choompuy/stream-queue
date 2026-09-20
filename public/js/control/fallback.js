@@ -1,26 +1,27 @@
 import { api } from './api.js'
-import { state, dom, views, log, renderStats } from './state.js'
-import { toggleActive, formatDateTime, withLoading } from './ui.js'
+import { state, dom, selectors, renderStats } from './state.js'
+import { views } from './views/index.js'
+import { run } from './run.js'
+import { toggleActive, formatDateTime } from './ui.js'
 import { refreshState } from './queue.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 
-export async function refreshFallbackState(silent = false) {
-  try {
-    state.fallback = await api.getFallback(silent)
-    renderFallback()
-  } catch (error) {
-    log('Error fetching fallback playlist:', error)
-  }
+export function refreshFallbackState(silent = false) {
+  return run(
+    'fetching fallback playlist',
+    async () => {
+      state.fallback = await api.getFallback()
+      renderFallback()
+    },
+    { silent }
+  )
 }
 
 export function renderFallback() {
   const data = state.fallback
   const tracks = data?.upNext ?? []
   const activeVideoId = data?.activeVideoId ?? ''
-  const list = dom.fallbackListWrapper.querySelector('.row-list')
-
-  if (list) list.dataset.activeVideoId = activeVideoId
 
   toggleActive(dom.fallbackShuffleBtn, data?.shuffle)
   toggleActive(dom.fallbackRepeatBtn, data?.repeat)
@@ -38,8 +39,7 @@ export function renderFallback() {
     count: tracks.length,
     datetime: formatDateTime(data.lastRefreshedAt)
   })
-  const blockedIds = new Set(state.blocklist.map((entry) => entry.videoId))
-  views.fallback.render(tracks.map((track) => ({ ...track, isBlocked: blockedIds.has(track.videoId) })))
+  views.fallback.render(selectors.markBlocked(tracks).map((track) => ({ ...track, isActive: track.videoId === activeVideoId })))
   scrollToActiveFallback()
   renderStats()
 }
@@ -63,64 +63,67 @@ export function scrollToActiveFallback() {
   })
 }
 
-export async function refreshFallback() {
-  await withLoading(dom.fallbackRefreshBtn, async () => {
-    try {
+export function refreshFallback() {
+  return run(
+    'refreshing fallback',
+    async () => {
       await api.refreshFallback()
       await refreshFallbackState()
       toastSuccess(t('toast.fallbackRefreshed'))
-    } catch (error) {
-      log('Error refreshing fallback:', error)
-    }
-  })
+    },
+    { button: dom.fallbackRefreshBtn }
+  )
 }
 
-export async function toggleFallbackShuffle() {
-  try {
+export function toggleFallbackShuffle() {
+  return run('toggling shuffle', async () => {
     state.fallback = await api.shuffleFallback()
     views.fallback.invalidate()
     renderFallback()
-  } catch (error) {
-    log('Failed to toggle shuffle:', error)
-  }
+  })
 }
 
-export async function toggleFallbackRepeat() {
-  try {
+export function toggleFallbackRepeat() {
+  return run('toggling repeat', async () => {
     state.fallback = await api.repeatFallback()
     renderFallback()
-  } catch (error) {
-    log('Failed to toggle repeat:', error)
-  }
+  })
 }
 
-export async function toggleFallbackEnabled() {
-  try {
+export function toggleFallbackEnabled() {
+  return run('toggling enabled', async () => {
     state.fallback = await api.enabledFallback()
     renderFallback()
-  } catch (error) {
-    log('Failed to toggle enabled:', error)
-  }
+  })
 }
 
-export async function playFallbackNow(videoId) {
-  const title = state.fallback?.upNext?.find((track) => track.videoId === videoId)?.title
-  try {
+const fallbackTitle = (videoId) => state.fallback?.upNext?.find((track) => track.videoId === videoId)?.title
+
+export function playFallbackNow(videoId) {
+  const title = fallbackTitle(videoId)
+
+  return run('playing fallback track', async () => {
     await api.playFallback(videoId)
     await refreshState()
     if (title) toastSuccess(t('toast.nowPlaying', { title }))
-  } catch (error) {
-    log('Error playing fallback track:', error)
-  }
+  })
 }
 
-export async function enqueueFallbackTrack(videoId) {
-  const title = state.fallback?.upNext?.find((track) => track.videoId === videoId)?.title
-  try {
+export function enqueueFallbackTrack(videoId) {
+  const title = fallbackTitle(videoId)
+
+  return run('queueing fallback track', async () => {
     await api.enqueueFallback(videoId)
     await refreshState()
     if (title) toastSuccess(t('toast.addedToQueue', { title, position: state.queue.length }))
-  } catch (error) {
-    log('Error queueing fallback track:', error)
-  }
+  })
+}
+
+export const fallbackActions = {
+  'fallback-refresh': refreshFallback,
+  'fallback-shuffle': toggleFallbackShuffle,
+  'fallback-repeat': toggleFallbackRepeat,
+  'fallback-enabled': toggleFallbackEnabled,
+  'fallback-play': (element) => playFallbackNow(element.dataset.videoId),
+  'fallback-enqueue': (element) => enqueueFallbackTrack(element.dataset.videoId)
 }

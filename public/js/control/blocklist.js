@@ -1,27 +1,39 @@
 import { api } from './api.js'
-import { state, views, log, renderStats } from './state.js'
+import { state, renderStats } from './state.js'
+import { views } from './views/index.js'
+import { run } from './run.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 import { refreshState } from './queue.js'
 
-export async function loadBlocklist() {
-  try {
+export function loadBlocklist() {
+  return run('loading blocklist', async () => {
     const data = await api.getBlocklist()
     state.blocklist = data.entries ?? []
     views.blocklist.render(state.blocklist)
     renderStats()
-  } catch (error) {
-    log('Error loading blocklist:', error)
-  }
+  })
 }
 
-export async function unblockTrack(videoId) {
-  try {
+export function blockTrack(videoId, title) {
+  return run('blocking track', async () => {
+    await api.blockTrack(videoId, title)
+    await loadBlocklist()
+    await refreshState(true)
+    toastSuccess(t('toast.trackBlocked'))
+  })
+}
+
+export function unblockTrack(videoId) {
+  return run('unblocking track', async () => {
     await api.unblockTrack(videoId)
     await loadBlocklist()
     await refreshState(true)
     toastSuccess(t('toast.trackUnblocked'))
-  } catch (error) {
-    log('Error unblocking track:', error)
-  }
+  })
+}
+
+export const blocklistActions = {
+  'block-track': (element) => blockTrack(element.dataset.videoId, element.dataset.title),
+  'unblock-track': (element) => unblockTrack(element.dataset.videoId)
 }

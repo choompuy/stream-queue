@@ -1,8 +1,14 @@
-import { t } from '../i18n.js'
-import { translateErrorCode } from '../shared.js'
-import { toastError } from './toast.js'
+export class ApiError extends Error {
+  constructor(message, { status, code, params } = {}) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.code = code
+    this.params = params
+  }
+}
 
-async function request(url, options = {}, silent = false) {
+async function request(url, options = {}) {
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -20,157 +26,63 @@ async function request(url, options = {}, silent = false) {
   }
 
   if (!response.ok) {
-    const error = new Error(data?.error || `Request failed: ${response.status}`)
-    error.code = data?.code
-    error.params = data?.params
-    if (!silent) toastError(translateErrorCode(t, error.code, error.params, error.message))
-    throw error
+    throw new ApiError(data?.error || `Request failed: ${response.status}`, {
+      status: response.status,
+      code: data?.code,
+      params: data?.params
+    })
   }
 
   return data
 }
 
+const post = (url, body) => request(url, { method: 'POST', ...(body !== undefined && { body: JSON.stringify(body) }) })
+const put = (url, body) => request(url, { method: 'PUT', body: JSON.stringify(body) })
+const del = (url) => request(url, { method: 'DELETE' })
+const id = encodeURIComponent
+
 export const api = {
   getSettings: () => request('/api/settings'),
-
-  updateSettings: (settings) =>
-    request('/api/settings', {
-      method: 'PUT',
-      body: JSON.stringify(settings)
-    }),
+  updateSettings: (settings) => put('/api/settings', settings),
 
   getLocale: () => request('/api/locale'),
-
-  updateLocale: (locale) =>
-    request('/api/locale', {
-      method: 'PUT',
-      body: JSON.stringify({ locale })
-    }),
+  updateLocale: (locale) => put('/api/locale', { locale }),
 
   getConfig: () => request('/api/config'),
-
-  updateConfig: (config) =>
-    request('/api/config', {
-      method: 'PUT',
-      body: JSON.stringify(config)
-    }),
+  updateConfig: (config) => put('/api/config', config),
 
   getSecrets: () => request('/api/secrets'),
+  updateSecrets: (secrets) => put('/api/secrets', secrets),
 
-  updateSecrets: (secrets) =>
-    request('/api/secrets', {
-      method: 'PUT',
-      body: JSON.stringify(secrets)
-    }),
+  getState: () => request('/api/state'),
+  search: (query) => request(`/api/search?q=${id(query)}&admin=1`),
+  requestSong: (query) => post('/api/queue/request', { query, requestedBy: 'ControlPanel', admin: true }),
+  removeFromQueue: (index) => del(`/api/queue/${index}`),
+  clearQueue: () => post('/api/queue/clear'),
 
-  getState: (silent) => request('/api/state', {}, silent),
+  skip: () => post('/api/player/skip'),
+  pause: () => post('/api/player/pause'),
+  resume: () => post('/api/player/resume'),
 
-  search: (query) => request(`/api/search?q=${encodeURIComponent(query)}&admin=1`),
-
-  requestSong: (query) =>
-    request('/api/queue/request', {
-      method: 'POST',
-      body: JSON.stringify({
-        query,
-        requestedBy: 'ControlPanel',
-        admin: true
-      })
-    }),
-
-  removeFromQueue: (index) =>
-    request(`/api/queue/${index}`, {
-      method: 'DELETE'
-    }),
-
-  clearQueue: () =>
-    request('/api/queue/clear', {
-      method: 'POST'
-    }),
-
-  skip: () =>
-    request('/api/player/skip', {
-      method: 'POST'
-    }),
-
-  pause: () =>
-    request('/api/player/pause', {
-      method: 'POST'
-    }),
-
-  resume: () =>
-    request('/api/player/resume', {
-      method: 'POST'
-    }),
-
-  getFallback: (silent) => request('/api/fallback', {}, silent),
-
-  refreshFallback: () =>
-    request('/api/fallback/refresh', {
-      method: 'POST'
-    }),
-
-  shuffleFallback: () =>
-    request('/api/fallback/shuffle', {
-      method: 'POST'
-    }),
-
-  repeatFallback: () =>
-    request('/api/fallback/repeat', {
-      method: 'POST'
-    }),
-
-  enabledFallback: () =>
-    request('/api/fallback/enabled', {
-      method: 'POST'
-    }),
-
-  playFallback: (videoId) =>
-    request(`/api/fallback/play/${encodeURIComponent(videoId)}`, {
-      method: 'POST'
-    }),
-
-  enqueueFallback: (videoId) =>
-    request(`/api/fallback/enqueue/${encodeURIComponent(videoId)}`, {
-      method: 'POST'
-    }),
+  getFallback: () => request('/api/fallback'),
+  refreshFallback: () => post('/api/fallback/refresh'),
+  shuffleFallback: () => post('/api/fallback/shuffle'),
+  repeatFallback: () => post('/api/fallback/repeat'),
+  enabledFallback: () => post('/api/fallback/enabled'),
+  playFallback: (videoId) => post(`/api/fallback/play/${id(videoId)}`),
+  enqueueFallback: (videoId) => post(`/api/fallback/enqueue/${id(videoId)}`),
 
   getNetworkInfo: () => request('/api/network-info'),
 
   getPlaylists: () => request('/api/playlists'),
+  addPlaylist: (playlistId) => post('/api/playlists', { playlistId }),
+  removePlaylist: (playlistId) => del(`/api/playlists/${id(playlistId)}`),
+  activatePlaylist: (playlistId) => post(`/api/playlists/${id(playlistId)}/activate`),
 
-  addPlaylist: (playlistId) =>
-    request('/api/playlists', {
-      method: 'POST',
-      body: JSON.stringify({ playlistId })
-    }),
-
-  removePlaylist: (id) =>
-    request(`/api/playlists/${encodeURIComponent(id)}`, {
-      method: 'DELETE'
-    }),
-
-  activatePlaylist: (id) =>
-    request(`/api/playlists/${encodeURIComponent(id)}/activate`, {
-      method: 'POST'
-    }),
-
-  getActivity: (silent) => request('/api/activity', {}, silent),
-
-  clearActivity: () =>
-    request('/api/activity/clear', {
-      method: 'POST'
-    }),
+  getActivity: () => request('/api/activity'),
+  clearActivity: () => post('/api/activity/clear'),
 
   getBlocklist: () => request('/api/blocklist'),
-
-  blockTrack: (videoId, title) =>
-    request('/api/blocklist', {
-      method: 'POST',
-      body: JSON.stringify({ videoId, title })
-    }),
-
-  unblockTrack: (videoId) =>
-    request(`/api/blocklist/${encodeURIComponent(videoId)}`, {
-      method: 'DELETE'
-    })
+  blockTrack: (videoId, title) => post('/api/blocklist', { videoId, title }),
+  unblockTrack: (videoId) => del(`/api/blocklist/${id(videoId)}`)
 }

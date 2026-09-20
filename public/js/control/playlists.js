@@ -1,18 +1,17 @@
 import { api } from './api.js'
-import { state, dom, views, log } from './state.js'
-import { withLoading } from './ui.js'
+import { state, dom, log } from './state.js'
+import { views } from './views/index.js'
+import { run } from './run.js'
 import { refreshFallbackState } from './fallback.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 
-export async function loadPlaylists() {
-  try {
+export function loadPlaylists() {
+  return run('loading playlists', async () => {
     const data = await api.getPlaylists()
     state.playlists = data.playlists ?? []
     renderPlaylists()
-  } catch (error) {
-    log('Error loading playlists:', error)
-  }
+  })
 }
 
 export function renderPlaylists() {
@@ -20,50 +19,52 @@ export function renderPlaylists() {
   if (dom.playlistsCount) dom.playlistsCount.textContent = state.playlists.length
 
   const activeId = state.config?.fallbackPlaylist?.playlistId ?? ''
-  dom.playlistsListWrapper.dataset.activeId = activeId
-  views.playlists.render(state.playlists)
+  views.playlists.render(state.playlists.map((playlist) => ({ ...playlist, isActive: playlist.id === activeId })))
 }
 
 export async function addPlaylist() {
   const value = dom.playlistUrlInput.value.trim()
   if (!value) return
 
-  await withLoading(dom.playlistAddBtn, async () => {
-    try {
+  await run(
+    'adding playlist',
+    async () => {
       await api.addPlaylist(value)
       dom.playlistUrlInput.value = ''
       await loadPlaylists()
       toastSuccess(t('toast.playlistAdded'))
-    } catch (error) {
-      log('Error adding playlist:', error)
-    }
-  })
+    },
+    { button: dom.playlistAddBtn }
+  )
 }
 
-export async function activatePlaylist(id) {
-  try {
+export function activatePlaylist(id) {
+  return run('activating playlist', async () => {
     state.config = await api.activatePlaylist(id)
     renderPlaylists()
     await refreshFallbackState()
     toastSuccess(t('toast.playlistActivated'))
-  } catch (error) {
-    log('Error activating playlist:', error)
-  }
+  })
 }
 
 export async function deletePlaylist(id) {
   if (!confirm(t('playlists.deleteConfirm'))) return
 
-  try {
+  await run('deleting playlist', async () => {
     const result = await api.removePlaylist(id)
     await loadPlaylists()
     toastSuccess(t('toast.playlistDeleted'))
+
     if (result?.fallbackCleared) {
       state.config = await api.getConfig()
       await refreshFallbackState()
       log('Fallback cleared - active playlist was removed')
     }
-  } catch (error) {
-    log('Error deleting playlist:', error)
-  }
+  })
+}
+
+export const playlistActions = {
+  'add-playlist': addPlaylist,
+  'playlist-activate': (element) => activatePlaylist(element.dataset.id),
+  'playlist-delete': (element) => deletePlaylist(element.dataset.id)
 }

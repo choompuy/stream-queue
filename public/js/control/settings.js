@@ -1,41 +1,36 @@
 import { escapeHtml } from '../shared.js'
 import { api } from './api.js'
 import { state, dom, log, CONFIG_FIELDS } from './state.js'
+import { run } from './run.js'
 import { syncPlayer } from './player.js'
 import { renderQueue } from './queue.js'
 import { renderPlaylists } from './playlists.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 
-export async function changeLocale(locale) {
-  try {
+export function changeLocale(locale) {
+  return run('changing locale', async () => {
     await api.updateLocale(locale)
     location.reload()
-  } catch (error) {
-    log('Error changing locale:', error)
-  }
+  })
 }
 
-export async function loadOverlaySettings() {
-  try {
+export function loadOverlaySettings() {
+  return run('loading settings', async () => {
     state.settings = await api.getSettings()
 
     if (dom.showVideo) dom.showVideo.checked = Boolean(state.settings.showVideo)
     if (dom.badgePosition) dom.badgePosition.value = state.settings.position || 'bottom-right'
-  } catch (error) {
-    log('Error loading settings:', error)
-  }
+  })
 }
 
-export async function saveOverlaySettings() {
-  try {
+export function saveOverlaySettings() {
+  return run('saving settings', async () => {
     state.settings.showVideo = dom.showVideo.checked
     state.settings.position = dom.badgePosition ? dom.badgePosition.value : state.settings.position
     await api.updateSettings(state.settings)
     syncPlayer()
-  } catch (error) {
-    log('Error saving settings:', error)
-  }
+  })
 }
 
 export function copyOverlayUrl() {
@@ -46,8 +41,8 @@ export function copyOverlayUrl() {
   })
 }
 
-export async function loadNetworkInfo() {
-  try {
+export function loadNetworkInfo() {
+  return run('loading network info', async () => {
     state.network = await api.getNetworkInfo()
     const ips = state.network?.ips ?? []
 
@@ -55,9 +50,7 @@ export async function loadNetworkInfo() {
     else if (!state.selectedIp || !ips.includes(state.selectedIp)) state.selectedIp = ips[0]
 
     renderQrUrl()
-  } catch (error) {
-    log('Error loading network info:', error)
-  }
+  })
 }
 
 export function renderQrUrl() {
@@ -108,8 +101,8 @@ export function toggleQr() {
   if (!dom.controlPanelQr.classList.contains('hidden')) renderQrUrl()
 }
 
-export async function loadConfig() {
-  try {
+export function loadConfig() {
+  return run('loading config', async () => {
     state.config = await api.getConfig()
 
     for (const field of CONFIG_FIELDS) {
@@ -121,21 +114,17 @@ export async function loadConfig() {
       if (field.type === 'checkbox') input.checked = Boolean(value)
       else input.value = value ?? ''
     }
-  } catch (error) {
-    log('Error loading config:', error)
-  }
+  })
 }
 
-export async function loadSecrets() {
-  try {
+export function loadSecrets() {
+  return run('loading secrets', async () => {
     const data = await api.getSecrets()
     const key = data.hasYoutubeApiKey ? 'settings.bot.apiKeyConfigured' : 'settings.bot.apiKeyNotConfigured'
     dom.secretsStatus.textContent = t(key)
     dom.secretsStatus.setAttribute('data-i18n', key)
     dom.secretsStatus.classList.toggle('text-red', !data.hasYoutubeApiKey)
-  } catch (error) {
-    log('Error loading secrets:', error)
-  }
+  })
 }
 
 export async function saveConfigSetting() {
@@ -161,7 +150,7 @@ export async function saveConfigSetting() {
 
   const youtubeApiKey = dom.secYoutubeKey.value.trim()
 
-  try {
+  await run('saving config', async () => {
     state.config = await api.updateConfig(config)
 
     if (youtubeApiKey) {
@@ -173,7 +162,11 @@ export async function saveConfigSetting() {
     renderQueue()
     renderPlaylists()
     toastSuccess(t('toast.settingsSaved'))
-  } catch (error) {
-    log('Error saving settings:', error)
-  }
+  })
+}
+
+export const settingsActions = {
+  'copy-overlay-url': copyOverlayUrl,
+  'toggle-qr': toggleQr,
+  'save-config': saveConfigSetting
 }

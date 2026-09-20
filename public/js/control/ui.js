@@ -11,61 +11,6 @@ export function withLoading(button, action) {
     })
 }
 
-export function createListView(wrapper, { renderRow, getKey, cache = true }) {
-  const list = wrapper?.querySelector('.row-list')
-  const empty = wrapper?.querySelector('.empty')
-
-  if (!wrapper || !list || !empty) {
-    return {
-      render: () => {},
-      clear: () => {},
-      invalidate: () => {}
-    }
-  }
-
-  let lastKey = null
-
-  function setEmpty(isEmpty) {
-    wrapper.classList.toggle('is-empty', isEmpty)
-  }
-
-  function render(items = []) {
-    setEmpty(items.length === 0)
-    const key = getKey ? getKey(items) : items.map((item) => item?.id ?? item?.videoId ?? item).join('|')
-
-    if (cache && key === lastKey) return false
-
-    lastKey = key
-
-    if (!items.length) {
-      list.innerHTML = ''
-      return true
-    }
-
-    list.innerHTML = items.map((item, index) => renderRow(item, index)).join('')
-    return true
-  }
-
-  function clear() {
-    lastKey = null
-    setEmpty(true)
-    list.innerHTML = ''
-  }
-
-  function invalidate() {
-    lastKey = null
-  }
-
-  return {
-    render,
-    clear,
-    invalidate,
-    list,
-    empty,
-    wrapper
-  }
-}
-
 export function setHidden(element, hidden) {
   element?.classList.toggle('hidden', hidden)
 }

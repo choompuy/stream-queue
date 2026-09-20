@@ -4,6 +4,8 @@ import { refreshFallbackState, scrollToActiveFallback } from './fallback.js'
 export let activeTab = 'dashboard'
 let activeSection = 'queue'
 
+export const isDashboardActive = () => activeTab === 'dashboard'
+
 export function switchPageTab(tabName) {
   const wasDashboard = activeTab === 'dashboard'
   if (activeTab === tabName) return

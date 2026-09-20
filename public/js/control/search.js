@@ -1,6 +1,7 @@
 import { api } from './api.js'
-import { dom, views, log } from './state.js'
-import { withLoading } from './ui.js'
+import { dom } from './state.js'
+import { views } from './views/index.js'
+import { run } from './run.js'
 import { refreshState } from './queue.js'
 import { loadActivity } from './activity.js'
 import { t } from '../i18n.js'
@@ -23,8 +24,9 @@ export async function search() {
 
   if (lastSearch === query) return
 
-  await withLoading(dom.searchBtn, async () => {
-    try {
+  await run(
+    'searching',
+    async () => {
       if (YOUTUBE_URL_HINT.test(query)) {
         await addSong(query)
         return
@@ -34,22 +36,30 @@ export async function search() {
       views.search.render(data.results)
       dom.searchListWrapper.classList.remove('hidden')
       lastSearch = query
-    } catch (error) {
-      log('Search error:', error)
-    }
-  })
+    },
+    { button: dom.searchBtn }
+  )
 }
 
-export async function addSong(query) {
-  try {
-    const data = await api.requestSong(query)
-    await refreshState()
-    await loadActivity()
-    toastSuccess(
-      data.started ? t('toast.nowPlaying', { title: data.song.title }) : t('toast.addedToQueue', { title: data.song.title, position: data.position })
-    )
-  } catch (error) {
-    log('Error adding song:', error)
-    await loadActivity()
-  }
+export function addSong(query) {
+  return run(
+    'adding song',
+    async () => {
+      const data = await api.requestSong(query)
+      await refreshState()
+      await loadActivity()
+      toastSuccess(
+        data.started
+          ? t('toast.nowPlaying', { title: data.song.title })
+          : t('toast.addedToQueue', { title: data.song.title, position: data.position })
+      )
+    },
+    { onError: () => loadActivity() }
+  )
+}
+
+export const searchActions = {
+  search,
+  'search-clear': clearSearchResults,
+  'search-add': (element) => addSong(`https://www.youtube.com/watch?v=${element.dataset.videoId}`)
 }

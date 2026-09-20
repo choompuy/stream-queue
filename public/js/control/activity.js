@@ -1,10 +1,9 @@
 import { api } from './api.js'
-import { state, views, dom, log, renderStats } from './state.js'
-import { withLoading } from './ui.js'
+import { state, dom, renderStats } from './state.js'
+import { views } from './views/index.js'
+import { run } from './run.js'
 import { t } from '../i18n.js'
-import { toastInfo, toastSuccess } from './toast.js'
-import { loadBlocklist } from './blocklist.js'
-import { refreshState } from './queue.js'
+import { toastInfo } from './toast.js'
 
 let knownActivityKeys = null
 
@@ -37,42 +36,37 @@ function renderActivity() {
   views.activity.render(entries)
 }
 
-export async function loadActivity(silent = false) {
-  try {
-    const data = await api.getActivity(silent)
-    const entries = data.entries ?? []
-    notifyNewViewerRequests(entries)
-    state.activity = entries
-    renderActivity()
-    renderStats()
-  } catch (error) {
-    log('Error loading activity:', error)
-  }
+export function loadActivity(silent = false) {
+  return run(
+    'loading activity',
+    async () => {
+      const data = await api.getActivity()
+      const entries = data.entries ?? []
+      notifyNewViewerRequests(entries)
+      state.activity = entries
+      renderActivity()
+      renderStats()
+    },
+    { silent }
+  )
 }
 
 export async function clearActivity() {
   if (!confirm(t('activity.clearConfirm'))) return
 
-  await withLoading(dom.clearActivityBtn, async () => {
-    try {
+  await run(
+    'clearing activity',
+    async () => {
       const data = await api.clearActivity()
       state.activity = data.entries ?? []
       views.activity.invalidate()
       renderActivity()
       renderStats()
-    } catch (error) {
-      log('Error clearing activity:', error)
-    }
-  })
+    },
+    { button: dom.clearActivityBtn }
+  )
 }
 
-export async function blockTrack(videoId, title) {
-  try {
-    await api.blockTrack(videoId, title)
-    await loadBlocklist()
-    await refreshState(true)
-    toastSuccess(t('toast.trackBlocked'))
-  } catch (error) {
-    log('Error blocking track:', error)
-  }
+export const activityActions = {
+  'clear-activity': clearActivity
 }
