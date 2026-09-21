@@ -5,7 +5,8 @@ import { dom } from '../state.js'
 import { blockTrackItem, createListView, row, rowMenu, statusPill, unblockTrackItem } from './primitives.js'
 
 export const queueView = createListView(dom.queueListWrapper, {
-  getKey: (items) => items.map((item) => [item.videoId, item.requestedBy, item.title, item.thumbnail, item.duration, item.isBlocked].join(':')).join('|'),
+  getKey: (items) =>
+    items.map((item) => [item.videoId, item.requestedBy, item.title, item.thumbnail, item.duration, item.isBlocked].join(':')).join('|'),
   renderRow: (item, index) =>
     row({
       index,
@@ -13,16 +14,18 @@ export const queueView = createListView(dom.queueListWrapper, {
       title: item.title,
       subtitle: item.channelTitle,
       extra: `
+        ${item.isBlocked ? statusPill(t('blocklist.blockedLabel'), 'rejected') : ''}
         <span class="text-sm text-green">
           @${escapeHtml(item.requestedBy)}
         </span>
-        ${item.isBlocked ? statusPill(t('blocklist.blockedLabel'), 'rejected') : ''}
       `,
       meta: formatDuration(item.duration),
-      actions: rowMenu([
-        item.isBlocked ? unblockTrackItem(item.videoId) : blockTrackItem(item.videoId, item.title),
-        { action: 'queue-remove', data: { index }, icon: DELETE_ICON, label: t('queue.remove'), danger: true }
-      ]),
+      actions: item.isBlocked
+        ? unblockTrackItem(item.videoId)
+        : rowMenu([
+            blockTrackItem(item.videoId, item.title),
+            { action: 'queue-remove', data: { index }, icon: DELETE_ICON, label: t('queue.remove'), danger: true }
+          ]),
       attributes: `data-queue-index="${index}"`
     })
 })

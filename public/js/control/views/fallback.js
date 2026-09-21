@@ -14,15 +14,17 @@ export const fallbackView = createListView(dom.fallbackListWrapper, {
       title: track.title,
       subtitle: track.channelTitle,
       meta: formatDuration(track.duration),
-      extra: track.isBlocked ? statusPill(t('blocklist.blockedLabel'), 'rejected') : '',
-      actions: rowMenu(
-        track.isBlocked
-          ? [unblockTrackItem(track.videoId)]
-          : [
-              { action: 'fallback-enqueue', data: { videoId: track.videoId }, icon: PLUS_ICON, label: t('fallback.addToQueue') },
-              { action: 'fallback-play', data: { videoId: track.videoId }, icon: PLAY_ICON, label: t('fallback.playNow') },
-              blockTrackItem(track.videoId, track.title)
-            ]
-      )
+      extra: track.isActive
+        ? statusPill(t('fallback.playing'), 'failed')
+        : track.isBlocked
+          ? statusPill(t('blocklist.blockedLabel'), 'rejected')
+          : '',
+      actions: track.isBlocked
+        ? unblockTrackItem(track.videoId)
+        : rowMenu([
+            { action: 'fallback-enqueue', data: { videoId: track.videoId }, icon: PLUS_ICON, label: t('fallback.addToQueue') },
+            { action: 'fallback-play', data: { videoId: track.videoId }, icon: PLAY_ICON, label: t('fallback.playNow') },
+            blockTrackItem(track.videoId, track.title)
+          ])
     })
 })

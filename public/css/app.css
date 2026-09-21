@@ -290,20 +290,9 @@ select {
 .section-tabs {
   display: flex;
   padding-inline: 1rem;
-  gap: 1rem;
+  gap: 0.5rem;
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.section-tab {
-  margin-bottom: -1px;
-  border-bottom: 1px solid transparent;
-}
-
-.section-tab.active {
-  border-bottom-color: var(--accent-blue);
-  color: var(--accent-blue);
 }
 
 .section-tab .count-badge {

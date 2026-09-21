@@ -122,9 +122,13 @@ export const blockTrackItem = (videoId, title) => ({
   danger: true
 })
 
-export const unblockTrackItem = (videoId) => ({
-  action: 'unblock-track',
-  data: { videoId },
-  icon: PLUS_ICON,
-  label: t('blocklist.unblock')
-})
+export const unblockTrackItem = (videoId) => `
+  <button
+    class="btn btn-sm btn-icon"
+    data-action="unblock-track"
+    data-video-id="${escapeHtml(videoId)}"
+    title="${t('blocklist.unblock')}"
+  >
+    ${PLUS_ICON()}
+  </button>
+`

@@ -81,7 +81,8 @@
     "enable": "Enable playlist",
     "info": "{{count}} tracks ▪ updated {{datetime}}",
     "addToQueue": "Add to queue",
-    "playNow": "Play now"
+    "playNow": "Play now",
+    "playing": "Playing"
   },
   "activity": {
     "title": "Activity",

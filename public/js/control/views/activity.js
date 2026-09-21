@@ -27,13 +27,13 @@ export const activityView = createListView(dom.activityListWrapper, {
       title,
       subtitle: translateErrorCode(t, entry.reasonCode, entry.reasonParams),
       extra: `
-        <div class="text-sm text-secondary">
-          ${formatRelativeTime(entry.at)}
-        </div>
+        ${statusPill(t(STATUS_LABEL_KEYS[entry.status] ?? STATUS_LABEL_KEYS.rejected), entry.status)}
         <div class="text-sm text-green">
           @${escapeHtml(entry.requestedBy)}
         </div>
-        ${statusPill(t(STATUS_LABEL_KEYS[entry.status] ?? STATUS_LABEL_KEYS.rejected), entry.status)}
+        <div class="text-sm text-secondary">
+          ${formatRelativeTime(entry.at)}
+        </div>
       `,
       actions: entry.videoId ? rowMenu([blockTrackItem(entry.videoId, title)]) : ''
     })
