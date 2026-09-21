@@ -58,7 +58,7 @@ function getUserActiveCount(username: string): number {
 }
 
 export function hydrateQueue(data: { current?: QueueItem | null; queue?: QueueItem[] }): void {
-  if (data.current) currentSong = data.current
+  if (data.current !== undefined) currentSong = data.current
 
   if (Array.isArray(data.queue)) {
     queue.length = 0

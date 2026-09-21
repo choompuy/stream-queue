@@ -4,6 +4,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+// the modules read data/ and cache/ relative to the working directory: keep the test away from the real ones
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
 const { playbackFailureReasonCode } = await import('./player.js')

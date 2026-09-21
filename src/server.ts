@@ -10,6 +10,7 @@ import { ok, fail } from './http.js'
 import { getSettings } from './settings.js'
 import { getAppRoot } from './runtime.js'
 import { getState, moveToNext } from './player.js'
+import { initState } from './state-file.js'
 import { flushAllStores } from './persist.js'
 import { refreshFallback } from './fallback.js'
 
@@ -127,6 +128,7 @@ function openBrowser(url: string): void {
 }
 
 async function main() {
+  initState()
   PORT = await findAvailablePort(3000)
 
   app.listen(PORT, async () => {

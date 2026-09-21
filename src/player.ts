@@ -1,11 +1,8 @@
-import { getSettings, setSettings } from './settings.js'
-import { STATE_FILE, createFileStore } from './persist.js'
-import { PlayerState, QueueItem, ActivityReasonCode, Settings } from './types.js'
+import { PlayerState, QueueItem, ActivityReasonCode } from './types.js'
 import { isBlocked } from './blocklist.js'
-import { onStateChange } from './state-events.js'
 import { logActivity } from './activity.js'
-import { getQueue, getCurrent, getIsPaused, setCurrent, shiftQueue, hydrateQueue } from './queue.js'
-import { peekNextFallbackTrack, advanceFallback, getFallbackSnapshot, hydrateFallback, FallbackSnapshot } from './fallback.js'
+import { getQueue, getCurrent, getIsPaused, setCurrent, shiftQueue } from './queue.js'
+import { peekNextFallbackTrack, advanceFallback } from './fallback.js'
 
 function log(message: string): void {
   console.log(`[PLAYER] ${message}`)
@@ -120,53 +117,3 @@ export function reportPlaybackFailure(errorCode?: number, videoId?: string): boo
   moveToNext()
   return true
 }
-
-// --- Combined-state persistence: this is the one place that knows the on-disk
-// state.json shape spans queue + settings + fallback, so it's the one place
-// that needs to import all three, rather than queue.ts reaching into fallback.ts.
-
-type StateFile = {
-  current: QueueItem | null
-  queue: QueueItem[]
-  settings: Settings
-  fallback: FallbackSnapshot
-}
-
-const store = createFileStore<Partial<StateFile>>(STATE_FILE)
-
-function stateSnapshot(): StateFile {
-  return {
-    current: getCurrent(),
-    queue: getQueue(),
-    settings: getSettings(),
-    fallback: getFallbackSnapshot()
-  }
-}
-
-function persistState(): void {
-  store.scheduleSave(stateSnapshot, (error) => {
-    console.error('[PLAYER] Failed to save state:', error instanceof Error ? error.message : error)
-  })
-}
-
-onStateChange(persistState)
-
-function loadState(): void {
-  try {
-    const data = store.load({})
-
-    hydrateQueue({ current: data.current, queue: data.queue })
-
-    if (data.settings) {
-      setSettings({ ...data.settings, locale: data.settings.locale || 'en' })
-    }
-
-    hydrateFallback(data.fallback)
-
-    log('State loaded from disk')
-  } catch (error) {
-    console.error('[PLAYER] Failed to load state:', error instanceof Error ? error.message : error)
-  }
-}
-
-loadState()
