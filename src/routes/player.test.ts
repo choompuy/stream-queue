@@ -44,7 +44,7 @@ test('POST /api/player/ended', async (t) => {
     const body = (await (await post('ended', { videoId: A })).json()) as Record<string, any>
 
     assert.equal(currentId(), B)
-    assert.equal(body.ignored, undefined)
+    assert.equal(body.data.ignored, undefined)
   })
 
   await t.test('about a track that is no longer current: ignored, the queue does not move', async () => {
@@ -52,7 +52,7 @@ test('POST /api/player/ended', async (t) => {
     const body = (await response.json()) as Record<string, any>
 
     assert.equal(response.status, 200)
-    assert.equal(body.ignored, true)
+    assert.equal(body.data.ignored, true)
     assert.equal(currentId(), A)
     assert.equal(player.getState().queue.length, 3)
   })
@@ -84,7 +84,7 @@ test('POST /api/player/report-failure', async (t) => {
     const second = (await (await post('report-failure', { errorCode: 101, videoId: A })).json()) as Record<string, any>
 
     assert.equal(currentId(), B)
-    assert.equal(second.ignored, true)
+    assert.equal(second.data.ignored, true)
     assert.equal(getActivity().filter((entry) => entry.status === 'failed').length, 1)
   })
 
@@ -100,13 +100,13 @@ test('POST /api/player/report-failure', async (t) => {
 
     assert.equal(currentId(), B)
     assert.equal(getActivity()[0]?.reasonCode, 'PLAYBACK_EMBED_DISALLOWED')
-    assert.equal(typeof body.message, 'string')
+    assert.equal(typeof body.data.message, 'string')
   })
 
   await t.test('nothing is playing: any report is ignored', async () => {
     queue.setCurrent(null)
     const body = (await (await post('report-failure', { videoId: A })).json()) as Record<string, any>
 
-    assert.equal(body.ignored, true)
+    assert.equal(body.data.ignored, true)
   })
 })

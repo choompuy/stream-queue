@@ -88,7 +88,7 @@ export type CacheFile = {
 }
 
 export type ApiError = { success: false; error: string; code: string; params?: Record<string, string | number> }
-export type ApiOk<T> = { success: true } & T
+export type ApiOk<T> = { success: true; data: T }
 export type ApiResult<T> = ApiOk<T> | ApiError
 
 export type FilterFailureReason =

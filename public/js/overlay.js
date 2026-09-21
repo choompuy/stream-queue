@@ -31,9 +31,9 @@ const dom = {
 async function fetchOverlayState() {
   try {
     const response = await fetch('/api/overlay-state')
-    const data = await response.json()
-    settings = data.settings
-    currentState = data.state
+    const body = await response.json()
+    settings = body.data.settings
+    currentState = body.data.state
     const serverLocale = settings.locale || 'en'
     if (!localeLoaded || serverLocale !== getCurrentLocale()) {
       await initI18n(serverLocale)

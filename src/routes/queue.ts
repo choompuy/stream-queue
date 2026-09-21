@@ -18,7 +18,7 @@ router.post(
     }
 
     if (typeof requestedBy !== 'string' || requestedBy.trim().length === 0) {
-      return fail(res, 'username is required', 'INVALID_REQUEST', 400)
+      return fail(res, 'username is required', 'USERNAME_REQUIRED', 400)
     }
 
     const result = await requestSong(query.trim(), requestedBy.trim(), bypassFilters)

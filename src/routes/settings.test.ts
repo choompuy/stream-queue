@@ -19,7 +19,7 @@ const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api`
 after(() => server.close())
 
 const putConfig = (body: unknown) => fetch(`${base}/config`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-const getConfig = async () => (await fetch(`${base}/config`)).json() as Promise<Record<string, any>>
+const getConfig = async () => ((await fetch(`${base}/config`)).json() as Promise<Record<string, any>>).then((body) => body.data)
 
 test('PUT /api/config', async (t) => {
   await t.test('a valid update is applied and returned', async () => {
@@ -27,7 +27,7 @@ test('PUT /api/config', async (t) => {
     const body = (await response.json()) as Record<string, any>
 
     assert.equal(response.status, 200)
-    assert.equal(body.minViews, 123)
+    assert.equal(body.data.minViews, 123)
     assert.equal((await getConfig()).fallbackPlaylist.repeat, true)
   })
 
@@ -105,13 +105,13 @@ test('PUT /api/config and the fallback playlist', async (t) => {
 
 test('PUT /api/settings', async (t) => {
   const putSettings = (body: unknown) => fetch(`${base}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  const getSettings = async () => (await fetch(`${base}/settings`)).json() as Promise<Record<string, any>>
+  const getSettings = async () => ((await fetch(`${base}/settings`)).json() as Promise<Record<string, any>>).then((body) => body.data)
 
   await t.test('valid values are applied', async () => {
     const response = await putSettings({ showVideo: true, position: 'top-left' })
 
     assert.equal(response.status, 200)
-    assert.deepEqual(await getSettings(), { success: true, showVideo: true, position: 'top-left', locale: 'en' })
+    assert.deepEqual(await getSettings(), { showVideo: true, position: 'top-left', locale: 'en' })
   })
 
   await t.test('invalid and unknown fields are a 400 that names them, and nothing is applied', async () => {

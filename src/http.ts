@@ -4,7 +4,7 @@ import { getSettings } from './settings.js'
 import { translateErrorCode } from './i18n.js'
 
 export function ok<T extends object>(res: Response, data: T, status = 200): void {
-  const body: ApiOk<T> = { success: true, ...data }
+  const body: ApiOk<T> = { success: true, data }
   res.status(status).json(body)
 }
 

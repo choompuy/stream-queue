@@ -58,12 +58,7 @@ export function getErrorMessage(code, t) {
   return `Error code ${code}`
 }
 
-const ERROR_CODE_KEY_OVERRIDES = {
-  INVALID_REQUEST: 'api.errors.usernameRequired'
-}
-
 function codeToI18nKey(code) {
-  if (ERROR_CODE_KEY_OVERRIDES[code]) return ERROR_CODE_KEY_OVERRIDES[code]
   const camel = code.toLowerCase().replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase())
   return `api.errors.${camel}`
 }

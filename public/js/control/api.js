@@ -24,23 +24,23 @@ async function request(url, options = {}) {
     throw new ApiError('Network error', { code: 'NETWORK_ERROR', cause })
   }
 
-  let data = null
+  let body = null
 
   try {
-    data = await response.json()
+    body = await response.json()
   } catch {
     // Empty/non-JSON response
   }
 
   if (!response.ok) {
-    throw new ApiError(data?.error || `Request failed: ${response.status}`, {
+    throw new ApiError(body?.error || `Request failed: ${response.status}`, {
       status: response.status,
-      code: data?.code,
-      params: data?.params
+      code: body?.code,
+      params: body?.params
     })
   }
 
-  return data
+  return body?.data ?? null
 }
 
 const post = (url, body) => request(url, { method: 'POST', ...(body !== undefined && { body: JSON.stringify(body) }) })

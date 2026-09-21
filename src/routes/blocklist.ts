@@ -14,7 +14,7 @@ router.post('/', (req, res) => {
   const { videoId, title } = req.body ?? {}
 
   if (!isValidVideoId(videoId)) {
-    return fail(res, 'a valid videoId is required', 'INVALID_REQUEST', 400)
+    return fail(res, 'a valid videoId is required', 'INVALID_VIDEO_ID', 400)
   }
 
   const entry = blockTrack(videoId, typeof title === 'string' ? title : videoId)

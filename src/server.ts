@@ -9,10 +9,12 @@ import { findAvailablePort } from './port.js'
 import { ok, fail } from './http.js'
 import { getSettings } from './settings.js'
 import { getAppRoot } from './runtime.js'
-import { getState, moveToNext } from './player.js'
+import { getState } from './player.js'
 import { initState } from './state-file.js'
 import { flushAllStores } from './persist.js'
-import { refreshFallback } from './fallback.js'
+import { runStartupTasks } from './startup.js'
+import { errorHandler, ForbiddenOriginError } from './error-handler.js'
+import { localOnly } from './local-only.js'
 
 import { router as settingsRouter } from './routes/settings.js'
 import { router as playlistsRouter } from './routes/playlists.js'
@@ -45,7 +47,7 @@ app.use(
         // not a valid origin - fall through to rejection below
       }
 
-      callback(new Error('Not allowed by CORS'))
+      callback(new ForbiddenOriginError())
     }
   })
 )
@@ -95,7 +97,7 @@ app.use('/api/player', playerRouter)
 app.use('/api/fallback', fallbackRouter)
 app.use('/api/chat', chatRouter)
 
-app.post('/api/shutdown', (_req, res) => {
+app.post('/api/shutdown', localOnly, (_req, res) => {
   res.on('finish', () => {
     flushAllStores()
       .catch((error) => console.error('[SHUTDOWN] Flush failed:', error instanceof Error ? error.message : error))
@@ -108,10 +110,7 @@ app.use('/api', (_req, res) => {
   fail(res, 'API endpoint not found', 'NOT_FOUND', 404)
 })
 
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  log(`[ERROR] ${err.message}`)
-  fail(res, 'internal server error', 'SERVER_ERROR', 500)
-})
+app.use(errorHandler)
 
 function openBrowser(url: string): void {
   if (process.platform === 'win32') {
@@ -128,15 +127,22 @@ function openBrowser(url: string): void {
 }
 
 async function main() {
+  // a stray rejected promise must not stop the music mid-stream: log it and carry on
+  process.on('unhandledRejection', (reason) => {
+    console.error('[UNHANDLED REJECTION]', reason instanceof Error ? (reason.stack ?? reason.message) : reason)
+  })
+
   initState()
   PORT = await findAvailablePort(3000)
 
-  app.listen(PORT, async () => {
+  const server = app.listen(PORT, () => {
     log(`Server running on http://localhost:${PORT}`)
-    await refreshFallback()
-    if (!getState().current) {
-      moveToNext()
-    }
+    void runStartupTasks()
+  })
+
+  server.on('error', (error) => {
+    console.error('[FATAL] Server error:', error.message)
+    process.exit(1)
   })
 }
 

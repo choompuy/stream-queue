@@ -58,7 +58,7 @@ for (const locale of LOCALES) {
   test(`client and server resolve every API error code identically ("${locale}")`, async () => {
     await client.loadTranslations(locale)
 
-    const codes = new Set(['INVALID_REQUEST'])
+    const codes = new Set<string>()
     for (const [key] of leaves(readLocale(locale).api?.errors ?? {})) {
       codes.add(key.replace(/([A-Z])/g, '_$1').toUpperCase())
     }

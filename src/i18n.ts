@@ -49,12 +49,7 @@ export function translateWithFallback(key: string, params: Record<string, string
   return t(getSettings().locale, key, params) ?? fallback
 }
 
-const ERROR_CODE_KEY_OVERRIDES: Record<string, string> = {
-  INVALID_REQUEST: 'api.errors.usernameRequired'
-}
-
 function codeToI18nKey(code: string): string {
-  if (ERROR_CODE_KEY_OVERRIDES[code]) return ERROR_CODE_KEY_OVERRIDES[code]
   const camel = code.toLowerCase().replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase())
   return `api.errors.${camel}`
 }

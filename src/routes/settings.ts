@@ -1,6 +1,7 @@
 import express from 'express'
 import { ConfigResponse, SettingsResponse, SecretsResponse } from '../types.js'
 import { ok, fail, failFromError, asyncHandler } from '../http.js'
+import { localOnly } from '../local-only.js'
 import { getConfig, updateConfig, restoreConfig, validateConfigUpdates } from '../config.js'
 import { getSettings, updateSettings, validateSettingsUpdates } from '../settings.js'
 import { getPublicSecretsView, updateSecrets } from '../secrets.js'
@@ -99,7 +100,7 @@ router.get('/secrets', (_req, res) => {
   ok<SecretsResponse>(res, getPublicSecretsView())
 })
 
-router.put('/secrets', (req, res) => {
+router.put('/secrets', localOnly, (req, res) => {
   updateSecrets(req.body ?? {})
   ok<SecretsResponse>(res, getPublicSecretsView())
 })
