@@ -125,21 +125,22 @@ export class AppError extends Error {
 export type StateResponse = PlayerState & { nextTrack: QueueItem | null }
 export type PlayerActionResponse = StateResponse & { message: string }
 export type SettingsResponse = Settings
-export type OverlayStateResponse = { state: PlayerState; settings: Settings }
+export type OverlayStateResponse = { state: StateResponse; settings: Settings }
 export type ConfigResponse = Config
 export type SearchResponse = { results: Song[] }
-export type QueueRequestResponse = {
+export type AddedSong = {
   song: QueueItem
   started: boolean
   position: number
-  state: PlayerState
 }
+export type QueueRequestResponse = AddedSong & { state: StateResponse; message: string }
+export type FallbackEnqueueResponse = { song: QueueItem; state: StateResponse }
 export type FallbackStateResponse = FallbackPlaylist & {
   lastRefreshedAt: number | null
   upNext: Song[]
   sourceCount: number
   activeVideoId: string | null
 }
-export type QueueRemoveResponse = { removed: QueueItem; state: PlayerState }
+export type QueueRemoveResponse = { removed: QueueItem; state: StateResponse }
 export type SecretsResponse = { youtubeApiKey: string; hasYoutubeApiKey: boolean }
 export type ActivityResponse = { entries: ActivityEntry[] }

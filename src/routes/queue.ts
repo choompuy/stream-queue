@@ -1,5 +1,5 @@
 import express from 'express'
-import { StateResponse, QueueRemoveResponse } from '../types.js'
+import { StateResponse, QueueRemoveResponse, QueueRequestResponse } from '../types.js'
 import { ok, fail, failFromError, asyncHandler } from '../http.js'
 import { translateWithFallback } from '../i18n.js'
 import { requestSong, removeAt, clearQueue } from '../queue.js'
@@ -31,15 +31,11 @@ router.post(
       case 'error':
         return failFromError(res, result.error)
       case 'added': {
-        const { response } = result
-        const message = response.started
-          ? translateWithFallback('toast.nowPlaying', { title: response.song.title }, `Now playing: ${response.song.title}`)
-          : translateWithFallback(
-              'toast.addedToQueue',
-              { title: response.song.title, position: response.position },
-              `Added to queue: ${response.song.title} [#${response.position}]`
-            )
-        return ok(res, { ...response, message }, 201)
+        const { added } = result
+        const message = added.started
+          ? translateWithFallback('toast.nowPlaying', { title: added.song.title }, `Now playing: ${added.song.title}`)
+          : translateWithFallback('toast.addedToQueue', { title: added.song.title, position: added.position }, `Added to queue: ${added.song.title} [#${added.position}]`)
+        return ok<QueueRequestResponse>(res, { ...added, state: getState(), message }, 201)
       }
     }
   })

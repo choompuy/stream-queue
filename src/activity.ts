@@ -1,4 +1,4 @@
-import { ActivityEntry } from './types.js'
+import { ActivityEntry, ActivityReasonCode, QueueItem } from './types.js'
 import { ACTIVITY_PATH, createFileStore } from './persist.js'
 
 const ACTIVITY_LIMIT = 100
@@ -33,4 +33,39 @@ export function clearActivity(): void {
   activityLog.length = 0
   save()
   log('cleared')
+}
+
+type ReasonParams = Record<string, string | number>
+
+export function logRejection(
+  requestedBy: string,
+  query: string,
+  reasonCode: ActivityReasonCode,
+  options: { title?: string | null; videoId?: string | null; reasonParams?: ReasonParams } = {}
+): void {
+  logActivity({
+    requestedBy,
+    query,
+    title: options.title ?? null,
+    videoId: options.videoId ?? null,
+    status: 'rejected',
+    reasonCode,
+    reasonParams: options.reasonParams
+  })
+}
+
+export function logAcceptance(requestedBy: string, query: string, title: string, videoId: string): void {
+  logActivity({ requestedBy, query, title, videoId, status: 'accepted', reasonCode: null })
+}
+
+export function logFailure(item: QueueItem, reasonCode: ActivityReasonCode, reasonParams?: ReasonParams): void {
+  logActivity({
+    requestedBy: item.requestedBy,
+    query: item.title,
+    title: item.title,
+    videoId: item.videoId,
+    status: 'failed',
+    reasonCode,
+    reasonParams
+  })
 }

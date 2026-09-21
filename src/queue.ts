@@ -1,31 +1,10 @@
 import { getConfig } from './config.js'
 import { getVideoById, searchSongs, selectBestSong } from './youtube/index.js'
 import { parseYouTubeUrl } from './youtube/url.js'
-import { logActivity } from './activity.js'
-import { QueueItem, Song, PlayerState, AppError, QueueRequestResponse, ActivityReasonCode } from './types.js'
+import { logRejection, logAcceptance } from './activity.js'
+import { QueueItem, Song, AppError, AddedSong } from './types.js'
 import { isBlocked } from './blocklist.js'
 import { notifyStateChange } from './state-events.js'
-
-function logRejection(
-  requestedBy: string,
-  query: string,
-  reasonCode: ActivityReasonCode,
-  options: { title?: string | null; videoId?: string | null; reasonParams?: Record<string, string | number> } = {}
-): void {
-  logActivity({
-    requestedBy,
-    query,
-    title: options.title ?? null,
-    videoId: options.videoId ?? null,
-    status: 'rejected',
-    reasonCode,
-    reasonParams: options.reasonParams
-  })
-}
-
-function logAcceptance(requestedBy: string, query: string, title: string, videoId: string): void {
-  logActivity({ requestedBy, query, title, videoId, status: 'accepted', reasonCode: null })
-}
 
 let currentSong: QueueItem | null = null
 const queue: QueueItem[] = []
@@ -207,7 +186,7 @@ export function clearQueue(): QueueItem[] {
 export type RequestSongResult =
   | { outcome: 'invalid-url' }
   | { outcome: 'not-found' }
-  | { outcome: 'added'; response: QueueRequestResponse }
+  | { outcome: 'added'; added: AddedSong }
   | { outcome: 'error'; error: unknown }
 
 export async function requestSong(query: string, requestedBy: string, bypassFilters: boolean): Promise<RequestSongResult> {
@@ -254,12 +233,8 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
     logAcceptance(requestedBy, query, song.title, song.videoId)
 
     const position = wasEmpty ? 0 : queue.length
-    const state: PlayerState = { current: currentSong, queue: getQueue(), isPaused }
 
-    return {
-      outcome: 'added',
-      response: { song: item, started: wasEmpty, position, state }
-    }
+    return { outcome: 'added', added: { song: item, started: wasEmpty, position } }
   } catch (error) {
     log(`[REJECT] ${requestedBy} → error while adding song`)
     const reasonCode = error instanceof AppError ? error.code : 'SERVER_ERROR'

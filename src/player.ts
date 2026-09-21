@@ -1,6 +1,6 @@
-import { PlayerState, QueueItem, ActivityReasonCode } from './types.js'
+import { StateResponse, QueueItem, ActivityReasonCode } from './types.js'
 import { isBlocked } from './blocklist.js'
-import { logActivity } from './activity.js'
+import { logRejection, logFailure } from './activity.js'
 import { getQueue, getCurrent, getIsPaused, setCurrent, shiftQueue } from './queue.js'
 import { peekNextFallbackTrack, advanceFallback } from './fallback.js'
 
@@ -8,27 +8,11 @@ function log(message: string): void {
   console.log(`[PLAYER] ${message}`)
 }
 
-function logRejection(requestedBy: string, query: string, reasonCode: ActivityReasonCode, videoId: string): void {
-  logActivity({ requestedBy, query, title: query, videoId, status: 'rejected', reasonCode })
-}
-
-function logFailure(item: QueueItem, reasonCode: ActivityReasonCode, reasonParams?: Record<string, string | number>): void {
-  logActivity({
-    requestedBy: item.requestedBy,
-    query: item.title,
-    title: item.title,
-    videoId: item.videoId,
-    status: 'failed',
-    reasonCode,
-    reasonParams
-  })
-}
-
 export function getNextTrack(): QueueItem | null {
   return getQueue().find((item) => !isBlocked(item.videoId)) ?? peekNextFallbackTrack()
 }
 
-export function getState(): PlayerState & { nextTrack: QueueItem | null } {
+export function getState(): StateResponse {
   return {
     current: getCurrent(),
     queue: getQueue(),
@@ -42,7 +26,7 @@ export function moveToNext(): QueueItem | null {
 
   while (next && isBlocked(next.videoId)) {
     log(`skipped blocked track in queue: "${next.title}"`)
-    logRejection(next.requestedBy, next.title, 'BLOCKED', next.videoId)
+    logRejection(next.requestedBy, next.title, 'BLOCKED', { title: next.title, videoId: next.videoId })
     next = shiftQueue()
   }
 
