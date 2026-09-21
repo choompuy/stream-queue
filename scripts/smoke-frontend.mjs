@@ -59,7 +59,8 @@ globalThis.fetch = async (url, options = {}) => {
   let result = handler(options.body ? JSON.parse(options.body) : undefined)
   let status = 200
   if (Array.isArray(result)) [status, result] = result
-  return { ok: status < 400, status, json: async () => result }
+  const body = status < 400 ? { success: true, data: result } : { success: false, ...result }
+  return { ok: status < 400, status, json: async () => body }
 }
 
 const errors = []
