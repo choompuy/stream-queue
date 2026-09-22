@@ -37,7 +37,7 @@ function jsFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name)
     if (entry.isDirectory()) return jsFiles(path)
-    return entry.name.endsWith('.js') ? [path] : []
+    return entry.name.endsWith('.js') && !entry.name.endsWith('.test.js') ? [path] : []
   })
 }
 
