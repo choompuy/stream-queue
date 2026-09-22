@@ -1,6 +1,7 @@
 import express from 'express'
 import { StateResponse, QueueRemoveResponse, QueueRequestResponse } from '../types.js'
 import { ok, fail, failFromError, asyncHandler } from '../http.js'
+import { isLoopbackAddress } from '../local-only.js'
 import { translateWithFallback } from '../i18n.js'
 import { requestSong, removeAt, clearQueue } from '../queue.js'
 import { getState } from '../player.js'
@@ -11,7 +12,7 @@ router.post(
   '/request',
   asyncHandler(async (req, res) => {
     const { query, requestedBy, admin } = req.body ?? {}
-    const bypassFilters = admin === true
+    const bypassFilters = admin === true && isLoopbackAddress(req.socket.remoteAddress)
 
     if (typeof query !== 'string' || query.trim().length < 2 || query.trim().length > 200) {
       return fail(res, 'query must be between 2 and 200 characters', 'INVALID_QUERY', 400)
@@ -34,7 +35,11 @@ router.post(
         const { added } = result
         const message = added.started
           ? translateWithFallback('toast.nowPlaying', { title: added.song.title }, `Now playing: ${added.song.title}`)
-          : translateWithFallback('toast.addedToQueue', { title: added.song.title, position: added.position }, `Added to queue: ${added.song.title} [#${added.position}]`)
+          : translateWithFallback(
+              'toast.addedToQueue',
+              { title: added.song.title, position: added.position },
+              `Added to queue: ${added.song.title} [#${added.position}]`
+            )
         return ok<QueueRequestResponse>(res, { ...added, state: getState(), message }, 201)
       }
     }
