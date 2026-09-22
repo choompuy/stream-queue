@@ -422,24 +422,31 @@ select {
   margin-left: 1rem;
 }
 
-.row-list .row-item > img.thumbnail:first-child {
-  margin-left: 0;
-}
-
 .row-list .row-index {
+  flex-shrink: 0;
   min-width: 2ch;
   text-align: center;
+  white-space: pre-line;
 }
 
 .row-list .thumbnail {
   border-width: 1px;
   border-color: var(--border);
+  border-style: none solid none solid;
+}
+
+.row-list .row-item > .thumbnail:first-child {
+  margin-left: 0;
   border-style: none solid none none;
 }
 
-.row-list .row-info {
+.row-list .column-info {
   flex: 1;
   min-width: 3rem;
+}
+
+.row-list .column-requested-by {
+  width: 8rem;
 }
 
 /* Dashboard tab */
@@ -514,10 +521,6 @@ select {
 
 .song-search-wrapper.section-panel {
   max-height: 25rem;
-}
-
-.section-panel-queue .row-item .thumbnail {
-  border-style: none solid none solid;
 }
 
 .status-pill {

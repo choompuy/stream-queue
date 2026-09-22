@@ -1,7 +1,7 @@
 import { escapeHtml, translateErrorCode, youtubeThumbnail } from '../../shared.js'
 import { t } from '../../i18n.js'
 import { dom } from '../state.js'
-import { formatRelativeTime } from '../ui.js'
+import { formatDateTime } from '../ui.js'
 import { blockTrackItem, createListView, row, rowMenu, statusPill } from './primitives.js'
 
 const STATUS_LABEL_KEYS = {
@@ -12,10 +12,7 @@ const STATUS_LABEL_KEYS = {
 
 export const activityView = createListView(dom.activityListWrapper, {
   getKey: (items) => {
-    // relative timestamps ("5 minutes ago") must be re-rendered as time passes
-    const minute = Math.floor(Date.now() / 60000)
     return [
-      minute,
       ...items.map((entry) => [entry.at, entry.status, entry.title, entry.videoId, entry.query, entry.requestedBy, entry.reasonCode].join(':'))
     ].join('|')
   },
@@ -23,19 +20,17 @@ export const activityView = createListView(dom.activityListWrapper, {
     const title = entry.title || entry.query
 
     return row({
+      index: formatDateTime(entry.at, '\n'),
       thumbnail: entry.videoId ? youtubeThumbnail(entry.videoId) : '',
       title,
       subtitle: translateErrorCode(t, entry.reasonCode, entry.reasonParams),
       extra: `
         ${statusPill(t(STATUS_LABEL_KEYS[entry.status] ?? STATUS_LABEL_KEYS.rejected), entry.status)}
-        <div class="text-sm text-green">
+        <span class="column-requested-by text-sm text-green truncate">
           @${escapeHtml(entry.requestedBy)}
-        </div>
-        <div class="text-sm text-secondary">
-          ${formatRelativeTime(entry.at)}
-        </div>
+        </span>
       `,
-      actions: entry.videoId ? rowMenu([blockTrackItem(entry.videoId, title)]) : ''
+      actions: entry.videoId ? rowMenu([blockTrackItem(entry.videoId, title)]) : '<span class="btn-sm"></span>'
     })
   }
 })

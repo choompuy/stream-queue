@@ -19,7 +19,7 @@ test('dataAttributes', async (t) => {
 test('row', async (t) => {
   await t.test('escapes title/subtitle and includes thumbnail/meta/actions', () => {
     const html = row({
-      index: 2,
+      index: 3,
       thumbnail: 'https://example.com/x.jpg',
       title: '<script>x</script>',
       subtitle: 'Some Channel',

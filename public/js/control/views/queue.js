@@ -9,13 +9,13 @@ export const queueView = createListView(dom.queueListWrapper, {
     items.map((item) => [item.videoId, item.requestedBy, item.title, item.thumbnail, item.duration, item.isBlocked].join(':')).join('|'),
   renderRow: (item, index) =>
     row({
-      index,
+      index: index + 1,
       thumbnail: item.thumbnail,
       title: item.title,
       subtitle: item.channelTitle,
       extra: `
         ${item.isBlocked ? statusPill(t('blocklist.blockedLabel'), 'rejected') : ''}
-        <span class="text-sm text-green">
+        <span class="column-requested-by text-sm text-green truncate">
           @${escapeHtml(item.requestedBy)}
         </span>
       `,

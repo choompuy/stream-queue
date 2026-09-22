@@ -44,6 +44,11 @@ export const BLOCK_ICON = (size) => `
     />
   </svg>
 `
+export const UNBLOCK_ICON = (size) => `
+  <svg xmlns="http://www.w3.org/2000/svg" width="${size || 20}" height="${size || 20}" fill="none" viewBox="0 0 24 24">
+    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h8m5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0" />
+  </svg>
+`
 
 export const MORE_ICON = (size) => `
   <svg xmlns="http://www.w3.org/2000/svg" width="${size || 20}" height="${size || 20}" fill="currentColor" viewBox="0 0 24 24">

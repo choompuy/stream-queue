@@ -1,5 +1,5 @@
 import { escapeHtml } from '../../shared.js'
-import { BLOCK_ICON, MORE_ICON, PLUS_ICON } from '../../icons.js'
+import { BLOCK_ICON, MORE_ICON, PLUS_ICON, UNBLOCK_ICON } from '../../icons.js'
 import { t } from '../../i18n.js'
 
 export function createListView(wrapper, { renderRow, getKey, cache = true }) {
@@ -69,15 +69,15 @@ export function dataAttributes(data = {}) {
 export function row({ index, thumbnail, title, subtitle, meta = '', extra = '', actions = '', className = '', attributes = '' }) {
   return `
     <div class="row-item ${className}" ${attributes}>
-      ${index != null ? `<span class="row-index text-sm text-secondary text-bold">${index + 1}</span>` : ''}
+      ${index != null ? `<span class="row-index text-sm text-secondary text-bold">${index}</span>` : ''}
       ${thumbnail ? `<img src="${escapeHtml(thumbnail)}" class="thumbnail" alt="${escapeHtml(title)}">` : ''}
-      <div class="row-info">
+      <div class="column-info">
         <div class="text-sm text-primary truncate">${escapeHtml(title)}</div>
         ${subtitle ? `<div class="text-xs text-secondary truncate">${escapeHtml(subtitle)}</div>` : ''}
       </div>
       ${extra}
       ${meta ? `<span class="text-sm text-secondary">${meta}</span>` : ''}
-      ${actions ? actions : ''}
+      ${actions}
     </div>
   `
 }
@@ -100,11 +100,11 @@ export function rowMenu(items) {
         ${items
           .map(
             (item) => `
-          <button class="row-menu-item btn btn-sm btn-secondary${item.danger ? ' btn-danger' : ''}" role="menuitem" data-action="${item.action}"${dataAttributes(item.data)}>
-            <span>${item.label}</span>
-            <span class="row-menu-icon">${item.icon ? item.icon(20) : ''}</span>
-          </button>
-        `
+              <button class="row-menu-item btn btn-sm btn-secondary${item.danger ? ' btn-danger' : ''}" role="menuitem" data-action="${item.action}"${dataAttributes(item.data)}>
+                <span>${item.label}</span>
+                <span class="row-menu-icon">${item.icon ? item.icon(20) : ''}</span>
+              </button>
+            `
           )
           .join('')}
       </div>
@@ -129,6 +129,6 @@ export const unblockTrackItem = (videoId) => `
     data-video-id="${escapeHtml(videoId)}"
     title="${t('blocklist.unblock')}"
   >
-    ${PLUS_ICON()}
+    ${UNBLOCK_ICON()}
   </button>
 `

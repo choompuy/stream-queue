@@ -6,8 +6,9 @@ import { blockTrackItem, createListView, dataAttributes, row, rowMenu, statusPil
 
 export const fallbackView = createListView(dom.fallbackListWrapper, {
   getKey: (items) => items.map((item) => `${item.videoId}:${item.isBlocked}:${item.isActive}`).join('|'),
-  renderRow: (track) =>
+  renderRow: (track, index) =>
     row({
+      index: index + 1,
       className: track.isActive ? 'row-active' : '',
       attributes: dataAttributes({ videoId: track.videoId }).trim(),
       thumbnail: track.thumbnail,
