@@ -1,9 +1,16 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { VideoItem } from './types.js'
-import { isAvailableInRegion, getFilterFailureReason, throwFilterError } from './client.js'
-import { updateConfig } from '../config.js'
-import { AppError, Song } from '../types.js'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import type { VideoItem } from './types.js'
+import { AppError, type Song } from '../types.js'
+
+// updateConfig() saves to data/config.json under the working directory: use a throwaway one, not the real one
+process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
+
+const { isAvailableInRegion, getFilterFailureReason, throwFilterError } = await import('./client.js')
+const { updateConfig } = await import('../config.js')
 
 function baseSong(overrides: Partial<Song> = {}): Song {
   return {

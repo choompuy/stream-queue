@@ -43,6 +43,10 @@ const routes = {
     return stateOverride ?? { current: track('a'), queue: [track('b'), track('c')], isPaused: false, nextTrack: null }
   },
   'GET /api/fallback': () => ({ upNext: [track('e'), track('f')], activeVideoId: V('f'), lastRefreshedAt: Date.now(), sourceCount: 2, shuffle: false, repeat: true, enabled: true }),
+  [`DELETE /api/blocklist/${V('c')}`]: () => {
+    blocklist = blocklist.filter((entry) => entry.videoId !== V('c'))
+    return {}
+  },
   'POST /api/blocklist': (body) => {
     blocklist = [{ videoId: body.videoId, title: body.title, blockedAt: Date.now() }, ...blocklist]
     return [201, { entry: blocklist[0] }]
@@ -86,10 +90,11 @@ check('queue rows rendered with blocked pill on the blocked one', () => {
   assert.equal(rows[0].querySelector('.status-pill'), null)
   assert.ok(rows[1].querySelector('.status-pill'))
 })
-check('queue menu: blocked row offers unblock, normal row offers block', () => {
+check('queue rows: a normal row has a menu (block, remove), a blocked row a dedicated unblock button', () => {
   const rows = $$('#queueListWrapper .row-item')
   assert.deepEqual([...rows[0].querySelectorAll('.row-menu-item')].map((b) => b.dataset.action), ['block-track', 'queue-remove'])
-  assert.deepEqual([...rows[1].querySelectorAll('.row-menu-item')].map((b) => b.dataset.action), ['unblock-track', 'queue-remove'])
+  assert.equal(rows[1].querySelector('.row-menu'), null)
+  assert.equal(rows[1].querySelector('[data-action="unblock-track"]')?.dataset.videoId, V('c'))
 })
 check('menu items have role=menuitem, toggles have aria-expanded=false', () => {
   assert.ok($$('.row-menu-item').every((b) => b.getAttribute('role') === 'menuitem'))
@@ -153,6 +158,19 @@ check('block-track posts videoId + title exactly, then reloads blocklist and sta
   assert.ok(toasts().some((m) => m.length > 0))
   assert.equal(blocklist[0].title, 'A $$ "quoted" & <b>')
   assert.equal($$('#blocklistListWrapper .row-item').length, 2)
+})
+
+// --- unblock from the dedicated button on a blocked queue row
+calls.length = 0
+$('#queueListWrapper [data-action="unblock-track"]').click()
+await tick(); await tick()
+check('unblock-track deletes the entry, reloads the lists and the row becomes a normal one', () => {
+  assert.ok(calls.includes(`DELETE /api/blocklist/${V('c')}`))
+  assert.ok(calls.includes('GET /api/blocklist'))
+  const rows = $$('#queueListWrapper .row-item')
+  assert.equal(rows[1].querySelector('.status-pill'), null)
+  assert.ok(rows[1].querySelector('.row-menu'))
+  assert.equal($('#queueListWrapper [data-action="unblock-track"]'), null)
 })
 
 // --- errors: API error -> toast (translated), silent polling -> no toast
