@@ -180,6 +180,7 @@
       "payloadTooLarge": "Request body is too large",
       "forbiddenOrigin": "This origin is not allowed",
       "localOnly": "This action is only available from the computer the app is running on",
+      "rateLimited": "Too many requests, please wait a moment",
       "invalidLocale": "Invalid locale",
       "invalidPlaylistId": "Invalid playlist ID or URL",
       "playlistNotFound": "Playlist not found",

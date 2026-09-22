@@ -109,3 +109,54 @@ test('"admin" filter bypass', async (t) => {
     })
   })
 })
+
+test('rate limiting', async (t) => {
+  await t.test('POST /api/queue/request: the 11th request in a minute from one address is 429', async () => {
+    await withServer('203.0.113.5', async (base) => {
+      let last: Response | undefined
+      for (let i = 0; i < 11; i++) {
+        last = await fetch(`${base}/queue/request`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: `https://www.youtube.com/watch?v=aaaaaaaaaaa`, requestedBy: `viewer${i}` })
+        })
+      }
+
+      assert.equal(last?.status, 429)
+      const body = (await last!.json()) as Record<string, any>
+      assert.equal(body.code, 'RATE_LIMITED')
+      assert.ok(last?.headers.get('Retry-After'))
+    })
+  })
+
+  await t.test('POST /api/queue/request: a different address is not affected by another one being limited', async () => {
+    await withServer('203.0.113.6', async (base) => {
+      for (let i = 0; i < 10; i++) {
+        await fetch(`${base}/queue/request`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: `https://www.youtube.com/watch?v=aaaaaaaaaaa`, requestedBy: `viewer${i}` })
+        })
+      }
+    })
+
+    await withServer('203.0.113.7', async (base) => {
+      const response = await fetch(`${base}/queue/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: `https://www.youtube.com/watch?v=aaaaaaaaaaa`, requestedBy: 'viewerX' })
+      })
+
+      assert.notEqual(response.status, 429)
+    })
+  })
+
+  await t.test('GET /api/search: the 31st search in a minute from one address is 429', async () => {
+    await withServer('203.0.113.8', async (base) => {
+      let last: Response | undefined
+      for (let i = 0; i < 31; i++) last = await fetch(`${base}/search?q=song${i}`)
+
+      assert.equal(last?.status, 429)
+    })
+  })
+})

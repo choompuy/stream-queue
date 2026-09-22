@@ -2,14 +2,19 @@ import express from 'express'
 import { StateResponse, QueueRemoveResponse, QueueRequestResponse } from '../types.js'
 import { ok, fail, failFromError, asyncHandler } from '../http.js'
 import { isLoopbackAddress } from '../local-only.js'
+import { createRateLimiter } from '../rate-limit.js'
 import { translateWithFallback } from '../i18n.js'
 import { requestSong, removeAt, clearQueue } from '../queue.js'
 import { getState } from '../player.js'
 
 export const router = express.Router()
 
+// generous enough for a real viewer clicking around, tight enough to stop a flood from one address
+const requestLimiter = createRateLimiter({ windowMs: 60_000, max: 10, keyPrefix: 'queue-request' })
+
 router.post(
   '/request',
+  requestLimiter.middleware,
   asyncHandler(async (req, res) => {
     const { query, requestedBy, admin } = req.body ?? {}
     const bypassFilters = admin === true && isLoopbackAddress(req.socket.remoteAddress)

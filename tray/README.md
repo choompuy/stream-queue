@@ -54,10 +54,10 @@ Service/
   public/               <- copy from the repo root
 ```
 
-`data/` and `cache/` are not part of this - they land in
-`%LOCALAPPDATA%\StreamQueue\` automatically (see `src/persist.ts`), not in this
-folder, so this whole folder can be zipped and handed to someone else without
-dragging your own queue/settings along.
+`data/` and `cache/` are created **next to `Service.exe`** (see `src/persist.ts`),
+so this whole folder is self-contained and portable - copy it as-is to move the
+whole setup, but that also means it carries your queue/settings/blocklist along
+if you zip and hand it to someone else.
 
 ## What to actually test on Windows
 
@@ -65,8 +65,8 @@ dragging your own queue/settings along.
   no browser tab popping open on its own (that's intentional - suppressed via
   `STREAMQUEUE_NO_AUTO_OPEN`, see `ServerManager.Start()`).
 - Tray menu "Open panel" - should open the control panel in your default browser.
-- "Open logs folder" - opens `%LOCALAPPDATA%\StreamQueue\logs`, should contain
-  `tray.log` with the server's stdout/stderr, timestamped.
+- "Open logs folder" - opens the `logs/` folder next to `StreamQueue.exe`, should
+  contain `tray.log` with the server's stdout/stderr, timestamped.
 - "Restart server" - stops and starts the child process; check the tray tooltip
   updates with the new port once it's back up.
 - "Exit" - tray icon disappears immediately, `Service.exe` process should be
@@ -81,8 +81,13 @@ dragging your own queue/settings along.
 
 ## Icon
 
-There's no `icon.ico` in this folder. `TrayContext.LoadIcon()` looks for one next
-to the exe and falls back to a generic system icon if it's missing, so the app
-runs fine without one - add your own `icon.ico` next to `StreamQueue.exe`
-whenever you have one (a build-time embedded icon via `<ApplicationIcon>` in the
-.csproj is optional and separate, see the comment there).
+`icon.ico` is included in this folder and wired up in `StreamQueueTray.csproj`
+two ways: `<ApplicationIcon>` embeds it into the exe itself (what you see in
+Explorer/Alt-Tab), and a `<None Update="icon.ico">` item with
+`CopyToOutputDirectory`/`CopyToPublishDirectory` makes both `dotnet build` and
+`dotnet publish` copy the actual file next to the exe - `TrayContext.LoadIcon()`
+reads it from disk at runtime for the tray icon itself, since `NotifyIcon`
+doesn't have access to the embedded resource. `ExcludeFromSingleFile` keeps it
+as a loose file rather than baked into the single-file bundle, which is what
+`LoadIcon()` needs. If you swap in a different `icon.ico`, both of those still
+apply automatically - no csproj changes needed.

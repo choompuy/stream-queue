@@ -1,6 +1,46 @@
 import { Song } from '../types.js'
 
-const OFFICIAL_CHANNEL_KEYWORDS = ['official', 'topic', 'vevo', 'records', 'music', 'audio']
+const OFFICIAL_CHANNEL_KEYWORDS = ['official', 'topic', 'vevo']
+
+// Words that usually mark a title as a *different version* of a song rather than the song itself. Only
+// penalized when the query itself does not ask for that version - someone searching "song remix" should
+// still find the remix
+const VERSION_KEYWORDS = [
+  'remix',
+  'mashup',
+  'bootleg',
+  'edit',
+  'rework',
+  'flip',
+  'cover',
+  'tribute',
+  'karaoke',
+  'instrumental',
+  'acapella',
+  'nightcore',
+  'sped',
+  'slowed',
+  'reverb',
+  'live',
+  'acoustic',
+  'unplugged',
+  'remaster',
+  'remastered',
+  'extended',
+  '8bit',
+  'chipmunk',
+  'reaction',
+  'react',
+  'reacting',
+  'tutorial',
+  'lesson',
+  'review',
+  'lyrics',
+  'lyric'
+]
+const VERSION_KEYWORD_SET = new Set(VERSION_KEYWORDS)
+// "8-bit" normalizes to two words ("8", "bit"); treat that pair as a single unit like the rest of the list
+const VERSION_KEYWORD_PAIRS: Array<[string, string]> = [['8', 'bit']]
 
 export function normalize(value: string): string {
   return value
@@ -20,6 +60,32 @@ export function isoDurationToSeconds(value = ''): number {
   return Number(match[1] ?? 0) * 3600 + Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0)
 }
 
+function unrequestedVersionWordCount(titleWords: string[], queryWordSet: Set<string>): number {
+  let count = 0
+  let skipNext = false
+
+  for (let i = 0; i < titleWords.length; i++) {
+    if (skipNext) {
+      skipNext = false
+      continue
+    }
+
+    const word = titleWords[i]
+    const next = titleWords[i + 1]
+    const pairMatch = next && VERSION_KEYWORD_PAIRS.some(([a, b]) => a === word && b === next)
+
+    if (pairMatch) {
+      if (!queryWordSet.has(word) || !queryWordSet.has(next!)) count++
+      skipNext = true
+      continue
+    }
+
+    if (VERSION_KEYWORD_SET.has(word) && !queryWordSet.has(word)) count++
+  }
+
+  return count
+}
+
 function titleScore(title: string, query: string, channelTitle?: string): number {
   const normalizedTitle = normalize(title)
   const normalizedQuery = normalize(query)
@@ -28,18 +94,31 @@ function titleScore(title: string, query: string, channelTitle?: string): number
     return 0
   }
 
+  const titleWords = normalizedTitle.split(' ')
+  const queryWords = normalizedQuery.split(' ')
+  const queryWordSet = new Set(queryWords)
+  const meaningfulWords = queryWords.filter((word) => word.length >= 2)
+  const versionPenalty = unrequestedVersionWordCount(titleWords, queryWordSet) * 220
+
+  const coverage = normalizedQuery.length / normalizedTitle.length
+  const channelBonus = channelTitle && OFFICIAL_CHANNEL_KEYWORDS.some((keyword) => normalize(channelTitle).includes(keyword)) ? 50 : 0
+
   if (normalizedTitle === normalizedQuery) {
-    return 1500
+    return 1500 - versionPenalty + channelBonus
   }
 
   if (normalizedTitle.includes(normalizedQuery)) {
-    return 1000
+    return 1000 * coverage - versionPenalty + channelBonus
   }
 
-  const queryWords = normalizedQuery.split(' ')
-  const titleWords = new Set(normalizedTitle.split(' '))
-  const meaningfulWords = queryWords.filter((word) => word.length >= 2)
-  const matchedWords = meaningfulWords.filter((word) => titleWords.has(word)).length
+  const titleWordSet = new Set(titleWords)
+  const matchedWords = meaningfulWords.filter((word) => titleWordSet.has(word)).length
+  const allWordsPresent = meaningfulWords.length > 0 && matchedWords === meaningfulWords.length
+
+  if (allWordsPresent) {
+    return 700 * coverage - versionPenalty + channelBonus
+  }
+
   let score = matchedWords * 180
 
   for (const word of meaningfulWords) {
@@ -48,19 +127,7 @@ function titleScore(title: string, query: string, channelTitle?: string): number
     }
   }
 
-  if (meaningfulWords.length > 1 && matchedWords === meaningfulWords.length) {
-    score += 300
-  }
-
-  if (channelTitle) {
-    const normalizedChannel = normalize(channelTitle)
-
-    if (OFFICIAL_CHANNEL_KEYWORDS.some((keyword) => normalizedChannel.includes(keyword))) {
-      score += 50
-    }
-  }
-
-  return score
+  return score - versionPenalty + channelBonus
 }
 
 function popularityScore(views: number): number {
