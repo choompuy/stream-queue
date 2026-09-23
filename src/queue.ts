@@ -86,7 +86,7 @@ function assertCanRequestSong(requestedBy: string, addToQueue: boolean, bypassLi
 
   if (bypassLimits) return
 
-  const activeCount = getUserActiveCount(requestedBy.toLowerCase())
+  const activeCount = getUserActiveCount(requestedBy)
   if (config.maxRequestsPerUser > 0 && activeCount >= config.maxRequestsPerUser) {
     throw new AppError('USER_LIMIT', `you can only queue ${config.maxRequestsPerUser} track(s) at a time`, {
       count: config.maxRequestsPerUser
