@@ -12,8 +12,8 @@
     "dev": "tsx src/server.ts",
     "start": "tsx src/server.ts",
     "test": "npm run test:backend && npm run test:frontend",
-    "test:backend": "tsx --test \"src/**/*.test.ts\"",
-    "test:frontend": "node --test \"public/js/**/*.test.js\"",
+    "test:backend": "tsx --test \"tests/**/*.test.ts\"",
+    "test:frontend": "node --test \"tests/**/*.test.js\"",
     "build": "tsc",
     "build:sea": "node scripts/build-sea.mjs",
     "test:smoke": "node scripts/smoke-frontend.mjs"
