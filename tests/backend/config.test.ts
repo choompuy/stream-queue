@@ -54,6 +54,44 @@ test('validateConfigUpdates()', async (t) => {
   await t.test('refuses a body that is not an object', () => {
     for (const body of [null, 'x', 5, [1, 2]]) assert.deepEqual(validateConfigUpdates(body).rejected, ['body'])
   })
+
+  await t.test('rejects a duration range where min >= max, so filtering could never let a video through', () => {
+    const { clean, rejected } = validateConfigUpdates({ minDurationSeconds: 500, maxDurationSeconds: 60 })
+
+    assert.deepEqual(rejected.sort(), ['maxDurationSeconds', 'minDurationSeconds'])
+    assert.equal('minDurationSeconds' in clean, false)
+    assert.equal('maxDurationSeconds' in clean, false)
+  })
+
+  await t.test('min == max is also rejected (an empty range, nothing could ever fit)', () => {
+    const { rejected } = validateConfigUpdates({ minDurationSeconds: 180, maxDurationSeconds: 180 })
+    assert.deepEqual(rejected.sort(), ['maxDurationSeconds', 'minDurationSeconds'])
+  })
+
+  await t.test('checks a single changed bound against the one already on file, not just against itself', () => {
+    const current = { ...DEFAULTS, minDurationSeconds: 60, maxDurationSeconds: 480 }
+
+    // only sending minDurationSeconds, but it would land above the stored maxDurationSeconds
+    const { clean, rejected } = validateConfigUpdates({ minDurationSeconds: 500 }, current)
+
+    assert.deepEqual(rejected, ['minDurationSeconds'])
+    assert.equal('minDurationSeconds' in clean, false)
+  })
+
+  await t.test('a valid range update leaves other invalid fields in the same request rejected independently', () => {
+    const { clean, rejected } = validateConfigUpdates({ minDurationSeconds: 60, maxDurationSeconds: 480, maxQueueSize: -5 })
+
+    assert.deepEqual(rejected, ['maxQueueSize'])
+    assert.deepEqual(clean, { minDurationSeconds: 60, maxDurationSeconds: 480 })
+  })
+
+  await t.test('a range that is already valid, with neither bound in this update, is not rejected', () => {
+    const current = { ...DEFAULTS, minDurationSeconds: 60, maxDurationSeconds: 480 }
+    const { clean, rejected } = validateConfigUpdates({ minViews: 5000 }, current)
+
+    assert.deepEqual(rejected, [])
+    assert.deepEqual(clean, { minViews: 5000 })
+  })
 })
 
 test('updateConfig()', async (t) => {

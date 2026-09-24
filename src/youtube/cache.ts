@@ -11,7 +11,7 @@ const cache = store.load({
 export const CACHE_LIMITS = {
   VIDEO_CACHE_TTL: 10 * 60 * 1000,
   SEARCH_CACHE_TTL: 3600 * 1000, // 1 hour
-  MAX_DAILY_SEARCHES: 80 // Maximum number of searches allowed per day
+  MAX_DAILY_SEARCHES: 90 // Maximum number of searches allowed per day
 }
 
 const SWEEP_INTERVAL = 60 * 60 * 1000

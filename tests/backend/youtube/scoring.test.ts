@@ -104,11 +104,20 @@ test('formatViews', async (t) => {
 })
 
 test('titleScore ranking (via combinedScore, views/duration held equal unless noted)', async (t) => {
-  const equalPopularity = (title: string, channelTitle?: string) => baseSong({ title, views: 100_000, duration: 200, channelTitle: channelTitle ?? 'Channel' })
+  const equalPopularity = (title: string, channelTitle?: string) =>
+    baseSong({ title, views: 100_000, duration: 200, channelTitle: channelTitle ?? 'Channel' })
 
   await t.test('an unrequested remix/version tag never outranks the plain title, even with far more views', () => {
     const query = 'Never Gonna Give You Up'
-    const official = combinedScore(baseSong({ title: 'Rick Astley - Never Gonna Give You Up (Official Video)', views: 1_500_000_000, duration: 213, channelTitle: 'RickAstleyVEVO' }), query)
+    const official = combinedScore(
+      baseSong({
+        title: 'Rick Astley - Never Gonna Give You Up (Official Video)',
+        views: 1_500_000_000,
+        duration: 213,
+        channelTitle: 'RickAstleyVEVO'
+      }),
+      query
+    )
 
     for (const [title, views] of [
       ['Never Gonna Give You Up (8-Bit Remix)', 80_000_000],
@@ -122,18 +131,32 @@ test('titleScore ranking (via combinedScore, views/duration held equal unless no
   await t.test('when the query itself asks for a version, a title with that same tag is not penalized for it', () => {
     const query = 'Never Gonna Give You Up 8-Bit Remix'
     const remix = combinedScore(baseSong({ title: 'Never Gonna Give You Up (8-Bit Remix)', views: 80_000_000, duration: 190 }), query)
-    const official = combinedScore(baseSong({ title: 'Rick Astley - Never Gonna Give You Up (Official Video)', views: 1_500_000_000, duration: 213, channelTitle: 'RickAstleyVEVO' }), query)
+    const official = combinedScore(
+      baseSong({
+        title: 'Rick Astley - Never Gonna Give You Up (Official Video)',
+        views: 1_500_000_000,
+        duration: 213,
+        channelTitle: 'RickAstleyVEVO'
+      }),
+      query
+    )
 
     assert.ok(remix > official, 'the requested remix should outrank the official upload when the remix was asked for')
   })
 
-  await t.test('a long query: an exact match outranks a cover even when the cover has a version tag spliced into the middle of the matching text', () => {
-    const query = 'Artist Name - Some Very Specific Long Song Title (Official Video)'
-    const exact = combinedScore(baseSong({ title: query, views: 1000, duration: 200 }), query)
-    const cover = combinedScore(baseSong({ title: 'Artist Name - Some Very Specific Long Song Title (Cover by Someone) (Official Video)', views: 500_000, duration: 200 }), query)
+  await t.test(
+    'a long query: an exact match outranks a cover even when the cover has a version tag spliced into the middle of the matching text',
+    () => {
+      const query = 'Artist Name - Some Very Specific Long Song Title (Official Video)'
+      const exact = combinedScore(baseSong({ title: query, views: 1000, duration: 200 }), query)
+      const cover = combinedScore(
+        baseSong({ title: 'Artist Name - Some Very Specific Long Song Title (Cover by Someone) (Official Video)', views: 500_000, duration: 200 }),
+        query
+      )
 
-    assert.ok(exact > cover)
-  })
+      assert.ok(exact > cover)
+    }
+  )
 
   await t.test('at the same title length/coverage, a clean substring beats reordered words, which beats a partial match', () => {
     // same total length in every title, so the tiers are compared at equal "coverage" rather than confounding
@@ -171,5 +194,33 @@ test('titleScore ranking (via combinedScore, views/duration held equal unless no
     const unrelated = combinedScore(baseSong({ title: 'Completely Different Track (Song Remix Cover)', views: 10_000_000, duration: 200 }), query)
 
     assert.ok(exact > unrelated)
+  })
+
+  await t.test(
+    'an official "- Topic" channel that titles the track as just the song name is not penalized for omitting the artist from the title',
+    () => {
+      const query = 'кино спокойная ночь'
+      const officialTopicUpload = equalPopularity('Спокойная ночь', 'Кино - Topic')
+      const liveReupload = equalPopularity('КИНО — Спокойная ночь Live 2021', 'Группа КИНО')
+      const randomChannelReupload = equalPopularity('Кино (Виктор Цой) - Спокойная ночь', 'Валерий Пак')
+
+      const official = combinedScore(officialTopicUpload, query)
+      const live = combinedScore(liveReupload, query)
+      const random = combinedScore(randomChannelReupload, query)
+
+      assert.ok(official > live, 'the official studio upload should beat an unrequested live version of the same song')
+      assert.ok(official > random, "the official studio upload should beat a random channel's reupload of the same song")
+    }
+  )
+
+  await t.test('the channel-name word credit only applies to already-trusted official/topic/vevo channels', () => {
+    const query = 'кино спокойная ночь'
+    const notOfficial = equalPopularity('Спокойная ночь', 'Кино Cover Channel')
+    const wordMatchingOnlyViaTitle = equalPopularity('Кино, Спокойная ночь (кавер)', 'Cover Channel')
+
+    // "Кино Cover Channel" is not an official/topic/vevo channel, so it gets no
+    // credit for "кино" appearing only in its name - it should score no higher
+    // than an unrelated channel whose title happens to contain the same words.
+    assert.ok(combinedScore(notOfficial, query) <= combinedScore(wordMatchingOnlyViaTitle, query))
   })
 })

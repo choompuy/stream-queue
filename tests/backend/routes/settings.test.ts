@@ -65,6 +65,25 @@ test('PUT /api/config', async (t) => {
     assert.equal(response.status, 400)
     assert.equal('notAField' in (await getConfig()), false)
   })
+
+  await t.test('a duration range where min >= max is a 400, not a config that silently rejects every song', async () => {
+    const before = await getConfig()
+    const response = await putConfig({ minDurationSeconds: 500, maxDurationSeconds: 60 })
+    const body = (await response.json()) as Record<string, any>
+
+    assert.equal(response.status, 400)
+    assert.equal(body.code, 'INVALID_CONFIG')
+    assert.deepEqual(body.params.fields.split(', ').sort(), ['maxDurationSeconds', 'minDurationSeconds'])
+    assert.deepEqual(await getConfig(), before)
+  })
+
+  await t.test('changing only one bound is checked against the stored value of the other', async () => {
+    await putConfig({ minDurationSeconds: 60, maxDurationSeconds: 480 })
+
+    const response = await putConfig({ minDurationSeconds: 500 })
+    assert.equal(response.status, 400)
+    assert.equal((await getConfig()).minDurationSeconds, 60)
+  })
 })
 
 test('PUT /api/config and the fallback playlist', async (t) => {

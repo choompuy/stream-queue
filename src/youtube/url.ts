@@ -16,7 +16,7 @@ export function parseYouTubeUrl(input: string): { isYouTube: boolean; videoId: s
     .replace(/^www\./, '')
     .replace(/^m\./, '')
 
-  const isYouTube = hostname === 'youtube.com' || hostname === 'youtube-nocookie.com' || hostname === 'youtu.be'
+  const isYouTube = hostname === 'youtube.com' || hostname === 'youtube-nocookie.com' || hostname === 'youtu.be' || hostname === 'music.youtube.com'
 
   if (!isYouTube) return { isYouTube: false, videoId: null }
 

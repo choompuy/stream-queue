@@ -104,8 +104,11 @@ function validateFallbackPlaylistUpdates(raw: unknown, rejected: string[]): Fall
 /**
  * Pure validation of a config update: returns the part that is safe to apply and the names of everything
  * that was refused (invalid values, unknown fields, malformed nested objects). Nested names are dotted.
+ * `current` is the config the update would be merged onto - needed to check a field against another one
+ * that isn't part of this particular update (e.g. changing only minDurationSeconds still has to make sense
+ * next to the maxDurationSeconds already on file)
  */
-export function validateConfigUpdates(updates: unknown): ConfigValidation {
+export function validateConfigUpdates(updates: unknown, current: Config = config): ConfigValidation {
   const clean: Record<string, unknown> = {}
   const rejected: string[] = []
 
@@ -129,6 +132,20 @@ export function validateConfigUpdates(updates: unknown): ConfigValidation {
     else rejected.push(key)
   }
 
+  const minDuration = 'minDurationSeconds' in clean ? (clean.minDurationSeconds as number) : current.minDurationSeconds
+  const maxDuration = 'maxDurationSeconds' in clean ? (clean.maxDurationSeconds as number) : current.maxDurationSeconds
+
+  if (('minDurationSeconds' in clean || 'maxDurationSeconds' in clean) && minDuration >= maxDuration) {
+    if ('minDurationSeconds' in clean) {
+      rejected.push('minDurationSeconds')
+      delete clean.minDurationSeconds
+    }
+    if ('maxDurationSeconds' in clean) {
+      rejected.push('maxDurationSeconds')
+      delete clean.maxDurationSeconds
+    }
+  }
+
   return { clean: clean as ConfigUpdates, rejected }
 }
 
@@ -140,7 +157,7 @@ export function restoreConfig(snapshot: Config): void {
 
 /** Applies the valid part of `updates` and reports what was refused; the caller decides whether that is an error. */
 export function updateConfig(updates: ConfigUpdates): { config: Config; rejected: string[] } {
-  const { clean, rejected } = validateConfigUpdates(updates)
+  const { clean, rejected } = validateConfigUpdates(updates, config)
   const { fallbackPlaylist, ...rest } = clean
 
   config = {

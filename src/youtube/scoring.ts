@@ -101,7 +101,9 @@ function titleScore(title: string, query: string, channelTitle?: string): number
   const versionPenalty = unrequestedVersionWordCount(titleWords, queryWordSet) * 220
 
   const coverage = normalizedQuery.length / normalizedTitle.length
-  const channelBonus = channelTitle && OFFICIAL_CHANNEL_KEYWORDS.some((keyword) => normalize(channelTitle).includes(keyword)) ? 50 : 0
+  const normalizedChannel = channelTitle ? normalize(channelTitle) : ''
+  const isOfficialChannel = normalizedChannel !== '' && OFFICIAL_CHANNEL_KEYWORDS.some((keyword) => normalizedChannel.includes(keyword))
+  const channelBonus = isOfficialChannel ? 50 : 0
 
   if (normalizedTitle === normalizedQuery) {
     return 1500 - versionPenalty + channelBonus
@@ -112,7 +114,9 @@ function titleScore(title: string, query: string, channelTitle?: string): number
   }
 
   const titleWordSet = new Set(titleWords)
-  const matchedWords = meaningfulWords.filter((word) => titleWordSet.has(word)).length
+  const channelWordSet = isOfficialChannel ? new Set(normalizedChannel.split(' ')) : new Set()
+  const isWordMatched = (word: string) => titleWordSet.has(word) || channelWordSet.has(word)
+  const matchedWords = meaningfulWords.filter(isWordMatched).length
   const allWordsPresent = meaningfulWords.length > 0 && matchedWords === meaningfulWords.length
 
   if (allWordsPresent) {
