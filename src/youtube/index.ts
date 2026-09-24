@@ -117,7 +117,6 @@ function mapValidSongs(videos: VideoItem[], bypassFilters = false): Song[] {
 
 async function performSearch(query: string, bypassFilters: boolean): Promise<Song[]> {
   try {
-    consumeSearchQuota()
     const search = await youtube<{ items: SearchItem[] }>('search', {
       part: 'snippet',
       q: query,
@@ -129,6 +128,7 @@ async function performSearch(query: string, bypassFilters: boolean): Promise<Son
       order: 'relevance',
       safeSearch: 'moderate'
     })
+    consumeSearchQuota()
 
     const ids = (search.items ?? []).map((item) => item.id?.videoId).filter((id): id is string => Boolean(id))
     console.log(`[SEARCH] Found ${ids.length} candidates`)
