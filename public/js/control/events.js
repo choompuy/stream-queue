@@ -1,4 +1,4 @@
-import { dom } from './state.js'
+import { CONFIG_FIELDS, dom } from './state.js'
 import { switchPageTab, switchSection } from './tabs.js'
 import { dispatchAction } from './actions.js'
 import { bindMenus } from './menu.js'
@@ -38,4 +38,31 @@ export function bindEvents() {
   dom.badgePosition?.addEventListener('change', saveOverlaySettings)
   dom.selectIp?.addEventListener('change', onIpChange)
   dom.localeSelect?.addEventListener('change', (event) => changeLocale(event.target.value))
+
+  const settingsInputs = [
+    dom.cfgMinViews,
+    dom.cfgMinDuration,
+    dom.cfgMaxDuration,
+    dom.cfgMaxQueue,
+    dom.cfgMaxPerUser,
+    dom.cfgRegionCode,
+    dom.cfgAllowShorts,
+    dom.cfgAllowLiveStreams,
+    dom.secYoutubeKey,
+    dom.showVideo,
+    dom.badgePosition,
+    dom.localeSelect
+  ]
+
+  settingsInputs.forEach((input) => {
+    if (input) {
+      input.addEventListener('input', () => input.classList.remove('error'))
+      input.addEventListener('change', () => input.classList.remove('error'))
+    }
+  })
+
+  const configFields = CONFIG_FIELDS.map((f) => dom[f.dom]).filter(Boolean)
+  configFields.forEach((input) => {
+    input.addEventListener('focus', () => input.classList.remove('error'))
+  })
 }

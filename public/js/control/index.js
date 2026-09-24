@@ -24,7 +24,10 @@ async function init() {
   const locale = localeData?.locale
 
   await initI18n(locale)
-  if (dom.localeSelect) dom.localeSelect.value = locale ?? dom.localeSelect.value
+  if (dom.localeSelect) {
+    dom.localeSelect.classList.remove('error')
+    dom.localeSelect.value = locale ?? dom.localeSelect.value
+  }
 
   bindEvents()
 

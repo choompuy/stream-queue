@@ -1,5 +1,5 @@
 import { escapeHtml } from '../shared.js'
-import { api } from './api.js'
+import { api, ApiError } from './api.js'
 import { state, dom, log, CONFIG_FIELDS } from './state.js'
 import { run } from './run.js'
 import { syncPlayer } from './player.js'
@@ -19,17 +19,40 @@ export function loadOverlaySettings() {
   return run('loading settings', async () => {
     state.settings = await api.getSettings()
 
-    if (dom.showVideo) dom.showVideo.checked = Boolean(state.settings.showVideo)
-    if (dom.badgePosition) dom.badgePosition.value = state.settings.position || 'bottom-right'
+    if (dom.showVideo) {
+      dom.showVideo.classList.remove('error')
+      dom.showVideo.checked = Boolean(state.settings.showVideo)
+    }
+    if (dom.badgePosition) {
+      dom.badgePosition.classList.remove('error')
+      dom.badgePosition.value = state.settings.position || 'bottom-right'
+    }
   })
 }
 
 export function saveOverlaySettings() {
   return run('saving settings', async () => {
-    state.settings.showVideo = dom.showVideo.checked
-    state.settings.position = dom.badgePosition ? dom.badgePosition.value : state.settings.position
-    await api.updateSettings(state.settings)
-    syncPlayer()
+    if (dom.showVideo) dom.showVideo.classList.remove('error')
+    if (dom.badgePosition) dom.badgePosition.classList.remove('error')
+
+    try {
+      state.settings.showVideo = dom.showVideo.checked
+      state.settings.position = dom.badgePosition ? dom.badgePosition.value : state.settings.position
+      await api.updateSettings(state.settings)
+      syncPlayer()
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'INVALID_SETTINGS' && error.params?.fields) {
+        const rejectedFields = error.params.fields.split(', ')
+
+        if (rejectedFields.includes('showVideo') && dom.showVideo) {
+          dom.showVideo.classList.add('error')
+        }
+        if (rejectedFields.includes('position') && dom.badgePosition) {
+          dom.badgePosition.classList.add('error')
+        }
+      }
+      throw error
+    }
   })
 }
 
@@ -108,6 +131,7 @@ export function loadConfig() {
     for (const field of CONFIG_FIELDS) {
       const input = dom[field.dom]
       if (!input) continue
+      input.classList.remove('error')
 
       const value = field.path ? state.config[field.path]?.[field.key] : state.config[field.key]
 
@@ -133,6 +157,7 @@ export async function saveConfigSetting() {
   for (const field of CONFIG_FIELDS) {
     const input = dom[field.dom]
     if (!input) continue
+    input.classList.remove('error')
 
     let value
 
@@ -151,17 +176,34 @@ export async function saveConfigSetting() {
   const youtubeApiKey = dom.secYoutubeKey.value.trim()
 
   await run('saving config', async () => {
-    state.config = await api.updateConfig(config)
+    try {
+      state.config = await api.updateConfig(config)
 
-    if (youtubeApiKey) {
-      await api.updateSecrets({ youtubeApiKey })
-      dom.secYoutubeKey.value = ''
-      await loadSecrets()
+      if (youtubeApiKey) {
+        await api.updateSecrets({ youtubeApiKey })
+        dom.secYoutubeKey.value = ''
+        await loadSecrets()
+      }
+
+      renderQueue()
+      renderPlaylists()
+      toastSuccess(t('toast.settingsSaved'))
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'INVALID_CONFIG' && error.params?.fields) {
+        const rejectedFields = error.params.fields.split(', ')
+
+        for (const field of CONFIG_FIELDS) {
+          const input = dom[field.dom]
+          if (!input) continue
+
+          const fieldName = field.key
+          if (rejectedFields.includes(fieldName)) {
+            input.classList.add('error')
+          }
+        }
+      }
+      throw error
     }
-
-    renderQueue()
-    renderPlaylists()
-    toastSuccess(t('toast.settingsSaved'))
   })
 }
 
