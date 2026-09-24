@@ -3,12 +3,16 @@ import assert from 'node:assert/strict'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { TwitchTokenData, TwitchUserInfo } from '../../src/integrations/twitch/types.js'
 
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
 const { getSecrets, updateSecrets, getPublicSecretsView } = await import('../../src/secrets.js')
 
-beforeEach(() => updateSecrets({ youtubeApiKey: ' ' })) // reset: a whitespace-only value is ignored, see below
+beforeEach(() => {
+  updateSecrets({ youtubeApiKey: ' ' }) // reset: a whitespace-only value is ignored, see below
+  updateSecrets({ twitchTokenData: null, twitchUserInfo: null, twitchConnectedAt: null })
+})
 
 test('updateSecrets()', async (t) => {
   await t.test('sets the key, trimmed', () => {
@@ -32,8 +36,40 @@ test('updateSecrets()', async (t) => {
     assert.equal(getSecrets().youtubeApiKey, 'kept-key')
   })
 
+  await t.test('can update Twitch token data', () => {
+    const tokenData: TwitchTokenData = {
+      accessToken: 'test_access_token',
+      refreshToken: 'test_refresh_token',
+      expiresAt: Date.now() + 3600000,
+      scope: ['channel:read:subscriptions']
+    }
+    updateSecrets({ twitchTokenData: tokenData })
+    assert.equal(getSecrets().twitchTokenData?.accessToken, 'test_access_token')
+  })
+
+  await t.test('can update Twitch user info', () => {
+    const userInfo: TwitchUserInfo = {
+      id: '12345',
+      login: 'testuser',
+      displayName: 'TestUser',
+      profileImageUrl: 'https://example.com/avatar.jpg'
+    }
+    updateSecrets({ twitchUserInfo: userInfo })
+    assert.equal(getSecrets().twitchUserInfo?.displayName, 'TestUser')
+  })
+
+  await t.test('can update Twitch connection timestamp', () => {
+    const timestamp = Date.now()
+    updateSecrets({ twitchConnectedAt: timestamp })
+    assert.equal(getSecrets().twitchConnectedAt, timestamp)
+  })
+
   await t.test('returns the resulting secrets', () => {
-    assert.deepEqual(updateSecrets({ youtubeApiKey: 'the-key' }), { youtubeApiKey: 'the-key' })
+    const result = updateSecrets({ youtubeApiKey: 'the-key' })
+    assert.equal(result.youtubeApiKey, 'the-key')
+    assert.equal(result.twitchTokenData, null)
+    assert.equal(result.twitchUserInfo, null)
+    assert.equal(result.twitchConnectedAt, null)
   })
 })
 
@@ -60,11 +96,12 @@ test('getPublicSecretsView() with no key set', async (t) => {
     const view = fresh.getPublicSecretsView()
     assert.equal(view.youtubeApiKey, '')
     assert.equal(view.hasYoutubeApiKey, false)
+    assert.equal(view.twitchConnected, false)
+    assert.equal(view.twitchUser, null)
   })
 })
 
 test('getPublicSecretsView()', async (t) => {
-
   await t.test('a short key (8 chars or fewer) is fully masked, same length as the original', () => {
     updateSecrets({ youtubeApiKey: 'abcd1234' }) // exactly 8
     const view = getPublicSecretsView()
@@ -96,6 +133,39 @@ test('getPublicSecretsView()', async (t) => {
 
   await t.test('hasYoutubeApiKey reflects whether a key is set, independent of masking', () => {
     updateSecrets({ youtubeApiKey: 'x'.repeat(20) })
-    assert.equal(getPublicSecretsView().hasYoutubeApiKey, true)
+    const view = getPublicSecretsView()
+    assert.equal(view.hasYoutubeApiKey, true)
+    assert.equal(view.twitchConnected, false)
+    assert.equal(view.twitchUser, null)
+  })
+
+  await t.test('twitchConnected reflects Twitch connection status', () => {
+    updateSecrets({ youtubeApiKey: 'x'.repeat(20) })
+    assert.equal(getPublicSecretsView().twitchConnected, false)
+
+    const tokenData: TwitchTokenData = {
+      accessToken: 'test_access_token',
+      refreshToken: 'test_refresh_token',
+      expiresAt: Date.now() + 3600000,
+      scope: ['channel:read:subscriptions']
+    }
+    updateSecrets({ twitchTokenData: tokenData })
+    assert.equal(getPublicSecretsView().twitchConnected, true)
+  })
+
+  await t.test('twitchUser reflects connected Twitch user info', () => {
+    updateSecrets({ youtubeApiKey: 'x'.repeat(20) })
+    assert.equal(getPublicSecretsView().twitchUser, null)
+
+    const userInfo: TwitchUserInfo = {
+      id: '12345',
+      login: 'testuser',
+      displayName: 'TestUser',
+      profileImageUrl: 'https://example.com/avatar.jpg'
+    }
+    updateSecrets({ twitchUserInfo: userInfo })
+    const view = getPublicSecretsView()
+    assert.equal(view.twitchUser?.displayName, 'TestUser')
+    assert.equal(view.twitchUser?.login, 'testuser')
   })
 })

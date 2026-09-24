@@ -149,14 +149,16 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
 
     setSourceTracks(newTracks)
 
-    const activeIndexBefore = activeId ? fallbackOrder.indexOf(activeId) : -1
-    fallbackOrder = fallbackOrder.filter((id) => newIds.has(id))
+    const orderBefore = fallbackOrder
+    const activeIndexBefore = activeId ? orderBefore.indexOf(activeId) : -1
+    fallbackOrder = orderBefore.filter((id) => newIds.has(id))
     fallbackOrder.push(...(config.fallbackPlaylist.shuffle ? shuffle(addedIds) : addedIds))
 
     if (activeId && newIds.has(activeId)) {
       fallbackCursor = fallbackOrder.indexOf(activeId)
     } else if (activeIndexBefore >= 0) {
-      fallbackCursor = Math.min(activeIndexBefore, Math.max(fallbackOrder.length - 1, 0))
+      const survivedBeforeActive = orderBefore.slice(0, activeIndexBefore).filter((id) => newIds.has(id)).length
+      fallbackCursor = survivedBeforeActive - 1
     }
 
     log(`Refreshed: +${addedIds.length} added, -${removedCount} removed, ${fallbackOrder.length} in rotation`)

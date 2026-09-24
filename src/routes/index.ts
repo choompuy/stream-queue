@@ -10,6 +10,7 @@ import { router as queueRouter } from './queue.js'
 import { router as playerRouter } from './player.js'
 import { router as fallbackRouter } from './fallback.js'
 import { router as chatRouter } from './chat.js'
+import { router as twitchRouter } from './twitch.js'
 
 export const apiRouter = express.Router()
 
@@ -24,6 +25,7 @@ apiRouter.use('/queue', queueRouter)
 apiRouter.use('/player', playerRouter)
 apiRouter.use('/fallback', fallbackRouter)
 apiRouter.use('/chat', chatRouter)
+apiRouter.use('/integrations/twitch', twitchRouter)
 
 apiRouter.use((_req, res) => {
   fail(res, 'API endpoint not found', 'NOT_FOUND', 404)
