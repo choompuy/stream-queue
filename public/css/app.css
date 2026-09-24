@@ -595,6 +595,15 @@ select {
   border-color: var(--border);
 }
 
+.settings-input.error {
+  border-color: var(--accent-red);
+  background-color: var(--accent-red-bg);
+}
+
+.settings-input.error:focus {
+  border-color: var(--accent-red);
+}
+
 .field {
   display: flex;
   flex-direction: column;

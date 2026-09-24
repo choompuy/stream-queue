@@ -3,12 +3,12 @@ import cors from 'cors'
 import { exec } from 'node:child_process'
 import path from 'node:path'
 
-import { findAvailablePort } from './port.js'
+import { findAvailablePort } from './infrastructure/port.js'
 import { getAppRoot } from './runtime.js'
 import { initState } from './state-file.js'
 import { runStartupTasks } from './startup.js'
-import { errorHandler, ForbiddenOriginError } from './error-handler.js'
-import { apiRouter } from './routes/index.js'
+import { errorHandler, ForbiddenOriginError } from './http/errors.js'
+import { apiRouter } from './http/routes/index.js'
 
 const app = express()
 let PORT: number
@@ -77,7 +77,7 @@ async function main() {
 
   const server = app.listen(PORT, () => {
     log(`Server running on http://localhost:${PORT}`)
-    void runStartupTasks()
+    void runStartupTasks(PORT)
   })
 
   server.on('error', (error) => {

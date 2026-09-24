@@ -1,5 +1,5 @@
 import { escapeHtml } from '../shared.js'
-import { api } from './api.js'
+import { api, ApiError } from './api.js'
 import { state, dom, log, CONFIG_FIELDS } from './state.js'
 import { run } from './run.js'
 import { syncPlayer } from './player.js'
@@ -10,8 +10,18 @@ import { toastSuccess } from './toast.js'
 
 export function changeLocale(locale) {
   return run('changing locale', async () => {
-    await api.updateLocale(locale)
-    location.reload()
+    // Clear error state for locale selector
+    if (dom.localeSelect) dom.localeSelect.classList.remove('error')
+
+    try {
+      await api.updateLocale(locale)
+      location.reload()
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'INVALID_LOCALE' && dom.localeSelect) {
+        dom.localeSelect.classList.add('error')
+      }
+      throw error
+    }
   })
 }
 
@@ -19,17 +29,42 @@ export function loadOverlaySettings() {
   return run('loading settings', async () => {
     state.settings = await api.getSettings()
 
-    if (dom.showVideo) dom.showVideo.checked = Boolean(state.settings.showVideo)
-    if (dom.badgePosition) dom.badgePosition.value = state.settings.position || 'bottom-right'
+    // Clear error states when loading fresh settings
+    if (dom.showVideo) {
+      dom.showVideo.classList.remove('error')
+      dom.showVideo.checked = Boolean(state.settings.showVideo)
+    }
+    if (dom.badgePosition) {
+      dom.badgePosition.classList.remove('error')
+      dom.badgePosition.value = state.settings.position || 'bottom-right'
+    }
   })
 }
 
 export function saveOverlaySettings() {
   return run('saving settings', async () => {
-    state.settings.showVideo = dom.showVideo.checked
-    state.settings.position = dom.badgePosition ? dom.badgePosition.value : state.settings.position
-    await api.updateSettings(state.settings)
-    syncPlayer()
+    // Clear previous error states
+    if (dom.showVideo) dom.showVideo.classList.remove('error')
+    if (dom.badgePosition) dom.badgePosition.classList.remove('error')
+
+    try {
+      state.settings.showVideo = dom.showVideo.checked
+      state.settings.position = dom.badgePosition ? dom.badgePosition.value : state.settings.position
+      await api.updateSettings(state.settings)
+      syncPlayer()
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'INVALID_SETTINGS' && error.params?.fields) {
+        const rejectedFields = error.params.fields.split(', ')
+        
+        if (rejectedFields.includes('showVideo') && dom.showVideo) {
+          dom.showVideo.classList.add('error')
+        }
+        if (rejectedFields.includes('position') && dom.badgePosition) {
+          dom.badgePosition.classList.add('error')
+        }
+      }
+      throw error
+    }
   })
 }
 
@@ -109,6 +144,9 @@ export function loadConfig() {
       const input = dom[field.dom]
       if (!input) continue
 
+      // Clear error state when loading fresh config
+      input.classList.remove('error')
+
       const value = field.path ? state.config[field.path]?.[field.key] : state.config[field.key]
 
       if (field.type === 'checkbox') input.checked = Boolean(value)
@@ -129,6 +167,12 @@ export function loadSecrets() {
 
 export async function saveConfigSetting() {
   const config = {}
+
+  // Clear previous error states
+  for (const field of CONFIG_FIELDS) {
+    const input = dom[field.dom]
+    if (input) input.classList.remove('error')
+  }
 
   for (const field of CONFIG_FIELDS) {
     const input = dom[field.dom]
@@ -151,17 +195,35 @@ export async function saveConfigSetting() {
   const youtubeApiKey = dom.secYoutubeKey.value.trim()
 
   await run('saving config', async () => {
-    state.config = await api.updateConfig(config)
+    try {
+      state.config = await api.updateConfig(config)
 
-    if (youtubeApiKey) {
-      await api.updateSecrets({ youtubeApiKey })
-      dom.secYoutubeKey.value = ''
-      await loadSecrets()
+      if (youtubeApiKey) {
+        await api.updateSecrets({ youtubeApiKey })
+        dom.secYoutubeKey.value = ''
+        await loadSecrets()
+      }
+
+      renderQueue()
+      renderPlaylists()
+      toastSuccess(t('toast.settingsSaved'))
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'INVALID_CONFIG' && error.params?.fields) {
+        const rejectedFields = error.params.fields.split(', ')
+        
+        for (const field of CONFIG_FIELDS) {
+          const input = dom[field.dom]
+          if (!input) continue
+
+          // Check if this field is in the rejected list
+          const fieldName = field.key
+          if (rejectedFields.includes(fieldName)) {
+            input.classList.add('error')
+          }
+        }
+      }
+      throw error
     }
-
-    renderQueue()
-    renderPlaylists()
-    toastSuccess(t('toast.settingsSaved'))
   })
 }
 

@@ -29,6 +29,10 @@ export type Config = {
   allowShorts: boolean
   allowLiveStreams: boolean
   fallbackPlaylist: FallbackPlaylist
+  twitch: {
+    clientId: string
+    clientSecret: string
+  }
 }
 
 export type FallbackPlaylist = {
@@ -142,5 +146,20 @@ export type FallbackStateResponse = FallbackPlaylist & {
   activeVideoId: string | null
 }
 export type QueueRemoveResponse = { removed: QueueItem; state: StateResponse }
-export type SecretsResponse = { youtubeApiKey: string; hasYoutubeApiKey: boolean }
+export type SecretsResponse = { youtubeApiKey: string; hasYoutubeApiKey: boolean; twitchConnected: boolean; twitchUser: { displayName: string; login: string } | null }
 export type ActivityResponse = { entries: ActivityEntry[] }
+
+export type TwitchConnectionResponse = {
+  connected: boolean
+  user: { displayName: string; login: string } | null
+  connectedAt: number | null
+}
+
+export type TwitchAuthResponse = {
+  authUrl: string
+}
+
+export type TwitchCallbackResponse = {
+  success: boolean
+  user: { displayName: string; login: string }
+}
