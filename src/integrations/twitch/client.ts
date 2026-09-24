@@ -1,4 +1,4 @@
-import type { TwitchUserInfo, TwitchUsersResponse, TwitchErrorResponse, TwitchAuthConfig } from './types.js'
+import type { TwitchUserInfo, TwitchUsersResponse, TwitchErrorResponse } from './types.js'
 import { TwitchOAuth } from './oauth.js'
 
 function log(message: string): void {
@@ -18,23 +18,24 @@ export class TwitchClient {
   }
 
   private async makeAuthenticatedRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
-    let accessToken = this.oauth.getAccessToken()
+    const accessToken = await this.oauth.getValidAccessToken()
+    if (!accessToken) throw new Error('Not authenticated with Twitch')
 
-    if (!accessToken && this.oauth.needsRefresh()) {
-      try {
-        await this.oauth.refreshAccessToken()
-        accessToken = this.oauth.getAccessToken()
-      } catch (error) {
-        logError(`Failed to refresh token for request: ${error instanceof Error ? error.message : error}`)
-        throw new Error('Authentication failed - please reconnect your Twitch account')
-      }
+    const response = await this.request<T>(url, options, accessToken)
+    if (response.status !== 401) return this.handleResponse<T>(response)
+
+    try {
+      const refreshedToken = await this.oauth.refreshAccessToken()
+      const retryResponse = await this.request<T>(url, options, refreshedToken.accessToken)
+      return this.handleResponse<T>(retryResponse)
+    } catch (error) {
+      logError(`Authentication retry failed: ${error instanceof Error ? error.message : error}`)
+      throw new Error('Authentication failed - please reconnect your Twitch account')
     }
+  }
 
-    if (!accessToken) {
-      throw new Error('Not authenticated with Twitch')
-    }
-
-    const response = await fetch(url, {
+  private async request<T>(url: string, options: RequestInit, accessToken: string): Promise<Response> {
+    return fetch(url, {
       ...options,
       headers: {
         ...options.headers,
@@ -42,22 +43,28 @@ export class TwitchClient {
         'Client-Id': this.oauth.getConfig().clientId
       }
     })
+  }
 
-    if (!response.ok) {
+  private async handleResponse<T>(response: Response): Promise<T> {
+    if (response.ok) return response.json() as Promise<T>
+
+    let message = `HTTP ${response.status}`
+
+    try {
       const error = (await response.json()) as TwitchErrorResponse
-      throw new Error(`Twitch API error: ${error.message} (${error.status})`)
+
+      if (error.message) message = error.message
+    } catch {
+      // Ignore invalid/non-JSON responses.
     }
 
-    return response.json() as Promise<T>
+    throw new Error(`Twitch API error: ${message}`)
   }
 
   async getUserInfo(): Promise<TwitchUserInfo> {
     try {
       const response = await this.makeAuthenticatedRequest<TwitchUsersResponse>('https://api.twitch.tv/helix/users')
-
-      if (!response.data || response.data.length === 0) {
-        throw new Error('No user data returned from Twitch API')
-      }
+      if (!response.data?.length) throw new Error('No user data returned from Twitch API')
 
       const userData = response.data[0]
       this.userInfo = {

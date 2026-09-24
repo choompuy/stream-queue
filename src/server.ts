@@ -1,6 +1,5 @@
 import express from 'express'
 import cors from 'cors'
-import { exec } from 'node:child_process'
 import path from 'node:path'
 
 import { findAvailablePort } from './port.js'
@@ -9,6 +8,8 @@ import { initState } from './state-file.js'
 import { runStartupTasks } from './startup.js'
 import { errorHandler, ForbiddenOriginError } from './error-handler.js'
 import { apiRouter } from './routes/index.js'
+import { initializeTwitchIntegration } from './integrations/twitch/index.js'
+import { getSecrets } from './secrets.js'
 
 const app = express()
 let PORT: number
@@ -52,20 +53,6 @@ app.use('/api', apiRouter)
 
 app.use(errorHandler)
 
-function openBrowser(url: string): void {
-  if (process.platform === 'win32') {
-    exec(`start "" "${url}"`)
-    return
-  }
-
-  if (process.platform === 'darwin') {
-    exec(`open "${url}"`)
-    return
-  }
-
-  exec(`xdg-open "${url}"`)
-}
-
 async function main() {
   // a stray rejected promise must not stop the music mid-stream: log it and carry on
   process.on('unhandledRejection', (reason) => {
@@ -73,7 +60,14 @@ async function main() {
   })
 
   initState()
+  const secrets = getSecrets()
   PORT = await findAvailablePort(3000)
+  
+  initializeTwitchIntegration({
+    clientId: secrets.twitch.clientId ?? undefined,
+    clientSecret: secrets.twitch.clientSecret ?? undefined,
+    redirectUri: `http://localhost:${PORT}/api/integrations/twitch/callback`
+  })
 
   const server = app.listen(PORT, () => {
     log(`Server running on http://localhost:${PORT}`)

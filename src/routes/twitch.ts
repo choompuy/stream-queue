@@ -1,96 +1,133 @@
+import crypto from 'node:crypto'
 import express from 'express'
 import { ok, fail, asyncHandler } from '../http.js'
 import type { TwitchConnectionResponse, TwitchAuthResponse, TwitchCallbackResponse } from '../types.js'
-import { initializeTwitchIntegration, getConnectionStatus, getAuthUrl, handleOAuthCallback, disconnect, refreshConnection } from '../integrations/twitch/index.js'
+import { getConnectionStatus, getAuthUrl, handleOAuthCallback, disconnect, refreshConnection } from '../integrations/twitch/index.js'
 
-function log(message: string): void {
-  console.log(`[TWITCH ROUTES] ${message}`)
+const OAUTH_STATE_TTL_MS = 10 * 60 * 1000
+const MAX_OAUTH_STATES = 100
+
+const oauthStates = new Map<string, number>()
+
+function cleanupExpiredStates(): void {
+  const now = Date.now()
+
+  for (const [state, expiresAt] of oauthStates) {
+    if (expiresAt <= now) oauthStates.delete(state)
+  }
+}
+
+function createOAuthState(): string {
+  cleanupExpiredStates()
+
+  if (oauthStates.size >= MAX_OAUTH_STATES) {
+    const oldestState = oauthStates.keys().next().value
+    if (oldestState) oauthStates.delete(oldestState)
+  }
+
+  const state = crypto.randomBytes(32).toString('hex')
+  oauthStates.set(state, Date.now() + OAUTH_STATE_TTL_MS)
+  return state
+}
+
+function consumeOAuthState(state: string): boolean {
+  cleanupExpiredStates()
+
+  const expiresAt = oauthStates.get(state)
+  if (!expiresAt) return false
+
+  oauthStates.delete(state)
+  return expiresAt > Date.now()
+}
+
+function toUserResponse(user: { displayName: string; login: string }) {
+  return {
+    displayName: user.displayName,
+    login: user.login
+  }
 }
 
 export const router = express.Router()
 
-let initialized = false
-
-function ensureInitialized(): void {
-  if (!initialized) {
-    initializeTwitchIntegration()
-    initialized = true
-    log('Twitch integration initialized')
-  }
-}
-
 router.get('/', (_req, res) => {
-  ensureInitialized()
   const status = getConnectionStatus()
-
   const response: TwitchConnectionResponse = {
     connected: status.connected,
-    user: status.user ? { displayName: status.user.displayName, login: status.user.login } : null,
+    user: status.user ? toUserResponse(status.user) : null,
     connectedAt: status.connectedAt
   }
-
   ok(res, response)
 })
 
-router.get('/auth', (req, res) => {
-  ensureInitialized()
+router.get('/auth', (_req, res) => {
   try {
-    const authUrl = getAuthUrl()
-    const response: TwitchAuthResponse = { authUrl }
+    const state = createOAuthState()
+    const authUrl = getAuthUrl(state)
+    const response: TwitchAuthResponse = {
+      authUrl
+    }
     ok(res, response)
   } catch (error) {
-    fail(res, 'Failed to generate auth URL', 'TWITCH_AUTH_ERROR', 500)
+    console.error('[TWITCH ROUTES] Failed to generate auth URL:', error instanceof Error ? error.message : error)
+    fail(res, 'Failed to generate Twitch authorization URL', 'TWITCH_AUTH_ERROR', 500)
   }
 })
 
-router.get(
-  '/callback',
-  asyncHandler(async (req, res) => {
-    ensureInitialized()
-    const { code, error, error_description } = req.query
+router.get('/callback', async (req, res) => {
+  const { code, state, error, error_description } = req.query
 
-    if (error) {
-      fail(res, (error_description as string) || 'OAuth authorization failed', 'TWITCH_OAUTH_ERROR', 400)
-      return
+  if (error) {
+    if (typeof state === 'string') consumeOAuthState(state)
+    fail(res, typeof error_description === 'string' ? error_description : 'OAuth authorization failed', 'TWITCH_OAUTH_ERROR', 400)
+    return
+  }
+
+  if (typeof state !== 'string') {
+    fail(res, 'Missing OAuth state', 'TWITCH_OAUTH_ERROR', 400)
+    return
+  }
+
+  if (!consumeOAuthState(state)) {
+    fail(res, 'Invalid or expired OAuth state', 'TWITCH_OAUTH_ERROR', 400)
+    return
+  }
+
+  if (typeof code !== 'string') {
+    fail(res, 'Missing authorization code', 'TWITCH_OAUTH_ERROR', 400)
+    return
+  }
+
+  try {
+    const userInfo = await handleOAuthCallback(code)
+    const response: TwitchCallbackResponse = {
+      success: true,
+      user: toUserResponse(userInfo)
     }
-
-    if (!code || typeof code !== 'string') {
-      fail(res, 'Missing authorization code', 'TWITCH_OAUTH_ERROR', 400)
-      return
-    }
-
-    try {
-      const userInfo = await handleOAuthCallback(code)
-      const response: TwitchCallbackResponse = {
-        success: true,
-        user: { displayName: userInfo.displayName, login: userInfo.login }
-      }
-      ok(res, response)
-    } catch (error) {
-      fail(res, 'Failed to complete OAuth flow', 'TWITCH_OAUTH_ERROR', 500)
-    }
-  })
-)
-
-router.post('/disconnect', (_req, res) => {
-  ensureInitialized()
-  disconnect()
-  ok(res, { success: true })
+    ok(res, response)
+  } catch (error) {
+    console.error('[TWITCH ROUTES] OAuth callback failed:', error instanceof Error ? error.message : error)
+    fail(res, 'Failed to complete Twitch authorization', 'TWITCH_OAUTH_ERROR', 500)
+  }
 })
 
 router.post(
-  '/refresh',
-  asyncHandler(async (req, res) => {
-    ensureInitialized()
-    try {
-      const userInfo = await refreshConnection()
-      const response: TwitchCallbackResponse = {
-        success: true,
-        user: { displayName: userInfo.displayName, login: userInfo.login }
-      }
-      ok(res, response)
-    } catch (error) {
-      fail(res, 'Failed to refresh connection', 'TWITCH_REFRESH_ERROR', 500)
-    }
+  '/disconnect',
+  asyncHandler(async (_req, res) => {
+    await disconnect()
+    ok(res, { success: true })
   })
 )
+
+router.post('/refresh', async (_req, res) => {
+  try {
+    const userInfo = await refreshConnection()
+    const response: TwitchCallbackResponse = {
+      success: true,
+      user: toUserResponse(userInfo)
+    }
+    ok(res, response)
+  } catch (error) {
+    console.error('[TWITCH ROUTES] Failed to refresh connection:', error instanceof Error ? error.message : error)
+    fail(res, 'Failed to refresh Twitch connection', 'TWITCH_REFRESH_ERROR', 500)
+  }
+})

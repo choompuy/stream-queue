@@ -1,51 +1,52 @@
 import { SECRETS_PATH, createFileStore } from './persist.js'
-import type { TwitchTokenData, TwitchUserInfo } from './integrations/twitch/types.js'
+import type { TwitchSecrets, TwitchSecretsUpdates } from './integrations/twitch/types.js'
 
 export type Secrets = {
   youtubeApiKey: string
-  twitchTokenData: TwitchTokenData | null
-  twitchUserInfo: TwitchUserInfo | null
-  twitchConnectedAt: number | null
+  twitch: TwitchSecrets
+}
+
+export type SecretsUpdates = {
+  youtubeApiKey?: string
+  twitch?: TwitchSecretsUpdates
 }
 
 const store = createFileStore<Secrets>(SECRETS_PATH)
 let secrets: Secrets = store.load({
   youtubeApiKey: '',
-  twitchTokenData: null,
-  twitchUserInfo: null,
-  twitchConnectedAt: null
+  twitch: {
+    clientId: null,
+    clientSecret: null,
+    tokenData: null,
+    userInfo: null,
+    connectedAt: null
+  }
 })
 
 export function getSecrets(): Secrets {
-  return { ...secrets }
+  return {
+    ...secrets,
+    twitch: {
+      ...secrets.twitch
+    }
+  }
 }
 
-export function updateSecrets(updates: Partial<Secrets>): Secrets {
-  const next = { ...secrets }
-
-  if (typeof updates.youtubeApiKey === 'string' && updates.youtubeApiKey.trim() !== '') {
-    next.youtubeApiKey = updates.youtubeApiKey.trim()
+export function updateSecrets(updates: SecretsUpdates): Secrets {
+  if (updates.youtubeApiKey !== undefined && updates.youtubeApiKey.trim() !== '') {
+    secrets.youtubeApiKey = updates.youtubeApiKey.trim()
   }
 
-  if (updates.twitchTokenData !== undefined) {
-    next.twitchTokenData = updates.twitchTokenData
+  if (updates.twitch) {
+    Object.assign(secrets.twitch, updates.twitch)
   }
 
-  if (updates.twitchUserInfo !== undefined) {
-    next.twitchUserInfo = updates.twitchUserInfo
-  }
-
-  if (updates.twitchConnectedAt !== undefined) {
-    next.twitchConnectedAt = updates.twitchConnectedAt
-  }
-
-  secrets = next
   store.scheduleSave(
     () => secrets,
     (error) => console.error('[SECRETS] Failed to save:', error instanceof Error ? error.message : error)
   )
-
-  return { ...secrets }
+  
+  return getSecrets()
 }
 
 function maskSecret(value: string): string {
@@ -58,12 +59,17 @@ export function getPublicSecretsView() {
   return {
     youtubeApiKey: maskSecret(secrets.youtubeApiKey),
     hasYoutubeApiKey: secrets.youtubeApiKey.length > 0,
-    twitchConnected: secrets.twitchTokenData !== null,
-    twitchUser: secrets.twitchUserInfo
-      ? {
-          displayName: secrets.twitchUserInfo.displayName,
-          login: secrets.twitchUserInfo.login
-        }
-      : null
+
+    twitch: {
+      configured: Boolean(secrets.twitch.clientId) && Boolean(secrets.twitch.clientSecret),
+      connected: secrets.twitch.tokenData !== null && secrets.twitch.userInfo !== null,
+      user: secrets.twitch.userInfo
+        ? {
+            displayName: secrets.twitch.userInfo.displayName,
+            login: secrets.twitch.userInfo.login
+          }
+        : null,
+      connectedAt: secrets.twitch.connectedAt
+    }
   }
 }
