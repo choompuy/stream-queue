@@ -7,6 +7,9 @@ import type { AddressInfo } from 'node:net'
 
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
+// Set required environment variables for tests
+process.env.TWITCH_CLIENT_ID = 'test_client_id'
+
 const express = (await import('express')).default
 const { createSystemRouter } = await import('../../../src/routes/system.js')
 const { apiRouter } = await import('../../../src/routes/index.js')

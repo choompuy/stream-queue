@@ -35,7 +35,7 @@ export function updateSecrets(updates: SecretsUpdates): Secrets {
     }
 
     const value = updates.youtubeApiKey.trim()
-    if (value !== '' && value !== secrets.youtubeApiKey) {
+    if (value !== secrets.youtubeApiKey) {
       secrets = {
         ...secrets,
         youtubeApiKey: value

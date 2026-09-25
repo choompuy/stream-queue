@@ -124,46 +124,136 @@ export function toggleQr() {
   if (!dom.controlPanelQr.classList.contains('hidden')) renderQrUrl()
 }
 
-export function connectTwitch() {
-  return run('connecting Twitch', async () => {
-    const response = await api.connectTwitch()
-    if (!response?.verificationUri || !response?.userCode) {
-      throw new Error('Twitch authorization data is missing')
+const TWITCH_POLL_INTERVAL_MS = 2000
+
+let twitchPollController = null
+
+export function stopTwitchPolling() {
+  twitchPollController?.abort()
+  twitchPollController = null
+}
+
+// resolves to false when the wait was cut short by an abort
+function delay(ms, signal) {
+  return new Promise((resolve) => {
+    if (signal.aborted) {
+      resolve(false)
+      return
     }
 
-    if (dom.twitchAuthorizationCode) {
-      dom.twitchAuthorizationCode.textContent = response.userCode
+    const onAbort = () => {
+      clearTimeout(timer)
+      resolve(false)
     }
 
-    dom.twitchAuthorization?.classList.remove('hidden')
-    window.open(response.verificationUri, '_blank', 'noopener,noreferrer')
-    const expiresAt = Date.now() + response.expiresIn * 1000
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve(true)
+    }, ms)
 
-    while (Date.now() < expiresAt) {
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      const status = await api.getTwitchStatus()
-
-      if (status.connected) {
-        state.twitch.connected = true
-        state.twitch.user = status.user
-        state.twitch.connectedAt = status.connectedAt
-        dom.twitchAuthorization?.classList.add('hidden')
-        renderTwitchConnection()
-
-        const response = await api.getTwitchRewards()
-        state.twitch.rewards = response.rewards ?? []
-        renderTwitchRewards()
-        return
-      }
-    }
-
-    dom.twitchAuthorization?.classList.add('hidden')
-    throw new Error('Twitch authorization expired')
+    signal.addEventListener('abort', onAbort, { once: true })
   })
+}
+
+function openAuthorizationWindow() {
+  try {
+    return window.open('', '_blank') ?? null
+  } catch {
+    return null
+  }
+}
+
+function navigateAuthorizationWindow(authWindow, url) {
+  if (!authWindow) {
+    window.open(url, '_blank', 'noopener,noreferrer')
+    return
+  }
+
+  try {
+    authWindow.opener = null
+    authWindow.location.href = url
+  } catch (error) {
+    log('Failed to navigate the Twitch authorization window:', error)
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+}
+
+async function loadTwitchRewards() {
+  const response = await api.getTwitchRewards()
+  state.twitch.rewards = response?.rewards ?? []
+  renderTwitchRewards()
+}
+
+export function connectTwitch() {
+  // opened up-front so the popup is attributed to the click and not to the API response
+  const authWindow = openAuthorizationWindow()
+
+  stopTwitchPolling()
+  const controller = new AbortController()
+  twitchPollController = controller
+  const { signal } = controller
+
+  return run(
+    'connecting Twitch',
+    async () => {
+      try {
+        let response
+
+        try {
+          response = await api.connectTwitch()
+        } catch (error) {
+          authWindow?.close()
+          throw error
+        }
+
+        if (!response?.verificationUri || !response?.userCode) {
+          authWindow?.close()
+          throw new ApiError('Twitch authorization data is missing', { code: 'TWITCH_AUTH_ERROR' })
+        }
+
+        if (signal.aborted) {
+          authWindow?.close()
+          return
+        }
+
+        if (dom.twitchAuthorizationCode) {
+          dom.twitchAuthorizationCode.textContent = response.userCode
+        }
+
+        dom.twitchAuthorization?.classList.remove('hidden')
+        navigateAuthorizationWindow(authWindow, response.verificationUri)
+        const expiresAt = Date.now() + response.expiresIn * 1000
+
+        while (Date.now() < expiresAt) {
+          if (!(await delay(TWITCH_POLL_INTERVAL_MS, signal))) return
+
+          const status = await api.getTwitchStatus()
+          if (signal.aborted) return
+
+          if (status.connected) {
+            state.twitch.connected = true
+            state.twitch.user = status.user
+            state.twitch.connectedAt = status.connectedAt
+            dom.twitchAuthorization?.classList.add('hidden')
+            renderTwitchConnection()
+            await loadTwitchRewards()
+            return
+          }
+        }
+
+        dom.twitchAuthorization?.classList.add('hidden')
+        throw new ApiError('Twitch authorization expired', { code: 'TWITCH_AUTH_EXPIRED' })
+      } finally {
+        if (twitchPollController === controller) twitchPollController = null
+      }
+    },
+    { button: dom.twitchConnectBtn }
+  )
 }
 
 export function disconnectTwitch() {
   return run('disconnecting Twitch', async () => {
+    stopTwitchPolling()
     await api.disconnectTwitch()
     state.twitch.connected = false
     state.twitch.user = null
@@ -171,8 +261,7 @@ export function disconnectTwitch() {
     state.twitch.rewards = []
     dom.twitchAuthorization?.classList.add('hidden')
     renderTwitchConnection()
-
-    if (dom.twitchRewardSelect) dom.twitchRewardSelect.innerHTML = ''
+    renderTwitchRewards()
   })
 }
 
@@ -186,9 +275,7 @@ export function loadTwitchSettings() {
 
     if (!state.twitch.connected) return
 
-    const response = await api.getTwitchRewards()
-    state.twitch.rewards = response.rewards ?? []
-    renderTwitchRewards()
+    await loadTwitchRewards()
   })
 }
 
@@ -210,10 +297,15 @@ function renderTwitchConnection() {
   }
 }
 
-function renderTwitchRewards() {
+export function renderTwitchRewards() {
   if (!dom.twitchRewardSelect) return
 
-  const selectedId = state.config?.twitch?.channelPointsRewardId ?? ''
+  if (!state.twitch.rewards.length) {
+    dom.twitchRewardSelect.innerHTML = `<option value="">${escapeHtml(t('settings.twitch.noRewards'))}</option>`
+    return
+  }
+
+  const selectedId = state.twitch.selectedRewardId ?? ''
 
   dom.twitchRewardSelect.innerHTML = `
     <option value="">${escapeHtml(t('settings.twitch.rewardNone'))}</option>
@@ -224,6 +316,12 @@ function renderTwitchRewards() {
       )
       .join('')}
   `
+}
+
+// the reward id lives in state, not in the <select>, so it survives a config load that happens
+// before the reward options exist
+export function onTwitchRewardChange() {
+  state.twitch.selectedRewardId = dom.twitchRewardSelect?.value ?? ''
 }
 
 export function loadConfig() {
@@ -240,6 +338,9 @@ export function loadConfig() {
       if (field.type === 'checkbox') input.checked = Boolean(value)
       else input.value = value ?? ''
     }
+
+    state.twitch.selectedRewardId = state.config?.twitch?.channelPointsRewardId ?? ''
+    renderTwitchRewards()
   })
 }
 
@@ -274,6 +375,8 @@ export async function saveConfigSetting() {
       config[field.key] = value
     }
   }
+
+  config.twitch = { ...config.twitch, channelPointsRewardId: state.twitch.selectedRewardId || null }
 
   const youtubeApiKey = dom.secYoutubeKey.value.trim()
 

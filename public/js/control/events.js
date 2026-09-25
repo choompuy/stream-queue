@@ -4,7 +4,7 @@ import { dispatchAction } from './actions.js'
 import { bindMenus } from './menu.js'
 import { search } from './search.js'
 import { addPlaylist } from './playlists.js'
-import { saveOverlaySettings, onIpChange, changeLocale } from './settings.js'
+import { saveOverlaySettings, onIpChange, changeLocale, onTwitchRewardChange, stopTwitchPolling } from './settings.js'
 
 export function bindEvents() {
   bindMenus()
@@ -37,6 +37,8 @@ export function bindEvents() {
   dom.showVideo?.addEventListener('change', saveOverlaySettings)
   dom.badgePosition?.addEventListener('change', saveOverlaySettings)
   dom.selectIp?.addEventListener('change', onIpChange)
+  dom.twitchRewardSelect?.addEventListener('change', onTwitchRewardChange)
+  window.addEventListener('pagehide', stopTwitchPolling)
   dom.localeSelect?.addEventListener('change', (event) => changeLocale(event.target.value))
 
   const settingsInputs = [

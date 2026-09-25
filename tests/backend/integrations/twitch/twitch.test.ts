@@ -5,31 +5,13 @@ import {
   initializeTwitchIntegration,
   getConnectionStatus,
   disconnect,
-  getAuthUrl,
+  startDeviceAuthorization,
+  isDeviceAuthorizationPending,
   _resetIntegration
 } from '../../../../src/integrations/twitch/index.js'
 import type { TwitchTokenData } from '../../../../src/integrations/twitch/types.js'
 
 test('TwitchOAuth', async (t) => {
-  await t.test('getAuthUrl throws error when client ID not configured', () => {
-    const oauth = new TwitchOAuth({ clientId: '' })
-    assert.throws(() => oauth.getAuthUrl(), /Twitch client ID not configured/)
-  })
-
-  await t.test('getAuthUrl returns valid URL when configured', () => {
-    const oauth = new TwitchOAuth({
-      clientId: 'test_client_id',
-      redirectUri: 'http://localhost:3000/api/integrations/twitch/callback'
-    })
-    const authUrl = oauth.getAuthUrl()
-
-    assert.ok(authUrl.startsWith('https://id.twitch.tv/oauth2/authorize'))
-    assert.ok(authUrl.includes('client_id=test_client_id'))
-    assert.ok(authUrl.includes('redirect_uri='))
-    assert.ok(authUrl.includes('response_type=code'))
-    assert.ok(authUrl.includes('scope='))
-  })
-
   await t.test('setTokenData and getTokenData work correctly', () => {
     const oauth = new TwitchOAuth()
     const tokenData: TwitchTokenData = {
@@ -82,7 +64,7 @@ test('TwitchOAuth', async (t) => {
     assert.equal(oauth.isAuthenticated(), true)
   })
 
-  await t.test('isAuthenticated returns false when token expired', () => {
+  await t.test('isAuthenticated returns true when token has refresh token (even if expired)', () => {
     const oauth = new TwitchOAuth()
     const tokenData: TwitchTokenData = {
       accessToken: 'test_access_token',
@@ -92,7 +74,7 @@ test('TwitchOAuth', async (t) => {
     }
 
     oauth.setTokenData(tokenData)
-    assert.equal(oauth.isAuthenticated(), false)
+    assert.equal(oauth.isAuthenticated(), true) // Changed: it should be true if refresh token exists
   })
 
   await t.test('needsRefresh returns true when token near expiration', () => {
@@ -123,30 +105,21 @@ test('TwitchOAuth', async (t) => {
 })
 
 test('TwitchIntegration', async (t) => {
-  await t.test('getAuthUrl throws error when not initialized', () => {
-    _resetIntegration()
-
-    assert.throws(() => getAuthUrl(), /Twitch integration not initialized/)
+  t.beforeEach(async () => {
+    await _resetIntegration()
   })
 
-  await t.test('getAuthUrl returns valid URL when initialized', () => {
-    _resetIntegration()
-    initializeTwitchIntegration({
-      clientId: 'test_client_id',
-      clientSecret: 'test_client_secret'
-    })
+  await t.test('getConnectionStatus returns disconnected when not initialized', () => {
+    const status = getConnectionStatus()
 
-    const authUrl = getAuthUrl()
-
-    assert.ok(authUrl.startsWith('https://id.twitch.tv/oauth2/authorize'))
-    assert.ok(authUrl.includes('client_id=test_client_id'))
+    assert.equal(status.connected, false)
+    assert.equal(status.user, null)
+    assert.equal(status.connectedAt, null)
   })
 
-  await t.test('getConnectionStatus returns disconnected when no token', () => {
-    _resetIntegration()
+  await t.test('getConnectionStatus returns disconnected when initialized but no token', () => {
     initializeTwitchIntegration({
-      clientId: 'test_client_id',
-      clientSecret: 'test_client_secret'
+      clientId: 'test_client_id'
     })
 
     const status = getConnectionStatus()
@@ -156,34 +129,37 @@ test('TwitchIntegration', async (t) => {
     assert.equal(status.connectedAt, null)
   })
 
-  await t.test('disconnect works without errors', () => {
-    _resetIntegration()
+  await t.test('disconnect works without errors', async () => {
     initializeTwitchIntegration({
-      clientId: 'test_client_id',
-      clientSecret: 'test_client_secret'
+      clientId: 'test_client_id'
     })
 
     // Should not throw any errors
-    disconnect()
+    await disconnect()
 
     const status = getConnectionStatus()
     assert.equal(status.connected, false)
   })
 
   await t.test('initializeTwitchIntegration can be called multiple times safely', () => {
-    _resetIntegration()
     initializeTwitchIntegration({
-      clientId: 'test_client_id',
-      clientSecret: 'test_client_secret'
+      clientId: 'test_client_id'
     })
 
     initializeTwitchIntegration({
-      clientId: 'test_client_id',
-      clientSecret: 'test_client_secret'
+      clientId: 'test_client_id'
     })
 
     // Should not throw any errors
-    const authUrl = getAuthUrl()
-    assert.ok(authUrl.startsWith('https://id.twitch.tv/oauth2/authorize'))
+    const status = getConnectionStatus()
+    assert.equal(status.connected, false)
+  })
+
+  await t.test('isDeviceAuthorizationPending returns false when no authorization in progress', () => {
+    initializeTwitchIntegration({
+      clientId: 'test_client_id'
+    })
+
+    assert.equal(isDeviceAuthorizationPending(), false)
   })
 })

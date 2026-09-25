@@ -33,13 +33,13 @@ async function init() {
 
   await Promise.allSettled([
     loadSecrets(),
-    loadConfig(),
+    // the reward list is rendered against the selected reward id that loadConfig() puts in state
+    loadConfig().then(() => loadTwitchSettings()),
     loadOverlaySettings(),
     loadNetworkInfo(),
     loadActivity(),
     loadBlocklist(),
     loadPlaylists(),
-    loadTwitchSettings(),
     refreshState(),
     refreshFallbackState()
   ])

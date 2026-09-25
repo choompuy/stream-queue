@@ -231,6 +231,7 @@
       "playbackEmbedDisallowed": "YouTube refused embedded playback (often age-restriction or an owner-side embed block not visible via the API)",
       "twitchAuthError": "Failed to generate Twitch authorization URL",
       "twitchOAuthError": "Failed to complete Twitch authorization",
+      "twitchAuthExpired": "Twitch authorization expired, try connecting again",
       "twitchNotConnected": "Twitch account is not connected",
       "twitchRefreshError": "Failed to refresh Twitch connection"
     }

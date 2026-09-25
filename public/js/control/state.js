@@ -26,7 +26,8 @@ export const state = {
     connected: false,
     user: null,
     connectedAt: null,
-    rewards: []
+    rewards: [],
+    selectedRewardId: ''
   }
 }
 
@@ -115,8 +116,7 @@ export const CONFIG_FIELDS = [
   { key: 'maxRequestsPerUser', dom: 'cfgMaxPerUser', type: 'number' },
   { key: 'regionCode', dom: 'cfgRegionCode', type: 'text' },
   { key: 'allowShorts', dom: 'cfgAllowShorts', type: 'checkbox' },
-  { key: 'allowLiveStreams', dom: 'cfgAllowLiveStreams', type: 'checkbox' },
-  { key: 'channelPointsRewardId', path: 'twitch', dom: 'twitchRewardSelect', type: 'text' }
+  { key: 'allowLiveStreams', dom: 'cfgAllowLiveStreams', type: 'checkbox' }
 ]
 
 export const selectors = {
