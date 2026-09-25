@@ -231,6 +231,7 @@
       "playbackEmbedDisallowed": "YouTube отказал во встроенном воспроизведении (часто из-за возрастного ограничения или блокировки со стороны автора, что не видно через API)",
       "twitchAuthError": "Не удалось получить URL авторизации Twitch",
       "twitchOAuthError": "Не удалось завершить авторизацию Twitch",
+      "twitchAuthExpired": "Время авторизации Twitch истекло, попробуйте подключиться снова",
       "twitchNotConnected": "Аккаунт Twitch не подключён",
       "twitchRefreshError": "Не удалось обновить подключение Twitch"
     }
