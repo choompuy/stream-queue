@@ -1,4 +1,4 @@
-import { test, beforeEach } from 'node:test'
+import { test, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -7,11 +7,15 @@ import type { TwitchTokenData, TwitchUserInfo } from '../../src/integrations/twi
 
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
-const { getSecrets, updateSecrets, getPublicSecretsView } = await import('../../src/secrets.js')
+const { getSecrets, updateSecrets, updateTwitchOAuthState, getPublicSecretsView } = await import('../../src/secrets.js')
 
 beforeEach(() => {
-  updateSecrets({ youtubeApiKey: ' ' }) // reset: a whitespace-only value is ignored, see below
-  updateSecrets({ twitchTokenData: null, twitchUserInfo: null, twitchConnectedAt: null })
+  updateSecrets({ youtubeApiKey: '' }) // reset to empty
+  updateTwitchOAuthState({ tokenData: null, userInfo: null, connectedAt: null })
+})
+
+afterEach(() => {
+  delete process.env.TWITCH_CLIENT_ID
 })
 
 test('updateSecrets()', async (t) => {
@@ -20,14 +24,15 @@ test('updateSecrets()', async (t) => {
     assert.equal(getSecrets().youtubeApiKey, 'my-api-key-123')
   })
 
-  await t.test('an empty or whitespace-only value is ignored, keeping the previous key', () => {
+  await t.test('an empty or whitespace-only value is reset to empty', () => {
     updateSecrets({ youtubeApiKey: 'first-key' })
 
     updateSecrets({ youtubeApiKey: '' })
-    assert.equal(getSecrets().youtubeApiKey, 'first-key')
+    assert.equal(getSecrets().youtubeApiKey, '')
 
+    updateSecrets({ youtubeApiKey: 'second-key' })
     updateSecrets({ youtubeApiKey: '   ' })
-    assert.equal(getSecrets().youtubeApiKey, 'first-key')
+    assert.equal(getSecrets().youtubeApiKey, '')
   })
 
   await t.test('an update with no youtubeApiKey field leaves the key untouched', () => {
@@ -43,8 +48,8 @@ test('updateSecrets()', async (t) => {
       expiresAt: Date.now() + 3600000,
       scope: ['channel:read:subscriptions']
     }
-    updateSecrets({ twitchTokenData: tokenData })
-    assert.equal(getSecrets().twitchTokenData?.accessToken, 'test_access_token')
+    updateTwitchOAuthState({ tokenData })
+    assert.equal(getSecrets().twitch.tokenData?.accessToken, 'test_access_token')
   })
 
   await t.test('can update Twitch user info', () => {
@@ -54,22 +59,22 @@ test('updateSecrets()', async (t) => {
       displayName: 'TestUser',
       profileImageUrl: 'https://example.com/avatar.jpg'
     }
-    updateSecrets({ twitchUserInfo: userInfo })
-    assert.equal(getSecrets().twitchUserInfo?.displayName, 'TestUser')
+    updateTwitchOAuthState({ userInfo })
+    assert.equal(getSecrets().twitch.userInfo?.displayName, 'TestUser')
   })
 
   await t.test('can update Twitch connection timestamp', () => {
     const timestamp = Date.now()
-    updateSecrets({ twitchConnectedAt: timestamp })
-    assert.equal(getSecrets().twitchConnectedAt, timestamp)
+    updateTwitchOAuthState({ connectedAt: timestamp })
+    assert.equal(getSecrets().twitch.connectedAt, timestamp)
   })
 
   await t.test('returns the resulting secrets', () => {
     const result = updateSecrets({ youtubeApiKey: 'the-key' })
     assert.equal(result.youtubeApiKey, 'the-key')
-    assert.equal(result.twitchTokenData, null)
-    assert.equal(result.twitchUserInfo, null)
-    assert.equal(result.twitchConnectedAt, null)
+    assert.equal(result.twitch.tokenData, null)
+    assert.equal(result.twitch.userInfo, null)
+    assert.equal(result.twitch.connectedAt, null)
   })
 })
 
@@ -84,24 +89,23 @@ test('getSecrets()', async (t) => {
 })
 
 test('getPublicSecretsView() with no key set', async (t) => {
-  // updateSecrets() never accepts an empty value (see above), so a truly empty key can only be observed on
-  // a fresh store that has never had one set - load it from a location no earlier test has written to
-  const emptyDir = mkdtempSync(join(tmpdir(), 'streamqueue-test-empty-'))
-  const cwd = process.cwd()
-  process.chdir(emptyDir)
-  const fresh = await import(`../../src/secrets.js?fresh=${Date.now()}`)
-  process.chdir(cwd)
-
   await t.test('masked value is empty and hasYoutubeApiKey is false', () => {
-    const view = fresh.getPublicSecretsView()
+    // Set a mock TWITCH_CLIENT_ID to avoid the error
+    process.env.TWITCH_CLIENT_ID = 'test_client_id'
+    // Ensure the current instance has an empty key (it should already be empty from beforeEach)
+    const view = getPublicSecretsView()
     assert.equal(view.youtubeApiKey, '')
     assert.equal(view.hasYoutubeApiKey, false)
-    assert.equal(view.twitchConnected, false)
-    assert.equal(view.twitchUser, null)
+    assert.equal(view.twitch.connected, false)
+    assert.equal(view.twitch.user, null)
   })
 })
 
 test('getPublicSecretsView()', async (t) => {
+  t.beforeEach(() => {
+    process.env.TWITCH_CLIENT_ID = 'test_client_id'
+  })
+
   await t.test('a short key (8 chars or fewer) is fully masked, same length as the original', () => {
     updateSecrets({ youtubeApiKey: 'abcd1234' }) // exactly 8
     const view = getPublicSecretsView()
@@ -135,13 +139,13 @@ test('getPublicSecretsView()', async (t) => {
     updateSecrets({ youtubeApiKey: 'x'.repeat(20) })
     const view = getPublicSecretsView()
     assert.equal(view.hasYoutubeApiKey, true)
-    assert.equal(view.twitchConnected, false)
-    assert.equal(view.twitchUser, null)
+    assert.equal(view.twitch.connected, false)
+    assert.equal(view.twitch.user, null)
   })
 
   await t.test('twitchConnected reflects Twitch connection status', () => {
     updateSecrets({ youtubeApiKey: 'x'.repeat(20) })
-    assert.equal(getPublicSecretsView().twitchConnected, false)
+    assert.equal(getPublicSecretsView().twitch.connected, false)
 
     const tokenData: TwitchTokenData = {
       accessToken: 'test_access_token',
@@ -149,13 +153,33 @@ test('getPublicSecretsView()', async (t) => {
       expiresAt: Date.now() + 3600000,
       scope: ['channel:read:subscriptions']
     }
-    updateSecrets({ twitchTokenData: tokenData })
-    assert.equal(getPublicSecretsView().twitchConnected, true)
+    updateTwitchOAuthState({ tokenData })
+    assert.equal(getPublicSecretsView().twitch.connected, false) // Still false without userInfo
+  })
+
+  await t.test('twitchConnected is true when both tokenData and userInfo are present', () => {
+    updateSecrets({ youtubeApiKey: 'x'.repeat(20) })
+    assert.equal(getPublicSecretsView().twitch.connected, false)
+
+    const tokenData: TwitchTokenData = {
+      accessToken: 'test_access_token',
+      refreshToken: 'test_refresh_token',
+      expiresAt: Date.now() + 3600000,
+      scope: ['channel:read:subscriptions']
+    }
+    const userInfo: TwitchUserInfo = {
+      id: '12345',
+      login: 'testuser',
+      displayName: 'TestUser',
+      profileImageUrl: 'https://example.com/avatar.jpg'
+    }
+    updateTwitchOAuthState({ tokenData, userInfo })
+    assert.equal(getPublicSecretsView().twitch.connected, true)
   })
 
   await t.test('twitchUser reflects connected Twitch user info', () => {
     updateSecrets({ youtubeApiKey: 'x'.repeat(20) })
-    assert.equal(getPublicSecretsView().twitchUser, null)
+    assert.equal(getPublicSecretsView().twitch.user, null)
 
     const userInfo: TwitchUserInfo = {
       id: '12345',
@@ -163,9 +187,9 @@ test('getPublicSecretsView()', async (t) => {
       displayName: 'TestUser',
       profileImageUrl: 'https://example.com/avatar.jpg'
     }
-    updateSecrets({ twitchUserInfo: userInfo })
+    updateTwitchOAuthState({ userInfo })
     const view = getPublicSecretsView()
-    assert.equal(view.twitchUser?.displayName, 'TestUser')
-    assert.equal(view.twitchUser?.login, 'testuser')
+    assert.equal(view.twitch.user?.displayName, 'TestUser')
+    assert.equal(view.twitch.user?.login, 'testuser')
   })
 })

@@ -1,10 +1,10 @@
 import { test, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { JSDOM } from 'jsdom'
 
-const PUBLIC_DIR = fileURLToPath(new URL('../../../public/', import.meta.url))
+const PUBLIC_DIR = pathToFileURL(fileURLToPath(new URL('../../../public/', import.meta.url)))
 
 const jsdom = new JSDOM(
   `<!doctype html><html><body>
@@ -42,7 +42,7 @@ globalThis.fetch = async (url, options = {}) => {
 
   if (url.startsWith('/locales/')) {
     const locale = /\/locales\/(\w+)\.json/.exec(url)[1]
-    return { ok: true, json: async () => JSON.parse(readFileSync(`${PUBLIC_DIR}locales/${locale}.json`, 'utf8')) }
+    return { ok: true, json: async () => JSON.parse(readFileSync(fileURLToPath(new URL(`locales/${locale}.json`, PUBLIC_DIR)), 'utf8')) }
   }
 
   const handler = handlers[`${method} ${url}`]
@@ -64,9 +64,9 @@ jsdom.window.open = (url) => {
   return opened
 }
 
-const { t: translate, loadTranslations } = await import(`${PUBLIC_DIR}js/i18n.js`)
-const { state, dom } = await import(`${PUBLIC_DIR}js/control/state.js`)
-const settings = await import(`${PUBLIC_DIR}js/control/settings.js`)
+const { t: translate, loadTranslations } = await import(new URL('js/i18n.js', PUBLIC_DIR))
+const { state, dom } = await import(new URL('js/control/state.js', PUBLIC_DIR))
+const settings = await import(new URL('js/control/settings.js', PUBLIC_DIR))
 
 await loadTranslations('en')
 
