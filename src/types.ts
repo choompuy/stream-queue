@@ -114,6 +114,9 @@ export type AppErrorCode =
   | 'YOUTUBE_QUOTA'
   | 'YOUTUBE_ERROR'
   | 'NO_API_KEY'
+  | 'TWITCH_AUTH_ERROR'
+  | 'TWITCH_REFRESH_ERROR'
+  | 'TWITCH_NOT_CONNECTED'
   | FilterFailureReason
 export class AppError extends Error {
   constructor(

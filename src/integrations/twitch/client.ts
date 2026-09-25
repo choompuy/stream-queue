@@ -6,9 +6,11 @@ import type {
   TwitchChannelPointsRedemption,
   TwitchRedemptionsResponse,
   TwitchCustomReward,
-  TwitchCustomRewardsResponse
+  TwitchCustomRewardsResponse,
+  TwitchRedemptionUpdateStatus
 } from './types.js'
 import { TwitchOAuth } from './oauth.js'
+import { AppError } from '../../types.js'
 
 function log(message: string): void {
   console.log(`[TWITCH CLIENT] ${message}`)
@@ -28,7 +30,7 @@ export class TwitchClient {
 
   private async makeAuthenticatedRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
     const accessToken = await this.oauth.getValidAccessToken()
-    if (!accessToken) throw new Error('Not authenticated with Twitch')
+    if (!accessToken) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
 
     const response = await this.request<T>(url, options, accessToken)
     if (response.status !== 401) return this.handleResponse<T>(response)
@@ -38,8 +40,9 @@ export class TwitchClient {
       const retryResponse = await this.request<T>(url, options, refreshedToken.accessToken)
       return this.handleResponse<T>(retryResponse)
     } catch (error) {
-      logError(`Authentication retry failed: ${error instanceof Error ? error.message : error}`)
-      throw new Error('Authentication failed - please reconnect your Twitch account')
+      const reason = error instanceof Error ? error.message : String(error)
+      logError(`Authentication retry failed: ${reason}`)
+      throw new AppError('TWITCH_REFRESH_ERROR', `Authentication failed - please reconnect your Twitch account (${reason})`)
     }
   }
 
@@ -90,9 +93,12 @@ export class TwitchClient {
     }
   }
 
-  async updateRedemptionStatus(redemption: TwitchChannelPointsRedemption, status: TwitchRedemptionStatus): Promise<TwitchChannelPointsRedemption> {
+  async updateRedemptionStatus(
+    redemption: TwitchChannelPointsRedemption,
+    status: TwitchRedemptionUpdateStatus
+  ): Promise<TwitchChannelPointsRedemption> {
     const userInfo = this.userInfo
-    if (!userInfo) throw new Error('Twitch user info is not available')
+    if (!userInfo) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
 
     const params = new URLSearchParams({
       broadcaster_id: userInfo.id,
@@ -119,7 +125,7 @@ export class TwitchClient {
 
   async getCustomRewards(): Promise<TwitchCustomReward[]> {
     const userInfo = this.userInfo
-    if (!userInfo) throw new Error('Twitch user info is not available')
+    if (!userInfo) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
 
     const params = new URLSearchParams({
       broadcaster_id: userInfo.id

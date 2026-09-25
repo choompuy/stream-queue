@@ -69,7 +69,6 @@ export type TwitchUsersResponse = {
 }
 
 export type TwitchRedemptionStatus = 'UNFULFILLED' | 'FULFILLED' | 'CANCELED'
-
 export type TwitchRedemptionUpdateStatus = 'FULFILLED' | 'CANCELED'
 
 export type TwitchChannelPointsRedemption = {

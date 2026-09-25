@@ -5,6 +5,7 @@ import type { TwitchAuthConfig, TwitchChannelPointsRedemption, TwitchConnectionS
 import { clearTwitchOAuthState, getSecrets, updateTwitchOAuthState } from '../../secrets.js'
 import { requestSong } from '../../queue.js'
 import { getConfig } from '../../config.js'
+import { AppError } from '../../types.js'
 
 function log(message: string): void {
   console.log(`[TWITCH INTEGRATION] ${message}`)
@@ -13,6 +14,9 @@ function log(message: string): void {
 function logError(message: string): void {
   console.error(`[TWITCH INTEGRATION] ${message}`)
 }
+
+const REDEMPTION_RETRY_ATTEMPTS = 3
+const REDEMPTION_RETRY_DELAY_MS = 1000
 
 let oauth: TwitchOAuth | null = null
 let client: TwitchClient | null = null
@@ -86,12 +90,7 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
     return
   }
 
-  try {
-    await client.updateRedemptionStatus(event, 'FULFILLED')
-    log(`Channel Points redemption fulfilled: ${event.id}`)
-  } catch (error) {
-    logError(`Failed to fulfill redemption ${event.id}: ${error instanceof Error ? error.message : error}`)
-  }
+  await fulfillRedemption(event, client)
 }
 
 async function startEventSub(): Promise<void> {
@@ -156,15 +155,15 @@ export function getConnectionStatus(): TwitchConnectionStatus {
 
 export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeResponse> {
   if (!oauth || !client) {
-    throw new Error('Twitch integration not initialized')
+    throw new AppError('TWITCH_AUTH_ERROR', 'Twitch integration not initialized')
   }
 
   if (getConnectionStatus().connected) {
-    throw new Error('Twitch account is already connected')
+    throw new AppError('TWITCH_AUTH_ERROR', 'Twitch account is already connected')
   }
 
   if (deviceAuthorizationPromise) {
-    throw new Error('Twitch authorization is already in progress')
+    throw new AppError('TWITCH_AUTH_ERROR', 'Twitch authorization is already in progress')
   }
 
   const device = await oauth.requestDeviceCode()
@@ -172,7 +171,7 @@ export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeRespon
   deviceAuthorizationPromise = oauth
     .pollForToken(device.device_code, device.interval, device.expires_in)
     .then(async () => {
-      if (!client) throw new Error('Twitch client is not initialized')
+      if (!client) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client is not initialized')
 
       const userInfo = await client.getUserInfo()
 
@@ -195,6 +194,33 @@ export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeRespon
     })
 
   return device
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function fulfillRedemption(redemption: TwitchChannelPointsRedemption, twitchClient: TwitchClient): Promise<void> {
+  for (let attempt = 1; attempt <= REDEMPTION_RETRY_ATTEMPTS; attempt++) {
+    try {
+      await twitchClient.updateRedemptionStatus(redemption, 'FULFILLED')
+      log(`Channel Points redemption fulfilled: ${redemption.id}`)
+      return
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+
+      if (attempt === REDEMPTION_RETRY_ATTEMPTS) {
+        logError(`Failed to fulfill redemption ${redemption.id} after ${attempt} attempts: ${reason}`)
+        return
+      }
+
+      const delay = REDEMPTION_RETRY_DELAY_MS * 2 ** (attempt - 1)
+
+      logError(`Failed to fulfill redemption ${redemption.id} (attempt ${attempt}/${REDEMPTION_RETRY_ATTEMPTS}): ${reason}. Retrying in ${delay}ms`)
+
+      await wait(delay)
+    }
+  }
 }
 
 export function isDeviceAuthorizationPending(): boolean {
@@ -221,7 +247,7 @@ export async function disconnect(): Promise<void> {
 }
 
 export async function refreshConnection(): Promise<TwitchUserInfo> {
-  if (!oauth || !client) throw new Error('Twitch integration not initialized')
+  if (!oauth || !client) throw new AppError('TWITCH_REFRESH_ERROR', 'Twitch integration not initialized')
 
   try {
     if (oauth.needsRefresh()) await oauth.refreshAccessToken()
@@ -235,8 +261,9 @@ export async function refreshConnection(): Promise<TwitchUserInfo> {
     log('Twitch connection refreshed')
     return userInfo
   } catch (error) {
-    logError(`Failed to refresh connection: ${error instanceof Error ? error.message : error}`)
-    throw error
+    const reason = error instanceof Error ? error.message : String(error)
+    logError(`Failed to refresh connection: ${reason}`)
+    throw new AppError('TWITCH_REFRESH_ERROR', reason)
   }
 }
 

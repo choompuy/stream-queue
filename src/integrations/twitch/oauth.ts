@@ -1,10 +1,11 @@
+import { AppError } from '../../types.js'
 import type {
-  TwitchTokenData,
   TwitchAuthConfig,
-  TwitchTokenResponse,
+  TwitchDeviceCodeResponse,
   TwitchErrorResponse,
   TwitchOAuthOptions,
-  TwitchDeviceCodeResponse
+  TwitchTokenData,
+  TwitchTokenResponse
 } from './types.js'
 
 const DEFAULT_SCOPES = ['chat:read', 'chat:edit', 'channel:manage:redemptions']
@@ -43,7 +44,7 @@ export class TwitchOAuth {
   }
 
   async requestDeviceCode(): Promise<TwitchDeviceCodeResponse> {
-    if (!this.config.clientId) throw new Error('Twitch client ID not configured')
+    if (!this.config.clientId) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID not configured')
 
     const params = new URLSearchParams({
       client_id: this.config.clientId,
@@ -71,8 +72,8 @@ export class TwitchOAuth {
   }
 
   async pollForToken(deviceCode: string, interval: number, expiresIn: number): Promise<TwitchTokenData> {
-    if (!deviceCode) throw new Error('Device code is required')
-    if (!this.config.clientId) throw new Error('Twitch client ID not configured')
+    if (!deviceCode) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch device code is required')
+    if (!this.config.clientId) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID not configured')
 
     const deadline = Date.now() + expiresIn * 1000
     let pollInterval = interval * 1000
@@ -110,19 +111,18 @@ export class TwitchOAuth {
         continue
       }
 
-      if (error.message === 'access_denied') throw new Error('Twitch authorization was denied')
-      if (error.message === 'expired_token') throw new Error('Twitch device code expired')
-
+      if (error.message === 'access_denied') throw new AppError('TWITCH_AUTH_ERROR', 'Twitch authorization was denied')
+      if (error.message === 'expired_token') throw new AppError('TWITCH_AUTH_ERROR', 'Twitch device code expired')
       throw new Error(error.message || 'Device authorization failed')
     }
 
-    throw new Error('Twitch device code expired')
+    throw new AppError('TWITCH_AUTH_ERROR', 'Twitch device code expired')
   }
 
   async refreshAccessToken(): Promise<TwitchTokenData> {
     if (this.refreshPromise) return this.refreshPromise
-    if (!this.tokenData?.refreshToken) throw new Error('No refresh token available')
-    if (!this.config.clientId) throw new Error('Twitch client ID not configured')
+    if (!this.tokenData?.refreshToken) throw new AppError('TWITCH_REFRESH_ERROR', 'No refresh token available')
+    if (!this.config.clientId) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID not configured')
 
     this.refreshPromise = this.performRefresh()
 
@@ -133,9 +133,57 @@ export class TwitchOAuth {
     }
   }
 
+  async getValidAccessToken(): Promise<string | null> {
+    if (!this.tokenData) return null
+    if (!this.needsRefresh()) return this.tokenData.accessToken
+
+    try {
+      const tokenData = await this.refreshAccessToken()
+      return tokenData.accessToken
+    } catch {
+      return null
+    }
+  }
+
+  setTokenData(tokenData: TwitchTokenData): void {
+    this.tokenData = {
+      ...tokenData,
+      scope: [...tokenData.scope]
+    }
+
+    log('Token data set from storage')
+  }
+
+  getTokenData(): TwitchTokenData | null {
+    if (!this.tokenData) return null
+
+    return {
+      ...this.tokenData,
+      scope: [...this.tokenData.scope]
+    }
+  }
+
+  clearTokenData(): void {
+    this.tokenData = null
+    this.refreshPromise = null
+    log('Token data cleared')
+  }
+
+  isAuthenticated(): boolean {
+    // Twitch refresh tokens have no locally known expiration time
+    // A revoked or invalid refresh token is detected only when Twitch rejects a refresh request
+    return this.tokenData !== null && this.tokenData.refreshToken.length > 0
+  }
+
+  needsRefresh(): boolean {
+    if (!this.tokenData) return false
+
+    return Date.now() >= this.tokenData.expiresAt - REFRESH_BUFFER_MS
+  }
+
   private async performRefresh(): Promise<TwitchTokenData> {
     const refreshToken = this.tokenData?.refreshToken
-    if (!refreshToken) throw new Error('No refresh token available')
+    if (!refreshToken) throw new AppError('TWITCH_REFRESH_ERROR', 'No refresh token available')
 
     const params = new URLSearchParams({
       client_id: this.config.clientId,
@@ -163,55 +211,6 @@ export class TwitchOAuth {
       logError(`Token refresh failed: ${error instanceof Error ? error.message : error}`)
       throw error
     }
-  }
-
-  async getValidAccessToken(): Promise<string | null> {
-    if (!this.tokenData) return null
-    if (!this.needsRefresh()) return this.tokenData.accessToken
-
-    try {
-      const tokenData = await this.refreshAccessToken()
-      return tokenData.accessToken
-    } catch {
-      return null
-    }
-  }
-
-  getAccessToken(): string | null {
-    if (!this.tokenData) return null
-    if (this.needsRefresh()) return null
-    return this.tokenData.accessToken
-  }
-
-  setTokenData(tokenData: TwitchTokenData): void {
-    this.tokenData = {
-      ...tokenData,
-      scope: [...tokenData.scope]
-    }
-    log('Token data set from storage')
-  }
-
-  getTokenData(): TwitchTokenData | null {
-    if (!this.tokenData) return null
-    return {
-      ...this.tokenData,
-      scope: [...this.tokenData.scope]
-    }
-  }
-
-  clearTokenData(): void {
-    this.tokenData = null
-    this.refreshPromise = null
-    log('Token data cleared')
-  }
-
-  isAuthenticated(): boolean {
-    return this.tokenData !== null && this.tokenData.refreshToken.length > 0
-  }
-
-  needsRefresh(): boolean {
-    if (!this.tokenData) return false
-    return Date.now() >= this.tokenData.expiresAt - REFRESH_BUFFER_MS
   }
 
   private createTokenData(data: TwitchTokenResponse): TwitchTokenData {
