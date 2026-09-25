@@ -197,7 +197,14 @@ export function connectTwitch() {
     'connecting Twitch',
     async () => {
       try {
-        const response = await api.connectTwitch()
+        let response
+
+        try {
+          response = await api.connectTwitch()
+        } catch (error) {
+          authWindow?.close()
+          throw error
+        }
 
         if (!response?.verificationUri || !response?.userCode) {
           authWindow?.close()
