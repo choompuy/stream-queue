@@ -387,7 +387,7 @@ test('the reward id is saved from state, not from the select element', async (t)
     await settings.loadTwitchSettings()
     dom.twitchRewardSelect.value = 'reward-1'
     settings.onTwitchRewardChange()
-    await settings.saveConfigSetting()
+    await settings.saveTwitchConfig()
 
     assert.equal(sent.twitch.channelPointsRewardId, 'reward-1')
   })
@@ -401,7 +401,7 @@ test('the reward id is saved from state, not from the select element', async (t)
       }
     }
 
-    await settings.saveConfigSetting()
+    await settings.saveTwitchConfig()
 
     assert.equal(sent.twitch.channelPointsRewardId, null)
   })

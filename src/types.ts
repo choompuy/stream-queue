@@ -117,6 +117,7 @@ export type AppErrorCode =
   | 'TWITCH_AUTH_ERROR'
   | 'TWITCH_REFRESH_ERROR'
   | 'TWITCH_NOT_CONNECTED'
+  | 'TWITCH_EVENTSUB_ERROR'
   | FilterFailureReason
 export class AppError extends Error {
   constructor(
@@ -154,13 +155,4 @@ export type TwitchConnectionResponse = {
   connected: boolean
   user: { displayName: string; login: string } | null
   connectedAt: number | null
-}
-
-export type TwitchAuthResponse = {
-  authUrl: string
-}
-
-export type TwitchCallbackResponse = {
-  success: boolean
-  user: { displayName: string; login: string }
 }

@@ -377,8 +377,6 @@ export async function saveConfigSetting() {
     }
   }
 
-  config.twitch = { ...config.twitch, channelPointsRewardId: state.twitch.selectedRewardId || null }
-
   const youtubeApiKey = dom.secYoutubeKey.value.trim()
 
   await run('saving config', async () => {
@@ -419,10 +417,39 @@ export async function saveConfigSetting() {
   })
 }
 
+export async function saveTwitchConfig() {
+  const config = {
+    twitch: {
+      channelPointsRewardId: state.twitch.selectedRewardId || null
+    }
+  }
+
+  if (dom.twitchRewardSelect) {
+    dom.twitchRewardSelect.classList.remove('error')
+  }
+
+  await run('saving Twitch config', async () => {
+    try {
+      state.config = await api.updateConfig(config)
+      toastSuccess(t('toast.twitchSettingsSaved'))
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'INVALID_CONFIG' && error.params?.fields) {
+        const rejectedFields = error.params.fields.split(', ')
+
+        if (rejectedFields.includes('channelPointsRewardId') && dom.twitchRewardSelect) {
+          dom.twitchRewardSelect.classList.add('error')
+        }
+      }
+      throw error
+    }
+  })
+}
+
 export const settingsActions = {
   'copy-overlay-url': copyOverlayUrl,
   'toggle-qr': toggleQr,
   'save-config': saveConfigSetting,
+  'save-twitch-config': saveTwitchConfig,
   'connect-twitch': connectTwitch,
   'disconnect-twitch': disconnectTwitch
 }

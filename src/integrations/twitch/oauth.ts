@@ -25,9 +25,9 @@ export class TwitchOAuth {
   private refreshPromise: Promise<TwitchTokenData> | null = null
   private onTokenUpdated?: (tokenData: TwitchTokenData) => void
 
-  constructor(config: TwitchOAuthOptions = {}) {
+  constructor(config: TwitchOAuthOptions) {
     this.config = {
-      clientId: config.clientId || '',
+      clientId: config.clientId,
       scopes: config.scopes || DEFAULT_SCOPES
     }
 
@@ -91,7 +91,8 @@ export class TwitchOAuth {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         },
-        body: params.toString()
+        body: params.toString(),
+        signal: AbortSignal.timeout(pollInterval)
       })
 
       if (response.ok) {
@@ -104,15 +105,15 @@ export class TwitchOAuth {
       }
 
       const error = (await response.json()) as TwitchErrorResponse
-      if (error.message === 'authorization_pending') continue
+      if (error.error === 'authorization_pending') continue
 
-      if (error.message === 'slow_down') {
+      if (error.error === 'slow_down') {
         pollInterval += 5000
         continue
       }
 
-      if (error.message === 'access_denied') throw new AppError('TWITCH_AUTH_ERROR', 'Twitch authorization was denied')
-      if (error.message === 'expired_token') throw new AppError('TWITCH_AUTH_ERROR', 'Twitch device code expired')
+      if (error.error === 'access_denied') throw new AppError('TWITCH_AUTH_ERROR', 'Twitch authorization was denied')
+      if (error.error === 'expired_token') throw new AppError('TWITCH_AUTH_ERROR', 'Twitch device code expired')
       throw new Error(error.message || 'Device authorization failed')
     }
 
@@ -121,8 +122,8 @@ export class TwitchOAuth {
 
   async refreshAccessToken(): Promise<TwitchTokenData> {
     if (this.refreshPromise) return this.refreshPromise
-    if (!this.tokenData?.refreshToken) throw new AppError('TWITCH_REFRESH_ERROR', 'No refresh token available')
     if (!this.config.clientId) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID not configured')
+    if (!this.tokenData?.refreshToken) throw new AppError('TWITCH_REFRESH_ERROR', 'No refresh token available')
 
     this.refreshPromise = this.performRefresh()
 
@@ -140,7 +141,8 @@ export class TwitchOAuth {
     try {
       const tokenData = await this.refreshAccessToken()
       return tokenData.accessToken
-    } catch {
+    } catch (error) {
+      logError(`Failed to get valid access token: ${error instanceof Error ? error.message : error}`)
       return null
     }
   }
@@ -239,6 +241,9 @@ export class TwitchOAuth {
 
   private async createOAuthError(response: Response, fallback: string): Promise<Error> {
     const error = await this.parseOAuthError(response)
-    return new Error(error.message ? `${fallback}: ${error.message}` : fallback)
+    const message = error.message ? `${fallback}: ${error.message}` : fallback
+    const oauthError = new Error(message) as Error & { code?: string }
+    if (error.code) oauthError.code = error.code
+    return oauthError
   }
 }

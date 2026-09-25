@@ -7,7 +7,8 @@ import type { TwitchTokenData, TwitchUserInfo } from '../../src/integrations/twi
 
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
-const { getSecrets, updateSecrets, updateTwitchOAuthState, getPublicSecretsView } = await import('../../src/secrets.js')
+const { getSecrets, updateSecrets, updateTwitchOAuthState, clearTwitchOAuthState, getPublicSecretsView, getTwitchClientId } =
+  await import('../../src/secrets.js')
 
 beforeEach(() => {
   updateSecrets({ youtubeApiKey: ' ' }) // reset: a whitespace-only value is ignored, see below
@@ -78,6 +79,78 @@ test('updateSecrets()', async (t) => {
   })
 })
 
+test('updateTwitchOAuthState() validation', async (t) => {
+  await t.test('rejects malformed tokenData and leaves the stored value untouched', () => {
+    assert.throws(() => updateTwitchOAuthState({ tokenData: { accessToken: 'only-this-field' } as unknown as TwitchTokenData }))
+    assert.equal(getSecrets().twitch.tokenData, null)
+  })
+
+  await t.test('rejects tokenData with a non-string scope entry', () => {
+    const bad = {
+      accessToken: 'a',
+      refreshToken: 'b',
+      expiresAt: Date.now(),
+      scope: ['ok', 123]
+    } as unknown as TwitchTokenData
+    assert.throws(() => updateTwitchOAuthState({ tokenData: bad }))
+  })
+
+  await t.test('rejects malformed userInfo and leaves the stored value untouched', () => {
+    assert.throws(() => updateTwitchOAuthState({ userInfo: { id: '1' } as unknown as TwitchUserInfo }))
+    assert.equal(getSecrets().twitch.userInfo, null)
+  })
+
+  await t.test('rejects a non-number connectedAt', () => {
+    assert.throws(() => updateTwitchOAuthState({ connectedAt: 'yesterday' as unknown as number }))
+  })
+
+  await t.test('accepts explicit null for tokenData, userInfo and connectedAt', () => {
+    const tokenData: TwitchTokenData = {
+      accessToken: 'a',
+      refreshToken: 'b',
+      expiresAt: Date.now(),
+      scope: []
+    }
+    updateTwitchOAuthState({ tokenData })
+    assert.doesNotThrow(() => updateTwitchOAuthState({ tokenData: null, userInfo: null, connectedAt: null }))
+    assert.equal(getSecrets().twitch.tokenData, null)
+  })
+
+  await t.test('a valid update still applies', () => {
+    const userInfo: TwitchUserInfo = {
+      id: '1',
+      login: 'user',
+      displayName: 'User',
+      profileImageUrl: 'https://example.com/a.jpg'
+    }
+    updateTwitchOAuthState({ userInfo })
+    assert.equal(getSecrets().twitch.userInfo?.login, 'user')
+  })
+})
+
+test('clearTwitchOAuthState()', async (t) => {
+  await t.test('is a no-op (does not throw, state stays empty) when already empty', () => {
+    assert.equal(getSecrets().twitch.tokenData, null)
+    assert.doesNotThrow(() => clearTwitchOAuthState())
+    assert.equal(getSecrets().twitch.tokenData, null)
+  })
+
+  await t.test('clears a previously set state', () => {
+    const userInfo: TwitchUserInfo = {
+      id: '1',
+      login: 'user',
+      displayName: 'User',
+      profileImageUrl: 'https://example.com/a.jpg'
+    }
+    updateTwitchOAuthState({ userInfo, connectedAt: Date.now() })
+
+    clearTwitchOAuthState()
+
+    assert.equal(getSecrets().twitch.userInfo, null)
+    assert.equal(getSecrets().twitch.connectedAt, null)
+  })
+})
+
 test('getSecrets()', async (t) => {
   await t.test('returns a copy: mutating the result does not change the stored secrets', () => {
     updateSecrets({ youtubeApiKey: 'original' })
@@ -90,7 +163,6 @@ test('getSecrets()', async (t) => {
 
 test('getPublicSecretsView() with no key set', async (t) => {
   await t.test('masked value is empty and hasYoutubeApiKey is false', () => {
-    // Set a mock TWITCH_CLIENT_ID to avoid the error
     process.env.TWITCH_CLIENT_ID = 'test_client_id'
     // Ensure the current instance has an empty key (it should already be empty from beforeEach)
     const view = getPublicSecretsView()
@@ -98,6 +170,31 @@ test('getPublicSecretsView() with no key set', async (t) => {
     assert.equal(view.hasYoutubeApiKey, false)
     assert.equal(view.twitch.connected, false)
     assert.equal(view.twitch.user, null)
+  })
+})
+
+test('getTwitchClientId()', async (t) => {
+  await t.test('returns an empty string, not a throw, when TWITCH_CLIENT_ID is unset', () => {
+    delete process.env.TWITCH_CLIENT_ID
+    assert.equal(getTwitchClientId(), '')
+  })
+
+  await t.test('trims surrounding whitespace', () => {
+    process.env.TWITCH_CLIENT_ID = '  abc123  '
+    assert.equal(getTwitchClientId(), 'abc123')
+  })
+
+  await t.test('a whitespace-only value is treated as unset', () => {
+    process.env.TWITCH_CLIENT_ID = '   '
+    assert.equal(getTwitchClientId(), '')
+  })
+})
+
+test('getPublicSecretsView() reflects an unset TWITCH_CLIENT_ID without throwing', async (t) => {
+  await t.test('twitch.configured is false and the call does not throw', () => {
+    delete process.env.TWITCH_CLIENT_ID
+    assert.doesNotThrow(() => getPublicSecretsView())
+    assert.equal(getPublicSecretsView().twitch.configured, false)
   })
 })
 

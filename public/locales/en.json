@@ -166,6 +166,7 @@
       "notConnected": "Not connected",
       "connect": "Connect Twitch",
       "disconnect": "Disconnect",
+      "save": "Save Twitch settings",
       "clientCredentialsNote": "Create an application in the Twitch Developer Console to get your Client ID and Client Secret",
       "reward": "Channel Points reward",
       "rewardNone": "Select reward",

@@ -1,8 +1,10 @@
 import express from 'express'
-import { ok, failFromError, asyncHandler } from '../http.js'
+import { ok, asyncHandler } from '../http.js'
 import type { TwitchConnectionResponse } from '../types.js'
 import { AppError } from '../types.js'
-import { getConnectionStatus, startDeviceAuthorization, disconnect, refreshConnection, getClient } from '../integrations/twitch/index.js'
+import { startDeviceAuthorization, disconnect, refreshConnection, _getClient } from '../integrations/twitch/index.js'
+import { localOnly } from '../local-only.js'
+import { getPublicSecretsView } from '../secrets.js'
 
 function toUserResponse(user: { displayName: string; login: string }) {
   return {
@@ -14,7 +16,7 @@ function toUserResponse(user: { displayName: string; login: string }) {
 export const router = express.Router()
 
 router.get('/', (_req, res) => {
-  const status = getConnectionStatus()
+  const status = getPublicSecretsView().twitch
   const response: TwitchConnectionResponse = {
     connected: status.connected,
     user: status.user ? toUserResponse(status.user) : null,
@@ -25,6 +27,7 @@ router.get('/', (_req, res) => {
 
 router.post(
   '/connect',
+  localOnly,
   asyncHandler(async (_req, res) => {
     const device = await startDeviceAuthorization()
 
@@ -38,6 +41,7 @@ router.post(
 
 router.post(
   '/disconnect',
+  localOnly,
   asyncHandler(async (_req, res) => {
     await disconnect()
     ok(res, {})
@@ -46,6 +50,7 @@ router.post(
 
 router.post(
   '/refresh',
+  localOnly,
   asyncHandler(async (_req, res) => {
     const userInfo = await refreshConnection()
 
@@ -57,10 +62,11 @@ router.post(
 
 router.get(
   '/rewards',
+  localOnly,
   asyncHandler(async (_req, res) => {
-    const client = getClient()
+    const client = _getClient()
 
-    if (!client || !getConnectionStatus().connected) {
+    if (!client || !getPublicSecretsView().twitch.connected) {
       throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
     }
 

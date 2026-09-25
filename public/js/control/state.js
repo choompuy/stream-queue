@@ -116,8 +116,7 @@ export const CONFIG_FIELDS = [
   { key: 'maxRequestsPerUser', dom: 'cfgMaxPerUser', type: 'number' },
   { key: 'regionCode', dom: 'cfgRegionCode', type: 'text' },
   { key: 'allowShorts', dom: 'cfgAllowShorts', type: 'checkbox' },
-  { key: 'allowLiveStreams', dom: 'cfgAllowLiveStreams', type: 'checkbox' },
-  { key: 'channelPointsRewardId', path: 'twitch', dom: 'twitchRewardSelect', type: 'nullableText' }
+  { key: 'allowLiveStreams', dom: 'cfgAllowLiveStreams', type: 'checkbox' }
 ]
 
 export const selectors = {

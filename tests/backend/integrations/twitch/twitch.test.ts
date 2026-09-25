@@ -3,18 +3,16 @@ import assert from 'node:assert/strict'
 import { TwitchOAuth } from '../../../../src/integrations/twitch/oauth.js'
 import {
   initializeTwitchIntegration,
-  getConnectionStatus,
   disconnect,
-  startDeviceAuthorization,
   isDeviceAuthorizationPending,
   _resetIntegration
 } from '../../../../src/integrations/twitch/index.js'
-import { clearTwitchOAuthState } from '../../../../src/secrets.js'
+import { clearTwitchOAuthState, getPublicSecretsView } from '../../../../src/secrets.js'
 import type { TwitchTokenData } from '../../../../src/integrations/twitch/types.js'
 
 test('TwitchOAuth', async (t) => {
   await t.test('setTokenData and getTokenData work correctly', () => {
-    const oauth = new TwitchOAuth()
+    const oauth = new TwitchOAuth({ clientId: 'test_client_id' })
     const tokenData: TwitchTokenData = {
       accessToken: 'test_access_token',
       refreshToken: 'test_refresh_token',
@@ -32,7 +30,7 @@ test('TwitchOAuth', async (t) => {
   })
 
   await t.test('clearTokenData removes token data', () => {
-    const oauth = new TwitchOAuth()
+    const oauth = new TwitchOAuth({ clientId: 'test_client_id' })
     const tokenData: TwitchTokenData = {
       accessToken: 'test_access_token',
       refreshToken: 'test_refresh_token',
@@ -48,12 +46,12 @@ test('TwitchOAuth', async (t) => {
   })
 
   await t.test('isAuthenticated returns false when no token', () => {
-    const oauth = new TwitchOAuth()
+    const oauth = new TwitchOAuth({ clientId: 'test_client_id' })
     assert.equal(oauth.isAuthenticated(), false)
   })
 
   await t.test('isAuthenticated returns true when valid token exists', () => {
-    const oauth = new TwitchOAuth()
+    const oauth = new TwitchOAuth({ clientId: 'test_client_id' })
     const tokenData: TwitchTokenData = {
       accessToken: 'test_access_token',
       refreshToken: 'test_refresh_token',
@@ -66,7 +64,7 @@ test('TwitchOAuth', async (t) => {
   })
 
   await t.test('isAuthenticated returns true when token has refresh token (even if expired)', () => {
-    const oauth = new TwitchOAuth()
+    const oauth = new TwitchOAuth({ clientId: 'test_client_id' })
     const tokenData: TwitchTokenData = {
       accessToken: 'test_access_token',
       refreshToken: 'test_refresh_token',
@@ -79,7 +77,7 @@ test('TwitchOAuth', async (t) => {
   })
 
   await t.test('needsRefresh returns true when token near expiration', () => {
-    const oauth = new TwitchOAuth()
+    const oauth = new TwitchOAuth({ clientId: 'test_client_id' })
     const tokenData: TwitchTokenData = {
       accessToken: 'test_access_token',
       refreshToken: 'test_refresh_token',
@@ -92,7 +90,7 @@ test('TwitchOAuth', async (t) => {
   })
 
   await t.test('needsRefresh returns false when token is fresh', () => {
-    const oauth = new TwitchOAuth()
+    const oauth = new TwitchOAuth({ clientId: 'test_client_id' })
     const tokenData: TwitchTokenData = {
       accessToken: 'test_access_token',
       refreshToken: 'test_refresh_token',
@@ -111,20 +109,20 @@ test('TwitchIntegration', async (t) => {
     clearTwitchOAuthState()
   })
 
-  await t.test('getConnectionStatus returns disconnected when not initialized', () => {
-    const status = getConnectionStatus()
+  await t.test('getPublicSecretsView returns disconnected when not initialized', () => {
+    const status = getPublicSecretsView().twitch
 
     assert.equal(status.connected, false)
     assert.equal(status.user, null)
     assert.equal(status.connectedAt, null)
   })
 
-  await t.test('getConnectionStatus returns disconnected when initialized but no token', () => {
+  await t.test('getPublicSecretsView returns disconnected when initialized but no token', () => {
     initializeTwitchIntegration({
       clientId: 'test_client_id'
     })
 
-    const status = getConnectionStatus()
+    const status = getPublicSecretsView().twitch
 
     assert.equal(status.connected, false)
     assert.equal(status.user, null)
@@ -139,7 +137,7 @@ test('TwitchIntegration', async (t) => {
     // Should not throw any errors
     await disconnect()
 
-    const status = getConnectionStatus()
+    const status = getPublicSecretsView().twitch
     assert.equal(status.connected, false)
   })
 
@@ -153,7 +151,7 @@ test('TwitchIntegration', async (t) => {
     })
 
     // Should not throw any errors
-    const status = getConnectionStatus()
+    const status = getPublicSecretsView().twitch
     assert.equal(status.connected, false)
   })
 

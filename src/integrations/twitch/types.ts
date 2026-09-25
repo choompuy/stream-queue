@@ -23,7 +23,9 @@ export type TwitchAuthConfig = {
   scopes: string[]
 }
 
-export type TwitchOAuthOptions = Partial<TwitchAuthConfig> & {
+export type TwitchOAuthOptions = {
+  clientId: string
+  scopes?: string[]
   onTokenUpdated?: (tokenData: TwitchTokenData) => void
 }
 
@@ -35,10 +37,6 @@ export type TwitchDeviceCodeResponse = {
   interval: number
 }
 
-export type TwitchCredentials = {
-  clientId: string | null
-}
-
 export type TwitchSecrets = {
   tokenData: TwitchTokenData | null
   userInfo: TwitchUserInfo | null
@@ -47,7 +45,6 @@ export type TwitchSecrets = {
 
 export type TwitchErrorResponse = {
   error: string
-  status: number
   message: string
 }
 

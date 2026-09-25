@@ -18,7 +18,9 @@ function logWarn(message: string): void {
 const EVENTSUB_WS_URL = 'wss://eventsub.wss.twitch.tv/ws'
 const CHANNEL_POINTS_REDEMPTION = 'channel.channel_points_custom_reward_redemption.add'
 const EVENTSUB_VERSION = '1'
-const RECONNECT_DELAY_MS = 5_000
+const INITIAL_RECONNECT_DELAY_MS = 5_000
+const MAX_RECONNECT_DELAY_MS = 60_000
+const MAX_RECONNECT_ATTEMPTS = 10
 const SESSION_TIMEOUT_MS = 10_000
 
 export type TwitchEventSubOptions = {
@@ -38,13 +40,19 @@ export class TwitchEventSub {
   private sessionReadyReject: ((error: Error) => void) | null = null
   private stopped = false
   private connecting = false
+  private reconnectAttempts = 0
+  private currentReconnectDelay = INITIAL_RECONNECT_DELAY_MS
 
   constructor(config: TwitchEventSubOptions) {
     this.config = config
   }
 
   async connect(): Promise<void> {
-    if (this.stopped) this.stopped = false
+    if (this.stopped) {
+      this.stopped = false
+      this.reconnectAttempts = 0
+      this.currentReconnectDelay = INITIAL_RECONNECT_DELAY_MS
+    }
     if (this.isConnected() || this.connecting) return
 
     if (this.reconnectTimer) {
@@ -141,7 +149,14 @@ export class TwitchEventSub {
 
     let timeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
       timeout = null
-      this.sessionReadyReject?.(new Error('Timed out waiting for EventSub session welcome'))
+      const error = new Error('Timed out waiting for EventSub session welcome')
+      this.sessionReadyReject?.(error)
+      
+      // Explicitly close the socket on timeout
+      const socket = this.socket
+      this.socket = null
+      this.sessionId = null
+      socket?.close()
     }, SESSION_TIMEOUT_MS)
 
     try {
@@ -214,16 +229,19 @@ export class TwitchEventSub {
   }
 
   private async subscribeToChannelPoints(): Promise<void> {
-    if (!this.sessionId) throw new Error('EventSub session is not initialized')
+    if (!this.sessionId) throw new AppError('TWITCH_EVENTSUB_ERROR', 'EventSub session is not initialized')
 
     const accessToken = await this.config.oauth.getValidAccessToken()
     if (!accessToken) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
+
+    const clientId = this.config.oauth.getConfig().clientId
+    if (!clientId) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID not configured')
 
     const response = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        'Client-Id': this.config.clientId,
+        'Client-Id': clientId,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -241,7 +259,7 @@ export class TwitchEventSub {
 
     if (!response.ok) {
       const body = await response.text()
-      throw new Error(`Failed to subscribe to Channel Points: HTTP ${response.status} ${body}`)
+      throw new AppError('TWITCH_EVENTSUB_ERROR', `Failed to subscribe to Channel Points: HTTP ${response.status} ${body}`)
     }
     log('Subscribed to Channel Points redemptions')
   }
@@ -298,7 +316,6 @@ export class TwitchEventSub {
 
     logWarn(`Subscription revoked: ${subscription?.type ?? 'unknown'} (${subscription?.status ?? 'unknown'})`)
 
-    this.stopped = true
     this.clearReconnectTimer()
     this.clearSessionWait()
 
@@ -324,14 +341,26 @@ export class TwitchEventSub {
   private scheduleReconnect(): void {
     if (this.stopped || this.reconnectTimer || this.connecting) return
 
+    // Check if we've exceeded max reconnect attempts
+    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      logError(`Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached, giving up`)
+      return
+    }
+
+    this.reconnectAttempts++
+    const delay = this.currentReconnectDelay
+
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null
 
       void this.connect().catch((error) => {
-        logError(`Reconnect failed: ${error instanceof Error ? error.message : error}`)
+        logError(`Reconnect failed (attempt ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}): ${error instanceof Error ? error.message : error}`)
+        
+        // Exponential backoff
+        this.currentReconnectDelay = Math.min(this.currentReconnectDelay * 2, MAX_RECONNECT_DELAY_MS)
         this.scheduleReconnect()
       })
-    }, RECONNECT_DELAY_MS)
+    }, delay)
   }
 
   private clearReconnectTimer(): void {

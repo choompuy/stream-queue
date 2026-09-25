@@ -166,6 +166,7 @@
       "notConnected": "Не подключено",
       "connect": "Подключить Twitch",
       "disconnect": "Отключить",
+      "save": "Сохранить настройки Twitch",
       "clientCredentialsNote": "Создайте приложение в Twitch Developer Console, чтобы получить Client ID и Client Secret",
       "reward": "Награда Channel Points",
       "rewardNone": "Выберите награду",

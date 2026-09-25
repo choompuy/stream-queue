@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import { SECRETS_PATH, createFileStore } from './persist.js'
-import type { TwitchSecrets } from './integrations/twitch/types.js'
+import type { TwitchSecrets, TwitchTokenData, TwitchUserInfo } from './integrations/twitch/types.js'
 
 export type Secrets = {
   youtubeApiKey: string
@@ -48,8 +48,40 @@ export function updateSecrets(updates: SecretsUpdates): Secrets {
   return getSecrets()
 }
 
+function isValidTokenData(value: unknown): value is TwitchTokenData {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+
+  return (
+    typeof v.accessToken === 'string' &&
+    typeof v.refreshToken === 'string' &&
+    typeof v.expiresAt === 'number' &&
+    Array.isArray(v.scope) &&
+    v.scope.every((s) => typeof s === 'string')
+  )
+}
+
+function isValidUserInfo(value: unknown): value is TwitchUserInfo {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+
+  return typeof v.id === 'string' && typeof v.login === 'string' && typeof v.displayName === 'string' && typeof v.profileImageUrl === 'string'
+}
+
 export function updateTwitchOAuthState(updates: Partial<TwitchSecrets>): void {
   if (Object.keys(updates).length === 0) return
+
+  if ('tokenData' in updates && updates.tokenData !== null && !isValidTokenData(updates.tokenData)) {
+    throw new Error('tokenData must be a valid TwitchTokenData object or null')
+  }
+
+  if ('userInfo' in updates && updates.userInfo !== null && !isValidUserInfo(updates.userInfo)) {
+    throw new Error('userInfo must be a valid TwitchUserInfo object or null')
+  }
+
+  if ('connectedAt' in updates && updates.connectedAt !== null && typeof updates.connectedAt !== 'number') {
+    throw new Error('connectedAt must be a number or null')
+  }
 
   secrets = {
     ...secrets,
@@ -63,6 +95,9 @@ export function updateTwitchOAuthState(updates: Partial<TwitchSecrets>): void {
 }
 
 export function clearTwitchOAuthState(): void {
+  const { tokenData, userInfo, connectedAt } = secrets.twitch
+  if (tokenData === null && userInfo === null && connectedAt === null) return
+
   updateTwitchOAuthState({
     tokenData: null,
     userInfo: null,
@@ -77,9 +112,7 @@ function maskSecret(value: string): string {
 }
 
 export function getTwitchClientId(): string {
-  const clientId = process.env.TWITCH_CLIENT_ID
-  if (!clientId) throw new Error('Twitch Client ID is not configured')
-  return clientId
+  return process.env.TWITCH_CLIENT_ID?.trim() || ''
 }
 
 export function getPublicSecretsView() {
