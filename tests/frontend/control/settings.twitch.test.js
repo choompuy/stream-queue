@@ -48,7 +48,12 @@ globalThis.fetch = async (url, options = {}) => {
   const handler = handlers[`${method} ${url}`]
   assert.ok(handler, `unexpected request ${method} ${url}`)
 
-  return { ok: true, json: async () => ({ data: await handler() }) }
+  try {
+    const data = await handler()
+    return { ok: true, json: async () => ({ data }) }
+  } catch (error) {
+    return { ok: false, status: 500, json: async () => ({ error: error.message, code: 'SERVER_ERROR' }) }
+  }
 }
 
 jsdom.window.open = (url) => {
@@ -193,6 +198,19 @@ test('connectTwitch', async (t) => {
 
     assert.equal(openedWindows[0].closed, true)
     assert.ok(document.getElementById('toastContainer').textContent.length > 0)
+  })
+
+  await t.test('closes the popup when the connect request itself fails', async () => {
+    handlers = {
+      'POST /api/integrations/twitch/connect': () => {
+        throw new Error('server error')
+      }
+    }
+
+    await drain(settings.connectTwitch())
+
+    assert.equal(openedWindows[0].closed, true, 'a failed connect must not leave a blank tab behind')
+    assert.equal(dom.twitchConnectBtn.disabled, false)
   })
 
   await t.test('disables the connect button for the whole polling window', async () => {
