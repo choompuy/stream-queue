@@ -634,7 +634,7 @@ select {
   height: 100% !important;
 }
 
-#saveConfigSettingBtn {
+.settings-section-btn {
   margin-top: auto;
 }
 

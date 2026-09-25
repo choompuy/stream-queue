@@ -1,5 +1,6 @@
+import 'dotenv/config'
 import { SECRETS_PATH, createFileStore } from './persist.js'
-import type { TwitchSecrets, TwitchSecretsUpdates } from './integrations/twitch/types.js'
+import type { TwitchSecrets } from './integrations/twitch/types.js'
 
 export type Secrets = {
   youtubeApiKey: string
@@ -8,15 +9,13 @@ export type Secrets = {
 
 export type SecretsUpdates = {
   youtubeApiKey?: string
-  twitch?: TwitchSecretsUpdates
 }
 
 const store = createFileStore<Secrets>(SECRETS_PATH)
+
 let secrets: Secrets = store.load({
   youtubeApiKey: '',
   twitch: {
-    clientId: null,
-    clientSecret: null,
     tokenData: null,
     userInfo: null,
     connectedAt: null
@@ -24,29 +23,51 @@ let secrets: Secrets = store.load({
 })
 
 export function getSecrets(): Secrets {
-  return {
-    ...secrets,
-    twitch: {
-      ...secrets.twitch
-    }
-  }
+  return structuredClone(secrets)
 }
 
 export function updateSecrets(updates: SecretsUpdates): Secrets {
-  if (updates.youtubeApiKey !== undefined && updates.youtubeApiKey.trim() !== '') {
-    secrets.youtubeApiKey = updates.youtubeApiKey.trim()
+  let changed = false
+
+  if (updates.youtubeApiKey !== undefined) {
+    if (typeof updates.youtubeApiKey !== 'string') {
+      throw new Error('youtubeApiKey must be a string')
+    }
+
+    const value = updates.youtubeApiKey.trim()
+    if (value !== '' && value !== secrets.youtubeApiKey) {
+      secrets = {
+        ...secrets,
+        youtubeApiKey: value
+      }
+      changed = true
+    }
   }
 
-  if (updates.twitch) {
-    Object.assign(secrets.twitch, updates.twitch)
-  }
-
-  store.scheduleSave(
-    () => secrets,
-    (error) => console.error('[SECRETS] Failed to save:', error instanceof Error ? error.message : error)
-  )
-  
+  if (changed) scheduleSave()
   return getSecrets()
+}
+
+export function updateTwitchOAuthState(updates: Partial<TwitchSecrets>): void {
+  if (Object.keys(updates).length === 0) return
+
+  secrets = {
+    ...secrets,
+    twitch: {
+      ...secrets.twitch,
+      ...updates
+    }
+  }
+
+  scheduleSave()
+}
+
+export function clearTwitchOAuthState(): void {
+  updateTwitchOAuthState({
+    tokenData: null,
+    userInfo: null,
+    connectedAt: null
+  })
 }
 
 function maskSecret(value: string): string {
@@ -55,13 +76,19 @@ function maskSecret(value: string): string {
   return `${value.slice(0, 4)}${'•'.repeat(value.length - 8)}${value.slice(-4)}`
 }
 
+export function getTwitchClientId(): string {
+  const clientId = process.env.TWITCH_CLIENT_ID
+  if (!clientId) throw new Error('Twitch Client ID is not configured')
+  return clientId
+}
+
 export function getPublicSecretsView() {
   return {
     youtubeApiKey: maskSecret(secrets.youtubeApiKey),
     hasYoutubeApiKey: secrets.youtubeApiKey.length > 0,
 
     twitch: {
-      configured: Boolean(secrets.twitch.clientId) && Boolean(secrets.twitch.clientSecret),
+      configured: Boolean(getTwitchClientId()),
       connected: secrets.twitch.tokenData !== null && secrets.twitch.userInfo !== null,
       user: secrets.twitch.userInfo
         ? {
@@ -73,3 +100,14 @@ export function getPublicSecretsView() {
     }
   }
 }
+
+function scheduleSave(): void {
+  store.scheduleSave(
+    () => secrets,
+    (error) => {
+      console.error('[SECRETS] Failed to save:', error instanceof Error ? error.message : error)
+    }
+  )
+}
+
+export type SecretsResponse = ReturnType<typeof getPublicSecretsView>

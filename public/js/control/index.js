@@ -10,7 +10,7 @@ import { refreshFallbackState } from './fallback.js'
 import { loadActivity } from './activity.js'
 import { loadBlocklist } from './blocklist.js'
 import { loadPlaylists } from './playlists.js'
-import { loadSecrets, loadConfig, loadOverlaySettings, loadNetworkInfo } from './settings.js'
+import { loadSecrets, loadConfig, loadOverlaySettings, loadNetworkInfo, loadTwitchSettings } from './settings.js'
 import { isDashboardActive } from './tabs.js'
 
 const POLLING = [
@@ -39,6 +39,7 @@ async function init() {
     loadActivity(),
     loadBlocklist(),
     loadPlaylists(),
+    loadTwitchSettings(),
     refreshState(),
     refreshFallbackState()
   ])

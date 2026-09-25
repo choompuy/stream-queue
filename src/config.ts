@@ -21,6 +21,9 @@ const configDefaults: Config = {
     enabled: true,
     shuffle: false,
     repeat: false
+  },
+  twitch: {
+    channelPointsRewardId: null
   }
 }
 
@@ -35,7 +38,11 @@ function saveConfig(): void {
 }
 
 function cloneConfig(source: Config): Config {
-  return { ...source, fallbackPlaylist: { ...source.fallbackPlaylist } }
+  return {
+    ...source,
+    fallbackPlaylist: { ...source.fallbackPlaylist },
+    twitch: { ...source.twitch }
+  }
 }
 
 export function getConfig(): Config {
@@ -71,14 +78,38 @@ const FIELD_RULES: Partial<Record<keyof Config, FieldRule>> = {
 }
 
 export type FallbackPlaylistUpdates = Partial<Config['fallbackPlaylist']>
-export type ConfigUpdates = Partial<Omit<Config, 'fallbackPlaylist'>> & { fallbackPlaylist?: FallbackPlaylistUpdates }
-export type ConfigValidation = { clean: ConfigUpdates; rejected: string[] }
+export type TwitchConfigUpdates = Partial<Config['twitch']>
 
-const FALLBACK_PLAYLIST_RULES: Record<keyof Config['fallbackPlaylist'], (value: unknown) => boolean> = {
-  playlistId: (v) => v === null || isValidPlaylistId(v),
-  enabled: (v) => typeof v === 'boolean',
-  shuffle: (v) => typeof v === 'boolean',
-  repeat: (v) => typeof v === 'boolean'
+export type ConfigUpdates = Partial<Omit<Config, 'fallbackPlaylist' | 'twitch'>> & {
+  fallbackPlaylist?: FallbackPlaylistUpdates
+  twitch?: TwitchConfigUpdates
+}
+
+export type ConfigValidation = {
+  clean: ConfigUpdates
+  rejected: string[]
+}
+
+const FALLBACK_PLAYLIST_RULES: Record<keyof Config['fallbackPlaylist'], FieldRule> = {
+  playlistId: {
+    validate: (v) => v === null || isValidPlaylistId(v)
+  },
+  enabled: {
+    validate: (v) => typeof v === 'boolean'
+  },
+  shuffle: {
+    validate: (v) => typeof v === 'boolean'
+  },
+  repeat: {
+    validate: (v) => typeof v === 'boolean'
+  }
+}
+
+const TWITCH_RULES: Record<keyof Config['twitch'], FieldRule> = {
+  channelPointsRewardId: {
+    normalize: (v) => (typeof v === 'string' ? v.trim() : v),
+    validate: (v) => v === null || (typeof v === 'string' && v.length > 0)
+  }
 }
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -91,14 +122,46 @@ function validateFallbackPlaylistUpdates(raw: unknown, rejected: string[]): Fall
 
   const clean: Record<string, unknown> = {}
 
-  for (const [key, value] of Object.entries(raw)) {
+  for (const [key, rawValue] of Object.entries(raw)) {
     const rule = Object.hasOwn(FALLBACK_PLAYLIST_RULES, key) ? FALLBACK_PLAYLIST_RULES[key as keyof Config['fallbackPlaylist']] : undefined
 
-    if (rule?.(value)) clean[key] = value
+    if (!rule) {
+      rejected.push(`fallbackPlaylist.${key}`)
+      continue
+    }
+
+    const value = rule.normalize ? rule.normalize(rawValue) : rawValue
+
+    if (rule.validate(value)) clean[key] = value
     else rejected.push(`fallbackPlaylist.${key}`)
   }
 
   return clean as FallbackPlaylistUpdates
+}
+
+function validateTwitchUpdates(raw: unknown, rejected: string[]): TwitchConfigUpdates | undefined {
+  if (!isPlainObject(raw)) {
+    rejected.push('twitch')
+    return undefined
+  }
+
+  const clean: Record<string, unknown> = {}
+
+  for (const [key, rawValue] of Object.entries(raw)) {
+    const rule = Object.hasOwn(TWITCH_RULES, key) ? TWITCH_RULES[key as keyof Config['twitch']] : undefined
+
+    if (!rule) {
+      rejected.push(`twitch.${key}`)
+      continue
+    }
+
+    const value = rule.normalize ? rule.normalize(rawValue) : rawValue
+
+    if (rule.validate(value)) clean[key] = value
+    else rejected.push(`twitch.${key}`)
+  }
+
+  return clean as TwitchConfigUpdates
 }
 
 /**
@@ -118,6 +181,12 @@ export function validateConfigUpdates(updates: unknown, current: Config = config
     if (key === 'fallbackPlaylist') {
       const nested = validateFallbackPlaylistUpdates(raw, rejected)
       if (nested) clean.fallbackPlaylist = nested
+      continue
+    }
+
+    if (key === 'twitch') {
+      const nested = validateTwitchUpdates(raw, rejected)
+      if (nested) clean.twitch = nested
       continue
     }
 
@@ -146,7 +215,10 @@ export function validateConfigUpdates(updates: unknown, current: Config = config
     }
   }
 
-  return { clean: clean as ConfigUpdates, rejected }
+  return {
+    clean: clean as ConfigUpdates,
+    rejected
+  }
 }
 
 /** Puts back a snapshot taken earlier (e.g. before an operation that failed half-way); bypasses validation on purpose. */
@@ -158,14 +230,18 @@ export function restoreConfig(snapshot: Config): void {
 /** Applies the valid part of `updates` and reports what was refused; the caller decides whether that is an error. */
 export function updateConfig(updates: ConfigUpdates): { config: Config; rejected: string[] } {
   const { clean, rejected } = validateConfigUpdates(updates, config)
-  const { fallbackPlaylist, ...rest } = clean
+  const { fallbackPlaylist, twitch, ...rest } = clean
 
   config = {
     ...config,
     ...rest,
-    fallbackPlaylist: { ...config.fallbackPlaylist, ...fallbackPlaylist }
+    fallbackPlaylist: { ...config.fallbackPlaylist, ...fallbackPlaylist },
+    twitch: { ...config.twitch, ...twitch }
   }
   saveConfig()
 
-  return { config: cloneConfig(config), rejected }
+  return {
+    config: cloneConfig(config),
+    rejected
+  }
 }

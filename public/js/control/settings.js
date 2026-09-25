@@ -124,6 +124,108 @@ export function toggleQr() {
   if (!dom.controlPanelQr.classList.contains('hidden')) renderQrUrl()
 }
 
+export function connectTwitch() {
+  return run('connecting Twitch', async () => {
+    const response = await api.connectTwitch()
+    if (!response?.verificationUri || !response?.userCode) {
+      throw new Error('Twitch authorization data is missing')
+    }
+
+    if (dom.twitchAuthorizationCode) {
+      dom.twitchAuthorizationCode.textContent = response.userCode
+    }
+
+    dom.twitchAuthorization?.classList.remove('hidden')
+    window.open(response.verificationUri, '_blank', 'noopener,noreferrer')
+    const expiresAt = Date.now() + response.expiresIn * 1000
+
+    while (Date.now() < expiresAt) {
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      const status = await api.getTwitchStatus()
+
+      if (status.connected) {
+        state.twitch.connected = true
+        state.twitch.user = status.user
+        state.twitch.connectedAt = status.connectedAt
+        dom.twitchAuthorization?.classList.add('hidden')
+        renderTwitchConnection()
+
+        const response = await api.getTwitchRewards()
+        state.twitch.rewards = response.rewards ?? []
+        renderTwitchRewards()
+        return
+      }
+    }
+
+    dom.twitchAuthorization?.classList.add('hidden')
+    throw new Error('Twitch authorization expired')
+  })
+}
+
+export function disconnectTwitch() {
+  return run('disconnecting Twitch', async () => {
+    await api.disconnectTwitch()
+    state.twitch.connected = false
+    state.twitch.user = null
+    state.twitch.connectedAt = null
+    state.twitch.rewards = []
+    dom.twitchAuthorization?.classList.add('hidden')
+    renderTwitchConnection()
+
+    if (dom.twitchRewardSelect) dom.twitchRewardSelect.innerHTML = ''
+  })
+}
+
+export function loadTwitchSettings() {
+  return run('loading Twitch settings', async () => {
+    const status = await api.getTwitchStatus()
+    state.twitch.connected = Boolean(status.connected)
+    state.twitch.user = status.user
+    state.twitch.connectedAt = status.connectedAt
+    renderTwitchConnection()
+
+    if (!state.twitch.connected) return
+
+    const response = await api.getTwitchRewards()
+    state.twitch.rewards = response.rewards ?? []
+    renderTwitchRewards()
+  })
+}
+
+function renderTwitchConnection() {
+  if (!dom.twitchConnectionStatus) return
+
+  if (state.twitch.connected && state.twitch.user) {
+    dom.twitchConnectionStatus.textContent = t('settings.twitch.connected', { user: state.twitch.user.displayName })
+    dom.twitchConnectionStatus.classList.remove('text-red')
+    dom.twitchConnectBtn?.classList.add('hidden')
+    dom.twitchDisconnectBtn?.classList.remove('hidden')
+    dom.twitchRewardSection?.classList.remove('hidden')
+  } else {
+    dom.twitchConnectionStatus.textContent = t('settings.twitch.notConnected')
+    dom.twitchConnectionStatus.classList.add('text-red')
+    dom.twitchConnectBtn?.classList.remove('hidden')
+    dom.twitchDisconnectBtn?.classList.add('hidden')
+    dom.twitchRewardSection?.classList.add('hidden')
+  }
+}
+
+function renderTwitchRewards() {
+  if (!dom.twitchRewardSelect) return
+
+  const selectedId = state.config?.twitch?.channelPointsRewardId ?? ''
+
+  dom.twitchRewardSelect.innerHTML = `
+    <option value="">${escapeHtml(t('settings.twitch.rewardNone'))}</option>
+    ${state.twitch.rewards
+      .map(
+        (reward) =>
+          `<option value="${escapeHtml(reward.id)}" ${reward.id === selectedId ? 'selected' : ''}>${escapeHtml(reward.title)} (${reward.cost})</option>`
+      )
+      .join('')}
+  `
+}
+
 export function loadConfig() {
   return run('loading config', async () => {
     state.config = await api.getConfig()
@@ -210,5 +312,7 @@ export async function saveConfigSetting() {
 export const settingsActions = {
   'copy-overlay-url': copyOverlayUrl,
   'toggle-qr': toggleQr,
-  'save-config': saveConfigSetting
+  'save-config': saveConfigSetting,
+  'connect-twitch': connectTwitch,
+  'disconnect-twitch': disconnectTwitch
 }

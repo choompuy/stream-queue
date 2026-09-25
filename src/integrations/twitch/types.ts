@@ -20,8 +20,6 @@ export type TwitchConnectionStatus = {
 
 export type TwitchAuthConfig = {
   clientId: string
-  clientSecret: string
-  redirectUri: string
   scopes: string[]
 }
 
@@ -29,11 +27,19 @@ export type TwitchOAuthOptions = Partial<TwitchAuthConfig> & {
   onTokenUpdated?: (tokenData: TwitchTokenData) => void
 }
 
-export type TwitchSecretsUpdates = Partial<TwitchSecrets>
+export type TwitchDeviceCodeResponse = {
+  device_code: string
+  user_code: string
+  verification_uri: string
+  expires_in: number
+  interval: number
+}
+
+export type TwitchCredentials = {
+  clientId: string | null
+}
 
 export type TwitchSecrets = {
-  clientId: string | null
-  clientSecret: string | null
   tokenData: TwitchTokenData | null
   userInfo: TwitchUserInfo | null
   connectedAt: number | null
@@ -62,6 +68,10 @@ export type TwitchUsersResponse = {
   }>
 }
 
+export type TwitchRedemptionStatus = 'UNFULFILLED' | 'FULFILLED' | 'CANCELED'
+
+export type TwitchRedemptionUpdateStatus = 'FULFILLED' | 'CANCELED'
+
 export type TwitchChannelPointsRedemption = {
   id: string
   broadcaster_user_id: string
@@ -71,13 +81,31 @@ export type TwitchChannelPointsRedemption = {
   user_login: string
   user_name: string
   user_input: string
+  status: TwitchRedemptionStatus
+  redeemed_at: string
   reward: {
     id: string
     title: string
     cost: number
     prompt: string
   }
-  redeemed_at: string
+}
+
+export type TwitchRedemptionsResponse = {
+  data: TwitchChannelPointsRedemption[]
+}
+
+export type TwitchCustomReward = {
+  id: string
+  title: string
+  cost: number
+  prompt: string
+  is_enabled: boolean
+  is_user_input_required: boolean
+}
+
+export type TwitchCustomRewardsResponse = {
+  data: TwitchCustomReward[]
 }
 
 export type EventSubMessage = {

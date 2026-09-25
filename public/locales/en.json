@@ -159,6 +159,20 @@
       "title": "About",
       "description": "Local music request manager for streamers",
       "developedBy": "Developed by"
+    },
+    "twitch": {
+      "integration": "Twitch integration",
+      "connected": "Connected as {{user}}",
+      "notConnected": "Not connected",
+      "connect": "Connect Twitch",
+      "disconnect": "Disconnect",
+      "clientCredentialsNote": "Create an application in the Twitch Developer Console to get your Client ID and Client Secret",
+      "reward": "Channel Points reward",
+      "rewardNone": "Select reward",
+      "rewardNote": "Redemptions of this reward will be used as song requests",
+      "noRewards": "No eligible rewards found",
+      "save": "Save Twitch settings",
+      "authorizationInstructions": "Open Twitch and enter this code to authorize StreamQueue"
     }
   },
   "player": {
@@ -214,7 +228,11 @@
       "isShort": "Shorts are not allowed",
       "playbackFailed": "Playback failed in the player (error {{errorCode}})",
       "playbackVideoUnavailable": "Video became unavailable (removed, made private, or deleted)",
-      "playbackEmbedDisallowed": "YouTube refused embedded playback (often age-restriction or an owner-side embed block not visible via the API)"
+      "playbackEmbedDisallowed": "YouTube refused embedded playback (often age-restriction or an owner-side embed block not visible via the API)",
+      "twitchAuthError": "Failed to generate Twitch authorization URL",
+      "twitchOAuthError": "Failed to complete Twitch authorization",
+      "twitchNotConnected": "Twitch account is not connected",
+      "twitchRefreshError": "Failed to refresh Twitch connection"
     }
   },
   "time": {
@@ -245,6 +263,7 @@
     "nowPlaying": "Now playing: {{title}}",
     "addedToQueue": "Added to queue: {{title}} [#{{position}}]",
     "viewerRequest": "🎵 {{user}} added: {{title}}",
-    "viewerRequestsMany": "🎵 {{count}} new tracks added by viewers"
+    "viewerRequestsMany": "🎵 {{count}} new tracks added by viewers",
+    "twitchSettingsSaved": "Twitch settings saved"
   }
 }

@@ -159,6 +159,20 @@
       "title": "О приложении",
       "description": "Локальное управление музыкальными запросами для стримеров",
       "developedBy": "Разработано"
+    },
+    "twitch": {
+      "integration": "Интеграция с Twitch",
+      "connected": "Подключено как {{user}}",
+      "notConnected": "Не подключено",
+      "connect": "Подключить Twitch",
+      "disconnect": "Отключить",
+      "clientCredentialsNote": "Создайте приложение в Twitch Developer Console, чтобы получить Client ID и Client Secret",
+      "reward": "Награда Channel Points",
+      "rewardNone": "Выберите награду",
+      "rewardNote": "Погашения этой награды будут использоваться как запросы песен",
+      "noRewards": "Подходящие награды не найдены",
+      "save": "Сохранить настройки Twitch",
+      "authorizationInstructions": "Откройте Twitch и введите этот код, чтобы авторизовать StreamQueue"
     }
   },
   "player": {
@@ -214,7 +228,11 @@
       "isShort": "Видео Shorts не поддерживаются",
       "playbackFailed": "Ошибка воспроизведения (код ошибки: {{errorCode}})",
       "playbackVideoUnavailable": "Видео стало недоступно (удалено, скрыто или сделано приватным)",
-      "playbackEmbedDisallowed": "YouTube отказал во встроенном воспроизведении (часто из-за возрастного ограничения или блокировки со стороны автора, что не видно через API)"
+      "playbackEmbedDisallowed": "YouTube отказал во встроенном воспроизведении (часто из-за возрастного ограничения или блокировки со стороны автора, что не видно через API)",
+      "twitchAuthError": "Не удалось получить URL авторизации Twitch",
+      "twitchOAuthError": "Не удалось завершить авторизацию Twitch",
+      "twitchNotConnected": "Аккаунт Twitch не подключён",
+      "twitchRefreshError": "Не удалось обновить подключение Twitch"
     }
   },
   "time": {
@@ -245,6 +263,7 @@
     "nowPlaying": "Сейчас играет: {{title}}",
     "addedToQueue": "Добавлено в очередь: {{title}} [#{{position}}]",
     "viewerRequest": "🎵 {{user}} добавил(а): {{title}}",
-    "viewerRequestsMany": "🎵 Добавлено {{count}} новых треков от зрителей"
+    "viewerRequestsMany": "🎵 Добавлено {{count}} новых треков от зрителей",
+    "twitchSettingsSaved": "Настройки Twitch сохранены"
   }
 }

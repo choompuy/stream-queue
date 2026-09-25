@@ -9,7 +9,7 @@ import { runStartupTasks } from './startup.js'
 import { errorHandler, ForbiddenOriginError } from './error-handler.js'
 import { apiRouter } from './routes/index.js'
 import { initializeTwitchIntegration } from './integrations/twitch/index.js'
-import { getSecrets } from './secrets.js'
+import { getTwitchClientId } from './secrets.js'
 
 const app = express()
 let PORT: number
@@ -60,14 +60,9 @@ async function main() {
   })
 
   initState()
-  const secrets = getSecrets()
+  initializeTwitchIntegration({ clientId: getTwitchClientId() })
+
   PORT = await findAvailablePort(3000)
-  
-  initializeTwitchIntegration({
-    clientId: secrets.twitch.clientId ?? undefined,
-    clientSecret: secrets.twitch.clientSecret ?? undefined,
-    redirectUri: `http://localhost:${PORT}/api/integrations/twitch/callback`
-  })
 
   const server = app.listen(PORT, () => {
     log(`Server running on http://localhost:${PORT}`)

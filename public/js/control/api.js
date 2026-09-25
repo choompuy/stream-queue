@@ -91,5 +91,11 @@ export const api = {
 
   getBlocklist: () => request('/api/blocklist'),
   blockTrack: (videoId, title) => post('/api/blocklist', { videoId, title }),
-  unblockTrack: (videoId) => del(`/api/blocklist/${id(videoId)}`)
+  unblockTrack: (videoId) => del(`/api/blocklist/${id(videoId)}`),
+  
+  getTwitchStatus: () => request('/api/integrations/twitch'),
+  connectTwitch: () => post('/api/integrations/twitch/connect'),
+  getTwitchRewards: () => request('/api/integrations/twitch/rewards'),
+  disconnectTwitch: () => post('/api/integrations/twitch/disconnect'),
+  refreshTwitch: () => post('/api/integrations/twitch/refresh')
 }

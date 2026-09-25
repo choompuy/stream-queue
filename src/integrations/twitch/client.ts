@@ -1,4 +1,13 @@
-import type { TwitchUserInfo, TwitchUsersResponse, TwitchErrorResponse } from './types.js'
+import type {
+  TwitchUserInfo,
+  TwitchUsersResponse,
+  TwitchErrorResponse,
+  TwitchRedemptionStatus,
+  TwitchChannelPointsRedemption,
+  TwitchRedemptionsResponse,
+  TwitchCustomReward,
+  TwitchCustomRewardsResponse
+} from './types.js'
 import { TwitchOAuth } from './oauth.js'
 
 function log(message: string): void {
@@ -10,7 +19,7 @@ function logError(message: string): void {
 }
 
 export class TwitchClient {
-  private oauth: TwitchOAuth
+  private readonly oauth: TwitchOAuth
   private userInfo: TwitchUserInfo | null = null
 
   constructor(oauth: TwitchOAuth) {
@@ -52,7 +61,6 @@ export class TwitchClient {
 
     try {
       const error = (await response.json()) as TwitchErrorResponse
-
       if (error.message) message = error.message
     } catch {
       // Ignore invalid/non-JSON responses.
@@ -80,6 +88,48 @@ export class TwitchClient {
       logError(`Failed to get user info: ${error instanceof Error ? error.message : error}`)
       throw error
     }
+  }
+
+  async updateRedemptionStatus(redemption: TwitchChannelPointsRedemption, status: TwitchRedemptionStatus): Promise<TwitchChannelPointsRedemption> {
+    const userInfo = this.userInfo
+    if (!userInfo) throw new Error('Twitch user info is not available')
+
+    const params = new URLSearchParams({
+      broadcaster_id: userInfo.id,
+      reward_id: redemption.reward.id,
+      id: redemption.id
+    })
+
+    const response = await this.makeAuthenticatedRequest<TwitchRedemptionsResponse>(
+      `https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions?${params}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status })
+      }
+    )
+
+    const updatedRedemption = response.data[0]
+    if (!updatedRedemption) throw new Error('Twitch API returned no updated redemption')
+
+    return updatedRedemption
+  }
+
+  async getCustomRewards(): Promise<TwitchCustomReward[]> {
+    const userInfo = this.userInfo
+    if (!userInfo) throw new Error('Twitch user info is not available')
+
+    const params = new URLSearchParams({
+      broadcaster_id: userInfo.id
+    })
+
+    const response = await this.makeAuthenticatedRequest<TwitchCustomRewardsResponse>(
+      `https://api.twitch.tv/helix/channel_points/custom_rewards?${params}`
+    )
+
+    return response.data
   }
 
   getCachedUserInfo(): TwitchUserInfo | null {

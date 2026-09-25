@@ -1,6 +1,13 @@
-import type { TwitchTokenData, TwitchAuthConfig, TwitchTokenResponse, TwitchErrorResponse, TwitchOAuthOptions } from './types.js'
+import type {
+  TwitchTokenData,
+  TwitchAuthConfig,
+  TwitchTokenResponse,
+  TwitchErrorResponse,
+  TwitchOAuthOptions,
+  TwitchDeviceCodeResponse
+} from './types.js'
 
-const DEFAULT_SCOPES = ['chat:read', 'chat:edit']
+const DEFAULT_SCOPES = ['chat:read', 'chat:edit', 'channel:manage:redemptions']
 const REFRESH_BUFFER_MS = 5 * 60 * 1000
 
 function log(message: string): void {
@@ -20,8 +27,6 @@ export class TwitchOAuth {
   constructor(config: TwitchOAuthOptions = {}) {
     this.config = {
       clientId: config.clientId || '',
-      clientSecret: config.clientSecret || '',
-      redirectUri: config.redirectUri || 'http://localhost:3000/api/integrations/twitch/callback',
       scopes: config.scopes || DEFAULT_SCOPES
     }
 
@@ -37,35 +42,49 @@ export class TwitchOAuth {
     }
   }
 
-  getAuthUrl(state: string): string {
+  async requestDeviceCode(): Promise<TwitchDeviceCodeResponse> {
     if (!this.config.clientId) throw new Error('Twitch client ID not configured')
-    if (!state) throw new Error('OAuth state is required')
 
     const params = new URLSearchParams({
       client_id: this.config.clientId,
-      redirect_uri: this.config.redirectUri,
-      response_type: 'code',
-      scope: this.config.scopes.join(' '),
-      state,
-      force_verify: 'true'
-    })
-
-    return `https://id.twitch.tv/oauth2/authorize?${params.toString()}`
-  }
-
-  async exchangeCodeForToken(code: string): Promise<TwitchTokenData> {
-    if (!this.config.clientId || !this.config.clientSecret) throw new Error('Twitch client credentials not configured')
-    if (!code) throw new Error('OAuth code is required')
-
-    const params = new URLSearchParams({
-      client_id: this.config.clientId,
-      client_secret: this.config.clientSecret,
-      code,
-      grant_type: 'authorization_code',
-      redirect_uri: this.config.redirectUri
+      scopes: this.config.scopes.join(' ')
     })
 
     try {
+      const response = await fetch('https://id.twitch.tv/oauth2/device', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params.toString()
+      })
+
+      if (!response.ok) throw await this.createOAuthError(response, 'Device authorization failed')
+
+      const data = (await response.json()) as TwitchDeviceCodeResponse
+      log('Device code requested')
+      return data
+    } catch (error) {
+      logError(`Device code request failed: ${error instanceof Error ? error.message : error}`)
+      throw error
+    }
+  }
+
+  async pollForToken(deviceCode: string, interval: number, expiresIn: number): Promise<TwitchTokenData> {
+    if (!deviceCode) throw new Error('Device code is required')
+    if (!this.config.clientId) throw new Error('Twitch client ID not configured')
+
+    const deadline = Date.now() + expiresIn * 1000
+    let pollInterval = interval * 1000
+
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, pollInterval))
+      const params = new URLSearchParams({
+        client_id: this.config.clientId,
+        device_code: deviceCode,
+        grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
+      })
+
       const response = await fetch('https://id.twitch.tv/oauth2/token', {
         method: 'POST',
         headers: {
@@ -74,23 +93,36 @@ export class TwitchOAuth {
         body: params.toString()
       })
 
-      if (!response.ok) throw await this.createOAuthError(response, 'OAuth token exchange failed')
+      if (response.ok) {
+        const data = (await response.json()) as TwitchTokenResponse
+        this.tokenData = this.createTokenData(data)
+        this.onTokenUpdated?.(this.tokenData)
 
-      const data = (await response.json()) as TwitchTokenResponse
-      this.tokenData = this.createTokenData(data)
-      this.onTokenUpdated?.(this.tokenData)
-      log('Token exchange successful')
-      return this.tokenData
-    } catch (error) {
-      logError(`Token exchange failed: ${error instanceof Error ? error.message : error}`)
-      throw error
+        log('Device authorization successful')
+        return this.tokenData
+      }
+
+      const error = (await response.json()) as TwitchErrorResponse
+      if (error.message === 'authorization_pending') continue
+
+      if (error.message === 'slow_down') {
+        pollInterval += 5000
+        continue
+      }
+
+      if (error.message === 'access_denied') throw new Error('Twitch authorization was denied')
+      if (error.message === 'expired_token') throw new Error('Twitch device code expired')
+
+      throw new Error(error.message || 'Device authorization failed')
     }
+
+    throw new Error('Twitch device code expired')
   }
 
   async refreshAccessToken(): Promise<TwitchTokenData> {
     if (this.refreshPromise) return this.refreshPromise
     if (!this.tokenData?.refreshToken) throw new Error('No refresh token available')
-    if (!this.config.clientId || !this.config.clientSecret) throw new Error('Twitch client credentials not configured')
+    if (!this.config.clientId) throw new Error('Twitch client ID not configured')
 
     this.refreshPromise = this.performRefresh()
 
@@ -107,7 +139,6 @@ export class TwitchOAuth {
 
     const params = new URLSearchParams({
       client_id: this.config.clientId,
-      client_secret: this.config.clientSecret,
       grant_type: 'refresh_token',
       refresh_token: refreshToken
     })
@@ -192,16 +223,23 @@ export class TwitchOAuth {
     }
   }
 
-  private async createOAuthError(response: Response, fallback: string): Promise<Error> {
-    let message = fallback
-
+  private async parseOAuthError(response: Response): Promise<{ code: string; message: string }> {
     try {
-      const error = (await response.json()) as TwitchErrorResponse
-      if (error.message) message = `${fallback}: ${error.message}`
+      const error = (await response.json()) as TwitchErrorResponse & { error?: string }
+      return {
+        code: error.error || '',
+        message: error.message || `OAuth request failed with HTTP ${response.status}`
+      }
     } catch {
-      // Ignore invalid/non-JSON error responses.
+      return {
+        code: '',
+        message: `OAuth request failed with HTTP ${response.status}`
+      }
     }
+  }
 
-    return new Error(message)
+  private async createOAuthError(response: Response, fallback: string): Promise<Error> {
+    const error = await this.parseOAuthError(response)
+    return new Error(error.message ? `${fallback}: ${error.message}` : fallback)
   }
 }

@@ -1,10 +1,10 @@
 import express from 'express'
-import { ConfigResponse, SettingsResponse, SecretsResponse } from '../types.js'
+import { ConfigResponse, SettingsResponse } from '../types.js'
 import { ok, fail, failFromError, asyncHandler } from '../http.js'
 import { localOnly } from '../local-only.js'
 import { getConfig, updateConfig, restoreConfig, validateConfigUpdates } from '../config.js'
 import { getSettings, updateSettings, validateSettingsUpdates } from '../settings.js'
-import { getPublicSecretsView, updateSecrets } from '../secrets.js'
+import { getPublicSecretsView, SecretsResponse, updateSecrets } from '../secrets.js'
 import { parsePlaylistId } from '../youtube/url.js'
 import { refreshFallback, reorderFallback } from '../fallback.js'
 

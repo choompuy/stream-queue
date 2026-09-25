@@ -1,8 +1,10 @@
 import { TwitchOAuth } from './oauth.js'
 import { TwitchClient } from './client.js'
 import { TwitchEventSub } from './eventsub.js'
-import type { TwitchAuthConfig, TwitchChannelPointsRedemption, TwitchConnectionStatus, TwitchUserInfo } from './types.js'
-import { getSecrets, updateSecrets } from '../../secrets.js'
+import type { TwitchAuthConfig, TwitchChannelPointsRedemption, TwitchConnectionStatus, TwitchUserInfo, TwitchDeviceCodeResponse } from './types.js'
+import { clearTwitchOAuthState, getSecrets, updateTwitchOAuthState } from '../../secrets.js'
+import { requestSong } from '../../queue.js'
+import { getConfig } from '../../config.js'
 
 function log(message: string): void {
   console.log(`[TWITCH INTEGRATION] ${message}`)
@@ -15,6 +17,7 @@ function logError(message: string): void {
 let oauth: TwitchOAuth | null = null
 let client: TwitchClient | null = null
 let eventSub: TwitchEventSub | null = null
+let deviceAuthorizationPromise: Promise<TwitchUserInfo> | null = null
 
 export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = {}): void {
   if (oauth) {
@@ -25,14 +28,11 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
   oauth = new TwitchOAuth({
     ...config,
     onTokenUpdated: (tokenData) => {
-      updateSecrets({
-        twitch: {
-          tokenData
-        }
-      })
+      updateTwitchOAuthState({ tokenData })
     }
   })
   client = new TwitchClient(oauth)
+
   const secrets = getSecrets()
 
   if (secrets.twitch.tokenData) {
@@ -50,8 +50,48 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
   void startEventSub()
 }
 
+export async function reinitializeTwitchIntegration(): Promise<void> {
+  if (eventSub) {
+    await eventSub.disconnect()
+    eventSub = null
+  }
+
+  oauth = null
+  client = null
+  deviceAuthorizationPromise = null
+  initializeTwitchIntegration()
+}
+
 async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemption): Promise<void> {
   log(`Channel Points redemption: ${event.reward.title} by ${event.user_name}`)
+
+  const configuredRewardId = getConfig().twitch.channelPointsRewardId
+  if (!configuredRewardId || event.reward.id !== configuredRewardId) return
+
+  const query = event.user_input.trim()
+  if (!query) {
+    logError(`Empty song request in redemption: ${event.id}`)
+    return
+  }
+
+  if (!client) {
+    logError(`Twitch client is not initialized for redemption: ${event.id}`)
+    return
+  }
+
+  const result = await requestSong(query, event.user_name, false)
+
+  if (result.outcome !== 'added') {
+    logError(`Song request failed for redemption ${event.id}: ${result.outcome}`)
+    return
+  }
+
+  try {
+    await client.updateRedemptionStatus(event, 'FULFILLED')
+    log(`Channel Points redemption fulfilled: ${event.id}`)
+  } catch (error) {
+    logError(`Failed to fulfill redemption ${event.id}: ${error instanceof Error ? error.message : error}`)
+  }
 }
 
 async function startEventSub(): Promise<void> {
@@ -114,30 +154,51 @@ export function getConnectionStatus(): TwitchConnectionStatus {
   }
 }
 
-export function getAuthUrl(state: string): string {
-  if (!oauth) throw new Error('Twitch integration not initialized')
-  return oauth.getAuthUrl(state)
-}
+export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeResponse> {
+  if (!oauth || !client) {
+    throw new Error('Twitch integration not initialized')
+  }
 
-export async function handleOAuthCallback(code: string): Promise<TwitchUserInfo> {
-  if (!oauth || !client) throw new Error('Twitch integration not initialized')
+  if (getConnectionStatus().connected) {
+    throw new Error('Twitch account is already connected')
+  }
 
-  try {
-    await oauth.exchangeCodeForToken(code)
-    const userInfo = await client.getUserInfo()
-    updateSecrets({
-      twitch: {
+  if (deviceAuthorizationPromise) {
+    throw new Error('Twitch authorization is already in progress')
+  }
+
+  const device = await oauth.requestDeviceCode()
+
+  deviceAuthorizationPromise = oauth
+    .pollForToken(device.device_code, device.interval, device.expires_in)
+    .then(async () => {
+      if (!client) throw new Error('Twitch client is not initialized')
+
+      const userInfo = await client.getUserInfo()
+
+      updateTwitchOAuthState({
         userInfo,
         connectedAt: Date.now()
-      }
+      })
+
+      await startEventSub()
+
+      log(`Twitch account connected: ${userInfo.displayName}`)
+      return userInfo
     })
-    await startEventSub()
-    log(`Twitch account connected: ${userInfo.displayName}`)
-    return userInfo
-  } catch (error) {
-    logError(`OAuth callback failed: ${error instanceof Error ? error.message : error}`)
-    throw error
-  }
+    .catch((error) => {
+      logError(`Device authorization failed: ${error instanceof Error ? error.message : error}`)
+      throw error
+    })
+    .finally(() => {
+      deviceAuthorizationPromise = null
+    })
+
+  return device
+}
+
+export function isDeviceAuthorizationPending(): boolean {
+  return deviceAuthorizationPromise !== null
 }
 
 export async function disconnect(): Promise<void> {
@@ -145,6 +206,7 @@ export async function disconnect(): Promise<void> {
     log('Twitch integration not initialized, nothing to disconnect')
     return
   }
+
   if (eventSub) {
     await eventSub.disconnect()
     eventSub = null
@@ -152,13 +214,9 @@ export async function disconnect(): Promise<void> {
 
   oauth.clearTokenData()
   client.clearUserInfo()
-  updateSecrets({
-    twitch: {
-      tokenData: null,
-      userInfo: null,
-      connectedAt: null
-    }
-  })
+  deviceAuthorizationPromise = null
+  clearTwitchOAuthState()
+
   log('Twitch account disconnected')
 }
 
@@ -169,11 +227,11 @@ export async function refreshConnection(): Promise<TwitchUserInfo> {
     if (oauth.needsRefresh()) await oauth.refreshAccessToken()
 
     const userInfo = await client.getUserInfo()
-    updateSecrets({
-      twitch: {
-        userInfo
-      }
-    })
+
+    updateTwitchOAuthState({ userInfo })
+
+    await startEventSub()
+
     log('Twitch connection refreshed')
     return userInfo
   } catch (error) {
@@ -195,7 +253,11 @@ export function getEventSub(): TwitchEventSub | null {
 }
 
 // Export for testing purposes only
-export function _resetIntegration(): void {
+export async function _resetIntegration(): Promise<void> {
+  if (eventSub) await eventSub.disconnect()
+
   oauth = null
   client = null
+  eventSub = null
+  deviceAuthorizationPromise = null
 }

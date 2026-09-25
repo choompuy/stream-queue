@@ -413,6 +413,33 @@
                 />
                 <div id="secretsStatus" class="text-muted text-xs"></div>
               </div>
+
+              <div class="field">
+                <div class="field-label" data-i18n="settings.twitch.integration">Twitch integration</div>
+
+                <button id="twitchConnectBtn" class="btn btn-primary" data-action="connect-twitch" data-i18n="settings.twitch.connect">
+                  Connect Twitch
+                </button>
+
+                <button
+                  id="twitchDisconnectBtn"
+                  class="btn btn-secondary hidden"
+                  data-action="disconnect-twitch"
+                  data-i18n="settings.twitch.disconnect"
+                >
+                  Disconnect
+                </button>
+
+                <div id="twitchConnectionStatus" class="text-muted text-xs" data-i18n="settings.twitch.notConnected">Not connected</div>
+              </div>
+
+              <div id="twitchAuthorization" class="field hidden">
+                <div class="field-label" data-i18n="settings.twitch.authorizationInstructions">
+                  Open Twitch and enter this code to authorize StreamQueue
+                </div>
+
+                <div id="twitchAuthorizationCode" class="settings-input input text-blue"></div>
+              </div>
             </div>
 
             <div class="settings-section">
@@ -473,7 +500,17 @@
               </div>
             </div>
 
-            <button id="saveConfigSettingBtn" class="btn btn-primary" data-action="save-config" data-i18n="settings.bot.save">Save settings</button>
+            <div id="twitchRewardSection" class="settings-section hidden">
+              <div class="field">
+                <label class="field-label" for="twitchRewardSelect" data-i18n="settings.twitch.reward">Channel Points reward</label>
+                <select class="settings-input input select" id="twitchRewardSelect">
+                  <option value="" data-i18n="settings.twitch.rewardNone">Select reward</option>
+                </select>
+                <div class="text-muted text-xs" data-i18n="settings.twitch.rewardNote">Redemptions of this reward will be used as song requests</div>
+              </div>
+            </div>
+
+            <button class="settings-section-btn btn btn-primary" data-action="save-config" data-i18n="settings.bot.save">Save settings</button>
           </div>
 
           <div class="section-panel panel">

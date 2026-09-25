@@ -20,7 +20,14 @@ export const state = {
   selectedIp: null,
   activity: [],
   activityFilter: 'all',
-  blocklist: []
+  blocklist: [],
+
+  twitch: {
+    connected: false,
+    user: null,
+    connectedAt: null,
+    rewards: []
+  }
 }
 
 export const dom = {
@@ -89,7 +96,15 @@ export const dom = {
   playlistsListWrapper: $('playlistsListWrapper'),
   playlistUrlInput: $('playlistUrlInput'),
   playlistAddBtn: $('playlistAddBtn'),
-  playlistsCount: $('playlistsCount')
+  playlistsCount: $('playlistsCount'),
+
+  twitchAuthorization: $('twitchAuthorization'),
+  twitchAuthorizationCode: $('twitchAuthorizationCode'),
+  twitchConnectionStatus: $('twitchConnectionStatus'),
+  twitchConnectBtn: $('twitchConnectBtn'),
+  twitchDisconnectBtn: $('twitchDisconnectBtn'),
+  twitchRewardSection: $('twitchRewardSection'),
+  twitchRewardSelect: $('twitchRewardSelect')
 }
 
 export const CONFIG_FIELDS = [
@@ -100,7 +115,8 @@ export const CONFIG_FIELDS = [
   { key: 'maxRequestsPerUser', dom: 'cfgMaxPerUser', type: 'number' },
   { key: 'regionCode', dom: 'cfgRegionCode', type: 'text' },
   { key: 'allowShorts', dom: 'cfgAllowShorts', type: 'checkbox' },
-  { key: 'allowLiveStreams', dom: 'cfgAllowLiveStreams', type: 'checkbox' }
+  { key: 'allowLiveStreams', dom: 'cfgAllowLiveStreams', type: 'checkbox' },
+  { key: 'channelPointsRewardId', path: 'twitch', dom: 'twitchRewardSelect', type: 'text' }
 ]
 
 export const selectors = {
