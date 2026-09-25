@@ -261,6 +261,7 @@
     "trackBlocked": "Трек заблокирован",
     "trackUnblocked": "Трек разблокирован",
     "settingsSaved": "Настройки сохранены",
+    "settingsPartiallySaved": "Настройки сохранены ({{rejected}}/{{total}} полей некорректны)",
     "nowPlaying": "Сейчас играет: {{title}}",
     "addedToQueue": "Добавлено в очередь: {{title}} [#{{position}}]",
     "viewerRequest": "🎵 {{user}} добавил(а): {{title}}",

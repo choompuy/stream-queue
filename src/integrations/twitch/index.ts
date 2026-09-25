@@ -138,7 +138,8 @@ export function getConnectionStatus(): TwitchConnectionStatus {
   const tokenData = oauth.getTokenData()
   const userInfo = client.getCachedUserInfo()
 
-  if (!tokenData?.refreshToken || !userInfo) {
+  // Connection requires both token data AND user info
+  if (!tokenData || !userInfo) {
     return {
       connected: false,
       user: null,

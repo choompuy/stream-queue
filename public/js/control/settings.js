@@ -366,6 +366,7 @@ export async function saveConfigSetting() {
 
     if (field.type === 'checkbox') value = input.checked
     else if (field.type === 'number') value = Number(input.value)
+    else if (field.type === 'nullableText') value = input.value.trim() || null
     else value = input.value.trim()
 
     if (field.path) {
@@ -405,6 +406,12 @@ export async function saveConfigSetting() {
           if (rejectedFields.includes(fieldName)) {
             input.classList.add('error')
           }
+        }
+
+        const totalFields = CONFIG_FIELDS.length
+        const rejectedCount = rejectedFields.length
+        if (rejectedCount < totalFields) {
+          toastSuccess(t('toast.settingsPartiallySaved', { rejected: rejectedCount, total: totalFields }))
         }
       }
       throw error

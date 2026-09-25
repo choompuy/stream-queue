@@ -10,7 +10,7 @@ process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 const { getSecrets, updateSecrets, updateTwitchOAuthState, getPublicSecretsView } = await import('../../src/secrets.js')
 
 beforeEach(() => {
-  updateSecrets({ youtubeApiKey: '' }) // reset to empty
+  updateSecrets({ youtubeApiKey: ' ' }) // reset: a whitespace-only value is ignored, see below
   updateTwitchOAuthState({ tokenData: null, userInfo: null, connectedAt: null })
 })
 

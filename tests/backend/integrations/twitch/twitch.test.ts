@@ -1,4 +1,4 @@
-import { test } from 'node:test'
+import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { TwitchOAuth } from '../../../../src/integrations/twitch/oauth.js'
 import {
@@ -9,6 +9,7 @@ import {
   isDeviceAuthorizationPending,
   _resetIntegration
 } from '../../../../src/integrations/twitch/index.js'
+import { clearTwitchOAuthState } from '../../../../src/secrets.js'
 import type { TwitchTokenData } from '../../../../src/integrations/twitch/types.js'
 
 test('TwitchOAuth', async (t) => {
@@ -107,6 +108,7 @@ test('TwitchOAuth', async (t) => {
 test('TwitchIntegration', async (t) => {
   t.beforeEach(async () => {
     await _resetIntegration()
+    clearTwitchOAuthState()
   })
 
   await t.test('getConnectionStatus returns disconnected when not initialized', () => {
