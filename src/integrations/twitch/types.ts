@@ -127,3 +127,12 @@ export type EventSubMessage = {
     event?: unknown
   }
 }
+
+export type TwitchChatMessage = {
+  channel: string
+  displayName: string
+  userLogin: string
+  text: string
+  isModerator: boolean
+  isBroadcaster: boolean
+}

@@ -267,6 +267,11 @@ export function disconnectTwitch() {
 
 export function loadTwitchSettings() {
   return run('loading Twitch settings', async () => {
+    if (!state.twitch.configured) {
+      renderTwitchConnection()
+      return
+    }
+
     const status = await api.getTwitchStatus()
     state.twitch.connected = Boolean(status.connected)
     state.twitch.user = status.user
@@ -281,6 +286,18 @@ export function loadTwitchSettings() {
 
 function renderTwitchConnection() {
   if (!dom.twitchConnectionStatus) return
+
+  if (!state.twitch.configured) {
+    dom.twitchNotConfigured?.classList.remove('hidden')
+    dom.twitchConnectionControls?.classList.add('hidden')
+    dom.twitchAuthorization?.classList.add('hidden')
+    dom.twitchRewardSection?.classList.add('hidden')
+    dom.twitchSaveBtn?.classList.add('hidden')
+    return
+  }
+
+  dom.twitchNotConfigured?.classList.add('hidden')
+  dom.twitchConnectionControls?.classList.remove('hidden')
 
   if (state.twitch.connected && state.twitch.user) {
     dom.twitchConnectionStatus.textContent = t('settings.twitch.connected', { user: state.twitch.user.displayName })
@@ -353,6 +370,9 @@ export function loadSecrets() {
     dom.secretsStatus.textContent = t(key)
     dom.secretsStatus.setAttribute('data-i18n', key)
     dom.secretsStatus.classList.toggle('text-red', !data.hasYoutubeApiKey)
+
+    state.twitch.configured = Boolean(data.twitch?.configured)
+    renderTwitchConnection()
   })
 }
 

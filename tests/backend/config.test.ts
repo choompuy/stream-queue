@@ -12,7 +12,22 @@ const { getConfig, updateConfig, validateConfigUpdates } = await import('../../s
 const DEFAULTS = getConfig()
 
 beforeEach(() => {
-  updateConfig({ ...DEFAULTS, fallbackPlaylist: { ...DEFAULTS.fallbackPlaylist } })
+  updateConfig({
+    ...DEFAULTS,
+    fallbackPlaylist: { ...DEFAULTS.fallbackPlaylist },
+    twitch: {
+      ...DEFAULTS.twitch,
+      chatCommands: {
+        ...DEFAULTS.twitch.chatCommands,
+        now: { ...DEFAULTS.twitch.chatCommands.now },
+        next: { ...DEFAULTS.twitch.chatCommands.next },
+        skip: { ...DEFAULTS.twitch.chatCommands.skip },
+        pause: { ...DEFAULTS.twitch.chatCommands.pause },
+        resume: { ...DEFAULTS.twitch.chatCommands.resume },
+        stop: { ...DEFAULTS.twitch.chatCommands.stop }
+      }
+    }
+  })
 })
 
 test('validateConfigUpdates()', async (t) => {
@@ -65,6 +80,56 @@ test('validateConfigUpdates()', async (t) => {
     const rejected = validateConfigUpdates({ twitch: { channelPointsRewardId: 42 } })
     assert.deepEqual(rejected.rejected, ['twitch.channelPointsRewardId'])
   })
+
+  await t.test('accepts a valid chat command update and normalizes it (trim, lowercase, collapse whitespace)', () => {
+    const { clean, rejected } = validateConfigUpdates({ twitch: { chatCommands: { skip: { command: '  !SG   Skip  ' } } } })
+
+    assert.deepEqual(rejected, [])
+    assert.deepEqual(clean.twitch?.chatCommands?.skip, { command: '!sg skip' })
+  })
+
+  await t.test('rejects a chat command missing the leading "!"', () => {
+    const { rejected } = validateConfigUpdates({ twitch: { chatCommands: { now: { command: 'sg now' } } } })
+    assert.deepEqual(rejected, ['twitch.chatCommands.now.command'])
+  })
+
+  await t.test('rejects a chat command permission outside the known set', () => {
+    const { rejected } = validateConfigUpdates({ twitch: { chatCommands: { skip: { permission: 'vip' } } } })
+    assert.deepEqual(rejected, ['twitch.chatCommands.skip.permission'])
+  })
+
+  await t.test('rejects an unknown command key under chatCommands', () => {
+    const { rejected } = validateConfigUpdates({ twitch: { chatCommands: { teleport: { command: '!sg tp' } } } })
+    assert.deepEqual(rejected, ['twitch.chatCommands.teleport'])
+  })
+
+  for (const value of ['x', 5, null, [], true]) {
+    await t.test(`refuses chatCommands = ${JSON.stringify(value)} instead of throwing`, () => {
+      const { clean, rejected } = validateConfigUpdates({ twitch: { chatCommands: value } })
+      assert.deepEqual(rejected, ['twitch.chatCommands'])
+      assert.equal(clean.twitch?.chatCommands === undefined, true)
+    })
+  }
+
+  for (const value of ['x', null, [], true]) {
+    await t.test(`refuses a single chat command = ${JSON.stringify(value)} instead of throwing`, () => {
+      const { rejected } = validateConfigUpdates({ twitch: { chatCommands: { skip: value } } })
+      assert.deepEqual(rejected, ['twitch.chatCommands.skip'])
+    })
+  }
+
+  await t.test('accepts a valid controlCooldownSeconds', () => {
+    const { clean, rejected } = validateConfigUpdates({ twitch: { chatCommands: { controlCooldownSeconds: 10 } } })
+    assert.deepEqual(rejected, [])
+    assert.equal(clean.twitch?.chatCommands?.controlCooldownSeconds, 10)
+  })
+
+  for (const value of [-1, 301, 'x', null]) {
+    await t.test(`rejects an out-of-range or non-numeric controlCooldownSeconds = ${JSON.stringify(value)}`, () => {
+      const { rejected } = validateConfigUpdates({ twitch: { chatCommands: { controlCooldownSeconds: value } } })
+      assert.deepEqual(rejected, ['twitch.chatCommands.controlCooldownSeconds'])
+    })
+  }
 
   await t.test('refuses unknown fields, including prototype keys', () => {
     const { clean, rejected } = validateConfigUpdates(JSON.parse('{"foo":1,"__proto__":{"polluted":true},"constructor":1,"minViews":5}'))
@@ -147,5 +212,34 @@ test('updateConfig()', async (t) => {
 
     assert.equal(getConfig().fallbackPlaylist.repeat, false)
     assert.equal(getConfig().fallbackPlaylist.shuffle, false)
+  })
+
+  await t.test('merges a partial chat command update without touching sibling commands or fields', () => {
+    const before = getConfig().twitch.chatCommands
+
+    const { config } = updateConfig({ twitch: { chatCommands: { skip: { command: '!sg s' } } } })
+
+    assert.equal(config.twitch.chatCommands.skip.command, '!sg s')
+    assert.equal(config.twitch.chatCommands.skip.enabled, before.skip.enabled)
+    assert.equal(config.twitch.chatCommands.skip.permission, before.skip.permission)
+    assert.deepEqual(config.twitch.chatCommands.now, before.now)
+    assert.deepEqual(config.twitch.chatCommands.pause, before.pause)
+    assert.equal(config.twitch.chatCommands.controlCooldownSeconds, before.controlCooldownSeconds)
+  })
+
+  await t.test('merges a controlCooldownSeconds update independently of the individual commands', () => {
+    updateConfig({ twitch: { chatCommands: { controlCooldownSeconds: 15 } } })
+    const { config } = updateConfig({ twitch: { chatCommands: { skip: { enabled: false } } } })
+
+    assert.equal(config.twitch.chatCommands.controlCooldownSeconds, 15)
+    assert.equal(config.twitch.chatCommands.skip.enabled, false)
+  })
+
+  await t.test('does not throw on a malformed chatCommands and leaves it unchanged', () => {
+    const before = getConfig().twitch.chatCommands
+    const { rejected } = updateConfig({ twitch: { chatCommands: 'x' as never } })
+
+    assert.deepEqual(rejected, ['twitch.chatCommands'])
+    assert.deepEqual(getConfig().twitch.chatCommands, before)
   })
 })

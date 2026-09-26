@@ -63,7 +63,10 @@ test('scheduleSave() / flush()', async (t) => {
     const path = filePath()
     const store = createFileStore<{ n: number }>(path)
 
-    store.scheduleSave(() => ({ n: 1 }), () => {})
+    store.scheduleSave(
+      () => ({ n: 1 }),
+      () => {}
+    )
     await store.flush()
 
     assert.deepEqual(readJson(path), { n: 1 })
@@ -75,9 +78,18 @@ test('scheduleSave() / flush()', async (t) => {
     const written: number[] = []
     const originalWriteFile = (await import('node:fs/promises')).writeFile
 
-    store.scheduleSave(() => ({ n: 1 }), () => {})
-    store.scheduleSave(() => ({ n: 2 }), () => {})
-    store.scheduleSave(() => ({ n: 3 }), () => {})
+    store.scheduleSave(
+      () => ({ n: 1 }),
+      () => {}
+    )
+    store.scheduleSave(
+      () => ({ n: 2 }),
+      () => {}
+    )
+    store.scheduleSave(
+      () => ({ n: 3 }),
+      () => {}
+    )
     await store.flush()
 
     assert.deepEqual(readJson(path), { n: 3 })
@@ -90,7 +102,10 @@ test('scheduleSave() / flush()', async (t) => {
     const store = createFileStore<{ n: number }>(path)
     let value = { n: 1 }
 
-    store.scheduleSave(() => value, () => {})
+    store.scheduleSave(
+      () => value,
+      () => {}
+    )
     value = { n: 99 } // mutated after scheduling, like a module-level array being pushed to again
     await store.flush()
 
@@ -109,7 +124,10 @@ test('scheduleSave() / flush()', async (t) => {
     const path = filePath()
     const store = createFileStore<{ n: number }>(path)
 
-    store.scheduleSave(() => ({ n: 1 }), () => {})
+    store.scheduleSave(
+      () => ({ n: 1 }),
+      () => {}
+    )
     await store.flush()
     await assert.doesNotReject(store.flush())
 
@@ -120,7 +138,10 @@ test('scheduleSave() / flush()', async (t) => {
     const path = join(testDir, `nested-${++counter}`, 'sub', 'store.json')
     const store = createFileStore<{ n: number }>(path)
 
-    store.scheduleSave(() => ({ n: 1 }), () => {})
+    store.scheduleSave(
+      () => ({ n: 1 }),
+      () => {}
+    )
     await store.flush()
 
     assert.deepEqual(readJson(path), { n: 1 })
@@ -130,7 +151,10 @@ test('scheduleSave() / flush()', async (t) => {
     const path = filePath()
     const store = createFileStore<{ n: number }>(path)
 
-    store.scheduleSave(() => ({ n: 1 }), () => {})
+    store.scheduleSave(
+      () => ({ n: 1 }),
+      () => {}
+    )
     await store.flush()
 
     assert.equal(existsSync(`${path}.tmp`), false)
@@ -146,7 +170,10 @@ test('scheduleSave() / flush()', async (t) => {
     const store = createFileStore<{ n: number }>(path)
     const errors: unknown[] = []
 
-    store.scheduleSave(() => ({ n: 1 }), (error) => errors.push(error))
+    store.scheduleSave(
+      () => ({ n: 1 }),
+      (error) => errors.push(error)
+    )
     await assert.doesNotReject(store.flush())
 
     assert.equal(errors.length, 1)
@@ -177,7 +204,10 @@ test('debounce timing', async (t) => {
     const path = filePath()
     const store = createFileStore<{ n: number }>(path)
 
-    store.scheduleSave(() => ({ n: 1 }), () => {})
+    store.scheduleSave(
+      () => ({ n: 1 }),
+      () => {}
+    )
     await new Promise((resolve) => setTimeout(resolve, DEBOUNCE_MS - 100))
     assert.equal(existsSync(path), false, 'nothing should be written before the debounce window elapses')
 
@@ -191,17 +221,23 @@ test('debounce timing', async (t) => {
     const path = filePath()
     const store = createFileStore<{ n: number }>(path)
 
-    store.scheduleSave(() => {
-      calls.push(Date.now() - start)
-      return { n: 1 }
-    }, () => {})
+    store.scheduleSave(
+      () => {
+        calls.push(Date.now() - start)
+        return { n: 1 }
+      },
+      () => {}
+    )
     await new Promise((resolve) => setTimeout(resolve, DEBOUNCE_MS - 50)) // well under the window
 
     const secondCallAt = Date.now() - start
-    store.scheduleSave(() => {
-      calls.push(Date.now() - start)
-      return { n: 2 }
-    }, () => {}) // must push the fire time out to (roughly) secondCallAt + DEBOUNCE_MS
+    store.scheduleSave(
+      () => {
+        calls.push(Date.now() - start)
+        return { n: 2 }
+      },
+      () => {}
+    ) // must push the fire time out to (roughly) secondCallAt + DEBOUNCE_MS
 
     await waitForFile(path)
 
@@ -219,10 +255,13 @@ test('debounce timing', async (t) => {
     const store = createFileStore<{ n: number }>(path)
 
     for (let i = 0; i < 5; i++) {
-      store.scheduleSave(() => {
-        calls.count++
-        return { n: i }
-      }, () => {})
+      store.scheduleSave(
+        () => {
+          calls.count++
+          return { n: i }
+        },
+        () => {}
+      )
       await new Promise((resolve) => setTimeout(resolve, 20)) // well under the debounce window each time
     }
 
@@ -241,7 +280,10 @@ test('flushAllStores()', async (t) => {
     const storeA = createFileStore<{ n: number }>(pathA)
     const storeB = createFileStore<{ n: number }>(pathB)
 
-    storeA.scheduleSave(() => ({ n: 1 }), () => {})
+    storeA.scheduleSave(
+      () => ({ n: 1 }),
+      () => {}
+    )
     // storeB has nothing scheduled
 
     await flushAllStores()
@@ -261,15 +303,21 @@ test('flushAllStores()', async (t) => {
     const badStore = createFileStore<{ n: number }>(badPath)
     const goodStore = createFileStore<{ n: number }>(goodPath)
 
-    badStore.scheduleSave(() => ({ n: 1 }), () => {})
-    goodStore.scheduleSave(() => ({ n: 2 }), () => {})
+    badStore.scheduleSave(
+      () => ({ n: 1 }),
+      () => {}
+    )
+    goodStore.scheduleSave(
+      () => ({ n: 2 }),
+      () => {}
+    )
 
     await assert.doesNotReject(flushAllStores())
 
     assert.deepEqual(readJson(goodPath), { n: 2 })
   })
 
-  await t.test('never rejects, even if a store\'s onError callback itself throws', async (t) => {
+  await t.test("never rejects, even if a store's onError callback itself throws", async (t) => {
     t.mock.method(console, 'error', () => {})
     const badDir = join(testDir, `not-writable-${++counter}`)
     mkdirSync(badDir)
@@ -277,9 +325,12 @@ test('flushAllStores()', async (t) => {
     mkdirSync(badPath)
 
     const badStore = createFileStore<{ n: number }>(badPath)
-    badStore.scheduleSave(() => ({ n: 1 }), () => {
-      throw new Error('onError itself is broken')
-    })
+    badStore.scheduleSave(
+      () => ({ n: 1 }),
+      () => {
+        throw new Error('onError itself is broken')
+      }
+    )
 
     // flushAllStores must not reject the whole process's shutdown sequence over one store's failure,
     // regardless of how badly that one store's own error handling misbehaves

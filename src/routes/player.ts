@@ -1,17 +1,12 @@
 import express from 'express'
-import { PlayerActionResponse, PlayerState } from '../types.js'
+import { PlayerActionResponse } from '../types.js'
 import { ok, fail } from '../http.js'
 import { isValidVideoId } from '../youtube/url.js'
 import { translateWithFallback } from '../i18n.js'
+import { buildSkipMessage } from '../chat-replies.js'
 import { setPaused } from '../queue.js'
 import { getState, endCurrent, skipCurrent, reportPlaybackFailure } from '../player.js'
 import { createRateLimiter } from '../rate-limit.js'
-
-function buildSkipMessage(state: PlayerState): string {
-  return state.current?.title
-    ? translateWithFallback('chat.skippedNowPlaying', { title: state.current.title }, `Track skipped. Now playing: ${state.current.title}`)
-    : translateWithFallback('chat.skipped', undefined, 'Track skipped')
-}
 
 export const router = express.Router()
 

@@ -31,7 +31,26 @@ export type Config = {
   fallbackPlaylist: FallbackPlaylist
   twitch: {
     channelPointsRewardId: string | null
+    chatCommands: TwitchChatCommandsConfig
   }
+}
+
+export type TwitchChatPermission = 'everyone' | 'moderator' | 'broadcaster'
+
+export type TwitchChatCommandConfig = {
+  enabled: boolean
+  command: string
+  permission: TwitchChatPermission
+}
+
+export type TwitchChatCommandsConfig = {
+  now: TwitchChatCommandConfig
+  next: TwitchChatCommandConfig
+  skip: TwitchChatCommandConfig
+  pause: TwitchChatCommandConfig
+  resume: TwitchChatCommandConfig
+  stop: TwitchChatCommandConfig
+  controlCooldownSeconds: number
 }
 
 export type FallbackPlaylist = {

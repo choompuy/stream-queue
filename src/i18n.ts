@@ -55,6 +55,5 @@ function codeToI18nKey(code: string): string {
 }
 
 export function translateErrorCode(locale: string, code: string, params?: Record<string, string | number>): string | null {
-  const key = codeToI18nKey(code)
-  return key ? t(locale, key, params) : null
+  return t(locale, codeToI18nKey(code), params)
 }

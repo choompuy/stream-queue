@@ -23,6 +23,7 @@ export const state = {
   blocklist: [],
 
   twitch: {
+    configured: false,
     connected: false,
     user: null,
     connectedAt: null,
@@ -99,6 +100,8 @@ export const dom = {
   playlistAddBtn: $('playlistAddBtn'),
   playlistsCount: $('playlistsCount'),
 
+  twitchNotConfigured: $('twitchNotConfigured'),
+  twitchConnectionControls: $('twitchConnectionControls'),
   twitchAuthorization: $('twitchAuthorization'),
   twitchAuthorizationCode: $('twitchAuthorizationCode'),
   twitchConnectionStatus: $('twitchConnectionStatus'),

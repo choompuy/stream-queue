@@ -1,14 +1,21 @@
 import { TwitchOAuth } from './oauth.js'
 import { TwitchClient } from './client.js'
 import { TwitchEventSub } from './eventsub.js'
-import type { TwitchAuthConfig, TwitchChannelPointsRedemption, TwitchUserInfo, TwitchDeviceCodeResponse } from './types.js'
+import { TwitchChat } from './chat.js'
+import type { TwitchAuthConfig, TwitchChannelPointsRedemption, TwitchUserInfo, TwitchDeviceCodeResponse, TwitchChatMessage } from './types.js'
 import { clearTwitchOAuthState, getPublicSecretsView, getSecrets, updateTwitchOAuthState } from '../../secrets.js'
 import { requestSong } from '../../queue.js'
+import { skipCurrent } from '../../player.js'
+import { setPaused } from '../../queue.js'
+import { buildNowPlayingMessage, buildQueueMessage, buildSkipMessage } from '../../chat-replies.js'
+import { translateWithFallback } from '../../i18n.js'
 import { getConfig } from '../../config.js'
-import { AppError } from '../../types.js'
+import { getState } from '../../player.js'
+import { AppError, TwitchChatPermission } from '../../types.js'
 import { createLogger } from '../../logger.js'
 
 const log = createLogger('TWITCH EVENTSUB')
+const chatLog = createLogger('TWITCH CHAT')
 
 const REDEMPTION_RETRY_ATTEMPTS = 3
 const REDEMPTION_RETRY_DELAY_MS = 1000
@@ -16,7 +23,9 @@ const REDEMPTION_RETRY_DELAY_MS = 1000
 let oauth: TwitchOAuth | null = null
 let client: TwitchClient | null = null
 let eventSub: TwitchEventSub | null = null
+let chat: TwitchChat | null = null
 let deviceAuthorizationPromise: Promise<TwitchUserInfo> | null = null
+let lastControlCommandAt = 0
 
 export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = {}): void {
   if (oauth) {
@@ -48,12 +57,18 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
   log.log('Twitch integration initialized')
 
   void startEventSub()
+  void startChat()
 }
 
 export async function reinitializeTwitchIntegration(): Promise<void> {
   if (eventSub) {
     await eventSub.disconnect()
     eventSub = null
+  }
+
+  if (chat) {
+    await chat.disconnect()
+    chat = null
   }
 
   oauth = null
@@ -124,6 +139,126 @@ async function startEventSub(): Promise<void> {
   }
 }
 
+function hasPermission(message: TwitchChatMessage, permission: TwitchChatPermission): boolean {
+  switch (permission) {
+    case 'everyone':
+      return true
+    case 'moderator':
+      return message.isModerator || message.isBroadcaster
+    case 'broadcaster':
+      return message.isBroadcaster
+  }
+}
+
+// A command word must be the whole message (or the first word, for forward-compatibility with arguments),
+// case-insensitive - "!sg skip" matches "!sg skip", "!SG SKIP", and "!sg skip please"
+// but not "!sg skipping" or a message that merely contains it midway through
+function matchesCommand(text: string, command: string): boolean {
+  const normalized = text.trim().toLowerCase().replace(/\s+/g, ' ')
+  return normalized === command || normalized.startsWith(`${command} `)
+}
+
+async function replyInChat(message: string): Promise<void> {
+  if (!chat) return
+  await chat.sendMessage(message).catch((error) => {
+    chatLog.error(`Failed to send chat reply: ${error instanceof Error ? error.message : error}`)
+  })
+}
+
+// skip/pause/resume/stop share one global (not per-user) cooldown so two different moderators
+// firing the same or different control commands back to back can't double up on the action
+async function handleControlCommand(
+  message: TwitchChatMessage,
+  permission: TwitchChatPermission,
+  cooldownSeconds: number,
+  action: () => string
+): Promise<void> {
+  if (!hasPermission(message, permission)) return
+
+  const now = Date.now()
+  if (now - lastControlCommandAt < cooldownSeconds * 1000) {
+    chatLog.log(`Ignored control command from ${message.displayName}: cooldown active`)
+    return
+  }
+  lastControlCommandAt = now
+
+  const reply = action()
+  await replyInChat(reply)
+}
+
+async function handleChatMessage(message: TwitchChatMessage): Promise<void> {
+  const commands = getConfig().twitch.chatCommands
+
+  if (commands.now.enabled && matchesCommand(message.text, commands.now.command) && hasPermission(message, commands.now.permission)) {
+    await replyInChat(buildNowPlayingMessage())
+    return
+  }
+
+  if (commands.next.enabled && matchesCommand(message.text, commands.next.command) && hasPermission(message, commands.next.permission)) {
+    await replyInChat(buildQueueMessage())
+    return
+  }
+
+  if (commands.skip.enabled && matchesCommand(message.text, commands.skip.command)) {
+    await handleControlCommand(message, commands.skip.permission, commands.controlCooldownSeconds, () => {
+      skipCurrent()
+      return buildSkipMessage(getState())
+    })
+    return
+  }
+
+  if (commands.pause.enabled && matchesCommand(message.text, commands.pause.command)) {
+    await handleControlCommand(message, commands.pause.permission, commands.controlCooldownSeconds, () => {
+      setPaused(true)
+      return translateWithFallback('chat.paused', undefined, 'Player paused')
+    })
+    return
+  }
+
+  if (commands.resume.enabled && matchesCommand(message.text, commands.resume.command)) {
+    await handleControlCommand(message, commands.resume.permission, commands.controlCooldownSeconds, () => {
+      setPaused(false)
+      return translateWithFallback('chat.resumed', undefined, 'Playback resumed')
+    })
+    return
+  }
+
+  if (commands.stop.enabled && matchesCommand(message.text, commands.stop.command)) {
+    // StreamQueue has no separate "stop" state - pause is the existing equivalent (play/pause is all there is)
+    await handleControlCommand(message, commands.stop.permission, commands.controlCooldownSeconds, () => {
+      setPaused(true)
+      return translateWithFallback('chat.paused', undefined, 'Player paused')
+    })
+    return
+  }
+}
+
+async function startChat(): Promise<void> {
+  if (!oauth || !client) return
+  if (chat) return
+
+  const userInfo = client.getCachedUserInfo()
+  if (!userInfo) {
+    chatLog.log('Twitch account not connected, chat will not start')
+    return
+  }
+
+  chat = new TwitchChat({
+    oauth,
+    channelLogin: userInfo.login,
+    botLogin: userInfo.login,
+    onMessage: handleChatMessage
+  })
+
+  try {
+    await chat.connect()
+    chatLog.log('Twitch chat connected')
+  } catch (error) {
+    chat = null
+    chatLog.error(`Failed to start chat: ${error instanceof Error ? error.message : error}`)
+  }
+}
+
 export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeResponse> {
   if (!oauth || !client) {
     throw new AppError('TWITCH_AUTH_ERROR', 'Twitch integration not initialized')
@@ -152,6 +287,7 @@ export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeRespon
       })
 
       await startEventSub()
+      await startChat()
 
       log.log(`Twitch account connected: ${userInfo.displayName}`)
       return userInfo
@@ -217,6 +353,11 @@ export async function disconnect(): Promise<void> {
     eventSub = null
   }
 
+  if (chat) {
+    await chat.disconnect()
+    chat = null
+  }
+
   // Cancel any active device authorization to prevent "resurrection"
   if (deviceAuthorizationPromise) {
     deviceAuthorizationPromise = null
@@ -239,6 +380,7 @@ export async function refreshConnection(): Promise<TwitchUserInfo> {
     updateTwitchOAuthState({ userInfo })
 
     await startEventSub()
+    await startChat()
 
     log.log('Twitch connection refreshed')
     return userInfo
@@ -265,11 +407,32 @@ export function _getEventSub(): TwitchEventSub | null {
 }
 
 // Export for testing purposes only
+export function _getChat(): TwitchChat | null {
+  return chat
+}
+
+// Export for testing purposes only
+export const _test = {
+  hasPermission,
+  matchesCommand,
+  handleChatMessage,
+  resetCooldown: () => {
+    lastControlCommandAt = 0
+  },
+  setChat: (mock: TwitchChat | null) => {
+    chat = mock
+  }
+}
+
+// Export for testing purposes only
 export async function _resetIntegration(): Promise<void> {
   if (eventSub) await eventSub.disconnect()
+  if (chat) await chat.disconnect()
 
   oauth = null
   client = null
   eventSub = null
+  chat = null
   deviceAuthorizationPromise = null
+  lastControlCommandAt = 0
 }

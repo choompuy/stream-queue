@@ -31,10 +31,11 @@ async function init() {
 
   bindEvents()
 
+  const secretsLoaded = loadSecrets()
+
   await Promise.allSettled([
-    loadSecrets(),
-    // the reward list is rendered against the selected reward id that loadConfig() puts in state
-    loadConfig().then(() => loadTwitchSettings()),
+    secretsLoaded,
+    secretsLoaded.then(() => loadConfig()).then(() => loadTwitchSettings()),
     loadOverlaySettings(),
     loadNetworkInfo(),
     loadActivity(),

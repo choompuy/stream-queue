@@ -482,7 +482,13 @@
             </div>
 
             <div class="settings-section">
-              <div class="field">
+              <div id="twitchNotConfigured" class="field hidden">
+                <div class="text-muted text-xs" data-i18n="settings.twitch.clientCredentialsNote">
+                  Create an application in the Twitch Developer Console to get your Client ID and Client Secret
+                </div>
+              </div>
+
+              <div id="twitchConnectionControls" class="field">
                 <button id="twitchConnectBtn" class="btn btn-primary" data-action="connect-twitch" data-i18n="settings.twitch.connect">
                   Connect Twitch
                 </button>
@@ -518,7 +524,12 @@
               </div>
             </div>
 
-            <button id="twitchSaveBtn" class="settings-section-btn btn btn-primary hidden" data-action="save-twitch-config" data-i18n="settings.twitch.save">
+            <button
+              id="twitchSaveBtn"
+              class="settings-section-btn btn btn-primary hidden"
+              data-action="save-twitch-config"
+              data-i18n="settings.twitch.save"
+            >
               Save Twitch settings
             </button>
           </div>
