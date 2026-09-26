@@ -2,18 +2,9 @@ import WebSocket from 'ws'
 import { TwitchOAuth } from './oauth.js'
 import type { EventSubMessage, TwitchChannelPointsRedemption } from './types.js'
 import { AppError } from '../../types.js'
+import { createLogger } from '../../logger.js'
 
-function log(message: string): void {
-  console.log(`[TWITCH EVENTSUB] ${message}`)
-}
-
-function logError(message: string): void {
-  console.error(`[TWITCH EVENTSUB] ${message}`)
-}
-
-function logWarn(message: string): void {
-  console.warn(`[TWITCH EVENTSUB] ${message}`)
-}
+const log = createLogger('TWITCH EVENTSUB')
 
 const EVENTSUB_WS_URL = 'wss://eventsub.wss.twitch.tv/ws'
 const CHANNEL_POINTS_REDEMPTION = 'channel.channel_points_custom_reward_redemption.add'
@@ -84,7 +75,7 @@ export class TwitchEventSub {
 
     socket.removeAllListeners()
     socket.close()
-    log('Disconnected')
+    log.log('Disconnected')
   }
 
   isConnected(): boolean {
@@ -124,7 +115,7 @@ export class TwitchEventSub {
 
       socket.on('message', (data) => {
         void this.handleMessage(data.toString()).catch((error) => {
-          logError(`Failed to handle message: ${error instanceof Error ? error.message : error}`)
+          log.error(`Failed to handle message: ${error instanceof Error ? error.message : error}`)
         })
       })
 
@@ -138,7 +129,7 @@ export class TwitchEventSub {
           return
         }
 
-        logError(`WebSocket error: ${error instanceof Error ? error.message : error}`)
+        log.error(`WebSocket error: ${error instanceof Error ? error.message : error}`)
       })
     })
   }
@@ -151,7 +142,7 @@ export class TwitchEventSub {
       timeout = null
       const error = new Error('Timed out waiting for EventSub session welcome')
       this.sessionReadyReject?.(error)
-      
+
       // Explicitly close the socket on timeout
       const socket = this.socket
       this.socket = null
@@ -173,7 +164,7 @@ export class TwitchEventSub {
     try {
       message = JSON.parse(rawMessage) as EventSubMessage
     } catch (error) {
-      logError(`Failed to parse message: ${error instanceof Error ? error.message : error}`)
+      log.error(`Failed to parse message: ${error instanceof Error ? error.message : error}`)
       return
     }
 
@@ -193,7 +184,7 @@ export class TwitchEventSub {
         this.handleRevocation(message)
         return
       default:
-        logWarn(`Unknown message type: ${message.metadata.message_type}`)
+        log.warn(`Unknown message type: ${message.metadata.message_type}`)
     }
   }
 
@@ -207,7 +198,7 @@ export class TwitchEventSub {
     }
 
     this.sessionId = session.id
-    log(`Session connected: ${this.sessionId}`)
+    log.log(`Session connected: ${this.sessionId}`)
 
     try {
       await this.subscribeToChannelPoints()
@@ -261,13 +252,13 @@ export class TwitchEventSub {
       const body = await response.text()
       throw new AppError('TWITCH_EVENTSUB_ERROR', `Failed to subscribe to Channel Points: HTTP ${response.status} ${body}`)
     }
-    log('Subscribed to Channel Points redemptions')
+    log.log('Subscribed to Channel Points redemptions')
   }
 
   private async handleNotification(message: EventSubMessage): Promise<void> {
     const subscription = message.payload.subscription
     if (!subscription) {
-      logWarn('Notification has no subscription')
+      log.warn('Notification has no subscription')
       return
     }
 
@@ -278,34 +269,34 @@ export class TwitchEventSub {
 
   private async handleChannelPointsRedemption(event: unknown): Promise<void> {
     if (!event || typeof event !== 'object') {
-      logWarn('Invalid Channel Points event')
+      log.warn('Invalid Channel Points event')
       return
     }
 
     const redemption = event as TwitchChannelPointsRedemption
-    log(`Channel Points redemption: ${redemption.reward.title} by ${redemption.user_name}`)
+    log.log(`Channel Points redemption: ${redemption.reward.title} by ${redemption.user_name}`)
     await this.config.onChannelPointsRedemption?.(redemption)
   }
 
   private async handleReconnect(message: EventSubMessage): Promise<void> {
     const reconnectUrl = message.payload.session?.reconnect_url
     if (!reconnectUrl) {
-      logError('Reconnect message has no URL')
+      log.error('Reconnect message has no URL')
       return
     }
 
     const oldSocket = this.socket
     this.sessionId = null
-    log('Twitch requested reconnect')
+    log.log('Twitch requested reconnect')
 
     try {
       await this.openSocket(reconnectUrl)
       await this.waitForSession()
       oldSocket?.removeAllListeners()
       oldSocket?.close()
-      log('Reconnected')
+      log.log('Reconnected')
     } catch (error) {
-      logError(`Reconnect failed: ${error instanceof Error ? error.message : error}`)
+      log.error(`Reconnect failed: ${error instanceof Error ? error.message : error}`)
       oldSocket?.removeAllListeners()
       this.scheduleReconnect()
     }
@@ -314,7 +305,7 @@ export class TwitchEventSub {
   private handleRevocation(message: EventSubMessage): void {
     const subscription = message.payload.subscription
 
-    logWarn(`Subscription revoked: ${subscription?.type ?? 'unknown'} (${subscription?.status ?? 'unknown'})`)
+    log.warn(`Subscription revoked: ${subscription?.type ?? 'unknown'} (${subscription?.status ?? 'unknown'})`)
 
     this.clearReconnectTimer()
     this.clearSessionWait()
@@ -338,7 +329,7 @@ export class TwitchEventSub {
 
     if (this.stopped) return
 
-    logWarn('Connection closed')
+    log.warn('Connection closed')
     this.scheduleReconnect()
   }
 
@@ -347,7 +338,7 @@ export class TwitchEventSub {
 
     // Check if we've exceeded max reconnect attempts
     if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      logError(`Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached, giving up`)
+      log.error(`Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached, giving up`)
       return
     }
 
@@ -358,8 +349,8 @@ export class TwitchEventSub {
       this.reconnectTimer = null
 
       void this.connect().catch((error) => {
-        logError(`Reconnect failed (attempt ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}): ${error instanceof Error ? error.message : error}`)
-        
+        log.error(`Reconnect failed (attempt ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}): ${error instanceof Error ? error.message : error}`)
+
         // Exponential backoff
         this.currentReconnectDelay = Math.min(this.currentReconnectDelay * 2, MAX_RECONNECT_DELAY_MS)
         this.scheduleReconnect()

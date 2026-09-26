@@ -11,11 +11,14 @@ const cache = store.load({
 export const CACHE_LIMITS = {
   VIDEO_CACHE_TTL: 10 * 60 * 1000,
   SEARCH_CACHE_TTL: 3600 * 1000, // 1 hour
-  MAX_DAILY_SEARCHES: 90 // Maximum number of searches allowed per day
+  // Each search call costs 100 quota units of the default 10,000/day project quota;
+  // 90 searches/day (9,000 units) leaves headroom for other endpoints (1 unit each)
+  MAX_DAILY_SEARCHES: 90
 }
 
 const SWEEP_INTERVAL = 60 * 60 * 1000
 
+// YouTube resets daily API quota at midnight Pacific Time — do not change this timezone
 function getQuotaDate(): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Los_Angeles',

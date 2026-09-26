@@ -6,10 +6,9 @@ import { parsePlaylistId, isValidPlaylistId } from '../youtube/url.js'
 import { fetchPlaylistMeta } from '../youtube/index.js'
 import { getPlaylists, upsertPlaylist, removePlaylist } from '../playlists.js'
 import { refreshFallback, clearFallback } from '../fallback.js'
+import { createLogger } from '../logger.js'
 
-function log(message: string): void {
-  console.log(`[SERVER] ${message}`)
-}
+const log = createLogger('PLAYLISTS')
 
 export const router = express.Router()
 
@@ -50,7 +49,7 @@ router.delete('/:id', (req, res) => {
 
   if (wasActive) {
     clearFallback()
-    log(`[PLAYLISTS] active playlist "${req.params.id}" removed - fallback cleared`)
+    log.log(`active playlist "${req.params.id}" removed - fallback cleared`)
   }
 
   ok(res, { playlists: getPlaylists(), fallbackCleared: wasActive })
@@ -73,7 +72,7 @@ router.post(
 
     if (previous.fallbackPlaylist.playlistId === id) {
       clearFallback()
-      log(`[PLAYLISTS] deactivated playlist "${id}"`)
+      log.log(`deactivated playlist "${id}"`)
       return ok<ConfigResponse>(res, getConfig())
     }
 
@@ -82,7 +81,7 @@ router.post(
     try {
       await refreshFallback()
     } catch (error) {
-      log(`[ERROR] Failed to activate playlist: ${error instanceof Error ? error.message : error}`)
+      log.error(`Failed to activate playlist: ${error instanceof Error ? error.message : error}`)
       restoreConfig(previous)
       return failFromError(res, error)
     }

@@ -1,5 +1,15 @@
 import { Song } from '../types.js'
 
+const SCORE = {
+  EXACT_MATCH: 1500,
+  CONTAINS_QUERY: 1000,
+  ALL_WORDS_PRESENT: 700,
+  PER_MATCHED_WORD: 180,
+  PARTIAL_WORD_BONUS: 40,
+  VERSION_PENALTY: 220,
+  OFFICIAL_CHANNEL_BONUS: 50
+} as const
+
 const OFFICIAL_CHANNEL_KEYWORDS = ['official', 'topic', 'vevo']
 
 // Words that usually mark a title as a *different version* of a song rather than the song itself. Only
@@ -40,7 +50,12 @@ const VERSION_KEYWORDS = [
 ]
 const VERSION_KEYWORD_SET = new Set(VERSION_KEYWORDS)
 // "8-bit" normalizes to two words ("8", "bit"); treat that pair as a single unit like the rest of the list
-const VERSION_KEYWORD_PAIRS: Array<[string, string]> = [['8', 'bit']]
+const VERSION_KEYWORD_PAIRS: Array<[string, string]> = [
+  ['8', 'bit'],
+  ['lo', 'fi'],
+  ['chill', 'out'],
+  ['space', 'out']
+]
 
 export function normalize(value: string): string {
   return value
@@ -98,19 +113,19 @@ function titleScore(title: string, query: string, channelTitle?: string): number
   const queryWords = normalizedQuery.split(' ')
   const queryWordSet = new Set(queryWords)
   const meaningfulWords = queryWords.filter((word) => word.length >= 2)
-  const versionPenalty = unrequestedVersionWordCount(titleWords, queryWordSet) * 220
+  const versionPenalty = unrequestedVersionWordCount(titleWords, queryWordSet) * SCORE.VERSION_PENALTY
 
   const coverage = normalizedQuery.length / normalizedTitle.length
   const normalizedChannel = channelTitle ? normalize(channelTitle) : ''
   const isOfficialChannel = normalizedChannel !== '' && OFFICIAL_CHANNEL_KEYWORDS.some((keyword) => normalizedChannel.includes(keyword))
-  const channelBonus = isOfficialChannel ? 50 : 0
+  const channelBonus = isOfficialChannel ? SCORE.OFFICIAL_CHANNEL_BONUS : 0
 
   if (normalizedTitle === normalizedQuery) {
-    return 1500 - versionPenalty + channelBonus
+    return SCORE.EXACT_MATCH - versionPenalty + channelBonus
   }
 
   if (normalizedTitle.includes(normalizedQuery)) {
-    return 1000 * coverage - versionPenalty + channelBonus
+    return SCORE.CONTAINS_QUERY * coverage - versionPenalty + channelBonus
   }
 
   const titleWordSet = new Set(titleWords)
@@ -120,14 +135,14 @@ function titleScore(title: string, query: string, channelTitle?: string): number
   const allWordsPresent = meaningfulWords.length > 0 && matchedWords === meaningfulWords.length
 
   if (allWordsPresent) {
-    return 700 * coverage - versionPenalty + channelBonus
+    return SCORE.ALL_WORDS_PRESENT * coverage - versionPenalty + channelBonus
   }
 
-  let score = matchedWords * 180
+  let score = matchedWords * SCORE.PER_MATCHED_WORD
 
   for (const word of meaningfulWords) {
     if (normalizedTitle.includes(word)) {
-      score += 40
+      score += SCORE.PARTIAL_WORD_BONUS
     }
   }
 
@@ -150,8 +165,18 @@ function durationScore(duration: number): number {
   return Math.max(0, 100 - (duration - 420) * 0.5)
 }
 
-export function combinedScore(song: Song, query: string): number {
-  return titleScore(song.title, query, song.channelTitle) + popularityScore(song.views) + durationScore(song.duration)
+function relevanceScore(rank: number | undefined, totalCandidates: number): number {
+  if (rank === undefined) return 0
+  return Math.max(0, 100 - (rank / totalCandidates) * 100)
+}
+
+export function combinedScore(song: Song, query: string, relevanceRank?: number, totalCandidates = 20): number {
+  return (
+    titleScore(song.title, query, song.channelTitle) +
+    popularityScore(song.views) +
+    durationScore(song.duration) +
+    relevanceScore(relevanceRank, totalCandidates)
+  )
 }
 
 export function formatViews(views: number): string {

@@ -5,6 +5,7 @@ import { isValidVideoId } from '../youtube/url.js'
 import { translateWithFallback } from '../i18n.js'
 import { setPaused } from '../queue.js'
 import { getState, endCurrent, skipCurrent, reportPlaybackFailure } from '../player.js'
+import { createRateLimiter } from '../rate-limit.js'
 
 function buildSkipMessage(state: PlayerState): string {
   return state.current?.title
@@ -13,6 +14,8 @@ function buildSkipMessage(state: PlayerState): string {
 }
 
 export const router = express.Router()
+
+const reportFailureLimiter = createRateLimiter({ windowMs: 60_000, max: 20, keyPrefix: 'report-failure' })
 
 // `videoId` says which track the client is talking about; without it the report is taken to be about the current one
 function readVideoId(body: unknown): { videoId?: string; valid: boolean } {
@@ -45,7 +48,7 @@ router.post('/resume', (_req, res) => {
   ok<PlayerActionResponse>(res, { ...getState(), message: translateWithFallback('chat.resumed', undefined, 'Playback resumed') })
 })
 
-router.post('/report-failure', (req, res) => {
+router.post('/report-failure', reportFailureLimiter.middleware, (req, res) => {
   const { videoId, valid } = readVideoId(req.body)
   if (!valid) return fail(res, 'a valid videoId is required', 'INVALID_VIDEO_ID', 400)
 

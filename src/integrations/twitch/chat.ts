@@ -10,9 +10,9 @@
  * TODO: Implement Twitch IRC chat connection and command processing
  */
 
-function log(message: string): void {
-  console.log(`[TWITCH CHAT] ${message}`)
-}
+import { createLogger } from '../../logger.js'
+
+const log = createLogger('TWITCH CHAT')
 
 export type ChatCommand = {
   command: string
@@ -30,21 +30,21 @@ export class TwitchChat {
   private connected: boolean = false
 
   constructor() {
-    log('Chat module initialized (placeholder)')
+    log.log('Chat module initialized (placeholder)')
   }
 
   /**
    * Connect to Twitch chat
    */
   async connect(channel: string): Promise<void> {
-    log(`connect to channel ${channel} - not implemented yet`)
+    log.log(`connect to channel ${channel} - not implemented yet`)
   }
 
   /**
    * Disconnect from chat
    */
   async disconnect(): Promise<void> {
-    log('disconnect - not implemented yet')
+    log.log('disconnect - not implemented yet')
   }
 
   /**
@@ -52,14 +52,14 @@ export class TwitchChat {
    */
   registerCommand(command: string, handler: ChatCommandHandler): void {
     this.commandHandlers.set(command, handler)
-    log(`Registered command: ${command}`)
+    log.log(`Registered command: ${command}`)
   }
 
   /**
    * Send a message to chat
    */
   async sendMessage(message: string): Promise<void> {
-    log(`sendMessage: ${message} - not implemented yet`)
+    log.log(`sendMessage: ${message} - not implemented yet`)
   }
 
   /**
@@ -73,6 +73,6 @@ export class TwitchChat {
    * Process incoming chat message
    */
   private async processMessage(user: string, message: string): Promise<void> {
-    log(`processMessage from ${user}: ${message} - not implemented yet`)
+    log.log(`processMessage from ${user}: ${message} - not implemented yet`)
   }
 }

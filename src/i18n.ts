@@ -21,7 +21,7 @@ function loadLocale(locale: string): Dict {
     return dict
   } catch (error) {
     console.error(`[I18N] Failed to load locale "${locale}":`, error instanceof Error ? error.message : error)
-    return {}
+    return {} // Return empty object without caching - allows retry on subsequent calls
   }
 }
 

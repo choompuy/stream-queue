@@ -5,6 +5,7 @@ import { getSettings, setSettings, validateSettingsUpdates } from './settings.js
 import { getQueue, getCurrent, hydrateQueue } from './queue.js'
 import { getFallbackSnapshot, hydrateFallback, FallbackSnapshot } from './fallback.js'
 import { onStateChange } from './state-events.js'
+import { createLogger } from './logger.js'
 
 export type StateFile = {
   current: QueueItem | null
@@ -129,9 +130,7 @@ export function sanitizeState(raw: unknown): SanitizedState {
 
 const store = createFileStore<Partial<StateFile>>(STATE_FILE)
 
-function log(message: string): void {
-  console.log(`[STATE] ${message}`)
-}
+const log = createLogger('STATE')
 
 function stateSnapshot(): StateFile {
   return {
@@ -144,7 +143,7 @@ function stateSnapshot(): StateFile {
 
 function persistState(): void {
   store.scheduleSave(stateSnapshot, (error) => {
-    console.error('[STATE] Failed to save state:', error instanceof Error ? error.message : error)
+    log.error(`Failed to save state: ${error instanceof Error ? error.message : error}`)
   })
 }
 
@@ -152,20 +151,20 @@ function attempt(part: string, apply: () => void): void {
   try {
     apply()
   } catch (error) {
-    console.error(`[STATE] Failed to load ${part}:`, error instanceof Error ? error.message : error)
+    log.error(`Failed to load ${part}: ${error instanceof Error ? error.message : error}`)
   }
 }
 
 export function loadState(): void {
   const { current, queue, settings, fallback, problems } = sanitizeState(store.load({}))
 
-  for (const problem of problems) console.warn(`[STATE] ${problem}`)
+  for (const problem of problems) log.warn(`${problem}`)
 
   attempt('queue', () => hydrateQueue({ current, queue }))
   attempt('settings', () => setSettings({ ...getSettings(), ...settings }))
   attempt('fallback', () => hydrateFallback(fallback))
 
-  log('State loaded from disk')
+  log.log('State loaded from disk')
 }
 
 let initialized = false

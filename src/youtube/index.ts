@@ -1,5 +1,15 @@
 import { Song, AppError } from '../types.js'
-import { youtube, videoToSong, isValidSong, getFilterFailureReason, throwFilterError, fetchPlaylistMeta, PlaylistMeta } from './client.js'
+import {
+  youtube,
+  videoToSong,
+  isValidSong,
+  getFilterFailureReason,
+  throwFilterError,
+  fetchPlaylistMeta,
+  PlaylistMeta,
+  VIDEO_DETAILS_PART,
+  PlaylistFetchResult
+} from './client.js'
 import { normalize, combinedScore, formatViews } from './scoring.js'
 import { getSearchCache, setSearchCache, getVideoCache, setVideoCache, canSearch, consumeSearchQuota, CACHE_LIMITS } from './cache.js'
 import { VideoItem, SearchItem, PlaylistItem } from './types.js'
@@ -7,10 +17,25 @@ import { getConfig } from '../config.js'
 
 const pendingSearches = new Map<string, Promise<Song[]>>()
 const pendingVideos = new Map<string, Promise<Song | null>>()
-const pendingPlaylists = new Map<string, Promise<Song[]>>()
+const pendingPlaylists = new Map<string, Promise<PlaylistFetchResult>>()
 const YOUTUBE_ID_BATCH_SIZE = 50
 const PLAYLIST_PAGE_SIZE = 50
 const MAX_PLAYLIST_PAGES = 3
+
+const DEBUG = process.env.YOUTUBE_DEBUG === 'true'
+function debugLog(message: string): void {
+  if (DEBUG) console.log(message)
+}
+
+async function withYouTubeErrorHandling<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (error) {
+    console.error(`[ERROR] ${label}:`, error instanceof Error ? error.message : error)
+    if (error instanceof AppError) throw error
+    throw new AppError('YOUTUBE_ERROR', `${label} failed`)
+  }
+}
 
 function dedupInFlight<T>(pending: Map<string, Promise<T>>, key: string, run: () => Promise<T>): Promise<T> {
   const existing = pending.get(key)
@@ -30,11 +55,11 @@ function filtersVersion(): string {
 }
 
 export async function getVideoById(videoId: string, bypassFilters = false): Promise<Song | null> {
-  console.log(`[VIDEO] Fetching video by ID: ${videoId}`)
+  debugLog(`[VIDEO] Fetching video by ID: ${videoId}`)
   const cached = bypassFilters ? undefined : getVideoCache(videoId, filtersVersion())
 
   if (cached !== undefined) {
-    console.log(`[CACHE] Video ${videoId}`)
+    debugLog(`[CACHE] Video ${videoId}`)
     if (cached.song === null && cached.reason) {
       throwFilterError(cached.reason, getConfig())
     }
@@ -45,16 +70,16 @@ export async function getVideoById(videoId: string, bypassFilters = false): Prom
 }
 
 async function fetchVideoById(videoId: string, bypassFilters: boolean): Promise<Song | null> {
-  try {
+  return withYouTubeErrorHandling('YouTube API', async () => {
     const details = await youtube<{ items: VideoItem[] }>('videos', {
-      part: 'snippet,contentDetails,statistics,status',
+      part: VIDEO_DETAILS_PART,
       id: videoId
     })
 
     const video = details.items?.[0]
 
     if (!video) {
-      console.log(`[VIDEO] Video not found: ${videoId}`)
+      debugLog(`[VIDEO] Video not found: ${videoId}`)
       if (!bypassFilters) setVideoCache(videoId, null, filtersVersion())
       return null
     }
@@ -64,29 +89,23 @@ async function fetchVideoById(videoId: string, bypassFilters: boolean): Promise<
     if (!bypassFilters) {
       const reason = getFilterFailureReason(song, video)
       if (reason) {
-        console.log(`[VIDEO] Video rejected (${reason}): "${song.title}"`)
+        debugLog(`[VIDEO] Video rejected (${reason}): "${song.title}"`)
         setVideoCache(videoId, null, filtersVersion(), reason)
         throwFilterError(reason, getConfig())
       }
     }
 
-    console.log(`[VIDEO] Valid: "${song.title}" - ${formatViews(song.views)} views`)
+    debugLog(`[VIDEO] Valid: "${song.title}" - ${formatViews(song.views)} views`)
     if (!bypassFilters) setVideoCache(videoId, song, filtersVersion())
 
     return song
-  } catch (error) {
-    console.error('[ERROR] YouTube API:', error instanceof Error ? error.message : error)
-
-    if (error instanceof AppError) throw error
-
-    throw new AppError('YOUTUBE_ERROR', 'failed to fetch video from YouTube')
-  }
+  })
 }
 
 export async function searchSongs(query: string, bypassFilters = false): Promise<Song[]> {
   const normalizedQuery = normalize(query)
 
-  console.log(`[SEARCH] Query: "${normalizedQuery}"`)
+  debugLog(`[SEARCH] Query: "${normalizedQuery}"`)
 
   if (!normalizedQuery) {
     return []
@@ -96,7 +115,7 @@ export async function searchSongs(query: string, bypassFilters = false): Promise
   const cached = bypassFilters ? null : getSearchCache(normalizedQuery, filtersVersion())
 
   if (cached !== null) {
-    console.log(`[CACHE] Search: "${normalizedQuery}" - ${cached.length} results`)
+    debugLog(`[CACHE] Search: "${normalizedQuery}" - ${cached.length} results`)
     return cached
   }
 
@@ -116,7 +135,7 @@ function mapValidSongs(videos: VideoItem[], bypassFilters = false): Song[] {
 }
 
 async function performSearch(query: string, bypassFilters: boolean): Promise<Song[]> {
-  try {
+  return withYouTubeErrorHandling('YouTube search', async () => {
     const search = await youtube<{ items: SearchItem[] }>('search', {
       part: 'snippet',
       q: query,
@@ -131,7 +150,8 @@ async function performSearch(query: string, bypassFilters: boolean): Promise<Son
     consumeSearchQuota()
 
     const ids = (search.items ?? []).map((item) => item.id?.videoId).filter((id): id is string => Boolean(id))
-    console.log(`[SEARCH] Found ${ids.length} candidates`)
+    const relevanceRank = new Map(ids.map((id, i) => [id, i]))
+    debugLog(`[SEARCH] Found ${ids.length} candidates`)
 
     if (!ids.length) {
       if (!bypassFilters) setSearchCache(query, [], filtersVersion())
@@ -139,26 +159,22 @@ async function performSearch(query: string, bypassFilters: boolean): Promise<Son
     }
 
     const details = await youtube<{ items: VideoItem[] }>('videos', {
-      part: 'snippet,contentDetails,statistics,status',
+      part: VIDEO_DETAILS_PART,
       id: ids.join(',')
     })
 
     const songs = mapValidSongs(details.items ?? [], bypassFilters)
 
-    console.log(`[FILTER] ${songs.length} suitable results`)
-    songs.sort((a, b) => combinedScore(b, query) - combinedScore(a, query))
+    debugLog(`[FILTER] ${songs.length} suitable results`)
+    songs.sort(
+      (a, b) => combinedScore(b, query, relevanceRank.get(b.videoId), ids.length) - combinedScore(a, query, relevanceRank.get(a.videoId), ids.length)
+    )
     if (!bypassFilters) {
       setSearchCache(query, songs, filtersVersion())
-      console.log(`[CACHE] Saved "${query}" - ${songs.length} results`)
+      debugLog(`[CACHE] Saved "${query}" - ${songs.length} results`)
     }
     return songs
-  } catch (error) {
-    console.error('[ERROR] YouTube search:', error instanceof Error ? error.message : error)
-
-    if (error instanceof AppError) throw error
-
-    throw new AppError('YOUTUBE_ERROR', 'YouTube search failed')
-  }
+  })
 }
 
 export function selectBestSong(songs: Song[], query: string): Song | null {
@@ -168,16 +184,16 @@ export function selectBestSong(songs: Song[], query: string): Song | null {
 
   const ranked = songs.map((song) => ({ song, score: combinedScore(song, query) })).sort((a, b) => b.score - a.score)
   const selected = ranked[0].song
-  console.log(`[SELECT] "${selected.title}" - ${formatViews(selected.views)} views`)
+  debugLog(`[SELECT] "${selected.title}" - ${formatViews(selected.views)} views`)
   return selected
 }
 
 export { fetchPlaylistMeta }
-export type { PlaylistMeta }
+export type { PlaylistMeta, PlaylistFetchResult }
 
-export async function fetchPlaylistSongs(playlistId: string): Promise<Song[]> {
+export async function fetchPlaylistSongs(playlistId: string): Promise<PlaylistFetchResult> {
   if (!playlistId) {
-    return []
+    return { songs: [], truncated: false }
   }
 
   return dedupInFlight(pendingPlaylists, playlistId, () => performPlaylistFetch(playlistId))
@@ -191,9 +207,9 @@ function chunk<T>(items: T[], size: number): T[][] {
   return result
 }
 
-async function performPlaylistFetch(playlistId: string): Promise<Song[]> {
-  try {
-    console.log(`[PLAYLIST] Fetching playlist: ${playlistId}`)
+async function performPlaylistFetch(playlistId: string): Promise<PlaylistFetchResult> {
+  return withYouTubeErrorHandling('Playlist fetch', async () => {
+    debugLog(`[PLAYLIST] Fetching playlist: ${playlistId}`)
 
     const videoIds: string[] = []
     const seenVideoIds = new Set<string>()
@@ -201,12 +217,14 @@ async function performPlaylistFetch(playlistId: string): Promise<Song[]> {
 
     let pageToken: string | undefined
     let page = 0
+    let truncated = false
 
     do {
       page++
 
       if (page >= MAX_PLAYLIST_PAGES) {
         console.warn(`[PLAYLIST] Maximum page limit reached (${MAX_PLAYLIST_PAGES}), stopping`)
+        truncated = true
         break
       }
 
@@ -218,7 +236,7 @@ async function performPlaylistFetch(playlistId: string): Promise<Song[]> {
         seenPageTokens.add(pageToken)
       }
 
-      console.log(`[PLAYLIST] Loading page ${page}${pageToken ? `, token=${pageToken.slice(0, 10)}...` : ''}`)
+      debugLog(`[PLAYLIST] Loading page ${page}${pageToken ? `, token=${pageToken.slice(0, 10)}...` : ''}`)
       const playlist = await youtube<{ items: PlaylistItem[]; nextPageToken?: string }>('playlistItems', {
         part: 'snippet',
         playlistId,
@@ -244,9 +262,7 @@ async function performPlaylistFetch(playlistId: string): Promise<Song[]> {
         newItems++
       }
 
-      console.log(
-        `[PLAYLIST] Page ${page}: ${items.length} items, ${newItems} new, ${duplicateItems} duplicates, total unique IDs: ${videoIds.length}`
-      )
+      debugLog(`[PLAYLIST] Page ${page}: ${items.length} items, ${newItems} new, ${duplicateItems} duplicates, total unique IDs: ${videoIds.length}`)
 
       const nextPageToken = playlist.nextPageToken
       if (nextPageToken && seenPageTokens.has(nextPageToken)) {
@@ -258,31 +274,27 @@ async function performPlaylistFetch(playlistId: string): Promise<Song[]> {
     } while (pageToken)
 
     if (!videoIds.length) {
-      console.log(`[PLAYLIST] No videos in playlist: ${playlistId}`)
-      return []
+      debugLog(`[PLAYLIST] No videos in playlist: ${playlistId}`)
+      return { songs: [], truncated: false }
     }
 
-    console.log(`[PLAYLIST] Collected ${videoIds.length} unique video IDs, loading video details`)
+    debugLog(`[PLAYLIST] Collected ${videoIds.length} unique video IDs, loading video details`)
     const allVideoItems: VideoItem[] = []
     const batches = chunk(videoIds, YOUTUBE_ID_BATCH_SIZE)
 
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i]
-      console.log(`[PLAYLIST] Loading video batch ${i + 1}/${batches.length} (${batch.length} videos)`)
+      debugLog(`[PLAYLIST] Loading video batch ${i + 1}/${batches.length} (${batch.length} videos)`)
       const details = await youtube<{ items: VideoItem[] }>('videos', {
-        part: 'snippet,contentDetails,statistics,status',
+        part: VIDEO_DETAILS_PART,
         id: batch.join(',')
       })
       allVideoItems.push(...(details.items ?? []))
-      console.log(`[PLAYLIST] Video batch ${i + 1}/${batches.length} complete, total details: ${allVideoItems.length}`)
+      debugLog(`[PLAYLIST] Video batch ${i + 1}/${batches.length} complete, total details: ${allVideoItems.length}`)
     }
 
     const songs = mapValidSongs(allVideoItems)
-    console.log(`[PLAYLIST] Fetched ${songs.length} valid unique songs from playlist: ${playlistId}`)
-    return songs
-  } catch (error) {
-    console.error('[ERROR] Playlist fetch:', error instanceof Error ? error.message : error)
-    if (error instanceof AppError) throw error
-    throw new AppError('YOUTUBE_ERROR', 'failed to load YouTube playlist')
-  }
+    debugLog(`[PLAYLIST] Fetched ${songs.length} valid unique songs from playlist: ${playlistId}`)
+    return { songs, truncated }
+  })
 }

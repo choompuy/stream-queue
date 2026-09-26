@@ -35,6 +35,7 @@ export function updateSecrets(updates: SecretsUpdates): Secrets {
     }
 
     const value = updates.youtubeApiKey.trim()
+    // Allow empty string to clear the key
     if (value !== secrets.youtubeApiKey) {
       secrets = {
         ...secrets,
@@ -116,12 +117,13 @@ export function getTwitchClientId(): string {
 }
 
 export function getPublicSecretsView() {
+  const twitchClientId = getTwitchClientId()
   return {
     youtubeApiKey: maskSecret(secrets.youtubeApiKey),
     hasYoutubeApiKey: secrets.youtubeApiKey.length > 0,
 
     twitch: {
-      configured: Boolean(getTwitchClientId()),
+      configured: Boolean(twitchClientId),
       connected: secrets.twitch.tokenData !== null && secrets.twitch.userInfo !== null,
       user: secrets.twitch.userInfo
         ? {

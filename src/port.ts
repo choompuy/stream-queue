@@ -14,11 +14,15 @@ function isPortAvailable(port: number): Promise<boolean> {
   })
 }
 
-export async function findAvailablePort(startPort: number): Promise<number> {
+export async function findAvailablePort(startPort: number, maxPort = 65535): Promise<number> {
   let port = startPort
 
-  while (!(await isPortAvailable(port))) {
+  while (port <= maxPort && !(await isPortAvailable(port))) {
     port++
+  }
+
+  if (port > maxPort) {
+    throw new Error(`No available port found in range ${startPort}-${maxPort}`)
   }
 
   return port

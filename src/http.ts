@@ -1,5 +1,5 @@
 import { Response, Request, NextFunction, RequestHandler, ParamsDictionary } from 'express-serve-static-core'
-import { AppError, AppErrorCode, ApiOk, ApiError } from './types.js'
+import { AppError, AppErrorCode, ApiOk, ApiError, ApiErrorCode } from './types.js'
 import { getSettings } from './settings.js'
 import { translateErrorCode } from './i18n.js'
 
@@ -8,7 +8,7 @@ export function ok<T extends object>(res: Response, data: T, status = 200): void
   res.status(status).json(body)
 }
 
-export function fail(res: Response, error: string, code: string, status: number, params?: Record<string, string | number>): void {
+export function fail(res: Response, error: string, code: ApiErrorCode, status: number, params?: Record<string, string | number>): void {
   const locale = getSettings().locale
   const localized = translateErrorCode(locale, code, params)
   const body: ApiError = { success: false, error: localized ?? error, code, params }
@@ -53,7 +53,7 @@ export function getErrorInfo(error: unknown): ErrorInfo {
 
 export function failFromError(res: Response, error: unknown): void {
   const info = getErrorInfo(error)
-  fail(res, info.message, info.code, info.status, info.params)
+  fail(res, info.message, info.code as ApiErrorCode, info.status, info.params)
 }
 
 export function asyncHandler<P = ParamsDictionary>(

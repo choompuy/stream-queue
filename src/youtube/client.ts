@@ -11,6 +11,8 @@ export type PlaylistMeta = {
   itemCount: number
 }
 
+export type PlaylistFetchResult = { songs: Song[]; truncated: boolean }
+
 type YouTubeErrorResponse = {
   error?: {
     code?: number
@@ -27,6 +29,8 @@ type FilterRule = {
 }
 
 const SHORTS_MAX_DURATION_SECONDS = 60
+
+export const VIDEO_DETAILS_PART = 'snippet,contentDetails,statistics,status'
 
 const FILTER_RULES: FilterRule[] = [
   {
@@ -96,20 +100,26 @@ export async function youtube<T>(path: string, params: Record<string, string>): 
     url.searchParams.set(key, value)
   }
 
-  const response = await fetch(url)
-  const data = (await response.json()) as T & YouTubeErrorResponse
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 10_000)
+  try {
+    const response = await fetch(url, { signal: controller.signal })
+    const data = (await response.json()) as T & YouTubeErrorResponse
 
-  if (!response.ok) {
-    const reason = data.error?.errors?.[0]?.reason
+    if (!response.ok) {
+      const reason = data.error?.errors?.[0]?.reason
 
-    if (reason === 'quotaExceeded') {
-      throw new AppError('YOUTUBE_QUOTA', 'YouTube API quota exceeded')
+      if (reason === 'quotaExceeded') {
+        throw new AppError('YOUTUBE_QUOTA', 'YouTube API quota exceeded')
+      }
+
+      throw new AppError('YOUTUBE_ERROR', data.error?.message || `YouTube API error ${response.status}`)
     }
 
-    throw new AppError('YOUTUBE_ERROR', data.error?.message || `YouTube API error ${response.status}`)
+    return data
+  } finally {
+    clearTimeout(timeout)
   }
-
-  return data
 }
 
 export function videoToSong(video: VideoItem): Song {
@@ -147,7 +157,7 @@ export function isAvailableInRegion(video: VideoItem, regionCode: string): boole
   if (!restriction) return true
 
   if (restriction.blocked?.includes(regionCode)) return false
-  if (restriction.allowed && !restriction.allowed.includes(regionCode)) return false
+  if (restriction.allowed && (restriction.allowed.length === 0 || !restriction.allowed.includes(regionCode))) return false
 
   return true
 }
@@ -166,6 +176,7 @@ export function isValidSong(song: Song, video: VideoItem): boolean {
 }
 
 export function throwFilterError(reason: FilterFailureReason, config: Config): never {
-  const rule = FILTER_RULES.find((r) => r.reason === reason)!
+  const rule = FILTER_RULES.find((r) => r.reason === reason)
+  if (!rule) throw new AppError('YOUTUBE_ERROR', `no filter rule registered for reason: ${reason}`)
   throw new AppError(reason, rule.message, rule.params?.(config))
 }

@@ -49,7 +49,7 @@ function deepMerge<T>(defaults: T, data: Partial<T>): T {
       !Array.isArray(defaultValue)
     ) {
       result[key] = deepMerge(defaultValue, value)
-    } else if (value !== undefined) {
+    } else if (value !== undefined && value !== null) {
       result[key] = value
     }
   }

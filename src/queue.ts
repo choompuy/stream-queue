@@ -5,6 +5,7 @@ import { logRejection, logAcceptance } from './activity.js'
 import { QueueItem, Song, AppError, AddedSong } from './types.js'
 import { isBlocked } from './blocklist.js'
 import { notifyStateChange } from './state-events.js'
+import { createLogger } from './logger.js'
 
 let currentSong: QueueItem | null = null
 const queue: QueueItem[] = []
@@ -13,9 +14,7 @@ const userQueueCounts = new Map<string, number>()
 
 let isPaused = false
 
-function log(message: string): void {
-  console.log(`[QUEUE] ${message}`)
-}
+const log = createLogger('QUEUE')
 
 function incUserCount(requestedBy: string): void {
   const key = requestedBy.toLowerCase()
@@ -28,6 +27,7 @@ function decUserCount(requestedBy: string): void {
   if (count > 0) {
     userQueueCounts.set(key, count)
   } else {
+    if (count < 0) log.warn(`user count went negative for "${key}", resetting to 0`)
     userQueueCounts.delete(key)
   }
 }
@@ -117,7 +117,7 @@ export function assertCanAddSong(song: Song, requestedBy: string, addToQueue: bo
 }
 
 export function addSong(song: Song, requestedBy: string, addToQueue: boolean = true, bypassLimits: boolean = false): QueueItem {
-  log(`[REQUEST] ${requestedBy} → "${song.title}"`)
+  log.log(`[REQUEST] ${requestedBy} → "${song.title}"`)
 
   assertCanAddSong(song, requestedBy, addToQueue, bypassLimits)
 
@@ -130,9 +130,9 @@ export function addSong(song: Song, requestedBy: string, addToQueue: boolean = t
     queue.push(item)
     queueVideoIds.add(item.videoId)
     incUserCount(requestedBy)
-    log(`[QUEUE] added "${song.title}" at position ${queue.length}`)
+    log.log(`added "${song.title}" at position ${queue.length}`)
   } else {
-    log(`[QUEUE] "${song.title}" will be set as current (not added to queue)`)
+    log.log(`"${song.title}" will be set as current (not added to queue)`)
   }
 
   notifyStateChange()
@@ -144,9 +144,9 @@ export function setCurrent(item: QueueItem | null): void {
   currentSong = item
 
   if (item) {
-    log(`[PLAYER] started "${item.title}"`)
+    log.log(`[PLAYER] started "${item.title}"`)
   } else {
-    log(`[PLAYER] stopped`)
+    log.log(`[PLAYER] stopped`)
   }
 
   notifyStateChange()
@@ -162,7 +162,7 @@ export function removeAt(index: number): QueueItem | null {
   if (item) {
     queueVideoIds.delete(item.videoId)
     decUserCount(item.requestedBy)
-    log(`[QUEUE] removed "${item.title}" at position ${index + 1}`)
+    log.log(`removed "${item.title}" at position ${index + 1}`)
   }
 
   notifyStateChange()
@@ -176,7 +176,7 @@ export function clearQueue(): QueueItem[] {
   queueVideoIds.clear()
   userQueueCounts.clear()
 
-  log(`[QUEUE] cleared ${cleared.length} songs`)
+  log.log(`cleared ${cleared.length} songs`)
 
   notifyStateChange()
 
@@ -198,7 +198,7 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
     const { isYouTube, videoId } = parseYouTubeUrl(query)
 
     if (isYouTube && !videoId) {
-      log(`[REJECT] ${requestedBy} → INVALID_YOUTUBE_URL`)
+      log.log(`[REJECT] ${requestedBy} → INVALID_YOUTUBE_URL`)
       logRejection(requestedBy, query, 'INVALID_YOUTUBE_URL')
       return { outcome: 'invalid-url' }
     }
@@ -206,16 +206,16 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
     if (videoId) {
       assertNotBlocked(videoId)
       assertNotDuplicate(videoId)
-      log(`[REQUEST] ${requestedBy} → YouTube URL: ${videoId}`)
+      log.log(`[REQUEST] ${requestedBy} → YouTube URL: ${videoId}`)
       song = await getVideoById(videoId, bypassFilters)
     } else {
-      log(`[REQUEST] ${requestedBy} → Search: "${query}"`)
+      log.log(`[REQUEST] ${requestedBy} → Search: "${query}"`)
       const songs = await searchSongs(query, bypassFilters)
       song = selectBestSong(songs, query)
     }
 
     if (!song) {
-      log(`[REJECT] ${requestedBy} → SONG_NOT_FOUND`)
+      log.log(`[REJECT] ${requestedBy} → SONG_NOT_FOUND`)
       logRejection(requestedBy, query, 'SONG_NOT_FOUND')
       return { outcome: 'not-found' }
     }
@@ -225,9 +225,9 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
 
     if (wasEmpty) {
       setCurrent(item)
-      log(`[ACCEPT] ${requestedBy} → "${song.title}" - now playing`)
+      log.log(`[ACCEPT] ${requestedBy} → "${song.title}" - now playing`)
     } else {
-      log(`[ACCEPT] ${requestedBy} → "${song.title}" - queued`)
+      log.log(`[ACCEPT] ${requestedBy} → "${song.title}" - queued`)
     }
 
     logAcceptance(requestedBy, query, song.title, song.videoId)
@@ -236,7 +236,7 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
 
     return { outcome: 'added', added: { song: item, started: wasEmpty, position } }
   } catch (error) {
-    log(`[REJECT] ${requestedBy} → error while adding song`)
+    log.error(`[REJECT] ${requestedBy} → error while adding song`)
     const reasonCode = error instanceof AppError ? error.code : 'SERVER_ERROR'
     const reasonParams = error instanceof AppError ? error.params : undefined
     logRejection(requestedBy, query, reasonCode, { title: song?.title ?? null, videoId: song?.videoId ?? null, reasonParams })

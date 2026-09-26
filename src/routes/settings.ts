@@ -8,10 +8,6 @@ import { getPublicSecretsView, SecretsResponse, updateSecrets } from '../secrets
 import { parsePlaylistId } from '../youtube/url.js'
 import { refreshFallback, reorderFallback } from '../fallback.js'
 
-function log(message: string): void {
-  console.log(`[SERVER] ${message}`)
-}
-
 export const router = express.Router()
 
 router.get('/settings', (_req, res) => {
@@ -83,7 +79,7 @@ router.put(
         await refreshFallback()
       } catch (error) {
         // the playlist could not be loaded: keep the previous config as a whole, like any other refused update
-        log(`[ERROR] Failed to refresh fallback playlist: ${error instanceof Error ? error.message : error}`)
+        console.error(`[CONFIG] Failed to refresh fallback playlist: ${error instanceof Error ? error.message : error}`)
         restoreConfig(previous)
         return failFromError(res, error)
       }

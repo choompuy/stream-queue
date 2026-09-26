@@ -120,6 +120,29 @@ export type AppErrorCode =
   | 'TWITCH_EVENTSUB_ERROR'
   | 'TWITCH_API_ERROR'
   | FilterFailureReason
+
+export type ApiErrorCode =
+  | ActivityReasonCode
+  | AppErrorCode
+  | 'INVALID_QUERY'
+  | 'INVALID_VIDEO_ID'
+  | 'USERNAME_REQUIRED'
+  | 'INVALID_INDEX'
+  | 'QUEUE_ITEM_NOT_FOUND'
+  | 'NOT_FOUND'
+  | 'INVALID_PLAYLIST_ID'
+  | 'PLAYLIST_NOT_FOUND'
+  | 'INVALID_SETTINGS'
+  | 'INVALID_CONFIG'
+  | 'INVALID_LOCALE'
+  | 'LOCAL_ONLY'
+  | 'FORBIDDEN_ORIGIN'
+  | 'INVALID_JSON'
+  | 'PAYLOAD_TOO_LARGE'
+  | 'INVALID_REQUEST'
+  | 'SERVER_ERROR'
+  | 'RATE_LIMITED'
+
 export class AppError extends Error {
   constructor(
     public code: AppErrorCode,

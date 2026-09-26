@@ -1,5 +1,6 @@
 import { Settings } from './types.js'
 import { notifyStateChange } from './state-events.js'
+import { createLogger } from './logger.js'
 
 const defaultSettings: Settings = {
   showVideo: false,
@@ -8,6 +9,8 @@ const defaultSettings: Settings = {
 }
 
 let currentSettings: Settings = { ...defaultSettings }
+
+const log = createLogger('SETTINGS')
 
 export function getSettings(): Settings {
   return { ...currentSettings }
@@ -51,19 +54,19 @@ export function updateSettings(updates: Partial<Settings>): Settings {
   }
 
   currentSettings = next
-  console.log('[SETTINGS] Updated:', currentSettings)
+  log.log(`Updated: ${currentSettings}`)
   notifyStateChange()
   return { ...currentSettings }
 }
 
 export function setSettings(settings: Settings): void {
   currentSettings = { ...settings }
-  console.log('[SETTINGS] Set:', currentSettings)
+  log.log(`Set: ${currentSettings}`)
 }
 
 export function resetSettings(): Settings {
   currentSettings = { ...defaultSettings }
-  console.log('[SETTINGS] Reset to defaults')
+  log.log('Reset to defaults')
   notifyStateChange()
   return { ...currentSettings }
 }

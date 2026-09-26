@@ -1,6 +1,6 @@
 import express from 'express'
 import { StateResponse, QueueItem, FallbackEnqueueResponse } from '../types.js'
-import { ok, fail, failFromError, asyncHandler } from '../http.js'
+import { ok, fail, asyncHandler } from '../http.js'
 import {
   refreshFallback,
   getFallbackState,
@@ -46,21 +46,13 @@ router.post('/enabled', (_req, res) => {
 })
 
 router.post('/play/:videoId', (req, res) => {
-  try {
-    const item = playFallbackTrackNow(req.params.videoId)
-    if (!fallbackTrackOrNotFound(res, item)) return
-    ok<StateResponse>(res, getState())
-  } catch (error) {
-    failFromError(res, error)
-  }
+  const item = playFallbackTrackNow(req.params.videoId)
+  if (!fallbackTrackOrNotFound(res, item)) return
+  ok<StateResponse>(res, getState())
 })
 
 router.post('/enqueue/:videoId', (req, res) => {
-  try {
-    const item = queueFallbackTrack(req.params.videoId)
-    if (!fallbackTrackOrNotFound(res, item)) return
-    ok<FallbackEnqueueResponse>(res, { song: item, state: getState() }, 201)
-  } catch (error) {
-    failFromError(res, error)
-  }
+  const item = queueFallbackTrack(req.params.videoId)
+  if (!fallbackTrackOrNotFound(res, item)) return
+  ok<FallbackEnqueueResponse>(res, { song: item, state: getState() }, 201)
 })

@@ -11,14 +11,9 @@ import type {
 } from './types.js'
 import { TwitchOAuth } from './oauth.js'
 import { AppError } from '../../types.js'
+import { createLogger } from '../../logger.js'
 
-function log(message: string): void {
-  console.log(`[TWITCH CLIENT] ${message}`)
-}
-
-function logError(message: string): void {
-  console.error(`[TWITCH CLIENT] ${message}`)
-}
+const log = createLogger('TWITCH CLIENT')
 
 export class TwitchClient {
   private readonly oauth: TwitchOAuth
@@ -44,7 +39,7 @@ export class TwitchClient {
       return this.handleResponse<T>(retryResponse)
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
-      logError(`Authentication retry failed: ${reason}`)
+      log.error(`Authentication retry failed: ${reason}`)
       throw new AppError('TWITCH_REFRESH_ERROR', `Authentication failed - please reconnect your Twitch account (${reason})`)
     }
   }
@@ -88,10 +83,10 @@ export class TwitchClient {
         profileImageUrl: userData.profile_image_url
       }
 
-      log(`Retrieved user info for: ${this.userInfo.displayName}`)
+      log.log(`Retrieved user info for: ${this.userInfo.displayName}`)
       return this.userInfo
     } catch (error) {
-      logError(`Failed to get user info: ${error instanceof Error ? error.message : error}`)
+      log.error(`Failed to get user info: ${error instanceof Error ? error.message : error}`)
       throw error
     }
   }

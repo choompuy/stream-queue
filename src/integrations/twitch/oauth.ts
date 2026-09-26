@@ -1,3 +1,4 @@
+import { createLogger } from '../../logger.js'
 import { AppError } from '../../types.js'
 import type {
   TwitchAuthConfig,
@@ -12,13 +13,7 @@ const DEFAULT_SCOPES = ['chat:read', 'chat:edit', 'channel:manage:redemptions']
 const REFRESH_BUFFER_MS = 5 * 60 * 1000
 const POLL_REQUEST_TIMEOUT_MS = 10_000
 
-function log(message: string): void {
-  console.log(`[TWITCH OAUTH] ${message}`)
-}
-
-function logError(message: string): void {
-  console.error(`[TWITCH OAUTH] ${message}`)
-}
+const log = createLogger('TWITCH EVENTSUB')
 
 export class TwitchOAuth {
   private config: TwitchAuthConfig
@@ -34,7 +29,7 @@ export class TwitchOAuth {
 
     this.onTokenUpdated = config.onTokenUpdated
 
-    if (!this.config.clientId) log('Twitch client ID not configured')
+    if (!this.config.clientId) log.log('Twitch client ID not configured')
   }
 
   getConfig(): TwitchAuthConfig {
@@ -64,10 +59,10 @@ export class TwitchOAuth {
       if (!response.ok) throw await this.createOAuthError(response, 'Device authorization failed')
 
       const data = (await response.json()) as TwitchDeviceCodeResponse
-      log('Device code requested')
+      log.log('Device code requested')
       return data
     } catch (error) {
-      logError(`Device code request failed: ${error instanceof Error ? error.message : error}`)
+      log.error(`Device code request failed: ${error instanceof Error ? error.message : error}`)
       throw error
     }
   }
@@ -101,7 +96,7 @@ export class TwitchOAuth {
         this.tokenData = this.createTokenData(data)
         this.onTokenUpdated?.(this.tokenData)
 
-        log('Device authorization successful')
+        log.log('Device authorization successful')
         return this.tokenData
       }
 
@@ -143,7 +138,7 @@ export class TwitchOAuth {
       const tokenData = await this.refreshAccessToken()
       return tokenData.accessToken
     } catch (error) {
-      logError(`Failed to get valid access token: ${error instanceof Error ? error.message : error}`)
+      log.error(`Failed to get valid access token: ${error instanceof Error ? error.message : error}`)
       return null
     }
   }
@@ -154,7 +149,7 @@ export class TwitchOAuth {
       scope: [...tokenData.scope]
     }
 
-    log('Token data set from storage')
+    log.log('Token data set from storage')
   }
 
   getTokenData(): TwitchTokenData | null {
@@ -169,7 +164,7 @@ export class TwitchOAuth {
   clearTokenData(): void {
     this.tokenData = null
     this.refreshPromise = null
-    log('Token data cleared')
+    log.log('Token data cleared')
   }
 
   isAuthenticated(): boolean {
@@ -208,10 +203,10 @@ export class TwitchOAuth {
       const data = (await response.json()) as TwitchTokenResponse
       this.tokenData = this.createTokenData(data)
       this.onTokenUpdated?.(this.tokenData)
-      log('Token refresh successful')
+      log.log('Token refresh successful')
       return this.tokenData
     } catch (error) {
-      logError(`Token refresh failed: ${error instanceof Error ? error.message : error}`)
+      log.error(`Token refresh failed: ${error instanceof Error ? error.message : error}`)
       throw error
     }
   }

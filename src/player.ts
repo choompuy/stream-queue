@@ -3,10 +3,9 @@ import { isBlocked } from './blocklist.js'
 import { logRejection, logFailure } from './activity.js'
 import { getQueue, getCurrent, getIsPaused, setCurrent, shiftQueue } from './queue.js'
 import { peekNextFallbackTrack, advanceFallback } from './fallback.js'
+import { createLogger } from './logger.js'
 
-function log(message: string): void {
-  console.log(`[PLAYER] ${message}`)
-}
+const log = createLogger('PLAYER')
 
 export function getNextTrack(): QueueItem | null {
   return getQueue().find((item) => !isBlocked(item.videoId)) ?? peekNextFallbackTrack()
@@ -25,18 +24,18 @@ export function moveToNext(): QueueItem | null {
   let next = shiftQueue()
 
   while (next && isBlocked(next.videoId)) {
-    log(`skipped blocked track in queue: "${next.title}"`)
+    log.log(`skipped blocked track in queue: "${next.title}"`)
     logRejection(next.requestedBy, next.title, 'BLOCKED', { title: next.title, videoId: next.videoId })
     next = shiftQueue()
   }
 
   if (next) {
     setCurrent(next)
-    log(`moved to next: "${next.title}"`)
+    log.log(`moved to next: "${next.title}"`)
   } else {
     const fallback = advanceFallback()
     setCurrent(fallback)
-    if (fallback) log(`started fallback: "${fallback.title}"`)
+    if (fallback) log.log(`started fallback: "${fallback.title}"`)
   }
 
   return getCurrent()
@@ -44,7 +43,7 @@ export function moveToNext(): QueueItem | null {
 
 export function skipCurrent(): QueueItem | null {
   const skipped = getCurrent()
-  if (skipped) log(`skipped "${skipped.title}"`)
+  if (skipped) log.log(`skipped "${skipped.title}"`)
   return moveToNext()
 }
 
@@ -52,7 +51,7 @@ export function skipIfCurrent(videoId: string): boolean {
   const current = getCurrent()
   if (current?.videoId !== videoId) return false
 
-  log(`current track was blocked, skipping: "${current.title}"`)
+  log.log(`current track was blocked, skipping: "${current.title}"`)
   moveToNext()
   return true
 }
@@ -76,7 +75,7 @@ function isAboutCurrent(videoId?: string): boolean {
 // The player reports that `videoId` finished. Returns false if that was not the current track and nothing changed
 export function endCurrent(videoId?: string): boolean {
   if (!isAboutCurrent(videoId)) {
-    log(`ignored "ended" for ${videoId}: it is not the current track`)
+    log.log(`ignored "ended" for ${videoId}: it is not the current track`)
     return false
   }
 
@@ -87,14 +86,14 @@ export function endCurrent(videoId?: string): boolean {
 // The player reports that `videoId` failed. Returns false if that was not the current track and nothing changed
 export function reportPlaybackFailure(errorCode?: number, videoId?: string): boolean {
   if (!isAboutCurrent(videoId)) {
-    log(`ignored playback failure for ${videoId}: it is not the current track`)
+    log.log(`ignored playback failure for ${videoId}: it is not the current track`)
     return false
   }
 
   const failed = getCurrent()
 
   if (failed) {
-    log(`playback failed: "${failed.title}" (error ${errorCode ?? 'unknown'})`)
+    log.error(`playback failed: "${failed.title}" (error ${errorCode ?? 'unknown'})`)
     logFailure(failed, playbackFailureReasonCode(errorCode), errorCode !== undefined ? { errorCode } : undefined)
   }
 
