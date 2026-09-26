@@ -24,19 +24,21 @@ export function renderFallback() {
   toggleActive(dom.fallbackShuffleBtn, data?.shuffle)
   toggleActive(dom.fallbackRepeatBtn, data?.repeat)
   toggleActive(dom.fallbackEnabledBtn, data?.enabled)
-  dom.fallbackEnabledText.textContent = data?.enabled ? t('common.on') : t('common.off')
+  if (dom.fallbackEnabledText) dom.fallbackEnabledText.textContent = data?.enabled ? t('common.on') : t('common.off')
 
   if (!tracks.length) {
-    dom.fallbackInfo.textContent = ''
+    if (dom.fallbackInfo) dom.fallbackInfo.textContent = ''
     views.fallback.render([])
     renderStats()
     return
   }
 
-  dom.fallbackInfo.textContent = t('fallback.info', {
-    count: tracks.length,
-    datetime: formatDateTime(data.lastRefreshedAt)
-  })
+  if (dom.fallbackInfo) {
+    dom.fallbackInfo.textContent = t('fallback.info', {
+      count: tracks.length,
+      datetime: formatDateTime(data.lastRefreshedAt)
+    })
+  }
   views.fallback.render(selectors.markBlocked(tracks).map((track) => ({ ...track, isActive: track.videoId === activeVideoId })))
   scrollToActiveFallback()
   renderStats()

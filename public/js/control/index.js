@@ -45,7 +45,9 @@ async function init() {
     refreshFallbackState()
   ])
 
-  createPoller(POLLING, { shouldRun: isDashboardActive }).start()
+  const poller = createPoller(POLLING, { shouldRun: isDashboardActive })
+  poller.start()
+  window.addEventListener('pagehide', poller.stop)
 
   log('Control panel initialized')
 }

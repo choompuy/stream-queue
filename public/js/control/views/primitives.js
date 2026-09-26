@@ -1,8 +1,12 @@
 import { escapeHtml } from '../../shared.js'
-import { BLOCK_ICON, MORE_ICON, PLUS_ICON, UNBLOCK_ICON } from '../../icons.js'
+import { BLOCK_ICON, MORE_ICON, UNBLOCK_ICON } from '../../icons.js'
 import { t } from '../../i18n.js'
 
 export function createListView(wrapper, { renderRow, getKey, cache = true }) {
+  if (cache && !getKey) {
+    console.warn('[UI] createListView: no getKey provided — falling back to a naive key that may not detect all changes')
+  }
+
   const list = wrapper?.querySelector('.row-list')
   const empty = wrapper?.querySelector('.empty')
 

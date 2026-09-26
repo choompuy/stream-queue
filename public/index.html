@@ -16,7 +16,7 @@
   <body>
     <header class="box-shadow">
       <nav class="header-nav container">
-        <button class="row btn btn-tab btn-sm active" data-page-tab-target="dashboard">
+        <button class="page-tab-btn btn btn-tab btn-sm active" data-page-tab-target="dashboard">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
             <path
               stroke="currentColor"
@@ -29,7 +29,7 @@
           </svg>
           <span data-i18n="nav.dashboard">Dashboard</span>
         </button>
-        <button class="row btn btn-tab btn-sm" data-page-tab-target="playlists">
+        <button class="page-tab-btn btn btn-tab btn-sm" data-page-tab-target="playlists">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
             <path
               stroke="currentColor"
@@ -41,7 +41,7 @@
           </svg>
           <span data-i18n="nav.playlists">Playlists</span>
         </button>
-        <button class="row btn btn-tab btn-sm" data-page-tab-target="settings">
+        <button class="page-tab-btn btn btn-tab btn-sm" data-page-tab-target="settings">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
             <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0" />
             <path
@@ -109,7 +109,7 @@
           </div>
         </div>
 
-        <div class="song-search-wrapper panel section-panel">
+        <div class="song-search-wrapper panel section-tab">
           <div class="row">
             <input class="input" type="search" id="searchInput" placeholder="YouTube URL or search..." data-i18n-placeholder="search.placeholder" />
             <button class="song-search-btn btn" id="searchBtn" data-action="search" data-i18n="search.searchBtn">Search</button>
@@ -130,26 +130,26 @@
 
         <div class="section-tabs-wrapper panel column">
           <div class="section-tabs" id="sectionTabs">
-            <button class="section-tab btn btn-tab active" data-section-target="queue">
+            <button class="section-tab-btn btn btn-tab active" data-section-target="queue">
               <span data-i18n="queue.title">Queue</span>
               <span class="count-badge" id="tabQueueCount">0</span>
             </button>
-            <button class="section-tab btn btn-tab" data-section-target="playlist">
+            <button class="section-tab-btn btn btn-tab" data-section-target="playlist">
               <span data-i18n="fallback.title">Playlist</span>
               <span class="count-badge" id="tabPlaylistCount">0</span>
             </button>
-            <button class="section-tab btn btn-tab" data-section-target="activity">
+            <button class="section-tab-btn btn btn-tab" data-section-target="activity">
               <span data-i18n="activity.title">Activity</span>
               <span class="count-badge" id="tabActivityCount">0</span>
             </button>
-            <button class="section-tab btn btn-tab" data-section-target="blocklist">
+            <button class="section-tab-btn btn btn-tab" data-section-target="blocklist">
               <span data-i18n="blocklist.title">Blocklist</span>
               <span class="count-badge" id="tabBlocklistCount">0</span>
             </button>
           </div>
 
-          <div class="section-panel section-panel-queue" data-section="queue">
-            <div class="section-panel-header">
+          <div class="section-tab section-tab-queue" data-section="queue">
+            <div class="section-tab-header">
               <h2><span data-i18n="queue.title">Queue</span> <span class="text-sm text-secondary" id="queueCount">0/0</span></h2>
               <button id="clearQueueBtn" class="btn btn-secondary btn-danger" data-action="clear-queue" data-i18n-title="queue.clear">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
@@ -171,13 +171,13 @@
             </div>
           </div>
 
-          <div class="section-panel section-panel-fallback hidden" data-section="playlist">
-            <div class="section-panel-header">
+          <div class="section-tab section-tab-fallback hidden" data-section="playlist">
+            <div class="section-tab-header">
               <div>
                 <h2 data-i18n="fallback.title">Playlist</h2>
                 <div id="fallbackInfo" class="text-sm text-secondary"></div>
               </div>
-              <div class="section-panel-actions">
+              <div class="section-tab-actions">
                 <button
                   id="fallbackRefreshBtn"
                   class="btn btn-icon btn-secondary"
@@ -255,10 +255,10 @@
             </div>
           </div>
 
-          <div class="section-panel section-panel-activity hidden" data-section="activity">
-            <div class="section-panel-header">
+          <div class="section-tab section-tab-activity hidden" data-section="activity">
+            <div class="section-tab-header">
               <h2 data-i18n="activity.title">Activity</h2>
-              <div class="section-panel-actions">
+              <div class="section-tab-actions">
                 <button id="clearActivityBtn" class="btn btn-secondary btn-danger" data-action="clear-activity" data-i18n-title="activity.clear">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                     <path
@@ -279,8 +279,8 @@
             </div>
           </div>
 
-          <div class="section-panel section-panel-blocklist hidden" data-section="blocklist">
-            <div class="section-panel-header">
+          <div class="section-tab section-tab-blocklist hidden" data-section="blocklist">
+            <div class="section-tab-header">
               <h2 data-i18n="blocklist.title">Blocklist</h2>
             </div>
             <div class="row-list-wrapper" id="blocklistListWrapper" data-list="blocklist">
@@ -296,7 +296,7 @@
           <h1 data-i18n="playlists.title">Playlists</h1>
         </div>
 
-        <div class="playlist-add-wrapper panel section-panel flex-1">
+        <div class="playlist-add-wrapper panel section-tab flex-1">
           <div class="row">
             <input
               id="playlistUrlInput"
@@ -324,8 +324,8 @@
           <h1 data-i18n="settings.title">Settings</h1>
         </div>
         <div class="settings-wrapper">
-          <div class="section-panel panel">
-            <div class="section-panel-header">
+          <div class="section-tab panel">
+            <div class="section-tab-header">
               <h2 data-i18n="settings.overlay.title">Overlay</h2>
             </div>
             <div class="settings-section">
@@ -395,8 +395,8 @@
             </div>
           </div>
 
-          <div class="section-panel panel">
-            <div class="section-panel-header">
+          <div class="section-tab panel">
+            <div class="section-tab-header">
               <h2 data-i18n="settings.bot.title">Bot Settings</h2>
             </div>
 
@@ -476,8 +476,8 @@
             <button class="settings-section-btn btn btn-primary" data-action="save-config" data-i18n="settings.bot.save">Save settings</button>
           </div>
 
-          <div class="section-panel panel">
-            <div class="section-panel-header">
+          <div class="section-tab panel">
+            <div class="section-tab-header">
               <h2 data-i18n="settings.twitch.integration">Twitch integration</h2>
             </div>
 
@@ -534,8 +534,8 @@
             </button>
           </div>
 
-          <div class="section-panel panel">
-            <div class="section-panel-header">
+          <div class="section-tab panel">
+            <div class="section-tab-header">
               <h2 data-i18n="settings.language.title">Language</h2>
             </div>
             <div class="settings-section">
@@ -549,8 +549,8 @@
             </div>
           </div>
 
-          <div class="section-panel panel">
-            <div class="section-panel-header">
+          <div class="section-tab panel">
+            <div class="section-tab-header">
               <h2 data-i18n="settings.about.title">About</h2>
             </div>
             <div class="settings-section">

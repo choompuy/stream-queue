@@ -14,7 +14,7 @@ export function switchPageTab(tabName) {
   document.querySelectorAll('.page-tab').forEach((el) => {
     el.classList.toggle('active', el.dataset.pageTab === tabName)
   })
-  document.querySelectorAll('.btn-tab').forEach((el) => {
+  document.querySelectorAll('.page-tab-btn').forEach((el) => {
     el.classList.toggle('active', el.dataset.pageTabTarget === tabName)
   })
 
@@ -29,12 +29,13 @@ export function switchSection(sectionName) {
 
   activeSection = sectionName
   const wrapper = document.querySelector('.section-tabs-wrapper')
+  if (!wrapper) return
 
-  wrapper.querySelectorAll('.section-panel').forEach((el) => {
+  wrapper.querySelectorAll('.section-tab').forEach((el) => {
     el.classList.toggle('hidden', el.dataset.section !== sectionName)
     if (el.dataset.section === 'playlist') scrollToActiveFallback()
   })
-  wrapper.querySelectorAll('.section-tab').forEach((el) => {
+  wrapper.querySelectorAll('.section-tab-btn').forEach((el) => {
     el.classList.toggle('active', el.dataset.sectionTarget === sectionName)
   })
 }

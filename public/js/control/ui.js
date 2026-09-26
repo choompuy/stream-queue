@@ -1,5 +1,3 @@
-import { t } from '../i18n.js'
-
 export function withLoading(button, action) {
   if (!button) return action()
 

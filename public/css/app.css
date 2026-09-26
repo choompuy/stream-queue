@@ -295,34 +295,34 @@ select {
   overflow-x: auto;
 }
 
-.section-tab .count-badge {
+.section-tab-btn .count-badge {
   padding-inline: 0.25rem;
   background-color: var(--bg-hover);
   font-size: 0.75rem;
 }
 
-.section-tab.active .count-badge {
+.section-tab-btn.active .count-badge {
   background-color: var(--accent-blue);
   color: var(--bg);
 }
 
-.section-panel {
+.section-tab {
   display: flex;
   flex-direction: column;
   height: auto;
   overflow: hidden;
 }
 
-.section-tabs-wrapper .section-panel {
+.section-tabs-wrapper .section-tab {
   height: 25rem;
   max-height: 25rem;
 }
 
-.section-panel > :not(:first-child) {
+.section-tab > :not(:first-child) {
   border-top: 1px solid var(--border);
 }
 
-.section-panel-header {
+.section-tab-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -364,7 +364,7 @@ select {
   flex-shrink: 0;
 }
 
-.section-panel-actions {
+.section-tab-actions {
   display: inline-flex;
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -519,7 +519,7 @@ select {
   margin-top: auto;
 }
 
-.song-search-wrapper.section-panel {
+.song-search-wrapper.section-tab {
   max-height: 25rem;
 }
 

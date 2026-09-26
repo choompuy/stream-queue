@@ -166,13 +166,13 @@
       "notConnected": "Не подключено",
       "connect": "Подключить Twitch",
       "disconnect": "Отключить",
+      "disconnectConfirm": "Отключить Twitch? Команды чата и интеграция с наградами за баллы канала перестанут работать",
       "save": "Сохранить настройки Twitch",
       "clientCredentialsNote": "Создайте приложение в Twitch Developer Console, чтобы получить Client ID и Client Secret",
       "reward": "Награда Channel Points",
       "rewardNone": "Выберите награду",
       "rewardNote": "Погашения этой награды будут использоваться как запросы песен",
       "noRewards": "Подходящие награды не найдены",
-      "save": "Сохранить настройки Twitch",
       "authorizationInstructions": "Откройте Twitch и введите этот код, чтобы авторизовать StreamQueue"
     }
   },
@@ -263,6 +263,7 @@
     "trackUnblocked": "Трек разблокирован",
     "settingsSaved": "Настройки сохранены",
     "settingsNotSaved": "Настройки не сохранены ({{rejected}}/{{total}} полей некорректны)",
+    "apiKeyNotSaved": "Config saved, but API key was not",
     "nowPlaying": "Сейчас играет: {{title}}",
     "addedToQueue": "Добавлено в очередь: {{title}} [#{{position}}]",
     "viewerRequest": "🎵 {{user}} добавил(а): {{title}}",

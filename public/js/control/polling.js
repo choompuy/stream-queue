@@ -13,6 +13,8 @@ export function createPoller(tasks, { shouldRun = () => true } = {}) {
           running.add(task)
           try {
             await task.run()
+          } catch (error) {
+            console.error('[POLLING] Task failed:', error)
           } finally {
             running.delete(task)
           }

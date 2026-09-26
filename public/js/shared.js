@@ -25,9 +25,10 @@ export function youtubeThumbnail(videoId, quality = 'mqdefault') {
 }
 
 export function formatViews(views) {
+  if (views == null) return '0'
   if (views >= 1000000) return `${(views / 1000000).toFixed(1)}M`
   if (views >= 1000) return `${(views / 1000).toFixed(1)}K`
-  return views?.toString()
+  return views.toString()
 }
 
 export function createLogger(prefix) {

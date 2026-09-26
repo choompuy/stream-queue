@@ -36,7 +36,7 @@ export function saveOverlaySettings() {
     if (dom.badgePosition) dom.badgePosition.classList.remove('error')
 
     try {
-      state.settings.showVideo = dom.showVideo.checked
+      state.settings.showVideo = dom.showVideo ? dom.showVideo.checked : state.settings.showVideo
       state.settings.position = dom.badgePosition ? dom.badgePosition.value : state.settings.position
       await api.updateSettings(state.settings)
       syncPlayer()
@@ -252,6 +252,8 @@ export function connectTwitch() {
 }
 
 export function disconnectTwitch() {
+  if (!confirm(t('settings.twitch.disconnectConfirm'))) return
+
   return run('disconnecting Twitch', async () => {
     stopTwitchPolling()
     await api.disconnectTwitch()
@@ -399,16 +401,21 @@ export async function saveConfigSetting() {
     }
   }
 
-  const youtubeApiKey = dom.secYoutubeKey.value.trim()
+  const youtubeApiKey = dom.secYoutubeKey?.value.trim() ?? ''
 
   await run('saving config', async () => {
     try {
       state.config = await api.updateConfig(config)
 
       if (youtubeApiKey) {
-        await api.updateSecrets({ youtubeApiKey })
-        dom.secYoutubeKey.value = ''
-        await loadSecrets()
+        try {
+          await api.updateSecrets({ youtubeApiKey })
+          dom.secYoutubeKey.value = ''
+          await loadSecrets()
+        } catch (error) {
+          toastError(t('toast.apiKeyNotSaved') ?? 'Config saved, but API key was not')
+          throw error
+        }
       }
 
       renderQueue()

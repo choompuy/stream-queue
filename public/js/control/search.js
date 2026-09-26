@@ -14,12 +14,12 @@ let lastSearch = ''
 export function clearSearchResults() {
   views.search.clear()
   lastSearch = ''
-  dom.searchInput.value = ''
+  if (dom.searchInput) dom.searchInput.value = ''
   dom.searchListWrapper.classList.add('hidden')
 }
 
 export async function search() {
-  const query = dom.searchInput.value.trim()
+  const query = dom.searchInput?.value.trim()
   if (!query) return
 
   if (lastSearch === query) return

@@ -166,13 +166,13 @@
       "notConnected": "Not connected",
       "connect": "Connect Twitch",
       "disconnect": "Disconnect",
+      "disconnectConfirm": "Disconnect Twitch? Chat commands and Channel Points integrations will stop working",
       "save": "Save Twitch settings",
       "clientCredentialsNote": "Create an application in the Twitch Developer Console to get your Client ID and Client Secret",
       "reward": "Channel Points reward",
       "rewardNone": "Select reward",
       "rewardNote": "Redemptions of this reward will be used as song requests",
       "noRewards": "No eligible rewards found",
-      "save": "Save Twitch settings",
       "authorizationInstructions": "Open Twitch and enter this code to authorize StreamQueue"
     }
   },
@@ -263,6 +263,7 @@
     "trackUnblocked": "Track unblocked",
     "settingsSaved": "Settings saved",
     "settingsNotSaved": "Settings not saved ({{rejected}}/{{total}} fields invalid)",
+    "apiKeyNotSaved": "Config saved, but API key was not",
     "nowPlaying": "Now playing: {{title}}",
     "addedToQueue": "Added to queue: {{title}} [#{{position}}]",
     "viewerRequest": "🎵 {{user}} added: {{title}}",

@@ -14,6 +14,7 @@ let playerGeneration = 0
 const log = createLogger('PREVIEW')
 
 const isPlaybackSource = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+let fetchInFlight = false
 
 const dom = {
   nowPlayingVideo: $('nowPlayingVideo'),
@@ -29,8 +30,13 @@ const dom = {
 }
 
 async function fetchOverlayState() {
+  if (fetchInFlight) return
+  fetchInFlight = true
+
   try {
     const response = await fetch('/api/overlay-state')
+    if (!response.ok) throw new Error(`overlay-state request failed: ${response.status}`)
+
     const body = await response.json()
     settings = body.data.settings
     currentState = body.data.state
@@ -43,6 +49,8 @@ async function fetchOverlayState() {
     renderState()
   } catch (error) {
     log('Error fetching settings:', error)
+  } finally {
+    fetchInFlight = false
   }
 }
 
