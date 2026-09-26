@@ -6,7 +6,7 @@ import { syncPlayer } from './player.js'
 import { renderQueue } from './queue.js'
 import { renderPlaylists } from './playlists.js'
 import { t } from '../i18n.js'
-import { toastSuccess } from './toast.js'
+import { toastSuccess, toastError } from './toast.js'
 
 export function changeLocale(locale) {
   return run('changing locale', async () => {
@@ -288,12 +288,14 @@ function renderTwitchConnection() {
     dom.twitchConnectBtn?.classList.add('hidden')
     dom.twitchDisconnectBtn?.classList.remove('hidden')
     dom.twitchRewardSection?.classList.remove('hidden')
+    dom.twitchSaveBtn.classList.remove('hidden')
   } else {
     dom.twitchConnectionStatus.textContent = t('settings.twitch.notConnected')
     dom.twitchConnectionStatus.classList.add('text-red')
     dom.twitchConnectBtn?.classList.remove('hidden')
     dom.twitchDisconnectBtn?.classList.add('hidden')
     dom.twitchRewardSection?.classList.add('hidden')
+    dom.twitchSaveBtn.classList.add('hidden')
   }
 }
 
@@ -400,17 +402,17 @@ export async function saveConfigSetting() {
           const input = dom[field.dom]
           if (!input) continue
 
-          const fieldName = field.key
+          // the backend reports rejected fields as dotted names (e.g. "twitch.channelPointsRewardId"),
+          // so the comparison must match that shape rather than the bare field key
+          const fieldName = field.path ? `${field.path}.${field.key}` : field.key
           if (rejectedFields.includes(fieldName)) {
             input.classList.add('error')
           }
         }
 
-        const totalFields = CONFIG_FIELDS.length
-        const rejectedCount = rejectedFields.length
-        if (rejectedCount < totalFields) {
-          toastSuccess(t('toast.settingsPartiallySaved', { rejected: rejectedCount, total: totalFields }))
-        }
+        // the backend is all-or-nothing: any invalid field means nothing was saved, so this must
+        // never read as a success regardless of how many fields were rejected
+        toastError(t('toast.settingsNotSaved', { rejected: rejectedFields.length, total: CONFIG_FIELDS.length }))
       }
       throw error
     }
@@ -436,7 +438,7 @@ export async function saveTwitchConfig() {
       if (error instanceof ApiError && error.code === 'INVALID_CONFIG' && error.params?.fields) {
         const rejectedFields = error.params.fields.split(', ')
 
-        if (rejectedFields.includes('channelPointsRewardId') && dom.twitchRewardSelect) {
+        if (rejectedFields.includes('twitch.channelPointsRewardId') && dom.twitchRewardSelect) {
           dom.twitchRewardSelect.classList.add('error')
         }
       }

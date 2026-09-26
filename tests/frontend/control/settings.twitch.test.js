@@ -35,6 +35,16 @@ let requests = []
 let openedWindows = []
 let lastBody = null
 
+// a handler throws this to simulate a specific API error response (code/params), instead of the
+// generic SERVER_ERROR fallback below
+class MockApiFailure extends Error {
+  constructor(code, params) {
+    super(`mock API failure: ${code}`)
+    this.code = code
+    this.params = params
+  }
+}
+
 globalThis.fetch = async (url, options = {}) => {
   const method = options.method ?? 'GET'
   requests.push(`${method} ${url}`)
@@ -52,6 +62,9 @@ globalThis.fetch = async (url, options = {}) => {
     const data = await handler()
     return { ok: true, json: async () => ({ data }) }
   } catch (error) {
+    if (error instanceof MockApiFailure) {
+      return { ok: false, status: 400, json: async () => ({ error: error.message, code: error.code, params: error.params }) }
+    }
     return { ok: false, status: 500, json: async () => ({ error: error.message, code: 'SERVER_ERROR' }) }
   }
 }
@@ -404,5 +417,33 @@ test('the reward id is saved from state, not from the select element', async (t)
     await settings.saveTwitchConfig()
 
     assert.equal(sent.twitch.channelPointsRewardId, null)
+  })
+})
+
+test('saveTwitchConfig() highlights the reward select on a rejected dotted field name', async (t) => {
+  t.beforeEach(reset)
+
+  await t.test('backend rejects "twitch.channelPointsRewardId" (dotted) - the select gets the error class', async () => {
+    handlers = {
+      'PUT /api/config': () => {
+        throw new MockApiFailure('INVALID_CONFIG', { fields: 'twitch.channelPointsRewardId' })
+      }
+    }
+
+    await settings.saveTwitchConfig()
+
+    assert.ok(dom.twitchRewardSelect.classList.contains('error'))
+  })
+
+  await t.test('a rejection for an unrelated field does not touch the reward select', async () => {
+    handlers = {
+      'PUT /api/config': () => {
+        throw new MockApiFailure('INVALID_CONFIG', { fields: 'minViews' })
+      }
+    }
+
+    await settings.saveTwitchConfig()
+
+    assert.equal(dom.twitchRewardSelect.classList.contains('error'), false)
   })
 })

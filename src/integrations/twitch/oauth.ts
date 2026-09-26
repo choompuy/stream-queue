@@ -10,6 +10,7 @@ import type {
 
 const DEFAULT_SCOPES = ['chat:read', 'chat:edit', 'channel:manage:redemptions']
 const REFRESH_BUFFER_MS = 5 * 60 * 1000
+const POLL_REQUEST_TIMEOUT_MS = 10_000
 
 function log(message: string): void {
   console.log(`[TWITCH OAUTH] ${message}`)
@@ -92,7 +93,7 @@ export class TwitchOAuth {
           'Content-Type': 'application/x-www-form-urlencoded'
         },
         body: params.toString(),
-        signal: AbortSignal.timeout(pollInterval)
+        signal: AbortSignal.timeout(POLL_REQUEST_TIMEOUT_MS)
       })
 
       if (response.ok) {

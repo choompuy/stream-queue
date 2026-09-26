@@ -262,7 +262,7 @@
     "trackBlocked": "Track blocked",
     "trackUnblocked": "Track unblocked",
     "settingsSaved": "Settings saved",
-    "settingsPartiallySaved": "Settings saved ({{rejected}}/{{total}} fields invalid)",
+    "settingsNotSaved": "Settings not saved ({{rejected}}/{{total}} fields invalid)",
     "nowPlaying": "Now playing: {{title}}",
     "addedToQueue": "Added to queue: {{title}} [#{{position}}]",
     "viewerRequest": "🎵 {{user}} added: {{title}}",

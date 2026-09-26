@@ -43,6 +43,29 @@ test('validateConfigUpdates()', async (t) => {
     assert.deepEqual(clean.fallbackPlaylist, { shuffle: true })
   })
 
+  await t.test('treats an empty channelPointsRewardId the same as null - "no reward selected" is valid, not invalid', () => {
+    const { clean, rejected } = validateConfigUpdates({ twitch: { channelPointsRewardId: '' } })
+
+    assert.deepEqual(rejected, [])
+    assert.deepEqual(clean.twitch, { channelPointsRewardId: null })
+  })
+
+  await t.test('trims whitespace-only channelPointsRewardId down to null too', () => {
+    const { clean, rejected } = validateConfigUpdates({ twitch: { channelPointsRewardId: '   ' } })
+
+    assert.deepEqual(rejected, [])
+    assert.deepEqual(clean.twitch, { channelPointsRewardId: null })
+  })
+
+  await t.test('accepts a real reward id and reports it with a dotted name when invalid', () => {
+    const accepted = validateConfigUpdates({ twitch: { channelPointsRewardId: 'reward-123' } })
+    assert.deepEqual(accepted.rejected, [])
+    assert.deepEqual(accepted.clean.twitch, { channelPointsRewardId: 'reward-123' })
+
+    const rejected = validateConfigUpdates({ twitch: { channelPointsRewardId: 42 } })
+    assert.deepEqual(rejected.rejected, ['twitch.channelPointsRewardId'])
+  })
+
   await t.test('refuses unknown fields, including prototype keys', () => {
     const { clean, rejected } = validateConfigUpdates(JSON.parse('{"foo":1,"__proto__":{"polluted":true},"constructor":1,"minViews":5}'))
 

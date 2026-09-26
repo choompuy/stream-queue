@@ -29,11 +29,14 @@ export class TwitchClient {
   }
 
   private async makeAuthenticatedRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
+    if (!this.oauth.getConfig().clientId) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID not configured')
+
     const accessToken = await this.oauth.getValidAccessToken()
     if (!accessToken) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
 
     const response = await this.request<T>(url, options, accessToken)
-    if (response.status !== 401) return this.handleResponse<T>(response)
+    // 403 can mean a revoked/insufficient scope, same remedy as an expired token: refresh and retry once
+    if (response.status !== 401 && response.status !== 403) return this.handleResponse<T>(response)
 
     try {
       const refreshedToken = await this.oauth.refreshAccessToken()
@@ -69,13 +72,13 @@ export class TwitchClient {
       // Ignore invalid/non-JSON responses.
     }
 
-    throw new Error(`Twitch API error: ${message}`)
+    throw new AppError('TWITCH_API_ERROR', `Twitch API error: ${message}`)
   }
 
   async getUserInfo(): Promise<TwitchUserInfo> {
     try {
       const response = await this.makeAuthenticatedRequest<TwitchUsersResponse>('https://api.twitch.tv/helix/users')
-      if (!response.data?.length) throw new Error('No user data returned from Twitch API')
+      if (!response.data?.length) throw new AppError('TWITCH_API_ERROR', 'No user data returned from Twitch API')
 
       const userData = response.data[0]
       this.userInfo = {
@@ -118,7 +121,7 @@ export class TwitchClient {
     )
 
     const updatedRedemption = response.data[0]
-    if (!updatedRedemption) throw new Error('Twitch API returned no updated redemption')
+    if (!updatedRedemption) throw new AppError('TWITCH_API_ERROR', 'Twitch API returned no updated redemption')
 
     return updatedRedemption
   }

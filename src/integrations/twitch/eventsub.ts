@@ -323,6 +323,10 @@ export class TwitchEventSub {
     this.socket = null
     this.sessionId = null
     socket?.close()
+
+    // Reconnecting here directly, not relying on the 'close' event: handleClose bails out early
+    // because this.socket is already null by the time the socket actually finishes closing
+    if (!this.stopped) this.scheduleReconnect()
   }
 
   private handleClose(socket: WebSocket): void {

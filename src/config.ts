@@ -107,7 +107,7 @@ const FALLBACK_PLAYLIST_RULES: Record<keyof Config['fallbackPlaylist'], FieldRul
 
 const TWITCH_RULES: Record<keyof Config['twitch'], FieldRule> = {
   channelPointsRewardId: {
-    normalize: (v) => (typeof v === 'string' ? v.trim() : v),
+    normalize: (v) => (typeof v === 'string' ? v.trim() || null : v),
     validate: (v) => v === null || (typeof v === 'string' && v.length > 0)
   }
 }

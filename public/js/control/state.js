@@ -105,7 +105,8 @@ export const dom = {
   twitchConnectBtn: $('twitchConnectBtn'),
   twitchDisconnectBtn: $('twitchDisconnectBtn'),
   twitchRewardSection: $('twitchRewardSection'),
-  twitchRewardSelect: $('twitchRewardSelect')
+  twitchRewardSelect: $('twitchRewardSelect'),
+  twitchSaveBtn: $('twitchSaveBtn')
 }
 
 export const CONFIG_FIELDS = [

@@ -99,6 +99,57 @@ test('twitch routes localOnly protection', async (t) => {
   })
 })
 
+test('twitch routes reject requests from a non-loopback address', async (t) => {
+  // A second app instance with a middleware that overrides remoteAddress before localOnly runs,
+  // so the actual localOnly middleware (not just isLoopbackAddress in isolation) is exercised.
+  const remoteApp = express()
+  remoteApp.use(express.json())
+  remoteApp.use((req, _res, next) => {
+    Object.defineProperty(req.socket, 'remoteAddress', { value: '192.168.1.50', configurable: true })
+    next()
+  })
+  remoteApp.use('/api/integrations/twitch', twitchRouter)
+
+  const remoteServer = remoteApp.listen(0)
+  const remotePort = (remoteServer.address() as AddressInfo).port
+  const remoteApi = (path: string, init?: RequestInit) => fetch(`http://127.0.0.1:${remotePort}/api/integrations/twitch${path}`, init)
+
+  t.after(() => remoteServer.close())
+
+  await t.test('POST /connect returns 403 LOCAL_ONLY', async () => {
+    const response = await remoteApi('/connect', { method: 'POST' })
+    assert.equal(response.status, 403)
+    const body = (await response.json()) as Record<string, any>
+    assert.equal(body.code, 'LOCAL_ONLY')
+  })
+
+  await t.test('POST /disconnect returns 403 LOCAL_ONLY', async () => {
+    const response = await remoteApi('/disconnect', { method: 'POST' })
+    assert.equal(response.status, 403)
+    const body = (await response.json()) as Record<string, any>
+    assert.equal(body.code, 'LOCAL_ONLY')
+  })
+
+  await t.test('POST /refresh returns 403 LOCAL_ONLY', async () => {
+    const response = await remoteApi('/refresh', { method: 'POST' })
+    assert.equal(response.status, 403)
+    const body = (await response.json()) as Record<string, any>
+    assert.equal(body.code, 'LOCAL_ONLY')
+  })
+
+  await t.test('GET /rewards returns 403 LOCAL_ONLY', async () => {
+    const response = await remoteApi('/rewards')
+    assert.equal(response.status, 403)
+    const body = (await response.json()) as Record<string, any>
+    assert.equal(body.code, 'LOCAL_ONLY')
+  })
+
+  await t.test('GET / still succeeds (intentionally open)', async () => {
+    const response = await remoteApi('/')
+    assert.equal(response.status, 200)
+  })
+})
+
 test('twitch routes with simulated remote address', async (t) => {
   // Verify the localOnly middleware helper function works correctly
   const { isLoopbackAddress } = await import('../../../src/local-only.js')
