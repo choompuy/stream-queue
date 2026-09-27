@@ -163,7 +163,7 @@ const CHAT_COMMAND_RULES: Record<keyof TwitchChatCommandConfig, FieldRule> = {
   }
 }
 
-const CHAT_COMMAND_KEYS: Array<keyof Omit<TwitchChatCommandsConfig, 'controlCooldownSeconds'>> = ['now', 'next', 'skip', 'pause', 'resume', 'stop']
+export const CHAT_COMMAND_KEYS: Array<keyof Omit<TwitchChatCommandsConfig, 'controlCooldownSeconds'>> = ['now', 'next', 'skip', 'pause', 'resume', 'stop']
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 
@@ -235,9 +235,8 @@ function validateChatCommandsUpdates(raw: unknown, rejected: string[]): TwitchCh
     }
 
     if (key === 'controlCooldownSeconds') {
-      const value = typeof rawValue === 'number' ? rawValue : rawValue
-      if (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 300) {
-        clean[key] = value
+      if (typeof rawValue === 'number' && Number.isFinite(rawValue) && rawValue >= 0 && rawValue <= 300) {
+        clean[key] = rawValue
       } else {
         rejected.push('twitch.chatCommands.controlCooldownSeconds')
       }
@@ -357,6 +356,19 @@ export function updateConfig(updates: ConfigUpdates): { config: Config; rejected
     }
     if (chatCommands.controlCooldownSeconds !== undefined) {
       mergedChatCommands.controlCooldownSeconds = chatCommands.controlCooldownSeconds
+    }
+  }
+
+  // Check for duplicate command strings between different actions
+  const commandTexts = CHAT_COMMAND_KEYS.map((key) => mergedChatCommands[key].command)
+  const duplicates = commandTexts.filter((text, i) => commandTexts.indexOf(text) !== i)
+  if (duplicates.length > 0) {
+    rejected.push(`twitch.chatCommands (duplicate command text: ${duplicates.join(', ')})`)
+    // Revert to previous values for conflicting fields
+    for (const key of CHAT_COMMAND_KEYS) {
+      if (duplicates.includes(mergedChatCommands[key].command)) {
+        mergedChatCommands[key] = { ...config.twitch.chatCommands[key] }
+      }
     }
   }
 

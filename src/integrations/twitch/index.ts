@@ -9,9 +9,9 @@ import { skipCurrent } from '../../player.js'
 import { setPaused } from '../../queue.js'
 import { buildNowPlayingMessage, buildQueueMessage, buildSkipMessage } from '../../chat-replies.js'
 import { translateWithFallback } from '../../i18n.js'
-import { getConfig } from '../../config.js'
+import { getConfig, CHAT_COMMAND_KEYS } from '../../config.js'
 import { getState } from '../../player.js'
-import { AppError, TwitchChatPermission } from '../../types.js'
+import { AppError, TwitchChatPermission, TwitchChatCommandsConfig } from '../../types.js'
 import { createLogger } from '../../logger.js'
 
 const log = createLogger('TWITCH EVENTSUB')
@@ -25,6 +25,7 @@ let client: TwitchClient | null = null
 let eventSub: TwitchEventSub | null = null
 let chat: TwitchChat | null = null
 let deviceAuthorizationPromise: Promise<TwitchUserInfo> | null = null
+let deviceAuthorizationGeneration = 0
 let lastControlCommandAt = 0
 
 export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = {}): void {
@@ -74,6 +75,7 @@ export async function reinitializeTwitchIntegration(): Promise<void> {
   oauth = null
   client = null
   deviceAuthorizationPromise = null
+  deviceAuthorizationGeneration = 0
   initializeTwitchIntegration()
 }
 
@@ -233,6 +235,18 @@ async function handleChatMessage(message: TwitchChatMessage): Promise<void> {
   }
 }
 
+function logChatCommandConflicts(commands: TwitchChatCommandsConfig): void {
+  const seen = new Map<string, string>()
+  for (const key of CHAT_COMMAND_KEYS) {
+    const text = commands[key].command
+    if (seen.has(text)) {
+      chatLog.warn(`Commands "${seen.get(text)}" and "${key}" share the same text "${text}" — only "${seen.get(text)}" will trigger`)
+    } else {
+      seen.set(text, key)
+    }
+  }
+}
+
 async function startChat(): Promise<void> {
   if (!oauth || !client) return
   if (chat) return
@@ -242,6 +256,15 @@ async function startChat(): Promise<void> {
     chatLog.log('Twitch account not connected, chat will not start')
     return
   }
+
+  const commands = getConfig().twitch.chatCommands
+  const anyEnabled = CHAT_COMMAND_KEYS.some((key) => commands[key].enabled)
+  if (!anyEnabled) {
+    chatLog.log('All chat commands disabled, chat will not start')
+    return
+  }
+
+  logChatCommandConflicts(commands)
 
   chat = new TwitchChat({
     oauth,
@@ -273,10 +296,14 @@ export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeRespon
   }
 
   const device = await oauth.requestDeviceCode()
+  const generation = ++deviceAuthorizationGeneration
 
   deviceAuthorizationPromise = oauth
     .pollForToken(device.device_code, device.interval, device.expires_in)
     .then(async () => {
+      if (generation !== deviceAuthorizationGeneration) {
+        throw new Error('Device authorization was cancelled')
+      }
       if (!client) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client is not initialized')
 
       const userInfo = await client.getUserInfo()
@@ -359,6 +386,7 @@ export async function disconnect(): Promise<void> {
   }
 
   // Cancel any active device authorization to prevent "resurrection"
+  deviceAuthorizationGeneration++
   if (deviceAuthorizationPromise) {
     deviceAuthorizationPromise = null
     log.log('Device authorization cancelled due to disconnect')
@@ -434,5 +462,6 @@ export async function _resetIntegration(): Promise<void> {
   eventSub = null
   chat = null
   deviceAuthorizationPromise = null
+  deviceAuthorizationGeneration = 0
   lastControlCommandAt = 0
 }

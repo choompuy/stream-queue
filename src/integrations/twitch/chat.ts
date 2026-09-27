@@ -88,20 +88,20 @@ export class TwitchChat {
   }
 
   async connect(): Promise<void> {
+    this.clearReconnectTimer()
     if (this.stopped) {
       this.stopped = false
-      this.reconnectAttempts = 0
-      this.currentReconnectDelay = INITIAL_RECONNECT_DELAY_MS
     }
     if (this.isConnected() || this.connecting) return
 
-    this.clearReconnectTimer()
     this.connecting = true
 
     try {
       await this.openSocket()
       await this.waitForJoin()
       this.startPingLoop()
+      this.reconnectAttempts = 0
+      this.currentReconnectDelay = INITIAL_RECONNECT_DELAY_MS
     } finally {
       this.connecting = false
     }
