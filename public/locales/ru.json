@@ -174,6 +174,27 @@
       "rewardNote": "Погашения этой награды будут использоваться как запросы песен",
       "noRewards": "Подходящие награды не найдены",
       "authorizationInstructions": "Откройте Twitch и введите этот код, чтобы авторизовать StreamQueue"
+    },
+    "twitchChat": {
+      "title": "Команды чата Twitch",
+      "note": "StreamQueue напрямую подключается к чату вашего канала и отвечает на эти команды. \"now\" и \"next\" только читают состояние; остальные управляют воспроизведением и по умолчанию доступны модераторам и вам.",
+      "save": "Сохранить команды чата",
+      "cooldown": "Кулдаун команд управления (секунды)",
+      "cooldownNote": "Применяется только к skip/pause/resume/stop - общий кулдаун, чтобы два модератора не могли подряд вызвать одно и то же действие. Не применяется к \"now\"/\"next\".",
+      "stopNote": "У StreamQueue есть только play/pause - \"stop\" ставит текущий трек на паузу.",
+      "commands": {
+        "now": "Текущий трек",
+        "next": "Очередь",
+        "skip": "Пропустить трек",
+        "pause": "Пауза",
+        "resume": "Продолжить",
+        "stop": "Стоп"
+      },
+      "permission": {
+        "everyone": "Все",
+        "moderator": "Модераторы",
+        "broadcaster": "Только стример"
+      }
     }
   },
   "player": {
@@ -268,6 +289,7 @@
     "addedToQueue": "Добавлено в очередь: {{title}} [#{{position}}]",
     "viewerRequest": "🎵 {{user}} добавил(а): {{title}}",
     "viewerRequestsMany": "🎵 Добавлено {{count}} новых треков от зрителей",
-    "twitchSettingsSaved": "Настройки Twitch сохранены"
+    "twitchSettingsSaved": "Настройки Twitch сохранены",
+    "twitchChatCommandsSaved": "Команды чата сохранены"
   }
 }

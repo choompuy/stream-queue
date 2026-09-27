@@ -534,6 +534,130 @@
             </button>
           </div>
 
+          <div id="twitchChatCommandsPanel" class="section-tab panel hidden">
+            <div class="section-tab-header">
+              <h2 data-i18n="settings.twitchChat.title">Twitch chat commands</h2>
+            </div>
+
+            <div class="settings-section text-muted text-xs" data-i18n="settings.twitchChat.note">
+              StreamQueue joins your channel's chat directly and responds to these commands. "now" and "next" only read state; the rest control
+              playback and default to moderators and you.
+            </div>
+
+            <div class="settings-section" id="twitchChatCommandRows">
+              <div class="field" data-chat-command="now">
+                <label class="field-label" data-i18n="settings.twitchChat.commands.now">Now playing</label>
+                <div class="field-row">
+                  <div class="checkbox-wrapper">
+                    <input class="checkbox" type="checkbox" id="chatCmdNowEnabled" />
+                  </div>
+                  <input class="settings-input input" type="text" id="chatCmdNowCommand" placeholder="!sg now" />
+                  <select class="settings-input input select" id="chatCmdNowPermission">
+                    <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
+                    <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
+                    <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field" data-chat-command="next">
+                <label class="field-label" data-i18n="settings.twitchChat.commands.next">Queue</label>
+                <div class="field-row">
+                  <div class="checkbox-wrapper">
+                    <input class="checkbox" type="checkbox" id="chatCmdNextEnabled" />
+                  </div>
+                  <input class="settings-input input" type="text" id="chatCmdNextCommand" placeholder="!sg next" />
+                  <select class="settings-input input select" id="chatCmdNextPermission">
+                    <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
+                    <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
+                    <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field" data-chat-command="skip">
+                <label class="field-label" data-i18n="settings.twitchChat.commands.skip">Skip track</label>
+                <div class="field-row">
+                  <div class="checkbox-wrapper">
+                    <input class="checkbox" type="checkbox" id="chatCmdSkipEnabled" />
+                  </div>
+                  <input class="settings-input input" type="text" id="chatCmdSkipCommand" placeholder="!sg skip" />
+                  <select class="settings-input input select" id="chatCmdSkipPermission">
+                    <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
+                    <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
+                    <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field" data-chat-command="pause">
+                <label class="field-label" data-i18n="settings.twitchChat.commands.pause">Pause</label>
+                <div class="field-row">
+                  <div class="checkbox-wrapper">
+                    <input class="checkbox" type="checkbox" id="chatCmdPauseEnabled" />
+                  </div>
+                  <input class="settings-input input" type="text" id="chatCmdPauseCommand" placeholder="!sg pause" />
+                  <select class="settings-input input select" id="chatCmdPausePermission">
+                    <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
+                    <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
+                    <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field" data-chat-command="resume">
+                <label class="field-label" data-i18n="settings.twitchChat.commands.resume">Resume</label>
+                <div class="field-row">
+                  <div class="checkbox-wrapper">
+                    <input class="checkbox" type="checkbox" id="chatCmdResumeEnabled" />
+                  </div>
+                  <input class="settings-input input" type="text" id="chatCmdResumeCommand" placeholder="!sg resume" />
+                  <select class="settings-input input select" id="chatCmdResumePermission">
+                    <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
+                    <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
+                    <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field" data-chat-command="stop">
+                <label class="field-label" data-i18n="settings.twitchChat.commands.stop">Stop</label>
+                <div class="field-row">
+                  <div class="checkbox-wrapper">
+                    <input class="checkbox" type="checkbox" id="chatCmdStopEnabled" />
+                  </div>
+                  <input class="settings-input input" type="text" id="chatCmdStopCommand" placeholder="!sg stop" />
+                  <select class="settings-input input select" id="chatCmdStopPermission">
+                    <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
+                    <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
+                    <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
+                  </select>
+                </div>
+                <div class="text-muted text-xs" data-i18n="settings.twitchChat.stopNote">
+                  StreamQueue only has play/pause - "stop" pauses the current track.
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="chatCmdCooldown" data-i18n="settings.twitchChat.cooldown">Control command cooldown (seconds)</label>
+                <input class="settings-input input" type="number" id="chatCmdCooldown" min="0" max="300" style="max-width: 8rem" />
+                <div class="text-muted text-xs" data-i18n="settings.twitchChat.cooldownNote">
+                  Applies only to skip/pause/resume/stop - a shared cooldown so two moderators can't trigger the same action back to back. Doesn't
+                  apply to "now"/"next".
+                </div>
+              </div>
+            </div>
+
+            <button
+              id="twitchChatCommandsSaveBtn"
+              class="settings-section-btn btn btn-primary"
+              data-action="save-twitch-chat-commands"
+              data-i18n="settings.twitchChat.save"
+            >
+              Save chat commands
+            </button>
+          </div>
+
           <div class="section-tab panel">
             <div class="section-tab-header">
               <h2 data-i18n="settings.language.title">Language</h2>

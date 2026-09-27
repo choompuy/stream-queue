@@ -1,6 +1,6 @@
 import { escapeHtml } from '../shared.js'
 import { api, ApiError } from './api.js'
-import { state, dom, log, CONFIG_FIELDS } from './state.js'
+import { state, dom, log, CONFIG_FIELDS, CHAT_COMMAND_FIELDS } from './state.js'
 import { run } from './run.js'
 import { syncPlayer } from './player.js'
 import { renderQueue } from './queue.js'
@@ -308,6 +308,7 @@ function renderTwitchConnection() {
     dom.twitchDisconnectBtn?.classList.remove('hidden')
     dom.twitchRewardSection?.classList.remove('hidden')
     dom.twitchSaveBtn.classList.remove('hidden')
+    dom.twitchChatCommandsPanel?.classList.remove('hidden')
   } else {
     dom.twitchConnectionStatus.textContent = t('settings.twitch.notConnected')
     dom.twitchConnectionStatus.classList.add('text-red')
@@ -315,6 +316,7 @@ function renderTwitchConnection() {
     dom.twitchDisconnectBtn?.classList.add('hidden')
     dom.twitchRewardSection?.classList.add('hidden')
     dom.twitchSaveBtn.classList.add('hidden')
+    dom.twitchChatCommandsPanel?.classList.add('hidden')
   }
 }
 
@@ -362,6 +364,36 @@ export function loadConfig() {
 
     state.twitch.selectedRewardId = state.config?.twitch?.channelPointsRewardId ?? ''
     renderTwitchRewards()
+
+    const chatCommands = state.config?.twitch?.chatCommands
+    if (chatCommands) {
+      for (const field of CHAT_COMMAND_FIELDS) {
+        const command = chatCommands[field.key]
+        if (!command) continue
+
+        const enabledInput = dom[`${field.dom}Enabled`]
+        const commandInput = dom[`${field.dom}Command`]
+        const permissionInput = dom[`${field.dom}Permission`]
+
+        if (enabledInput) {
+          enabledInput.classList.remove('error')
+          enabledInput.checked = Boolean(command.enabled)
+        }
+        if (commandInput) {
+          commandInput.classList.remove('error')
+          commandInput.value = command.command ?? ''
+        }
+        if (permissionInput) {
+          permissionInput.classList.remove('error')
+          permissionInput.value = command.permission ?? 'moderator'
+        }
+      }
+
+      if (dom.chatCmdCooldown) {
+        dom.chatCmdCooldown.classList.remove('error')
+        dom.chatCmdCooldown.value = chatCommands.controlCooldownSeconds ?? 5
+      }
+    }
   })
 }
 
@@ -474,11 +506,69 @@ export async function saveTwitchConfig() {
   })
 }
 
+export async function saveTwitchChatCommands() {
+  const chatCommands = {}
+
+  for (const field of CHAT_COMMAND_FIELDS) {
+    const enabledInput = dom[`${field.dom}Enabled`]
+    const commandInput = dom[`${field.dom}Command`]
+    const permissionInput = dom[`${field.dom}Permission`]
+
+    enabledInput?.classList.remove('error')
+    commandInput?.classList.remove('error')
+    permissionInput?.classList.remove('error')
+
+    chatCommands[field.key] = {
+      enabled: Boolean(enabledInput?.checked),
+      command: commandInput?.value.trim() ?? '',
+      permission: permissionInput?.value ?? 'moderator'
+    }
+  }
+
+  dom.chatCmdCooldown?.classList.remove('error')
+  chatCommands.controlCooldownSeconds = Number(dom.chatCmdCooldown?.value ?? 5)
+
+  const config = { twitch: { chatCommands } }
+
+  await run('saving Twitch chat commands', async () => {
+    try {
+      state.config = await api.updateConfig(config)
+      toastSuccess(t('toast.twitchChatCommandsSaved'))
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'INVALID_CONFIG' && error.params?.fields) {
+        const rejectedFields = error.params.fields.split(', ')
+
+        for (const field of CHAT_COMMAND_FIELDS) {
+          const enabledInput = dom[`${field.dom}Enabled`]
+          const commandInput = dom[`${field.dom}Command`]
+          const permissionInput = dom[`${field.dom}Permission`]
+
+          if (rejectedFields.includes(`twitch.chatCommands.${field.key}.enabled`)) enabledInput?.classList.add('error')
+          if (rejectedFields.includes(`twitch.chatCommands.${field.key}.command`)) commandInput?.classList.add('error')
+          if (rejectedFields.includes(`twitch.chatCommands.${field.key}.permission`)) permissionInput?.classList.add('error')
+          // the whole command object can also be rejected as a unit (e.g. not an object at all)
+          if (rejectedFields.includes(`twitch.chatCommands.${field.key}`)) {
+            enabledInput?.classList.add('error')
+            commandInput?.classList.add('error')
+            permissionInput?.classList.add('error')
+          }
+        }
+
+        if (rejectedFields.includes('twitch.chatCommands.controlCooldownSeconds')) {
+          dom.chatCmdCooldown?.classList.add('error')
+        }
+      }
+      throw error
+    }
+  })
+}
+
 export const settingsActions = {
   'copy-overlay-url': copyOverlayUrl,
   'toggle-qr': toggleQr,
   'save-config': saveConfigSetting,
   'save-twitch-config': saveTwitchConfig,
+  'save-twitch-chat-commands': saveTwitchChatCommands,
   'connect-twitch': connectTwitch,
   'disconnect-twitch': disconnectTwitch
 }

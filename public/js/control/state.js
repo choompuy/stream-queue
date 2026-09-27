@@ -109,7 +109,28 @@ export const dom = {
   twitchDisconnectBtn: $('twitchDisconnectBtn'),
   twitchRewardSection: $('twitchRewardSection'),
   twitchRewardSelect: $('twitchRewardSelect'),
-  twitchSaveBtn: $('twitchSaveBtn')
+  twitchSaveBtn: $('twitchSaveBtn'),
+
+  twitchChatCommandsPanel: $('twitchChatCommandsPanel'),
+  chatCmdCooldown: $('chatCmdCooldown'),
+  chatCmdNowEnabled: $('chatCmdNowEnabled'),
+  chatCmdNowCommand: $('chatCmdNowCommand'),
+  chatCmdNowPermission: $('chatCmdNowPermission'),
+  chatCmdNextEnabled: $('chatCmdNextEnabled'),
+  chatCmdNextCommand: $('chatCmdNextCommand'),
+  chatCmdNextPermission: $('chatCmdNextPermission'),
+  chatCmdSkipEnabled: $('chatCmdSkipEnabled'),
+  chatCmdSkipCommand: $('chatCmdSkipCommand'),
+  chatCmdSkipPermission: $('chatCmdSkipPermission'),
+  chatCmdPauseEnabled: $('chatCmdPauseEnabled'),
+  chatCmdPauseCommand: $('chatCmdPauseCommand'),
+  chatCmdPausePermission: $('chatCmdPausePermission'),
+  chatCmdResumeEnabled: $('chatCmdResumeEnabled'),
+  chatCmdResumeCommand: $('chatCmdResumeCommand'),
+  chatCmdResumePermission: $('chatCmdResumePermission'),
+  chatCmdStopEnabled: $('chatCmdStopEnabled'),
+  chatCmdStopCommand: $('chatCmdStopCommand'),
+  chatCmdStopPermission: $('chatCmdStopPermission')
 }
 
 export const CONFIG_FIELDS = [
@@ -121,6 +142,17 @@ export const CONFIG_FIELDS = [
   { key: 'regionCode', dom: 'cfgRegionCode', type: 'text' },
   { key: 'allowShorts', dom: 'cfgAllowShorts', type: 'checkbox' },
   { key: 'allowLiveStreams', dom: 'cfgAllowLiveStreams', type: 'checkbox' }
+]
+
+// Each Twitch chat command has three sub-fields (enabled/command/permission), rendered from
+// <name>Enabled / <name>Command / <name>Permission DOM ids built from `dom` below.
+export const CHAT_COMMAND_FIELDS = [
+  { key: 'now', dom: 'chatCmdNow' },
+  { key: 'next', dom: 'chatCmdNext' },
+  { key: 'skip', dom: 'chatCmdSkip' },
+  { key: 'pause', dom: 'chatCmdPause' },
+  { key: 'resume', dom: 'chatCmdResume' },
+  { key: 'stop', dom: 'chatCmdStop' }
 ]
 
 export const selectors = {
