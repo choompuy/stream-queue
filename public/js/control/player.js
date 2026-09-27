@@ -1,7 +1,6 @@
-import { formatDuration, formatViews, getErrorMessage } from '../shared.js'
+import { formatDuration, formatViews, getErrorMessage, show, setText } from '../shared.js'
 import { PLAY_ICON, PAUSE_ICON } from '../icons.js'
 import { state, dom, log } from './state.js'
-import { setHidden } from './ui.js'
 import { t } from '../i18n.js'
 
 let player = null
@@ -11,28 +10,28 @@ export function renderCurrent() {
   const current = state.current
 
   if (!current) {
-    setHidden(dom.nowPlaying, true)
-    setHidden(dom.noPlaying, false)
+    show(dom.nowPlaying, false)
+    show(dom.noPlaying)
     return
   }
 
-  setHidden(dom.nowPlaying, false)
-  setHidden(dom.noPlaying, true)
+  show(dom.nowPlaying)
+  show(dom.noPlaying, false)
 
-  dom.currentTitle.textContent = current.title
-  dom.currentChannel.textContent = current.channelTitle
-  dom.currentDuration.textContent = formatDuration(current.duration)
-  dom.currentViews.textContent = `${formatViews(current.views)} views`
-  dom.currentRequester.textContent = `@${current.requestedBy}`
+  setText(dom.currentTitle, current.title)
+  setText(dom.currentChannel, current.channelTitle)
+  setText(dom.currentDuration, formatDuration(current.duration))
+  setText(dom.currentViews, `${formatViews(current.views)} views`)
+  setText(dom.currentRequester, `@${current.requestedBy}`)
 }
 
 export function renderNext() {
   const next = state.nextTrack
-  setHidden(dom.nextPlaying, !next)
+  show(dom.nextPlaying, !!next)
   if (!next) return
 
-  dom.nextTitle.textContent = next.title
-  dom.nextDuration.textContent = formatDuration(next.duration)
+  setText(dom.nextTitle, next.title)
+  setText(dom.nextDuration, formatDuration(next.duration))
 }
 
 export function renderPlayPause() {

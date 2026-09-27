@@ -29,28 +29,6 @@ export type Config = {
   allowShorts: boolean
   allowLiveStreams: boolean
   fallbackPlaylist: FallbackPlaylist
-  twitch: {
-    channelPointsRewardId: string | null
-    chatCommands: TwitchChatCommandsConfig
-  }
-}
-
-export type TwitchChatPermission = 'everyone' | 'moderator' | 'broadcaster'
-
-export type TwitchChatCommandConfig = {
-  enabled: boolean
-  command: string
-  permission: TwitchChatPermission
-}
-
-export type TwitchChatCommandsConfig = {
-  now: TwitchChatCommandConfig
-  next: TwitchChatCommandConfig
-  skip: TwitchChatCommandConfig
-  pause: TwitchChatCommandConfig
-  resume: TwitchChatCommandConfig
-  stop: TwitchChatCommandConfig
-  controlCooldownSeconds: number
 }
 
 export type FallbackPlaylist = {
@@ -193,9 +171,3 @@ export type FallbackStateResponse = FallbackPlaylist & {
 }
 export type QueueRemoveResponse = { removed: QueueItem; state: StateResponse }
 export type ActivityResponse = { entries: ActivityEntry[] }
-
-export type TwitchConnectionResponse = {
-  connected: boolean
-  user: { displayName: string; login: string } | null
-  connectedAt: number | null
-}

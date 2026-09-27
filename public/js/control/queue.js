@@ -6,6 +6,7 @@ import { renderCurrent, renderNext, renderPlayPause, syncPlayer } from './player
 import { refreshFallbackState } from './fallback.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
+import { setText } from '../shared.js'
 
 export function refreshState(silent = false) {
   return run(
@@ -36,9 +37,8 @@ export function renderState() {
 
 export function renderQueue() {
   const maxQueueSize = state.config?.maxQueueSize ?? 0
-  dom.queueCount.textContent = `${state.queue.length}/${maxQueueSize}`
-
-  if (dom.tabQueueCount) dom.tabQueueCount.textContent = state.queue.length
+  setText(dom.queueCount, `${state.queue.length}/${maxQueueSize}`)
+  setText(dom.tabQueueCount, state.queue.length)
 
   views.queue.render(selectors.markBlocked(state.queue))
 }

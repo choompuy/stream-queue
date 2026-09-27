@@ -4,7 +4,9 @@ import { dispatchAction } from './actions.js'
 import { bindMenus } from './menu.js'
 import { search } from './search.js'
 import { addPlaylist } from './playlists.js'
-import { saveOverlaySettings, onIpChange, changeLocale, onTwitchRewardChange, stopTwitchPolling } from './settings.js'
+import { saveOverlaySettings, onIpChange, changeLocale } from './settings.js'
+import { onTwitchRewardChange, stopTwitchPolling } from './twitch.js'
+import { setError } from '../shared.js'
 
 export function bindEvents() {
   bindMenus()
@@ -58,13 +60,13 @@ export function bindEvents() {
 
   settingsInputs.forEach((input) => {
     if (input) {
-      input.addEventListener('input', () => input.classList.remove('error'))
-      input.addEventListener('change', () => input.classList.remove('error'))
+      input.addEventListener('input', () => setError(input, false))
+      input.addEventListener('change', () => setError(input, false))
     }
   })
 
   const configFields = CONFIG_FIELDS.map((f) => dom[f.dom]).filter(Boolean)
   configFields.forEach((input) => {
-    input.addEventListener('focus', () => input.classList.remove('error'))
+    input.addEventListener('focus', () => setError(input, false))
   })
 }

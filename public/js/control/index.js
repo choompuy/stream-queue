@@ -10,8 +10,10 @@ import { refreshFallbackState } from './fallback.js'
 import { loadActivity } from './activity.js'
 import { loadBlocklist } from './blocklist.js'
 import { loadPlaylists } from './playlists.js'
-import { loadSecrets, loadConfig, loadOverlaySettings, loadNetworkInfo, loadTwitchSettings } from './settings.js'
+import { loadSecrets, loadConfig, loadOverlaySettings, loadNetworkInfo } from './settings.js'
+import { loadTwitchSettings, loadTwitchConfig, loadTwitchSecrets } from './twitch.js'
 import { isDashboardActive } from './tabs.js'
+import { setError } from '../shared.js'
 
 const POLLING = [
   { run: () => refreshState(true), every: 2000 },
@@ -25,17 +27,20 @@ async function init() {
 
   await initI18n(locale)
   if (dom.localeSelect) {
-    dom.localeSelect.classList.remove('error')
+    setError(dom.localeSelect, false)
     dom.localeSelect.value = locale ?? dom.localeSelect.value
   }
 
   bindEvents()
 
   const secretsLoaded = loadSecrets()
+  const twitchSecretsLoaded = loadTwitchSecrets()
 
   await Promise.allSettled([
     secretsLoaded,
-    secretsLoaded.then(() => loadConfig()).then(() => loadTwitchSettings()),
+    twitchSecretsLoaded,
+    secretsLoaded.then(() => loadConfig()),
+    twitchSecretsLoaded.then(() => loadTwitchSettings()).then(() => loadTwitchConfig()),
     loadOverlaySettings(),
     loadNetworkInfo(),
     loadActivity(),

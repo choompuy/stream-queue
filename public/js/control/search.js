@@ -6,6 +6,7 @@ import { refreshState } from './queue.js'
 import { loadActivity } from './activity.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
+import { show } from '../shared.js'
 
 const YOUTUBE_URL_HINT = /(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com|youtube-nocookie\.com|youtu\.be)\//
 
@@ -15,7 +16,7 @@ export function clearSearchResults() {
   views.search.clear()
   lastSearch = ''
   if (dom.searchInput) dom.searchInput.value = ''
-  dom.searchListWrapper.classList.add('hidden')
+  show(dom.searchListWrapper, false)
 }
 
 export async function search() {
@@ -34,7 +35,7 @@ export async function search() {
 
       const data = await api.search(query)
       views.search.render(data.results)
-      dom.searchListWrapper.classList.remove('hidden')
+      show(dom.searchListWrapper)
       lastSearch = query
     },
     { button: dom.searchBtn }

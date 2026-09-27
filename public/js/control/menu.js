@@ -1,10 +1,12 @@
+import { show } from '../shared.js'
+
 export function closeAllMenus({ restoreFocus = false } = {}) {
   document.querySelectorAll('.row-menu').forEach((menu) => {
     const dropdown = menu.querySelector('.row-menu-dropdown')
     const toggle = menu.querySelector('[data-action="toggle-menu"]')
     const wasOpen = dropdown && !dropdown.classList.contains('hidden')
 
-    dropdown?.classList.add('hidden')
+    show(dropdown, false)
     toggle?.setAttribute('aria-expanded', 'false')
 
     if (wasOpen && restoreFocus) toggle?.focus()
@@ -18,7 +20,7 @@ export function toggleMenu(toggle, event) {
   closeAllMenus()
   if (!dropdown || wasOpen) return
 
-  dropdown.classList.remove('hidden')
+  show(dropdown)
   toggle.setAttribute('aria-expanded', 'true')
 
   // keyboard activation (Enter/Space give detail === 0): move focus into the menu

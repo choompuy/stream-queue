@@ -4,6 +4,7 @@ import { views } from './views/index.js'
 import { run } from './run.js'
 import { toggleActive, formatDateTime } from './ui.js'
 import { t } from '../i18n.js'
+import { setText } from '../shared.js'
 
 export function refreshFallbackState(silent = false) {
   return run(
@@ -24,21 +25,19 @@ export function renderFallback() {
   toggleActive(dom.fallbackShuffleBtn, data?.shuffle)
   toggleActive(dom.fallbackRepeatBtn, data?.repeat)
   toggleActive(dom.fallbackEnabledBtn, data?.enabled)
-  if (dom.fallbackEnabledText) dom.fallbackEnabledText.textContent = data?.enabled ? t('common.on') : t('common.off')
+  setText(dom.fallbackEnabledText, data?.enabled ? t('common.on') : t('common.off'))
 
   if (!tracks.length) {
-    if (dom.fallbackInfo) dom.fallbackInfo.textContent = ''
+    setText(dom.fallbackInfo, '')
     views.fallback.render([])
     renderStats()
     return
   }
 
-  if (dom.fallbackInfo) {
-    dom.fallbackInfo.textContent = t('fallback.info', {
-      count: tracks.length,
-      datetime: formatDateTime(data.lastRefreshedAt)
-    })
-  }
+  setText(dom.fallbackInfo, t('fallback.info', {
+    count: tracks.length,
+    datetime: formatDateTime(data.lastRefreshedAt)
+  }))
   views.fallback.render(selectors.markBlocked(tracks).map((track) => ({ ...track, isActive: track.videoId === activeVideoId })))
   scrollToActiveFallback()
   renderStats()

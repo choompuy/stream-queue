@@ -97,5 +97,7 @@ export const api = {
   connectTwitch: () => post('/api/integrations/twitch/connect'),
   getTwitchRewards: () => request('/api/integrations/twitch/rewards'),
   disconnectTwitch: () => post('/api/integrations/twitch/disconnect'),
-  refreshTwitch: () => post('/api/integrations/twitch/refresh')
+  refreshTwitch: () => post('/api/integrations/twitch/refresh'),
+  getTwitchConfig: () => request('/api/integrations/twitch/config'),
+  updateTwitchConfig: (config) => put('/api/integrations/twitch/config', config)
 }

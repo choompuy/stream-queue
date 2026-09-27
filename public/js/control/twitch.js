@@ -1,0 +1,356 @@
+import { escapeHtml, show, setError, setValue, setChecked } from '../shared.js'
+import { api, ApiError } from './api.js'
+import { state, dom, log, CHAT_COMMAND_FIELDS } from './state.js'
+import { run } from './run.js'
+import { t } from '../i18n.js'
+import { toastSuccess } from './toast.js'
+
+const TWITCH_POLL_INTERVAL_MS = 2000
+
+let twitchPollController = null
+
+export function stopTwitchPolling() {
+  twitchPollController?.abort()
+  twitchPollController = null
+}
+
+// resolves to false when the wait was cut short by an abort
+function delay(ms, signal) {
+  return new Promise((resolve) => {
+    if (signal.aborted) {
+      resolve(false)
+      return
+    }
+
+    const onAbort = () => {
+      clearTimeout(timer)
+      resolve(false)
+    }
+
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve(true)
+    }, ms)
+
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
+function openAuthorizationWindow() {
+  try {
+    return window.open('', '_blank') ?? null
+  } catch {
+    return null
+  }
+}
+
+function navigateAuthorizationWindow(authWindow, url) {
+  if (!authWindow) {
+    window.open(url, '_blank', 'noopener,noreferrer')
+    return
+  }
+
+  try {
+    authWindow.opener = null
+    authWindow.location.href = url
+  } catch (error) {
+    log('Failed to navigate the Twitch authorization window:', error)
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+}
+
+async function loadTwitchRewards() {
+  const response = await api.getTwitchRewards()
+  state.twitch.rewards = response?.rewards ?? []
+  renderTwitchRewards()
+}
+
+export function connectTwitch() {
+  // opened up-front so the popup is attributed to the click and not to the API response
+  const authWindow = openAuthorizationWindow()
+
+  stopTwitchPolling()
+  const controller = new AbortController()
+  twitchPollController = controller
+  const { signal } = controller
+
+  return run(
+    'connecting Twitch',
+    async () => {
+      try {
+        let response
+
+        try {
+          response = await api.connectTwitch()
+        } catch (error) {
+          authWindow?.close()
+          throw error
+        }
+
+        if (!response?.verificationUri || !response?.userCode) {
+          authWindow?.close()
+          throw new ApiError('Twitch authorization data is missing', { code: 'TWITCH_AUTH_ERROR' })
+        }
+
+        if (signal.aborted) {
+          authWindow?.close()
+          return
+        }
+
+        if (dom.twitchAuthorizationCode) {
+          dom.twitchAuthorizationCode.textContent = response.userCode
+        }
+
+        show(dom.twitchAuthorization)
+        navigateAuthorizationWindow(authWindow, response.verificationUri)
+        const expiresAt = Date.now() + response.expiresIn * 1000
+
+        while (Date.now() < expiresAt) {
+          if (!(await delay(TWITCH_POLL_INTERVAL_MS, signal))) return
+
+          const status = await api.getTwitchStatus()
+          if (signal.aborted) return
+
+          if (status.connected) {
+            state.twitch.connected = true
+            state.twitch.user = status.user
+            state.twitch.connectedAt = status.connectedAt
+            show(dom.twitchAuthorization, false)
+            renderTwitchConnection()
+            await loadTwitchRewards()
+            return
+          }
+        }
+
+        show(dom.twitchAuthorization, false)
+        throw new ApiError('Twitch authorization expired', { code: 'TWITCH_AUTH_EXPIRED' })
+      } finally {
+        if (twitchPollController === controller) twitchPollController = null
+      }
+    },
+    { button: dom.twitchConnectBtn }
+  )
+}
+
+export function disconnectTwitch() {
+  if (!confirm(t('settings.twitch.disconnectConfirm'))) return
+
+  return run('disconnecting Twitch', async () => {
+    stopTwitchPolling()
+    await api.disconnectTwitch()
+    state.twitch.connected = false
+    state.twitch.user = null
+    state.twitch.connectedAt = null
+    state.twitch.rewards = []
+    show(dom.twitchAuthorization, false)
+    renderTwitchConnection()
+    renderTwitchRewards()
+  })
+}
+
+export function loadTwitchSettings() {
+  return run('loading Twitch settings', async () => {
+    if (!state.twitch.configured) {
+      renderTwitchConnection()
+      return
+    }
+
+    const status = await api.getTwitchStatus()
+    state.twitch.connected = Boolean(status.connected)
+    state.twitch.user = status.user
+    state.twitch.connectedAt = status.connectedAt
+    renderTwitchConnection()
+
+    if (!state.twitch.connected) return
+
+    await loadTwitchRewards()
+  })
+}
+
+export function renderTwitchConnection() {
+  if (!dom.twitchConnectionStatus) return
+
+  if (!state.twitch.configured) {
+    show(dom.twitchNotConfigured)
+    show(dom.twitchConnectionControls, false)
+    show(dom.twitchAuthorization, false)
+    show(dom.twitchRewardSection, false)
+    show(dom.twitchSaveBtn, false)
+    return
+  }
+
+  show(dom.twitchNotConfigured, false)
+  show(dom.twitchConnectionControls)
+
+  if (state.twitch.connected && state.twitch.user) {
+    dom.twitchConnectionStatus.textContent = t('settings.twitch.connected', { user: state.twitch.user.displayName })
+    dom.twitchConnectionStatus.classList.remove('text-red')
+    show(dom.twitchConnectBtn, false)
+    show(dom.twitchDisconnectBtn)
+    show(dom.twitchRewardSection)
+    show(dom.twitchSaveBtn)
+    show(dom.twitchChatCommandsPanel)
+  } else {
+    dom.twitchConnectionStatus.textContent = t('settings.twitch.notConnected')
+    dom.twitchConnectionStatus.classList.add('text-red')
+    show(dom.twitchConnectBtn)
+    show(dom.twitchDisconnectBtn, false)
+    show(dom.twitchRewardSection, false)
+    show(dom.twitchSaveBtn, false)
+    show(dom.twitchChatCommandsPanel, false)
+  }
+}
+
+export function renderTwitchRewards() {
+  if (!dom.twitchRewardSelect) return
+
+  if (!state.twitch.rewards.length) {
+    dom.twitchRewardSelect.innerHTML = `<option value="">${escapeHtml(t('settings.twitch.noRewards'))}</option>`
+    return
+  }
+
+  const selectedId = state.twitch.selectedRewardId ?? ''
+
+  dom.twitchRewardSelect.innerHTML = `
+    <option value="">${escapeHtml(t('settings.twitch.rewardNone'))}</option>
+    ${state.twitch.rewards
+      .map(
+        (reward) =>
+          `<option value="${escapeHtml(reward.id)}" ${reward.id === selectedId ? 'selected' : ''}>${escapeHtml(reward.title)} (${reward.cost})</option>`
+      )
+      .join('')}
+  `
+}
+
+// the reward id lives in state, not in the <select>, so it survives a config load that happens
+// before the reward options exist
+export function onTwitchRewardChange() {
+  state.twitch.selectedRewardId = dom.twitchRewardSelect?.value ?? ''
+}
+
+export function loadTwitchConfig() {
+  return run('loading Twitch config', async () => {
+    const twitchConfig = await api.getTwitchConfig()
+
+    state.twitch.selectedRewardId = twitchConfig?.channelPointsRewardId ?? ''
+    renderTwitchRewards()
+
+    const chatCommands = twitchConfig?.chatCommands
+    if (chatCommands) {
+      for (const field of CHAT_COMMAND_FIELDS) {
+        const command = chatCommands[field.key]
+        if (!command) continue
+
+        const enabledInput = dom[`${field.dom}Enabled`]
+        const commandInput = dom[`${field.dom}Command`]
+        const permissionInput = dom[`${field.dom}Permission`]
+
+        setError(enabledInput, false)
+        setChecked(enabledInput, command.enabled)
+        setError(commandInput, false)
+        setValue(commandInput, command.command ?? '')
+        setError(permissionInput, false)
+        setValue(permissionInput, command.permission ?? 'moderator')
+      }
+
+      setError(dom.chatCmdCooldown, false)
+      setValue(dom.chatCmdCooldown, chatCommands.controlCooldownSeconds ?? 5)
+    }
+  })
+}
+
+export async function saveTwitchConfig() {
+  const config = {
+    channelPointsRewardId: state.twitch.selectedRewardId || null
+  }
+
+  setError(dom.twitchRewardSelect, false)
+
+  await run('saving Twitch config', async () => {
+    try {
+      await api.updateTwitchConfig(config)
+      toastSuccess(t('toast.twitchSettingsSaved'))
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'INVALID_CONFIG' && error.params?.fields) {
+        const rejectedFields = error.params.fields.split(', ')
+
+        if (rejectedFields.includes('channelPointsRewardId')) {
+          setError(dom.twitchRewardSelect)
+        }
+      }
+      throw error
+    }
+  })
+}
+
+export async function saveTwitchChatCommands() {
+  const chatCommands = {}
+
+  for (const field of CHAT_COMMAND_FIELDS) {
+    const enabledInput = dom[`${field.dom}Enabled`]
+    const commandInput = dom[`${field.dom}Command`]
+    const permissionInput = dom[`${field.dom}Permission`]
+
+    setError(enabledInput, false)
+    setError(commandInput, false)
+    setError(permissionInput, false)
+
+    chatCommands[field.key] = {
+      enabled: Boolean(enabledInput?.checked),
+      command: commandInput?.value.trim() ?? '',
+      permission: permissionInput?.value ?? 'moderator'
+    }
+  }
+
+  setError(dom.chatCmdCooldown, false)
+  chatCommands.controlCooldownSeconds = Number(dom.chatCmdCooldown?.value ?? 5)
+
+  const config = { chatCommands }
+
+  await run('saving Twitch chat commands', async () => {
+    try {
+      await api.updateTwitchConfig(config)
+      toastSuccess(t('toast.twitchChatCommandsSaved'))
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'INVALID_CONFIG' && error.params?.fields) {
+        const rejectedFields = error.params.fields.split(', ')
+
+        for (const field of CHAT_COMMAND_FIELDS) {
+          const enabledInput = dom[`${field.dom}Enabled`]
+          const commandInput = dom[`${field.dom}Command`]
+          const permissionInput = dom[`${field.dom}Permission`]
+
+          if (rejectedFields.includes(`chatCommands.${field.key}.enabled`)) setError(enabledInput)
+          if (rejectedFields.includes(`chatCommands.${field.key}.command`)) setError(commandInput)
+          if (rejectedFields.includes(`chatCommands.${field.key}.permission`)) setError(permissionInput)
+          // the whole command object can also be rejected as a unit (e.g. not an object at all)
+          if (rejectedFields.includes(`chatCommands.${field.key}`)) {
+            setError(enabledInput)
+            setError(commandInput)
+            setError(permissionInput)
+          }
+        }
+
+        if (rejectedFields.includes('chatCommands.controlCooldownSeconds')) {
+          setError(dom.chatCmdCooldown)
+        }
+      }
+      throw error
+    }
+  })
+}
+
+export function loadTwitchSecrets() {
+  return run('loading Twitch secrets', async () => {
+    const data = await api.getSecrets()
+    state.twitch.configured = Boolean(data.twitch?.configured)
+    renderTwitchConnection()
+  })
+}
+
+export const twitchActions = {
+  'save-twitch-config': saveTwitchConfig,
+  'save-twitch-chat-commands': saveTwitchChatCommands,
+  'connect-twitch': connectTwitch,
+  'disconnect-twitch': disconnectTwitch
+}

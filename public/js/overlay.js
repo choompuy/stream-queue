@@ -1,4 +1,4 @@
-import { $, formatDuration, createLogger, getErrorMessage } from './shared.js'
+import { $, formatDuration, createLogger, getErrorMessage, show, setClass, setText } from './shared.js'
 import { initI18n, t, getCurrentLocale } from './i18n.js'
 
 let player = null
@@ -56,14 +56,10 @@ async function fetchOverlayState() {
 
 function updateMediaVisibility() {
   if (!currentState?.current || currentState.isPaused) {
-    dom.badge.classList.remove('visible')
+    setClass(dom.badge, 'visible', false)
   } else {
-    if (settings.showVideo) {
-      dom.badge.classList.add('with-video')
-    } else {
-      dom.badge.classList.remove('with-video')
-    }
-    dom.badge.classList.add('visible')
+    setClass(dom.badge, 'with-video', settings.showVideo)
+    setClass(dom.badge, 'visible')
   }
 }
 
@@ -75,15 +71,15 @@ function renderCurrent() {
 
   dom.badge.dataset.position = settings.position
   dom.currentThumbnail.src = currentState.current.thumbnail
-  dom.currentTitle.textContent = currentState.current.title
-  dom.currentRequester.textContent = `@${currentState.current.requestedBy}`
+  setText(dom.currentTitle, currentState.current.title)
+  setText(dom.currentRequester, `@${currentState.current.requestedBy}`)
 
   if (currentState.nextTrack) {
-    dom.nextTitle.textContent = currentState.nextTrack.title
-    dom.nextElapsedTime.textContent = formatDuration(Math.floor(currentState.nextTrack.duration))
-    dom.nextPlaying.classList.remove('hidden')
+    setText(dom.nextTitle, currentState.nextTrack.title)
+    setText(dom.nextElapsedTime, formatDuration(Math.floor(currentState.nextTrack.duration)))
+    show(dom.nextPlaying)
   } else {
-    dom.nextPlaying.classList.add('hidden')
+    show(dom.nextPlaying, false)
   }
   updateMediaVisibility()
 }
@@ -91,7 +87,7 @@ function renderCurrent() {
 function renderState() {
   renderCurrent()
 
-  if (currentState && (!isPlaybackSource || isPlayerReady)) dom.badge.classList.remove('hidden')
+  if (currentState && (!isPlaybackSource || isPlayerReady)) show(dom.badge)
   if (!isPlaybackSource || !isPlayerReady || !currentState || !player) return
 
   if (!currentState.current) {
@@ -155,7 +151,7 @@ function configurePlayer() {
 function updateProgress() {
   if (!isPlaybackSource || !player || !currentState?.current) {
     dom.progressBar.style.width = '0%'
-    dom.elapsedTime.textContent = '0:00 / 0:00'
+    setText(dom.elapsedTime, '0:00 / 0:00')
     return
   }
 
@@ -163,7 +159,7 @@ function updateProgress() {
   const duration = currentState.current.duration
   const progress = duration > 0 ? ((currentTime / duration) * 100).toFixed(2) : 0
   dom.progressBar.style.width = `${progress}%`
-  dom.elapsedTime.textContent = `${formatDuration(Math.floor(currentTime))} / ${formatDuration(duration)}`
+  setText(dom.elapsedTime, `${formatDuration(Math.floor(currentTime))} / ${formatDuration(duration)}`)
 }
 
 async function notifyEnded(videoId) {

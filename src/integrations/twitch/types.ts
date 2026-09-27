@@ -136,3 +136,43 @@ export type TwitchChatMessage = {
   isModerator: boolean
   isBroadcaster: boolean
 }
+
+export type TwitchChatPermission = 'everyone' | 'moderator' | 'broadcaster'
+
+export type TwitchChatCommandConfig = {
+  enabled: boolean
+  command: string
+  permission: TwitchChatPermission
+}
+
+export type TwitchChatCommandsConfig = {
+  now?: TwitchChatCommandUpdates
+  next?: TwitchChatCommandUpdates
+  skip?: TwitchChatCommandUpdates
+  pause?: TwitchChatCommandUpdates
+  resume?: TwitchChatCommandUpdates
+  stop?: TwitchChatCommandUpdates
+  controlCooldownSeconds?: number
+}
+
+export type TwitchConfig = {
+  channelPointsRewardId: string | null
+  chatCommands: TwitchChatCommandsConfig
+}
+
+export type TwitchConfigUpdates = Omit<Partial<TwitchConfig>, 'chatCommands'> & {
+  chatCommands?: TwitchChatCommandsUpdates
+}
+export type TwitchChatCommandUpdates = Partial<TwitchChatCommandConfig>
+export type TwitchChatCommandsUpdates = Partial<Omit<TwitchChatCommandsConfig, 'controlCooldownSeconds'>> & {
+  controlCooldownSeconds?: number
+} & {
+  [K in keyof Omit<TwitchChatCommandsConfig, 'controlCooldownSeconds'>]?: TwitchChatCommandUpdates
+}
+
+export type TwitchConnectionResponse = {
+  configured: boolean
+  connected: boolean
+  user: { displayName: string; login: string } | null
+  connectedAt: number | null
+}

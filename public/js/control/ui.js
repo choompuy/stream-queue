@@ -9,14 +9,6 @@ export function withLoading(button, action) {
     })
 }
 
-export function setHidden(element, hidden) {
-  element?.classList.toggle('hidden', hidden)
-}
-
-export function toggleActive(element, active) {
-  element?.classList.toggle('active', Boolean(active))
-}
-
 export function formatDateTime(timestamp, joiner = ', ') {
   if (!timestamp) return '-'
 
@@ -27,4 +19,13 @@ export function formatDateTime(timestamp, joiner = ', ') {
   const minutes = String(date.getMinutes()).padStart(2, '0')
 
   return [`${hours}:${minutes}`, `${day}/${month}`].join(joiner)
+}
+
+export function toggleActive(element, isActive) {
+  if (!element) return
+  if (isActive) {
+    element.classList.add('active')
+  } else {
+    element.classList.remove('active')
+  }
 }

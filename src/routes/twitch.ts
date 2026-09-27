@@ -1,8 +1,9 @@
 import express from 'express'
-import { ok, asyncHandler } from '../http.js'
-import type { TwitchConnectionResponse } from '../types.js'
+import { ok, fail, asyncHandler } from '../http.js'
+import type { TwitchConnectionResponse } from '../integrations/twitch/types.js'
 import { AppError } from '../types.js'
 import { startDeviceAuthorization, disconnect, refreshConnection, _getClient } from '../integrations/twitch/index.js'
+import { getTwitchConfig, updateTwitchConfig } from '../integrations/twitch/config.js'
 import { localOnly } from '../local-only.js'
 import { getPublicSecretsView } from '../secrets.js'
 
@@ -16,14 +17,35 @@ function toUserResponse(user: { displayName: string; login: string }) {
 export const router = express.Router()
 
 router.get('/', (_req, res) => {
-  const status = getPublicSecretsView().twitch
-  const response: TwitchConnectionResponse = {
-    connected: status.connected,
-    user: status.user ? toUserResponse(status.user) : null,
-    connectedAt: status.connectedAt
+  ok<TwitchConnectionResponse>(res, getPublicSecretsView().twitch)
+})
+
+router.get('/config', (_req, res) => {
+  const twitchConfig = getTwitchConfig()
+  const response = {
+    channelPointsRewardId: twitchConfig.channelPointsRewardId,
+    chatCommands: twitchConfig.chatCommands
   }
   ok(res, response)
 })
+
+router.put(
+  '/config',
+  localOnly,
+  asyncHandler(async (req, res) => {
+    const { config: twitchConfig, rejected } = updateTwitchConfig(req.body)
+
+    if (rejected.length > 0) {
+      return fail(res, 'invalid config fields', 'INVALID_CONFIG', 400, { fields: rejected.join(', ') })
+    }
+
+    const response = {
+      channelPointsRewardId: twitchConfig.channelPointsRewardId,
+      chatCommands: twitchConfig.chatCommands
+    }
+    ok(res, response)
+  })
+)
 
 router.post(
   '/connect',

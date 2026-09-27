@@ -13,6 +13,7 @@ process.env.TWITCH_CLIENT_ID = 'test_client_id'
 const express = (await import('express')).default
 const { router: twitchRouter } = await import('../../../src/routes/twitch.js')
 const { initializeTwitchIntegration } = await import('../../../src/integrations/twitch/index.js')
+const { getTwitchConfig, updateTwitchConfig } = await import('../../../src/integrations/twitch/config.js')
 
 // Initialize Twitch integration for tests
 initializeTwitchIntegration({
@@ -96,6 +97,38 @@ test('twitch routes localOnly protection', async (t) => {
     assert.equal(body.success, true)
     assert.ok('connected' in body.data)
     assert.equal(body.data.connected, false) // No connection in test environment
+  })
+
+  await t.test('GET /config returns the current Twitch config', async () => {
+    const response = await api('/config')
+    assert.equal(response.status, 200)
+    const body = (await response.json()) as Record<string, any>
+    assert.equal(body.success, true)
+    assert.ok('channelPointsRewardId' in body.data)
+    assert.ok('chatCommands' in body.data)
+  })
+
+  await t.test('PUT /config updates the Twitch config', async () => {
+    const response = await api('/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channelPointsRewardId: 'test-reward-id' })
+    })
+    assert.equal(response.status, 200)
+    const body = (await response.json()) as Record<string, any>
+    assert.equal(body.success, true)
+    assert.equal(body.data.channelPointsRewardId, 'test-reward-id')
+  })
+
+  await t.test('PUT /config rejects invalid config fields', async () => {
+    const response = await api('/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channelPointsRewardId: 123 })
+    })
+    assert.equal(response.status, 400)
+    const body = (await response.json()) as Record<string, any>
+    assert.equal(body.code, 'INVALID_CONFIG')
   })
 })
 

@@ -5,6 +5,7 @@ import { run } from './run.js'
 import { refreshFallbackState } from './fallback.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
+import { setText, setValue } from '../shared.js'
 
 export function loadPlaylists() {
   return run('loading playlists', async () => {
@@ -16,7 +17,7 @@ export function loadPlaylists() {
 
 export function renderPlaylists() {
   if (!dom.playlistsListWrapper) return
-  if (dom.playlistsCount) dom.playlistsCount.textContent = state.playlists.length
+  setText(dom.playlistsCount, state.playlists.length)
 
   const activeId = state.config?.fallbackPlaylist?.playlistId ?? ''
   views.playlists.render(state.playlists.map((playlist) => ({ ...playlist, isActive: playlist.id === activeId })))
@@ -30,7 +31,7 @@ export async function addPlaylist() {
     'adding playlist',
     async () => {
       await api.addPlaylist(value)
-      dom.playlistUrlInput.value = ''
+      setValue(dom.playlistUrlInput, '')
       await loadPlaylists()
       toastSuccess(t('toast.playlistAdded'))
     },

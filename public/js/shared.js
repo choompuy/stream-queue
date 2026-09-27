@@ -72,3 +72,64 @@ export function translateErrorCode(t, code, params, fallback = '') {
 
   return text === key ? fallback : text
 }
+
+// UI Helper functions for DOM manipulation
+
+/**
+ * Safely add or remove a class from an element
+ * @param {HTMLElement|null|undefined} element - The DOM element
+ * @param {string} className - The class name to add/remove
+ * @param {boolean} condition - If true, add class; if false, remove class (default: true)
+ */
+export function setClass(element, className, condition = true) {
+  if (!element) return
+  element.classList.toggle(className, condition)
+}
+
+/**
+ * Show or hide an element using the 'hidden' class
+ * @param {HTMLElement|null|undefined} element - The DOM element
+ * @param {boolean} show - If true, remove 'hidden'; if false, add 'hidden' (default: true)
+ */
+export function show(element, show = true) {
+  setClass(element, 'hidden', !show)
+}
+
+/**
+ * Set or remove error state on an element
+ * @param {HTMLElement|null|undefined} element - The DOM element
+ * @param {boolean} hasError - If true, add 'error'; if false, remove 'error' (default: true)
+ */
+export function setError(element, hasError = true) {
+  setClass(element, 'error', hasError)
+}
+
+/**
+ * Safely set value on an input element
+ * @param {HTMLElement|null|undefined} element - The input element
+ * @param {string|number|null} value - The value to set
+ */
+export function setValue(element, value) {
+  if (!element) return
+  element.value = value ?? ''
+}
+
+/**
+ * Safely set checked state on a checkbox/radio element
+ * @param {HTMLElement|null|undefined} element - The checkbox/radio element
+ * @param {boolean} checked - The checked state
+ */
+export function setChecked(element, checked) {
+  if (!element) return
+  element.checked = Boolean(checked)
+}
+
+/**
+ * Safely set text content on an element
+ * @param {HTMLElement|null|undefined} element - The DOM element
+ * @param {string} text - The text content
+ */
+export function setText(element, text) {
+  if (!element) return
+  element.textContent = text
+}

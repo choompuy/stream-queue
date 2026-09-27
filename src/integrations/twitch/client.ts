@@ -2,7 +2,6 @@ import type {
   TwitchUserInfo,
   TwitchUsersResponse,
   TwitchErrorResponse,
-  TwitchRedemptionStatus,
   TwitchChannelPointsRedemption,
   TwitchRedemptionsResponse,
   TwitchCustomReward,

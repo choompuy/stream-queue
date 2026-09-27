@@ -2,16 +2,23 @@ import { TwitchOAuth } from './oauth.js'
 import { TwitchClient } from './client.js'
 import { TwitchEventSub } from './eventsub.js'
 import { TwitchChat } from './chat.js'
-import type { TwitchAuthConfig, TwitchChannelPointsRedemption, TwitchUserInfo, TwitchDeviceCodeResponse, TwitchChatMessage } from './types.js'
+import type {
+  TwitchAuthConfig,
+  TwitchChannelPointsRedemption,
+  TwitchUserInfo,
+  TwitchDeviceCodeResponse,
+  TwitchChatMessage,
+  TwitchChatPermission
+} from './types.js'
 import { clearTwitchOAuthState, getPublicSecretsView, getSecrets, updateTwitchOAuthState } from '../../secrets.js'
 import { requestSong } from '../../queue.js'
 import { skipCurrent } from '../../player.js'
 import { setPaused } from '../../queue.js'
 import { buildNowPlayingMessage, buildQueueMessage, buildSkipMessage } from '../../chat-replies.js'
 import { translateWithFallback } from '../../i18n.js'
-import { getConfig, CHAT_COMMAND_KEYS } from '../../config.js'
+import { getTwitchConfig, CHAT_COMMAND_KEYS } from './config.js'
 import { getState } from '../../player.js'
-import { AppError, TwitchChatPermission, TwitchChatCommandsConfig } from '../../types.js'
+import { AppError } from '../../types.js'
 import { createLogger } from '../../logger.js'
 
 const log = createLogger('TWITCH EVENTSUB')
@@ -82,7 +89,7 @@ export async function reinitializeTwitchIntegration(): Promise<void> {
 async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemption): Promise<void> {
   log.log(`Channel Points redemption: ${event.reward.title} by ${event.user_name}`)
 
-  const configuredRewardId = getConfig().twitch.channelPointsRewardId
+  const configuredRewardId = getTwitchConfig().channelPointsRewardId
   if (!configuredRewardId || event.reward.id !== configuredRewardId) {
     log.log(`Ignoring redemption with non-matching reward ID: ${event.reward.id} (configured: ${configuredRewardId || 'none'})`)
     return
@@ -189,7 +196,7 @@ async function handleControlCommand(
 }
 
 async function handleChatMessage(message: TwitchChatMessage): Promise<void> {
-  const commands = getConfig().twitch.chatCommands
+  const commands = getTwitchConfig().chatCommands
 
   if (commands.now.enabled && matchesCommand(message.text, commands.now.command) && hasPermission(message, commands.now.permission)) {
     await replyInChat(buildNowPlayingMessage())
@@ -235,18 +242,6 @@ async function handleChatMessage(message: TwitchChatMessage): Promise<void> {
   }
 }
 
-function logChatCommandConflicts(commands: TwitchChatCommandsConfig): void {
-  const seen = new Map<string, string>()
-  for (const key of CHAT_COMMAND_KEYS) {
-    const text = commands[key].command
-    if (seen.has(text)) {
-      chatLog.warn(`Commands "${seen.get(text)}" and "${key}" share the same text "${text}" — only "${seen.get(text)}" will trigger`)
-    } else {
-      seen.set(text, key)
-    }
-  }
-}
-
 async function startChat(): Promise<void> {
   if (!oauth || !client) return
   if (chat) return
@@ -257,14 +252,12 @@ async function startChat(): Promise<void> {
     return
   }
 
-  const commands = getConfig().twitch.chatCommands
+  const commands = getTwitchConfig().chatCommands
   const anyEnabled = CHAT_COMMAND_KEYS.some((key) => commands[key].enabled)
   if (!anyEnabled) {
     chatLog.log('All chat commands disabled, chat will not start')
     return
   }
-
-  logChatCommandConflicts(commands)
 
   chat = new TwitchChat({
     oauth,

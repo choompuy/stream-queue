@@ -1,6 +1,5 @@
 import express from 'express'
 import { fail } from '../http.js'
-import { createLogger } from '../logger.js'
 import { router as systemRouter } from './system.js'
 import { router as settingsRouter } from './settings.js'
 import { router as playlistsRouter } from './playlists.js'

@@ -1,4 +1,4 @@
-import { escapeHtml } from '../../shared.js'
+import { escapeHtml, setClass } from '../../shared.js'
 import { BLOCK_ICON, MORE_ICON, UNBLOCK_ICON } from '../../icons.js'
 import { t } from '../../i18n.js'
 
@@ -21,7 +21,7 @@ export function createListView(wrapper, { renderRow, getKey, cache = true }) {
   let lastKey = null
 
   function setEmpty(isEmpty) {
-    wrapper.classList.toggle('is-empty', isEmpty)
+    setClass(wrapper, 'is-empty', isEmpty)
   }
 
   function render(items = []) {
