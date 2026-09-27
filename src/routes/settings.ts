@@ -65,14 +65,12 @@ router.put(
       }
     }
 
-    // all-or-nothing: a request with any invalid field changes nothing, and says which fields were wrong
-    const { rejected } = validateConfigUpdates(body)
-    if (rejected.length) {
+    const { config: updated, rejected } = updateConfig(body)
+    if (rejected.length > 0) {
       return fail(res, 'invalid config fields', 'INVALID_CONFIG', 400, { fields: rejected.join(', ') })
     }
 
     const previous = getConfig()
-    const { config: updated } = updateConfig(body)
 
     if (updated.fallbackPlaylist.playlistId !== previous.fallbackPlaylist.playlistId) {
       try {

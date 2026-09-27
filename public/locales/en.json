@@ -34,7 +34,6 @@
     "disabled": "Off",
     "on": "On",
     "off": "Off",
-    "play": "Play",
     "pause": "Pause",
     "resume": "Resume",
     "skip": "Skip",
@@ -180,15 +179,13 @@
       "note": "StreamQueue joins your channel's chat directly and responds to these commands. \"now\" and \"next\" only read state; the rest control playback and default to moderators and you.",
       "save": "Save chat commands",
       "cooldown": "Control command cooldown (seconds)",
-      "cooldownNote": "Applies only to skip/pause/resume/stop - a shared cooldown so two moderators can't trigger the same action back to back. Doesn't apply to \"now\"/\"next\".",
-      "stopNote": "StreamQueue only has play/pause - \"stop\" pauses the current track.",
+      "cooldownNote": "Applies only to skip/pause/resume/pause - a shared cooldown so two moderators can't trigger the same action back to back. Doesn't apply to \"now\"/\"next\".",
       "commands": {
         "now": "Now playing",
         "next": "Queue",
         "skip": "Skip track",
         "pause": "Pause",
-        "resume": "Resume",
-        "stop": "Stop"
+        "resume": "Resume"
       },
       "permission": {
         "everyone": "Everyone",

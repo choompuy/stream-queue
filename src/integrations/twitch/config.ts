@@ -25,19 +25,11 @@ const twitchConfigDefaults: TwitchConfig = {
     skip: defaultChatCommand('!sg skip', 'moderator'),
     pause: defaultChatCommand('!sg pause', 'moderator'),
     resume: defaultChatCommand('!sg resume', 'moderator'),
-    stop: defaultChatCommand('!sg stop', 'moderator'),
     controlCooldownSeconds: 5
   }
 }
 
-export const CHAT_COMMAND_KEYS: Array<keyof Omit<TwitchChatCommandsConfig, 'controlCooldownSeconds'>> = [
-  'now',
-  'next',
-  'skip',
-  'pause',
-  'resume',
-  'stop'
-]
+export const CHAT_COMMAND_KEYS: Array<keyof Omit<TwitchChatCommandsConfig, 'controlCooldownSeconds'>> = ['now', 'next', 'skip', 'pause', 'resume']
 
 const TWITCH_CONFIG_RULES: Record<keyof TwitchConfig, FieldRule> = {
   channelPointsRewardId: {
@@ -188,14 +180,24 @@ export function updateTwitchConfig(updates: TwitchConfigUpdates): { config: Twit
     chatCommands: mergedChatCommands
   }
 
-  // Use the updateConfigModule to save the config
+  const commandTexts = CHAT_COMMAND_KEYS.map((key) => finalConfig.chatCommands[key].command)
+  const duplicateTexts = [...new Set(commandTexts.filter((text, i) => commandTexts.indexOf(text) !== i))]
+
+  if (duplicateTexts.length > 0) {
+    const conflictingKeys = CHAT_COMMAND_KEYS.filter((key) => duplicateTexts.includes(finalConfig.chatCommands[key].command))
+
+    // push the exact field paths first (frontend matches on these via params.fields.split(', '))
+    rejected.push(...conflictingKeys.map((key) => `chatCommands.${key}.command`))
+
+    return { config: cloneTwitchConfig(current), rejected }
+  }
+
   updateConfigModule(finalConfig)
 
-  // Return a cloned copy
   return {
     config: cloneTwitchConfig(getConfig()),
     rejected
   }
 }
 
-export { getConfig as getTwitchConfig, restoreConfig as restoreTwitchConfig, updateConfigModule as _updateConfigModule, cloneTwitchConfig }
+export { getConfig as getTwitchConfig, restoreConfig as restoreTwitchConfig }

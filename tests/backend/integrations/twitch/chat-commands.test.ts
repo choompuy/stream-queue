@@ -49,7 +49,6 @@ beforeEach(async () => {
       skip: { enabled: true, command: '!sg skip', permission: 'moderator' },
       pause: { enabled: true, command: '!sg pause', permission: 'moderator' },
       resume: { enabled: true, command: '!sg resume', permission: 'moderator' },
-      stop: { enabled: true, command: '!sg stop', permission: 'moderator' },
       controlCooldownSeconds: 5
     }
   })
@@ -135,7 +134,7 @@ test('handleChatMessage() - read-only commands (now/next)', async (t) => {
   })
 })
 
-test('handleChatMessage() - control commands (skip/pause/resume/stop)', async (t) => {
+test('handleChatMessage() - control commands (skip/pause/resume/pause)', async (t) => {
   await t.test('a regular viewer cannot skip (default permission is moderator)', async () => {
     hydrateQueue({
       current: { videoId: 'abc', title: 'Song A', channelTitle: 'x', thumbnail: '', duration: 100, views: 1, url: '', requestedBy: 'someone' }
@@ -182,10 +181,10 @@ test('handleChatMessage() - control commands (skip/pause/resume/stop)', async (t
     assert.equal(getIsPaused(), false)
   })
 
-  await t.test('stop is an alias for pause (there is no separate stop state)', async () => {
+  await t.test('pause is an alias for pause (there is no separate pause state)', async () => {
     setPaused(false)
 
-    await _test.handleChatMessage(message({ text: '!sg stop', isModerator: true }))
+    await _test.handleChatMessage(message({ text: '!sg pause', isModerator: true }))
 
     assert.equal(getIsPaused(), true)
   })

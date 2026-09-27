@@ -144,9 +144,9 @@ export function setCurrent(item: QueueItem | null): void {
   currentSong = item
 
   if (item) {
-    log.log(`[PLAYER] started "${item.title}"`)
+    log.log(`[PLAYER] resumed "${item.title}"`)
   } else {
-    log.log(`[PLAYER] stopped`)
+    log.log(`[PLAYER] paused`)
   }
 
   notifyStateChange()

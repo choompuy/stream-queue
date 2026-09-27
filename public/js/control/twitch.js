@@ -3,7 +3,7 @@ import { api, ApiError } from './api.js'
 import { state, dom, log, CHAT_COMMAND_FIELDS } from './state.js'
 import { run } from './run.js'
 import { t } from '../i18n.js'
-import { toastSuccess } from './toast.js'
+import { toastError, toastSuccess } from './toast.js'
 
 const TWITCH_POLL_INTERVAL_MS = 2000
 
@@ -245,11 +245,9 @@ export function loadTwitchConfig() {
         const commandInput = dom[`${field.dom}Command`]
         const permissionInput = dom[`${field.dom}Permission`]
 
-        setError(enabledInput, false)
         setChecked(enabledInput, command.enabled)
         setError(commandInput, false)
         setValue(commandInput, command.command ?? '')
-        setError(permissionInput, false)
         setValue(permissionInput, command.permission ?? 'moderator')
       }
 
@@ -266,21 +264,26 @@ export async function saveTwitchConfig() {
 
   setError(dom.twitchRewardSelect, false)
 
-  await run('saving Twitch config', async () => {
-    try {
-      await api.updateTwitchConfig(config)
-      toastSuccess(t('toast.twitchSettingsSaved'))
-    } catch (error) {
-      if (error instanceof ApiError && error.code === 'INVALID_CONFIG' && error.params?.fields) {
-        const rejectedFields = error.params.fields.split(', ')
+  await run(
+    'saving Twitch config',
+    async () => {
+      try {
+        await api.updateTwitchConfig(config)
+        toastSuccess(t('toast.twitchSettingsSaved'))
+      } catch (error) {
+        if (error instanceof ApiError && error.code === 'INVALID_CONFIG' && error.params?.fields) {
+          const rejectedFields = error.params.fields.split(', ')
 
-        if (rejectedFields.includes('channelPointsRewardId')) {
-          setError(dom.twitchRewardSelect)
+          if (rejectedFields.includes('channelPointsRewardId')) setError(dom.twitchRewardSelect)
+
+          toastError(t('toast.settingsNotSaved', { rejected: rejectedFields.length, total: 1 }))
         }
+
+        console.error(error)
       }
-      throw error
-    }
-  })
+    },
+    { silent: true }
+  )
 }
 
 export async function saveTwitchChatCommands() {
@@ -291,9 +294,7 @@ export async function saveTwitchChatCommands() {
     const commandInput = dom[`${field.dom}Command`]
     const permissionInput = dom[`${field.dom}Permission`]
 
-    setError(enabledInput, false)
     setError(commandInput, false)
-    setError(permissionInput, false)
 
     chatCommands[field.key] = {
       enabled: Boolean(enabledInput?.checked),
@@ -307,37 +308,30 @@ export async function saveTwitchChatCommands() {
 
   const config = { chatCommands }
 
-  await run('saving Twitch chat commands', async () => {
-    try {
-      await api.updateTwitchConfig(config)
-      toastSuccess(t('toast.twitchChatCommandsSaved'))
-    } catch (error) {
-      if (error instanceof ApiError && error.code === 'INVALID_CONFIG' && error.params?.fields) {
-        const rejectedFields = error.params.fields.split(', ')
+  await run(
+    'saving Twitch chat commands',
+    async () => {
+      try {
+        await api.updateTwitchConfig(config)
+        toastSuccess(t('toast.twitchChatCommandsSaved'))
+      } catch (error) {
+        if (error instanceof ApiError && error.code === 'INVALID_CONFIG' && error.params?.fields) {
+          const rejectedFields = error.params.fields.split(', ')
 
-        for (const field of CHAT_COMMAND_FIELDS) {
-          const enabledInput = dom[`${field.dom}Enabled`]
-          const commandInput = dom[`${field.dom}Command`]
-          const permissionInput = dom[`${field.dom}Permission`]
-
-          if (rejectedFields.includes(`chatCommands.${field.key}.enabled`)) setError(enabledInput)
-          if (rejectedFields.includes(`chatCommands.${field.key}.command`)) setError(commandInput)
-          if (rejectedFields.includes(`chatCommands.${field.key}.permission`)) setError(permissionInput)
-          // the whole command object can also be rejected as a unit (e.g. not an object at all)
-          if (rejectedFields.includes(`chatCommands.${field.key}`)) {
-            setError(enabledInput)
-            setError(commandInput)
-            setError(permissionInput)
+          for (const field of CHAT_COMMAND_FIELDS) {
+            if (rejectedFields.includes(`chatCommands.${field.key}.command`)) setError(dom[`${field.dom}Command`])
           }
+
+          if (rejectedFields.includes('chatCommands.controlCooldownSeconds')) setError(dom.chatCmdCooldown)
+
+          toastError(t('toast.settingsNotSaved', { rejected: rejectedFields.length, total: CHAT_COMMAND_FIELDS.length + 1 }))
         }
 
-        if (rejectedFields.includes('chatCommands.controlCooldownSeconds')) {
-          setError(dom.chatCmdCooldown)
-        }
+        console.error(error)
       }
-      throw error
-    }
-  })
+    },
+    { silent: true }
+  )
 }
 
 export function loadTwitchSecrets() {

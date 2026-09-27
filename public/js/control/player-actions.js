@@ -4,7 +4,7 @@ import { run } from './run.js'
 import { refreshState } from './queue.js'
 
 export function playPauseCurrent() {
-  return run('toggling play/pause', async () => {
+  return run('toggling resume/pause', async () => {
     if (state.isPaused) await api.resume()
     else await api.pause()
 
@@ -20,6 +20,6 @@ export function skipCurrent() {
 }
 
 export const playerActions = {
-  'play-pause': playPauseCurrent,
+  'resume-pause': playPauseCurrent,
   skip: skipCurrent
 }

@@ -127,10 +127,7 @@ export const dom = {
   chatCmdPausePermission: $('chatCmdPausePermission'),
   chatCmdResumeEnabled: $('chatCmdResumeEnabled'),
   chatCmdResumeCommand: $('chatCmdResumeCommand'),
-  chatCmdResumePermission: $('chatCmdResumePermission'),
-  chatCmdStopEnabled: $('chatCmdStopEnabled'),
-  chatCmdStopCommand: $('chatCmdStopCommand'),
-  chatCmdStopPermission: $('chatCmdStopPermission')
+  chatCmdResumePermission: $('chatCmdResumePermission')
 }
 
 export const CONFIG_FIELDS = [
@@ -151,8 +148,7 @@ export const CHAT_COMMAND_FIELDS = [
   { key: 'next', dom: 'chatCmdNext' },
   { key: 'skip', dom: 'chatCmdSkip' },
   { key: 'pause', dom: 'chatCmdPause' },
-  { key: 'resume', dom: 'chatCmdResume' },
-  { key: 'stop', dom: 'chatCmdStop' }
+  { key: 'resume', dom: 'chatCmdResume' }
 ]
 
 export const selectors = {

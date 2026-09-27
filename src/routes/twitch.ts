@@ -2,7 +2,7 @@ import express from 'express'
 import { ok, fail, asyncHandler } from '../http.js'
 import type { TwitchConnectionResponse } from '../integrations/twitch/types.js'
 import { AppError } from '../types.js'
-import { startDeviceAuthorization, disconnect, refreshConnection, _getClient } from '../integrations/twitch/index.js'
+import { startDeviceAuthorization, disconnect, refreshConnection, getClient } from '../integrations/twitch/index.js'
 import { getTwitchConfig, updateTwitchConfig } from '../integrations/twitch/config.js'
 import { localOnly } from '../local-only.js'
 import { getPublicSecretsView } from '../secrets.js'
@@ -33,15 +33,15 @@ router.put(
   '/config',
   localOnly,
   asyncHandler(async (req, res) => {
-    const { config: twitchConfig, rejected } = updateTwitchConfig(req.body)
+    const { config, rejected } = updateTwitchConfig(req.body)
 
     if (rejected.length > 0) {
       return fail(res, 'invalid config fields', 'INVALID_CONFIG', 400, { fields: rejected.join(', ') })
     }
 
     const response = {
-      channelPointsRewardId: twitchConfig.channelPointsRewardId,
-      chatCommands: twitchConfig.chatCommands
+      channelPointsRewardId: config.channelPointsRewardId,
+      chatCommands: config.chatCommands
     }
     ok(res, response)
   })
@@ -86,7 +86,7 @@ router.get(
   '/rewards',
   localOnly,
   asyncHandler(async (_req, res) => {
-    const client = _getClient()
+    const client = getClient()
 
     if (!client || !getPublicSecretsView().twitch.connected) {
       throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')

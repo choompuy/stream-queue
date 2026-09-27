@@ -168,45 +168,46 @@ export async function saveConfigSetting() {
 
   const youtubeApiKey = dom.secYoutubeKey?.value.trim() ?? ''
 
-  await run('saving config', async () => {
-    try {
-      state.config = await api.updateConfig(config)
+  await run(
+    'saving config',
+    async () => {
+      try {
+        state.config = await api.updateConfig(config)
 
-      if (youtubeApiKey) {
-        try {
-          await api.updateSecrets({ youtubeApiKey })
-          dom.secYoutubeKey.value = ''
-          await loadSecrets()
-        } catch (error) {
-          toastError(t('toast.apiKeyNotSaved') ?? 'Config saved, but API key was not')
-          throw error
-        }
-      }
-
-      renderQueue()
-      renderPlaylists()
-      toastSuccess(t('toast.settingsSaved'))
-    } catch (error) {
-      if (error instanceof ApiError && error.code === 'INVALID_CONFIG' && error.params?.fields) {
-        const rejectedFields = error.params.fields.split(', ')
-
-        for (const field of CONFIG_FIELDS) {
-          const input = dom[field.dom]
-          if (!input) continue
-
-          // the backend reports rejected fields as dotted names (e.g. "twitch.channelPointsRewardId"),
-          // so the comparison must match that shape rather than the bare field key
-          const fieldName = field.path ? `${field.path}.${field.key}` : field.key
-          if (rejectedFields.includes(fieldName)) setError(input, true)
+        if (youtubeApiKey) {
+          try {
+            await api.updateSecrets({ youtubeApiKey })
+            dom.secYoutubeKey.value = ''
+            await loadSecrets()
+          } catch (error) {
+            toastError(t('toast.apiKeyNotSaved') ?? 'Config saved, but API key was not')
+            throw error
+          }
         }
 
-        // the backend is all-or-nothing: any invalid field means nothing was saved, so this must
-        // never read as a success regardless of how many fields were rejected
-        toastError(t('toast.settingsNotSaved', { rejected: rejectedFields.length, total: CONFIG_FIELDS.length }))
+        renderQueue()
+        renderPlaylists()
+        toastSuccess(t('toast.settingsSaved'))
+      } catch (error) {
+        if (error instanceof ApiError && error.code === 'INVALID_CONFIG' && error.params?.fields) {
+          const rejectedFields = error.params.fields.split(', ')
+
+          for (const field of CONFIG_FIELDS) {
+            const input = dom[field.dom]
+            if (!input) continue
+
+            const fieldName = field.path ? `${field.path}.${field.key}` : field.key
+            if (rejectedFields.includes(fieldName)) setError(input, true)
+          }
+
+          toastError(t('toast.settingsNotSaved', { rejected: rejectedFields.length, total: CONFIG_FIELDS.length }))
+        }
+
+        console.error(error)
       }
-      throw error
-    }
-  })
+    },
+    { silent: true }
+  )
 }
 
 export const settingsActions = {

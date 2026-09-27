@@ -20,8 +20,7 @@ beforeEach(() => {
       next: { ...DEFAULTS.chatCommands.next },
       skip: { ...DEFAULTS.chatCommands.skip },
       pause: { ...DEFAULTS.chatCommands.pause },
-      resume: { ...DEFAULTS.chatCommands.resume },
-      stop: { ...DEFAULTS.chatCommands.stop }
+      resume: { ...DEFAULTS.chatCommands.resume }
     }
   })
 })
@@ -157,17 +156,17 @@ test('updateTwitchConfig()', async (t) => {
   })
 
   await t.test('rejects duplicate command strings between different actions', () => {
-    // This test is now handled by the frontend validation
-    // The backend just accepts the config as-is
-    const { rejected } = updateTwitchConfig({
+    const before = getTwitchConfig().chatCommands
+
+    const { config, rejected } = updateTwitchConfig({
       chatCommands: {
         skip: { command: '!sg action' },
         pause: { command: '!sg action' }
       }
     })
 
-    // The backend doesn't validate duplicates anymore
-    assert.deepEqual(rejected, [])
+    assert.deepEqual(rejected, ['chatCommands.skip.command', 'chatCommands.pause.command', 'chatCommands (duplicate command text: !sg action)'])
+    assert.deepEqual(config.chatCommands, before)
   })
 
   await t.test('returns copies: mutating a result does not change the stored config', () => {

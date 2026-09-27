@@ -77,7 +77,7 @@
                 <button
                   class="btn btn-lg btn-icon btn-primary"
                   id="playPauseBtn"
-                  data-action="play-pause"
+                  data-action="resume-pause"
                   title="Pause"
                   data-i18n-title="nowPlaying.pause"
                 >
@@ -620,29 +620,11 @@
                 </div>
               </div>
 
-              <div class="field" data-chat-command="stop">
-                <label class="field-label" data-i18n="settings.twitchChat.commands.stop">Stop</label>
-                <div class="field-row">
-                  <div class="checkbox-wrapper">
-                    <input class="checkbox" type="checkbox" id="chatCmdStopEnabled" />
-                  </div>
-                  <input class="settings-input input" type="text" id="chatCmdStopCommand" placeholder="!sg stop" />
-                  <select class="settings-input input select" id="chatCmdStopPermission">
-                    <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
-                    <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
-                    <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
-                  </select>
-                </div>
-                <div class="text-muted text-xs" data-i18n="settings.twitchChat.stopNote">
-                  StreamQueue only has play/pause - "stop" pauses the current track.
-                </div>
-              </div>
-
               <div class="field">
                 <label class="field-label" for="chatCmdCooldown" data-i18n="settings.twitchChat.cooldown">Control command cooldown (seconds)</label>
                 <input class="settings-input input" type="number" id="chatCmdCooldown" min="0" max="300" style="max-width: 8rem" />
                 <div class="text-muted text-xs" data-i18n="settings.twitchChat.cooldownNote">
-                  Applies only to skip/pause/resume/stop - a shared cooldown so two moderators can't trigger the same action back to back. Doesn't
+                  Applies only to skip/pause/resume/pause - a shared cooldown so two moderators can't trigger the same action back to back. Doesn't
                   apply to "now"/"next".
                 </div>
               </div>

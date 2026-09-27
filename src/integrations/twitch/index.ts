@@ -174,7 +174,7 @@ async function replyInChat(message: string): Promise<void> {
   })
 }
 
-// skip/pause/resume/stop share one global (not per-user) cooldown so two different moderators
+// skip/pause/resume/pause share one global (not per-user) cooldown so two different moderators
 // firing the same or different control commands back to back can't double up on the action
 async function handleControlCommand(
   message: TwitchChatMessage,
@@ -195,50 +195,46 @@ async function handleControlCommand(
   await replyInChat(reply)
 }
 
+type PlainCommandKey = 'now' | 'next'
+type ControlCommandKey = 'skip' | 'pause' | 'resume'
+
+const PLAIN_COMMAND_HANDLERS: Record<PlainCommandKey, () => Promise<string>> = {
+  now: async () => buildNowPlayingMessage(),
+  next: async () => buildQueueMessage()
+}
+
+const CONTROL_COMMAND_HANDLERS: Record<ControlCommandKey, () => string> = {
+  skip: () => {
+    skipCurrent()
+    return buildSkipMessage(getState())
+  },
+  pause: () => {
+    setPaused(true)
+    return translateWithFallback('chat.paused', undefined, 'Player paused')
+  },
+  resume: () => {
+    setPaused(false)
+    return translateWithFallback('chat.resumed', undefined, 'Player resumed')
+  }
+}
+
 async function handleChatMessage(message: TwitchChatMessage): Promise<void> {
   const commands = getTwitchConfig().chatCommands
 
-  if (commands.now.enabled && matchesCommand(message.text, commands.now.command) && hasPermission(message, commands.now.permission)) {
-    await replyInChat(buildNowPlayingMessage())
-    return
+  for (const key of Object.keys(PLAIN_COMMAND_HANDLERS) as PlainCommandKey[]) {
+    const config = commands[key]
+    if (config.enabled && matchesCommand(message.text, config.command) && hasPermission(message, config.permission)) {
+      await replyInChat(await PLAIN_COMMAND_HANDLERS[key]())
+      return
+    }
   }
 
-  if (commands.next.enabled && matchesCommand(message.text, commands.next.command) && hasPermission(message, commands.next.permission)) {
-    await replyInChat(buildQueueMessage())
-    return
-  }
-
-  if (commands.skip.enabled && matchesCommand(message.text, commands.skip.command)) {
-    await handleControlCommand(message, commands.skip.permission, commands.controlCooldownSeconds, () => {
-      skipCurrent()
-      return buildSkipMessage(getState())
-    })
-    return
-  }
-
-  if (commands.pause.enabled && matchesCommand(message.text, commands.pause.command)) {
-    await handleControlCommand(message, commands.pause.permission, commands.controlCooldownSeconds, () => {
-      setPaused(true)
-      return translateWithFallback('chat.paused', undefined, 'Player paused')
-    })
-    return
-  }
-
-  if (commands.resume.enabled && matchesCommand(message.text, commands.resume.command)) {
-    await handleControlCommand(message, commands.resume.permission, commands.controlCooldownSeconds, () => {
-      setPaused(false)
-      return translateWithFallback('chat.resumed', undefined, 'Playback resumed')
-    })
-    return
-  }
-
-  if (commands.stop.enabled && matchesCommand(message.text, commands.stop.command)) {
-    // StreamQueue has no separate "stop" state - pause is the existing equivalent (play/pause is all there is)
-    await handleControlCommand(message, commands.stop.permission, commands.controlCooldownSeconds, () => {
-      setPaused(true)
-      return translateWithFallback('chat.paused', undefined, 'Player paused')
-    })
-    return
+  for (const key of Object.keys(CONTROL_COMMAND_HANDLERS) as ControlCommandKey[]) {
+    const config = commands[key]
+    if (config.enabled && matchesCommand(message.text, config.command)) {
+      await handleControlCommand(message, config.permission, commands.controlCooldownSeconds, CONTROL_COMMAND_HANDLERS[key])
+      return
+    }
   }
 }
 
@@ -413,7 +409,7 @@ export async function refreshConnection(): Promise<TwitchUserInfo> {
 }
 
 // Export for internal use (routes)
-export function _getClient(): TwitchClient | null {
+export function getClient(): TwitchClient | null {
   return client
 }
 
