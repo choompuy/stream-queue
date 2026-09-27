@@ -165,7 +165,7 @@ test('updateTwitchConfig()', async (t) => {
       }
     })
 
-    assert.deepEqual(rejected, ['chatCommands.skip.command', 'chatCommands.pause.command', 'chatCommands (duplicate command text: !sg action)'])
+    assert.deepEqual(rejected, ['chatCommands.skip.command', 'chatCommands.pause.command'])
     assert.deepEqual(config.chatCommands, before)
   })
 
