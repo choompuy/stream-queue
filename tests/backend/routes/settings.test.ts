@@ -28,7 +28,7 @@ test('PUT /api/config', async (t) => {
     const body = (await response.json()) as Record<string, any>
 
     assert.equal(response.status, 200)
-    assert.equal(body.data.minViews, 123)
+    assert.equal(body.data.config.minViews, 123)
     assert.equal((await getConfig()).fallbackPlaylist.repeat, true)
   })
 

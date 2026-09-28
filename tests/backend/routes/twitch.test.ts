@@ -117,7 +117,7 @@ test('twitch routes localOnly protection', async (t) => {
     assert.equal(response.status, 200)
     const body = (await response.json()) as Record<string, any>
     assert.equal(body.success, true)
-    assert.equal(body.data.channelPointsRewardId, 'test-reward-id')
+    assert.equal(body.data.config.channelPointsRewardId, 'test-reward-id')
   })
 
   await t.test('PUT /config rejects invalid config fields', async () => {

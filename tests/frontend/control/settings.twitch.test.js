@@ -8,6 +8,8 @@ const PUBLIC_DIR = pathToFileURL(fileURLToPath(new URL('../../../public/', impor
 
 const jsdom = new JSDOM(
   `<!doctype html><html><body>
+    <div id="twitchNotConfigured" class="hidden"></div>
+    <div id="twitchConnectionControls" class="hidden"></div>
     <div id="twitchAuthorization" class="hidden"></div>
     <span id="twitchAuthorizationCode"></span>
     <div id="twitchConnectionStatus"></div>
@@ -15,6 +17,25 @@ const jsdom = new JSDOM(
     <button id="twitchDisconnectBtn" class="hidden"></button>
     <div id="twitchRewardSection" class="hidden"></div>
     <select id="twitchRewardSelect"></select>
+    <button id="twitchSaveBtn" class="hidden"></button>
+    <div id="twitchChatCommandsPanel" class="hidden"></div>
+    <input type="checkbox" id="chatCmdNowEnabled" />
+    <input id="chatCmdNowCommand" />
+    <select id="chatCmdNowPermission"><option value="everyone"></option><option value="moderator"></option><option value="broadcaster"></option></select>
+    <input type="checkbox" id="chatCmdQueueEnabled" />
+    <input id="chatCmdQueueCommand" />
+    <select id="chatCmdQueuePermission"><option value="everyone"></option><option value="moderator"></option><option value="broadcaster"></option></select>
+    <input type="checkbox" id="chatCmdSkipEnabled" />
+    <input id="chatCmdSkipCommand" />
+    <select id="chatCmdSkipPermission"><option value="everyone"></option><option value="moderator"></option><option value="broadcaster"></option></select>
+    <input type="checkbox" id="chatCmdPauseEnabled" />
+    <input id="chatCmdPauseCommand" />
+    <select id="chatCmdPausePermission"><option value="everyone"></option><option value="moderator"></option><option value="broadcaster"></option></select>
+    <input type="checkbox" id="chatCmdResumeEnabled" />
+    <input id="chatCmdResumeCommand" />
+    <select id="chatCmdResumePermission"><option value="everyone"></option><option value="moderator"></option><option value="broadcaster"></option></select>
+    <input id="chatCmdCooldown" />
+    <input id="chatCmdPlainCooldown" />
     <input id="secYoutubeKey" />
     <div id="secretsStatus"></div>
     <span id="queueCount"></span>
@@ -29,6 +50,10 @@ const jsdom = new JSDOM(
 globalThis.window = jsdom.window
 globalThis.document = jsdom.window.document
 
+// disconnectTwitch() asks for confirmation; a test flips this to simulate the user cancelling
+let confirmAnswer = true
+globalThis.confirm = () => confirmAnswer
+
 // requests the control panel makes, keyed by "METHOD path"
 let handlers = {}
 let requests = []
@@ -38,10 +63,12 @@ let lastBody = null
 // a handler throws this to simulate a specific API error response (code/params), instead of the
 // generic SERVER_ERROR fallback below
 class MockApiFailure extends Error {
-  constructor(code, params) {
+  constructor(message, code, params, data = null) {
     super(`mock API failure: ${code}`)
+    this.message = message
     this.code = code
     this.params = params
+    this.data = data
   }
 }
 
@@ -63,7 +90,9 @@ globalThis.fetch = async (url, options = {}) => {
     return { ok: true, json: async () => ({ data }) }
   } catch (error) {
     if (error instanceof MockApiFailure) {
-      return { ok: false, status: 400, json: async () => ({ error: error.message, code: error.code, params: error.params }) }
+      const body = { error: error.message, code: error.code, params: error.params }
+      if (error.data) body.data = error.data
+      return { ok: false, status: 400, json: async () => body }
     }
     return { ok: false, status: 500, json: async () => ({ error: error.message, code: 'SERVER_ERROR' }) }
   }
@@ -83,7 +112,7 @@ jsdom.window.open = (url) => {
 }
 
 const { t: translate, loadTranslations } = await import(new URL('js/i18n.js', PUBLIC_DIR))
-const { state, dom } = await import(new URL('js/control/state.js', PUBLIC_DIR))
+const { state, dom, CHAT_COMMAND_FIELDS } = await import(new URL('js/control/state.js', PUBLIC_DIR))
 const settings = await import(new URL('js/control/twitch.js', PUBLIC_DIR))
 
 await loadTranslations('en')
@@ -119,9 +148,10 @@ function reset() {
   requests = []
   openedWindows = []
   lastBody = null
+  confirmAnswer = true
   settings.stopTwitchPolling()
 
-  state.config = null
+  state.twitch.configured = true
   state.twitch.connected = false
   state.twitch.user = null
   state.twitch.connectedAt = null
@@ -129,8 +159,26 @@ function reset() {
   state.twitch.selectedRewardId = ''
 
   dom.twitchRewardSelect.innerHTML = ''
+  dom.twitchRewardSelect.classList.remove('error')
+  dom.twitchNotConfigured.classList.add('hidden')
+  dom.twitchConnectionControls.classList.add('hidden')
   dom.twitchAuthorization.classList.add('hidden')
   dom.twitchConnectBtn.disabled = false
+  dom.twitchConnectBtn.classList.remove('hidden')
+  dom.twitchDisconnectBtn.classList.add('hidden')
+  dom.twitchRewardSection.classList.add('hidden')
+  dom.twitchSaveBtn.classList.add('hidden')
+  dom.twitchChatCommandsPanel.classList.add('hidden')
+
+  for (const field of CHAT_COMMAND_FIELDS) {
+    dom[`${field.dom}Enabled`].checked = false
+    dom[`${field.dom}Command`].value = ''
+    dom[`${field.dom}Command`].classList.remove('error')
+    dom[`${field.dom}Permission`].selectedIndex = 0
+  }
+  dom.chatCmdCooldown.value = ''
+  dom.chatCmdCooldown.classList.remove('error')
+
   document.getElementById('toastContainer').innerHTML = ''
 }
 
@@ -328,6 +376,32 @@ test('loadTwitchSettings', async (t) => {
     assert.ok(dom.twitchRewardSection.classList.contains('hidden'))
   })
 
+  await t.test('does not even ask Twitch for its status while the client id is not configured', async () => {
+    state.twitch.configured = false
+
+    await settings.loadTwitchSettings()
+
+    assert.deepEqual(requests, [])
+    assert.ok(!dom.twitchNotConfigured.classList.contains('hidden'), 'the "not configured" notice is shown')
+    assert.ok(dom.twitchConnectionControls.classList.contains('hidden'), 'the connect controls are hidden')
+  })
+
+  await t.test('shows the connected UI, including the chat commands panel, once Twitch is connected', async () => {
+    handlers = {
+      'GET /api/integrations/twitch': () => ({ connected: true, user: { displayName: 'streamer' } }),
+      'GET /api/integrations/twitch/rewards': () => ({ rewards: [] })
+    }
+
+    await settings.loadTwitchSettings()
+
+    assert.ok(!dom.twitchConnectionControls.classList.contains('hidden'))
+    assert.ok(!dom.twitchRewardSection.classList.contains('hidden'))
+    assert.ok(!dom.twitchSaveBtn.classList.contains('hidden'))
+    assert.ok(!dom.twitchChatCommandsPanel.classList.contains('hidden'))
+    assert.ok(dom.twitchConnectBtn.classList.contains('hidden'))
+    assert.ok(!dom.twitchDisconnectBtn.classList.contains('hidden'))
+  })
+
   await t.test('shows the "no rewards" option for an empty reward list', async () => {
     handlers = {
       'GET /api/integrations/twitch': () => ({ connected: true, user: { displayName: 'streamer' } }),
@@ -343,11 +417,11 @@ test('loadTwitchSettings', async (t) => {
     handlers = {
       'GET /api/integrations/twitch': () => ({ connected: true, user: { displayName: 'streamer' } }),
       'GET /api/integrations/twitch/rewards': () => ({ rewards: REWARDS }),
-      'GET /api/config': () => ({ twitch: { channelPointsRewardId: 'reward-2' } })
+      'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: 'reward-2' })
     }
 
     await settings.loadTwitchSettings()
-    await settings.loadConfig()
+    await settings.loadTwitchConfig()
 
     assert.equal(state.twitch.selectedRewardId, 'reward-2')
     assert.equal(dom.twitchRewardSelect.value, 'reward-2')
@@ -357,10 +431,10 @@ test('loadTwitchSettings', async (t) => {
     handlers = {
       'GET /api/integrations/twitch': () => ({ connected: true, user: { displayName: 'streamer' } }),
       'GET /api/integrations/twitch/rewards': () => ({ rewards: REWARDS }),
-      'GET /api/config': () => ({ twitch: { channelPointsRewardId: 'reward-2' } })
+      'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: 'reward-2' })
     }
 
-    await settings.loadConfig()
+    await settings.loadTwitchConfig()
     // the <select> is still empty here - the id has to survive in state until the options exist
     assert.equal(dom.twitchRewardSelect.value, '')
 
@@ -373,27 +447,74 @@ test('loadTwitchSettings', async (t) => {
     handlers = {
       'GET /api/integrations/twitch': () => ({ connected: true, user: { displayName: 'streamer' } }),
       'GET /api/integrations/twitch/rewards': () => ({ rewards: [] }),
-      'GET /api/config': () => ({ twitch: { channelPointsRewardId: 'reward-gone' } })
+      'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: 'reward-gone' })
     }
 
-    await settings.loadConfig()
+    await settings.loadTwitchConfig()
     await settings.loadTwitchSettings()
 
     assert.equal(state.twitch.selectedRewardId, 'reward-gone')
   })
 })
 
+test('disconnectTwitch asks for confirmation first', async (t) => {
+  t.beforeEach(reset)
+
+  await t.test('cancelling the confirmation changes nothing and sends no request', async () => {
+    state.twitch.connected = true
+    state.twitch.user = { displayName: 'streamer' }
+    confirmAnswer = false
+
+    await settings.disconnectTwitch()
+
+    assert.equal(state.twitch.connected, true)
+    assert.deepEqual(requests, [])
+  })
+})
+
+test('loadTwitchSecrets', async (t) => {
+  t.beforeEach(reset)
+
+  await t.test('remembers that a client id is configured', async () => {
+    state.twitch.configured = false
+    handlers = { 'GET /api/secrets': () => ({ twitch: { configured: true } }) }
+
+    await settings.loadTwitchSecrets()
+
+    assert.equal(state.twitch.configured, true)
+  })
+
+  await t.test('hides the connect controls and shows the notice when no client id is configured', async () => {
+    handlers = { 'GET /api/secrets': () => ({ twitch: { configured: false } }) }
+
+    await settings.loadTwitchSecrets()
+
+    assert.equal(state.twitch.configured, false)
+    assert.ok(!dom.twitchNotConfigured.classList.contains('hidden'))
+    assert.ok(dom.twitchConnectionControls.classList.contains('hidden'))
+  })
+})
+
+const CHAT_COMMANDS_CONFIG = {
+  now: { enabled: true, command: '!sg now', permission: 'everyone' },
+  queue: { enabled: true, command: '!sg queue', permission: 'everyone' },
+  skip: { enabled: true, command: '!sg skip', permission: 'moderator' },
+  pause: { enabled: false, command: '!sg pause', permission: 'moderator' },
+  resume: { enabled: true, command: '!sg resume', permission: 'broadcaster' },
+  controlCooldownSeconds: 7
+}
+
 test('the reward id is saved from state, not from the select element', async (t) => {
   t.beforeEach(reset)
 
-  await t.test('sends the selected reward id with the config update', async () => {
+  await t.test('sends the selected reward id to the Twitch config endpoint', async () => {
     let sent = null
     handlers = {
       'GET /api/integrations/twitch': () => ({ connected: true, user: { displayName: 'streamer' } }),
       'GET /api/integrations/twitch/rewards': () => ({ rewards: REWARDS }),
-      'PUT /api/config': () => {
+      'PUT /api/integrations/twitch/config': () => {
         sent = JSON.parse(lastBody)
-        return sent
+        return { config: { channelPointsRewardId: sent.channelPointsRewardId, chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] }
       }
     }
 
@@ -402,48 +523,183 @@ test('the reward id is saved from state, not from the select element', async (t)
     settings.onTwitchRewardChange()
     await settings.saveTwitchConfig()
 
-    assert.equal(sent.twitch.channelPointsRewardId, 'reward-1')
+    assert.deepEqual(sent, { channelPointsRewardId: 'reward-1' })
   })
 
   await t.test('sends null when no reward is selected', async () => {
     let sent = null
     handlers = {
-      'PUT /api/config': () => {
+      'PUT /api/integrations/twitch/config': () => {
         sent = JSON.parse(lastBody)
-        return sent
+        return { config: { channelPointsRewardId: sent.channelPointsRewardId, chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] }
       }
     }
 
     await settings.saveTwitchConfig()
 
-    assert.equal(sent.twitch.channelPointsRewardId, null)
+    assert.deepEqual(sent, { channelPointsRewardId: null })
+  })
+
+  await t.test('shows a success toast on success', async () => {
+    handlers = { 'PUT /api/integrations/twitch/config': () => ({ config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] }) }
+
+    await settings.saveTwitchConfig()
+
+    assert.ok(document.getElementById('toastContainer').textContent.includes(translate('toast.twitchSettingsSaved')))
   })
 })
 
-test('saveTwitchConfig() highlights the reward select on a rejected dotted field name', async (t) => {
+test('saveTwitchConfig() highlights the reward select when the backend rejects it', async (t) => {
   t.beforeEach(reset)
 
-  await t.test('backend rejects "twitch.channelPointsRewardId" (dotted) - the select gets the error class', async () => {
+  await t.test('a rejected channelPointsRewardId puts the error class on the select and toasts', async () => {
     handlers = {
-      'PUT /api/config': () => {
-        throw new MockApiFailure('INVALID_CONFIG', { fields: 'twitch.channelPointsRewardId' })
+      'PUT /api/integrations/twitch/config': () => {
+        throw new MockApiFailure('invalid config fields', 'INVALID_CONFIG', { fields: 'channelPointsRewardId' }, {
+          config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG },
+          rejected: ['channelPointsRewardId']
+        })
       }
     }
 
     await settings.saveTwitchConfig()
 
     assert.ok(dom.twitchRewardSelect.classList.contains('error'))
+    assert.ok(document.getElementById('toastContainer').textContent.includes(translate('toast.settingsPartiallySaved', { saved: 0, rejected: 1 })))
   })
 
   await t.test('a rejection for an unrelated field does not touch the reward select', async () => {
     handlers = {
-      'PUT /api/config': () => {
-        throw new MockApiFailure('INVALID_CONFIG', { fields: 'minViews' })
-      }
+      'PUT /api/integrations/twitch/config': () => ({
+        config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG },
+        rejected: ['chatCommands.skip.command']
+      })
     }
 
     await settings.saveTwitchConfig()
 
     assert.equal(dom.twitchRewardSelect.classList.contains('error'), false)
+  })
+
+  await t.test('clears a previous error class when the next save goes through', async () => {
+    dom.twitchRewardSelect.classList.add('error')
+    handlers = { 'PUT /api/integrations/twitch/config': () => ({ config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] }) }
+
+    await settings.saveTwitchConfig()
+
+    assert.equal(dom.twitchRewardSelect.classList.contains('error'), false)
+  })
+})
+
+test('loadTwitchConfig() fills in the chat command fields', async (t) => {
+  t.beforeEach(reset)
+
+  await t.test('populates enabled/command/permission for every command and the cooldown', async () => {
+    handlers = { 'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }) }
+
+    await settings.loadTwitchConfig()
+
+    for (const field of CHAT_COMMAND_FIELDS) {
+      const expected = CHAT_COMMANDS_CONFIG[field.key]
+      assert.equal(dom[`${field.dom}Enabled`].checked, expected.enabled, `${field.key}.enabled`)
+      assert.equal(dom[`${field.dom}Command`].value, expected.command, `${field.key}.command`)
+      assert.equal(dom[`${field.dom}Permission`].value, expected.permission, `${field.key}.permission`)
+    }
+    assert.equal(dom.chatCmdCooldown.value, '7')
+  })
+
+  await t.test('does nothing and does not throw when the config has no chatCommands yet', async () => {
+    handlers = { 'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: null }) }
+
+    await assert.doesNotReject(() => settings.loadTwitchConfig())
+  })
+})
+
+test('saveTwitchChatCommands()', async (t) => {
+  t.beforeEach(reset)
+
+  await t.test('sends every command and the cooldown, reading straight from the DOM', async () => {
+    let sent = null
+    handlers = {
+      'PUT /api/integrations/twitch/config': () => {
+        sent = JSON.parse(lastBody)
+        return { config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] }
+      }
+    }
+
+    for (const field of CHAT_COMMAND_FIELDS) {
+      const expected = CHAT_COMMANDS_CONFIG[field.key]
+      dom[`${field.dom}Enabled`].checked = expected.enabled
+      dom[`${field.dom}Command`].value = expected.command
+      dom[`${field.dom}Permission`].value = expected.permission
+    }
+    dom.chatCmdCooldown.value = '7'
+
+    await settings.saveTwitchChatCommands()
+
+    assert.deepEqual(sent, { chatCommands: CHAT_COMMANDS_CONFIG })
+  })
+
+  await t.test('trims whitespace from a command before sending it', async () => {
+    let sent = null
+    handlers = {
+      'PUT /api/integrations/twitch/config': () => {
+        sent = JSON.parse(lastBody)
+        return { config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] }
+      }
+    }
+
+    dom.chatCmdSkipCommand.value = '  !sg skip  '
+
+    await settings.saveTwitchChatCommands()
+
+    assert.equal(sent.chatCommands.skip.command, '!sg skip')
+  })
+
+  await t.test('shows a success toast on success', async () => {
+    handlers = { 'PUT /api/integrations/twitch/config': () => ({ config: { chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] }) }
+
+    await settings.saveTwitchChatCommands()
+
+    assert.ok(document.getElementById('toastContainer').textContent.includes(translate('toast.twitchChatCommandsSaved')))
+  })
+
+  await t.test('highlights the rejected command field and toasts', async () => {
+    handlers = {
+      'PUT /api/integrations/twitch/config': () => ({
+        config: { chatCommands: CHAT_COMMANDS_CONFIG },
+        rejected: ['chatCommands.skip.command']
+      })
+    }
+
+    await settings.saveTwitchChatCommands()
+
+    assert.ok(dom.chatCmdSkipCommand.classList.contains('error'))
+    assert.equal(dom.chatCmdNowCommand.classList.contains('error'), false)
+    assert.ok(document.getElementById('toastContainer').textContent.length > 0)
+  })
+
+  await t.test('highlights the cooldown field when it is rejected', async () => {
+    handlers = {
+      'PUT /api/integrations/twitch/config': () => ({
+        config: { chatCommands: CHAT_COMMANDS_CONFIG },
+        rejected: ['chatCommands.controlCooldownSeconds']
+      })
+    }
+
+    await settings.saveTwitchChatCommands()
+
+    assert.ok(dom.chatCmdCooldown.classList.contains('error'))
+  })
+
+  await t.test('clears a previous error class when the next save goes through', async () => {
+    dom.chatCmdSkipCommand.classList.add('error')
+    dom.chatCmdCooldown.classList.add('error')
+    handlers = { 'PUT /api/integrations/twitch/config': () => ({ config: { chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] }) }
+
+    await settings.saveTwitchChatCommands()
+
+    assert.equal(dom.chatCmdSkipCommand.classList.contains('error'), false)
+    assert.equal(dom.chatCmdCooldown.classList.contains('error'), false)
   })
 })

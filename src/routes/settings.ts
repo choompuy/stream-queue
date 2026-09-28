@@ -1,8 +1,8 @@
 import express from 'express'
-import { ConfigResponse, SettingsResponse } from '../types.js'
+import { ConfigResponse, ConfigUpdateResponse, SettingsResponse } from '../types.js'
 import { ok, fail, failFromError, asyncHandler } from '../http.js'
 import { localOnly } from '../local-only.js'
-import { getConfig, updateConfig, restoreConfig, validateConfigUpdates } from '../config.js'
+import { getConfig, updateConfig, restoreConfig } from '../config.js'
 import { getSettings, updateSettings, validateSettingsUpdates } from '../settings.js'
 import { getPublicSecretsView, SecretsResponse, updateSecrets } from '../secrets.js'
 import { parsePlaylistId } from '../youtube/url.js'
@@ -51,34 +51,46 @@ router.put(
   asyncHandler(async (req, res) => {
     const body = { ...(req.body ?? {}) }
 
-    if (body.fallbackPlaylist && typeof body.fallbackPlaylist.playlistId === 'string') {
-      const rawPlaylistId = body.fallbackPlaylist.playlistId.trim()
+    if (body.fallbackPlaylist !== undefined) {
+      if (typeof body.fallbackPlaylist !== 'object' || body.fallbackPlaylist === null || Array.isArray(body.fallbackPlaylist)) {
+        return fail(res, 'invalid fallbackPlaylist: must be an object', 'INVALID_CONFIG', 400, { fields: 'fallbackPlaylist' })
+      }
 
-      if (rawPlaylistId) {
-        const parsedId = parsePlaylistId(rawPlaylistId)
-        if (!parsedId) {
-          return fail(res, 'invalid playlist ID or URL', 'INVALID_PLAYLIST_ID', 400)
+      if (typeof body.fallbackPlaylist.playlistId === 'string') {
+        const rawPlaylistId = body.fallbackPlaylist.playlistId.trim()
+
+        if (rawPlaylistId) {
+          const parsedId = parsePlaylistId(rawPlaylistId)
+          if (!parsedId) {
+            return fail(res, 'invalid playlist ID or URL', 'INVALID_PLAYLIST_ID', 400)
+          }
+          body.fallbackPlaylist = { ...body.fallbackPlaylist, playlistId: parsedId }
+        } else {
+          body.fallbackPlaylist = { ...body.fallbackPlaylist, playlistId: null }
         }
-        body.fallbackPlaylist = { ...body.fallbackPlaylist, playlistId: parsedId }
-      } else {
-        body.fallbackPlaylist = { ...body.fallbackPlaylist, playlistId: null }
       }
     }
 
-    const { config: updated, rejected } = updateConfig(body)
-    if (rejected.length > 0) {
-      return fail(res, 'invalid config fields', 'INVALID_CONFIG', 400, { fields: rejected.join(', ') })
-    }
-
     const previous = getConfig()
+    const { config: updated, rejected } = updateConfig(body)
+
+    if (rejected.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'invalid config fields',
+        code: 'INVALID_CONFIG',
+        params: { fields: rejected.join(', ') },
+        data: { config: updated, rejected }
+      })
+    }
 
     if (updated.fallbackPlaylist.playlistId !== previous.fallbackPlaylist.playlistId) {
       try {
         await refreshFallback()
       } catch (error) {
-        // the playlist could not be loaded: keep the previous config as a whole, like any other refused update
+        // the playlist could not be loaded: only the playlist change is undone, the other saved fields stay
         console.error(`[CONFIG] Failed to refresh fallback playlist: ${error instanceof Error ? error.message : error}`)
-        restoreConfig(previous)
+        restoreConfig({ ...getConfig(), fallbackPlaylist: previous.fallbackPlaylist })
         return failFromError(res, error)
       }
     } else if (updated.fallbackPlaylist.shuffle !== previous.fallbackPlaylist.shuffle) {
@@ -86,7 +98,7 @@ router.put(
       reorderFallback(updated.fallbackPlaylist.shuffle)
     }
 
-    ok<ConfigResponse>(res, updated)
+    ok<ConfigUpdateResponse>(res, { config: updated, rejected })
   })
 )
 

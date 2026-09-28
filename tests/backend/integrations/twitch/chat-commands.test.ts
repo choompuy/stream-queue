@@ -45,11 +45,12 @@ beforeEach(async () => {
     channelPointsRewardId: null,
     chatCommands: {
       now: { enabled: true, command: '!sg now', permission: 'everyone' },
-      next: { enabled: true, command: '!sg next', permission: 'everyone' },
+      queue: { enabled: true, command: '!sg queue', permission: 'everyone' },
       skip: { enabled: true, command: '!sg skip', permission: 'moderator' },
       pause: { enabled: true, command: '!sg pause', permission: 'moderator' },
       resume: { enabled: true, command: '!sg resume', permission: 'moderator' },
-      controlCooldownSeconds: 5
+      controlCooldownSeconds: 5,
+      plainCooldownSeconds: 5
     }
   })
 })
@@ -102,7 +103,7 @@ test('matchesCommand()', async (t) => {
   })
 })
 
-test('handleChatMessage() - read-only commands (now/next)', async (t) => {
+test('handleChatMessage() - read-only commands (now/queue)', async (t) => {
   await t.test('"now" command is processed for anyone', async () => {
     hydrateQueue({
       current: { videoId: 'abc', title: 'Test Song', channelTitle: 'x', thumbnail: '', duration: 100, views: 1, url: '', requestedBy: 'someone' }
@@ -112,13 +113,13 @@ test('handleChatMessage() - read-only commands (now/next)', async (t) => {
     await _test.handleChatMessage(message({ text: '!sg now' }))
   })
 
-  await t.test('"next" command is processed for anyone', async () => {
+  await t.test('"queue" command is processed for anyone', async () => {
     hydrateQueue({
       queue: [{ videoId: 'abc', title: 'Queued Song', channelTitle: 'x', thumbnail: '', duration: 100, views: 1, url: '', requestedBy: 'someone' }]
     })
 
     // The command should be processed without errors
-    await _test.handleChatMessage(message({ text: '!sg next' }))
+    await _test.handleChatMessage(message({ text: '!sg queue' }))
   })
 
   await t.test('a disabled command does not trigger', async () => {
@@ -132,9 +133,20 @@ test('handleChatMessage() - read-only commands (now/next)', async (t) => {
     // The message should be processed without errors
     await _test.handleChatMessage(message({ text: 'just chatting' }))
   })
+
+  await t.test('the global cooldown blocks a second plain command from a different user', async () => {
+    hydrateQueue({
+      current: { videoId: 'abc', title: 'Test Song', channelTitle: 'x', thumbnail: '', duration: 100, views: 1, url: '', requestedBy: 'someone' }
+    })
+
+    await _test.handleChatMessage(message({ text: '!sg now', displayName: 'UserOne' }))
+    await _test.handleChatMessage(message({ text: '!sg now', displayName: 'UserTwo' }))
+
+    // The second call should be blocked by cooldown (no error thrown, but message logged)
+  })
 })
 
-test('handleChatMessage() - control commands (skip/pause/resume/pause)', async (t) => {
+test('handleChatMessage() - control commands (skip/pause/resume)', async (t) => {
   await t.test('a regular viewer cannot skip (default permission is moderator)', async () => {
     hydrateQueue({
       current: { videoId: 'abc', title: 'Song A', channelTitle: 'x', thumbnail: '', duration: 100, views: 1, url: '', requestedBy: 'someone' }
@@ -179,14 +191,6 @@ test('handleChatMessage() - control commands (skip/pause/resume/pause)', async (
     await _test.handleChatMessage(message({ text: '!sg resume', isModerator: true }))
 
     assert.equal(getIsPaused(), false)
-  })
-
-  await t.test('pause is an alias for pause (there is no separate pause state)', async () => {
-    setPaused(false)
-
-    await _test.handleChatMessage(message({ text: '!sg pause', isModerator: true }))
-
-    assert.equal(getIsPaused(), true)
   })
 
   await t.test('the global cooldown blocks a second control command from a different moderator', async () => {

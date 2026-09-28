@@ -9,7 +9,10 @@
     "pausedSuffix": " (paused)",
     "queueEmpty": "The queue is empty",
     "queueList": "Queue [{{count}}]: {{list}}",
-    "queueMore": " [+{{count}}]"
+    "queueMore": " [+{{count}}]",
+    "redemption": {
+      "rejected": "@{{user}}, your song request was rejected. Points have been refunded."
+    }
   },
   "common": {
     "save": "Save",
@@ -176,13 +179,15 @@
     },
     "twitchChat": {
       "title": "Twitch chat commands",
-      "note": "StreamQueue joins your channel's chat directly and responds to these commands. \"now\" and \"next\" only read state; the rest control playback and default to moderators and you.",
+      "note": "StreamQueue joins your channel's chat directly and responds to these commands. \"now\" and \"queue\" only read state; the rest control playback and default to moderators and you.",
       "save": "Save chat commands",
       "cooldown": "Control command cooldown (seconds)",
-      "cooldownNote": "Applies only to skip/pause/resume/pause - a shared cooldown so two moderators can't trigger the same action back to back. Doesn't apply to \"now\"/\"next\".",
+      "cooldownNote": "Applies only to skip/pause/resume - a shared cooldown so two moderators can't trigger the same action back to back.",
+      "plainCooldown": "Queue command cooldown (seconds)",
+      "plainCooldownNote": "Applies to \"now\"/\"queue\" commands to prevent spam.",
       "commands": {
         "now": "Now playing",
-        "next": "Queue",
+        "queue": "Queue",
         "skip": "Skip track",
         "pause": "Pause",
         "resume": "Resume"
@@ -280,7 +285,7 @@
     "trackBlocked": "Track blocked",
     "trackUnblocked": "Track unblocked",
     "settingsSaved": "Settings saved",
-    "settingsNotSaved": "Settings not saved ({{rejected}}/{{total}} fields invalid)",
+    "settingsPartiallySaved": "Saved {{saved}}, not saved {{rejected}} (invalid values)",
     "apiKeyNotSaved": "Config saved, but API key was not",
     "nowPlaying": "Now playing: {{title}}",
     "addedToQueue": "Added to queue: {{title}} [#{{position}}]",

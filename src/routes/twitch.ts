@@ -1,7 +1,7 @@
 import express from 'express'
 import { ok, fail, asyncHandler } from '../http.js'
-import type { TwitchConnectionResponse } from '../integrations/twitch/types.js'
-import { AppError } from '../types.js'
+import type { TwitchConfig, TwitchConnectionResponse } from '../integrations/twitch/types.js'
+import { AppError, type ConfigUpdateResponse } from '../types.js'
 import { startDeviceAuthorization, disconnect, refreshConnection, getClient } from '../integrations/twitch/index.js'
 import { getTwitchConfig, updateTwitchConfig } from '../integrations/twitch/config.js'
 import { localOnly } from '../local-only.js'
@@ -35,14 +35,15 @@ router.put(
   asyncHandler(async (req, res) => {
     const { config, rejected } = updateTwitchConfig(req.body)
 
-    if (rejected.length > 0) {
-      return fail(res, 'invalid config fields', 'INVALID_CONFIG', 400, { fields: rejected.join(', ') })
+    const response: ConfigUpdateResponse<TwitchConfig> = {
+      config: { channelPointsRewardId: config.channelPointsRewardId, chatCommands: config.chatCommands },
+      rejected
     }
 
-    const response = {
-      channelPointsRewardId: config.channelPointsRewardId,
-      chatCommands: config.chatCommands
+    if (rejected.length) {
+      fail(res, 'invalid config fields', 'INVALID_CONFIG', 400, { fields: rejected.join(', ') })
     }
+
     ok(res, response)
   })
 )

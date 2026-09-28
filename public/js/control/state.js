@@ -28,7 +28,9 @@ export const state = {
     user: null,
     connectedAt: null,
     rewards: [],
-    selectedRewardId: ''
+    selectedRewardId: '',
+    savedRewardId: '',
+    chatCommands: null
   }
 }
 
@@ -113,12 +115,13 @@ export const dom = {
 
   twitchChatCommandsPanel: $('twitchChatCommandsPanel'),
   chatCmdCooldown: $('chatCmdCooldown'),
+  chatCmdPlainCooldown: $('chatCmdPlainCooldown'),
   chatCmdNowEnabled: $('chatCmdNowEnabled'),
   chatCmdNowCommand: $('chatCmdNowCommand'),
   chatCmdNowPermission: $('chatCmdNowPermission'),
-  chatCmdNextEnabled: $('chatCmdNextEnabled'),
-  chatCmdNextCommand: $('chatCmdNextCommand'),
-  chatCmdNextPermission: $('chatCmdNextPermission'),
+  chatCmdQueueEnabled: $('chatCmdQueueEnabled'),
+  chatCmdQueueCommand: $('chatCmdQueueCommand'),
+  chatCmdQueuePermission: $('chatCmdQueuePermission'),
   chatCmdSkipEnabled: $('chatCmdSkipEnabled'),
   chatCmdSkipCommand: $('chatCmdSkipCommand'),
   chatCmdSkipPermission: $('chatCmdSkipPermission'),
@@ -145,7 +148,7 @@ export const CONFIG_FIELDS = [
 // <name>Enabled / <name>Command / <name>Permission DOM ids built from `dom` below.
 export const CHAT_COMMAND_FIELDS = [
   { key: 'now', dom: 'chatCmdNow' },
-  { key: 'next', dom: 'chatCmdNext' },
+  { key: 'queue', dom: 'chatCmdQueue' },
   { key: 'skip', dom: 'chatCmdSkip' },
   { key: 'pause', dom: 'chatCmdPause' },
   { key: 'resume', dom: 'chatCmdResume' }

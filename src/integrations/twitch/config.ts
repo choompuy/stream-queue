@@ -21,15 +21,16 @@ const twitchConfigDefaults: TwitchConfig = {
   channelPointsRewardId: null,
   chatCommands: {
     now: defaultChatCommand('!sg now', 'everyone'),
-    next: defaultChatCommand('!sg next', 'everyone'),
+    queue: defaultChatCommand('!sg queue', 'everyone'),
     skip: defaultChatCommand('!sg skip', 'moderator'),
     pause: defaultChatCommand('!sg pause', 'moderator'),
     resume: defaultChatCommand('!sg resume', 'moderator'),
-    controlCooldownSeconds: 5
+    controlCooldownSeconds: 5,
+    plainCooldownSeconds: 5
   }
 }
 
-export const CHAT_COMMAND_KEYS: Array<keyof Omit<TwitchChatCommandsConfig, 'controlCooldownSeconds'>> = ['now', 'next', 'skip', 'pause', 'resume']
+export const CHAT_COMMAND_KEYS: Array<keyof Omit<TwitchChatCommandsConfig, 'controlCooldownSeconds' | 'plainCooldownSeconds'>> = ['now', 'queue', 'skip', 'pause', 'resume']
 
 const TWITCH_CONFIG_RULES: Record<keyof TwitchConfig, FieldRule> = {
   channelPointsRewardId: {
@@ -123,6 +124,15 @@ function validateChatCommandsUpdates(raw: unknown, rejected: string[]): TwitchCh
       continue
     }
 
+    if (key === 'plainCooldownSeconds') {
+      if (typeof rawValue === 'number' && Number.isFinite(rawValue) && rawValue >= 0 && rawValue <= 300) {
+        clean[key] = rawValue
+      } else {
+        rejected.push('chatCommands.plainCooldownSeconds')
+      }
+      continue
+    }
+
     rejected.push(`chatCommands.${key}`)
   }
 
@@ -158,6 +168,10 @@ export function validateTwitchConfigUpdates(updates: unknown): { clean: TwitchCo
   return { clean: clean as TwitchConfigUpdates, rejected }
 }
 
+function duplicateCommandKeys(commands: TwitchChatCommandsConfig): typeof CHAT_COMMAND_KEYS {
+  return CHAT_COMMAND_KEYS.filter((key) => CHAT_COMMAND_KEYS.some((other) => other !== key && commands[other].command === commands[key].command))
+}
+
 export function updateTwitchConfig(updates: TwitchConfigUpdates): { config: TwitchConfig; rejected: string[] } {
   const { clean, rejected } = validateTwitchConfigUpdates(updates)
   const { chatCommands, ...rest } = clean
@@ -172,6 +186,9 @@ export function updateTwitchConfig(updates: TwitchConfigUpdates): { config: Twit
     if (chatCommands.controlCooldownSeconds !== undefined) {
       mergedChatCommands.controlCooldownSeconds = chatCommands.controlCooldownSeconds
     }
+    if (chatCommands.plainCooldownSeconds !== undefined) {
+      mergedChatCommands.plainCooldownSeconds = chatCommands.plainCooldownSeconds
+    }
   }
 
   const finalConfig: TwitchConfig = {
@@ -180,16 +197,16 @@ export function updateTwitchConfig(updates: TwitchConfigUpdates): { config: Twit
     chatCommands: mergedChatCommands
   }
 
-  const commandTexts = CHAT_COMMAND_KEYS.map((key) => finalConfig.chatCommands[key].command)
-  const duplicateTexts = [...new Set(commandTexts.filter((text, i) => commandTexts.indexOf(text) !== i))]
+  for (let pass = 0; pass < CHAT_COMMAND_KEYS.length; pass++) {
+    const conflicting = duplicateCommandKeys(finalConfig.chatCommands).filter((key) => finalConfig.chatCommands[key].command !== current.chatCommands[key].command)
+    if (conflicting.length === 0) break
 
-  if (duplicateTexts.length > 0) {
-    const conflictingKeys = CHAT_COMMAND_KEYS.filter((key) => duplicateTexts.includes(finalConfig.chatCommands[key].command))
+    for (const key of conflicting) {
+      finalConfig.chatCommands[key] = { ...finalConfig.chatCommands[key], command: current.chatCommands[key].command }
 
-    // push the exact field paths first (frontend matches on these via params.fields.split(', '))
-    rejected.push(...conflictingKeys.map((key) => `chatCommands.${key}.command`))
-
-    return { config: cloneTwitchConfig(current), rejected }
+      const path = `chatCommands.${key}.command`
+      if (!rejected.includes(path)) rejected.push(path)
+    }
   }
 
   updateConfigModule(finalConfig)

@@ -105,6 +105,15 @@ export function setError(element, hasError = true) {
 }
 
 /**
+ * Show exactly one save state on a field: 'changed' (differs from stored), 'saved', 'error', or none
+ * @param {HTMLElement|null|undefined} element - The input element
+ * @param {'changed'|'saved'|'error'|null} state - The state to show, null to clear
+ */
+export function setFieldState(element, state = null) {
+  for (const name of ['changed', 'saved', 'error']) setClass(element, name, name === state)
+}
+
+/**
  * Safely set value on an input element
  * @param {HTMLElement|null|undefined} element - The input element
  * @param {string|number|null} value - The value to set

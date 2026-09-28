@@ -147,11 +147,12 @@ export type TwitchChatCommandConfig = {
 
 export type TwitchChatCommandsConfig = {
   now: TwitchChatCommandConfig
-  next: TwitchChatCommandConfig
+  queue: TwitchChatCommandConfig
   skip: TwitchChatCommandConfig
   pause: TwitchChatCommandConfig
   resume: TwitchChatCommandConfig
   controlCooldownSeconds: number
+  plainCooldownSeconds: number
 }
 
 export type TwitchConfig = {
@@ -164,9 +165,10 @@ export type TwitchConfigUpdates = Omit<Partial<TwitchConfig>, 'chatCommands'> & 
 }
 export type TwitchChatCommandUpdates = Partial<TwitchChatCommandConfig>
 export type TwitchChatCommandsUpdates = {
-  [K in keyof Omit<TwitchChatCommandsConfig, 'controlCooldownSeconds'>]?: TwitchChatCommandUpdates
+  [K in keyof Omit<TwitchChatCommandsConfig, 'controlCooldownSeconds' | 'plainCooldownSeconds'>]?: TwitchChatCommandUpdates
 } & {
   controlCooldownSeconds?: number
+  plainCooldownSeconds?: number
 }
 
 export type TwitchConnectionResponse = {

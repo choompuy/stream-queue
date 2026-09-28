@@ -17,7 +17,7 @@ beforeEach(() => {
     chatCommands: {
       ...DEFAULTS.chatCommands,
       now: { ...DEFAULTS.chatCommands.now },
-      next: { ...DEFAULTS.chatCommands.next },
+      queue: { ...DEFAULTS.chatCommands.queue },
       skip: { ...DEFAULTS.chatCommands.skip },
       pause: { ...DEFAULTS.chatCommands.pause },
       resume: { ...DEFAULTS.chatCommands.resume }
@@ -110,6 +110,19 @@ test('validateTwitchConfigUpdates()', async (t) => {
     })
   }
 
+  await t.test('accepts a valid plainCooldownSeconds', () => {
+    const { clean, rejected } = validateTwitchConfigUpdates({ chatCommands: { plainCooldownSeconds: 10 } })
+    assert.deepEqual(rejected, [])
+    assert.equal(clean.chatCommands?.plainCooldownSeconds, 10)
+  })
+
+  for (const value of [-1, 301, 'x', null]) {
+    await t.test(`rejects an out-of-range or non-numeric plainCooldownSeconds = ${JSON.stringify(value)}`, () => {
+      const { rejected } = validateTwitchConfigUpdates({ chatCommands: { plainCooldownSeconds: value } })
+      assert.deepEqual(rejected, ['chatCommands.plainCooldownSeconds'])
+    })
+  }
+
   await t.test('refuses unknown fields, including prototype keys', () => {
     const { clean, rejected } = validateTwitchConfigUpdates(
       JSON.parse('{"foo":1,"__proto__":{"polluted":true},"constructor":1,"channelPointsRewardId":"reward-123"}')
@@ -135,6 +148,7 @@ test('updateTwitchConfig()', async (t) => {
     assert.equal(config.chatCommands.skip?.enabled, before.skip?.enabled)
     assert.equal(config.chatCommands.skip?.permission, before.skip?.permission)
     assert.deepEqual(config.chatCommands.now, before.now)
+    assert.deepEqual(config.chatCommands.queue, before.queue)
     assert.deepEqual(config.chatCommands.pause, before.pause)
     assert.equal(config.chatCommands.controlCooldownSeconds, before.controlCooldownSeconds)
   })

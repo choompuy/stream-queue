@@ -1,9 +1,9 @@
-import { escapeHtml, show, setError, setValue, setChecked } from '../shared.js'
+import { escapeHtml, show, setFieldState, setValue, setChecked } from '../shared.js'
 import { api, ApiError } from './api.js'
 import { state, dom, log, CHAT_COMMAND_FIELDS } from './state.js'
 import { run } from './run.js'
 import { t } from '../i18n.js'
-import { toastError, toastSuccess } from './toast.js'
+import { reportSaveResult, trackChanges } from './save-result.js'
 
 const TWITCH_POLL_INTERVAL_MS = 2000
 
@@ -228,12 +228,55 @@ export function onTwitchRewardChange() {
   state.twitch.selectedRewardId = dom.twitchRewardSelect?.value ?? ''
 }
 
+function chatCommandFields() {
+  const stored = () => state.twitch.chatCommands
+
+  const fields = CHAT_COMMAND_FIELDS.flatMap((field) => [
+    {
+      input: dom[`${field.dom}Command`],
+      path: `chatCommands.${field.key}.command`,
+      read: (input) => input.value.trim(),
+      stored: () => stored()?.[field.key]?.command
+    },
+    {
+      input: dom[`${field.dom}Permission`],
+      path: `chatCommands.${field.key}.permission`,
+      read: (input) => input.value,
+      stored: () => stored()?.[field.key]?.permission
+    }
+  ])
+
+  fields.push({
+    input: dom.chatCmdCooldown,
+    path: 'chatCommands.controlCooldownSeconds',
+    read: (input) => Number(input.value),
+    stored: () => stored()?.controlCooldownSeconds
+  })
+  fields.push({
+    input: dom.chatCmdPlainCooldown,
+    path: 'chatCommands.plainCooldownSeconds',
+    read: (input) => Number(input.value),
+    stored: () => stored()?.plainCooldownSeconds
+  })
+
+  return fields.filter((field) => field.input)
+}
+
+export function bindTwitchFieldTracking() {
+  for (const field of chatCommandFields()) trackChanges(field.input, () => field.read(field.input) !== field.stored())
+
+  trackChanges(dom.twitchRewardSelect, () => dom.twitchRewardSelect.value !== state.twitch.savedRewardId)
+}
+
 export function loadTwitchConfig() {
   return run('loading Twitch config', async () => {
     const twitchConfig = await api.getTwitchConfig()
 
     state.twitch.selectedRewardId = twitchConfig?.channelPointsRewardId ?? ''
+    state.twitch.savedRewardId = state.twitch.selectedRewardId
+    state.twitch.chatCommands = twitchConfig?.chatCommands ?? null
     renderTwitchRewards()
+    setFieldState(dom.twitchRewardSelect, null)
 
     const chatCommands = twitchConfig?.chatCommands
     if (chatCommands) {
@@ -246,92 +289,59 @@ export function loadTwitchConfig() {
         const permissionInput = dom[`${field.dom}Permission`]
 
         setChecked(enabledInput, command.enabled)
-        setError(commandInput, false)
         setValue(commandInput, command.command ?? '')
         setValue(permissionInput, command.permission ?? 'moderator')
+        setFieldState(commandInput, null)
+        setFieldState(permissionInput, null)
       }
 
-      setError(dom.chatCmdCooldown, false)
       setValue(dom.chatCmdCooldown, chatCommands.controlCooldownSeconds ?? 5)
+      setFieldState(dom.chatCmdCooldown, null)
+
+      setValue(dom.chatCmdPlainCooldown, chatCommands.plainCooldownSeconds ?? 5)
+      setFieldState(dom.chatCmdPlainCooldown, null)
     }
   })
 }
 
 export async function saveTwitchConfig() {
-  const config = {
-    channelPointsRewardId: state.twitch.selectedRewardId || null
-  }
+  const rewardId = state.twitch.selectedRewardId || ''
+  const entries = [{ input: dom.twitchRewardSelect, path: 'channelPointsRewardId', changed: rewardId !== state.twitch.savedRewardId }]
 
-  setError(dom.twitchRewardSelect, false)
+  await run('saving Twitch config', async () => {
+    const { config, rejected } = await api.updateTwitchConfig({ channelPointsRewardId: rewardId || null })
 
-  await run(
-    'saving Twitch config',
-    async () => {
-      try {
-        await api.updateTwitchConfig(config)
-        toastSuccess(t('toast.twitchSettingsSaved'))
-      } catch (error) {
-        if (error instanceof ApiError && error.code === 'INVALID_CONFIG' && error.params?.fields) {
-          const rejectedFields = error.params.fields.split(', ')
-
-          if (rejectedFields.includes('channelPointsRewardId')) setError(dom.twitchRewardSelect)
-
-          toastError(t('toast.settingsNotSaved', { rejected: rejectedFields.length, total: 1 }))
-        }
-
-        console.error(error)
-      }
-    },
-    { silent: true }
-  )
+    state.twitch.savedRewardId = config.channelPointsRewardId ?? ''
+    reportSaveResult(entries, rejected, 'toast.twitchSettingsSaved')
+  })
 }
 
 export async function saveTwitchChatCommands() {
   const chatCommands = {}
 
   for (const field of CHAT_COMMAND_FIELDS) {
-    const enabledInput = dom[`${field.dom}Enabled`]
-    const commandInput = dom[`${field.dom}Command`]
-    const permissionInput = dom[`${field.dom}Permission`]
-
-    setError(commandInput, false)
-
     chatCommands[field.key] = {
-      enabled: Boolean(enabledInput?.checked),
-      command: commandInput?.value.trim() ?? '',
-      permission: permissionInput?.value ?? 'moderator'
+      enabled: Boolean(dom[`${field.dom}Enabled`]?.checked),
+      command: dom[`${field.dom}Command`]?.value.trim() ?? '',
+      permission: dom[`${field.dom}Permission`]?.value ?? 'moderator'
     }
   }
 
-  setError(dom.chatCmdCooldown, false)
   chatCommands.controlCooldownSeconds = Number(dom.chatCmdCooldown?.value ?? 5)
+  chatCommands.plainCooldownSeconds = Number(dom.chatCmdPlainCooldown?.value ?? 5)
 
-  const config = { chatCommands }
+  const entries = chatCommandFields().map((field) => ({
+    input: field.input,
+    path: field.path,
+    changed: field.read(field.input) !== field.stored()
+  }))
 
-  await run(
-    'saving Twitch chat commands',
-    async () => {
-      try {
-        await api.updateTwitchConfig(config)
-        toastSuccess(t('toast.twitchChatCommandsSaved'))
-      } catch (error) {
-        if (error instanceof ApiError && error.code === 'INVALID_CONFIG' && error.params?.fields) {
-          const rejectedFields = error.params.fields.split(', ')
+  await run('saving Twitch chat commands', async () => {
+    const { config, rejected } = await api.updateTwitchConfig({ chatCommands })
 
-          for (const field of CHAT_COMMAND_FIELDS) {
-            if (rejectedFields.includes(`chatCommands.${field.key}.command`)) setError(dom[`${field.dom}Command`])
-          }
-
-          if (rejectedFields.includes('chatCommands.controlCooldownSeconds')) setError(dom.chatCmdCooldown)
-
-          toastError(t('toast.settingsNotSaved', { rejected: rejectedFields.length, total: CHAT_COMMAND_FIELDS.length + 1 }))
-        }
-
-        console.error(error)
-      }
-    },
-    { silent: true }
-  )
+    state.twitch.chatCommands = config.chatCommands
+    reportSaveResult(entries, rejected, 'toast.twitchChatCommandsSaved')
+  })
 }
 
 export function loadTwitchSecrets() {

@@ -33,6 +33,10 @@ async function request(url, options = {}) {
   }
 
   if (!response.ok) {
+    if (body?.code === 'INVALID_CONFIG' && body?.data) {
+      return body.data
+    }
+
     throw new ApiError(body?.error || `Request failed: ${response.status}`, {
       status: response.status,
       code: body?.code,

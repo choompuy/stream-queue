@@ -76,7 +76,12 @@ router.post(
       return ok<ConfigResponse>(res, getConfig())
     }
 
-    updateConfig({ fallbackPlaylist: { playlistId: id } })
+    const { rejected } = updateConfig({ fallbackPlaylist: { playlistId: id } })
+
+    if (rejected.length) {
+      restoreConfig(previous)
+      return fail(res, 'invalid config fields', 'INVALID_CONFIG', 400, { fields: rejected.join(', ') })
+    }
 
     try {
       await refreshFallback()

@@ -604,6 +604,18 @@ select {
   border-color: var(--accent-red);
 }
 
+.settings-input.changed,
+.settings-input.changed:focus {
+  border-color: var(--accent-yellow);
+  background-color: var(--accent-yellow-bg);
+}
+
+.settings-input.saved,
+.settings-input.saved:focus {
+  border-color: var(--accent-green);
+  background-color: var(--accent-green-bg);
+}
+
 .field {
   display: flex;
   flex-direction: column;

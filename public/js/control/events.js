@@ -4,8 +4,9 @@ import { dispatchAction } from './actions.js'
 import { bindMenus } from './menu.js'
 import { search } from './search.js'
 import { addPlaylist } from './playlists.js'
-import { saveOverlaySettings, onIpChange, changeLocale } from './settings.js'
-import { onTwitchRewardChange, stopTwitchPolling } from './twitch.js'
+import { saveOverlaySettings, onIpChange, changeLocale, isConfigFieldChanged } from './settings.js'
+import { onTwitchRewardChange, stopTwitchPolling, bindTwitchFieldTracking } from './twitch.js'
+import { trackChanges } from './save-result.js'
 import { setError } from '../shared.js'
 
 export function bindEvents() {
@@ -65,8 +66,6 @@ export function bindEvents() {
     }
   })
 
-  const configFields = CONFIG_FIELDS.map((f) => dom[f.dom]).filter(Boolean)
-  configFields.forEach((input) => {
-    input.addEventListener('focus', () => setError(input, false))
-  })
+  CONFIG_FIELDS.forEach((field) => trackChanges(dom[field.dom], () => isConfigFieldChanged(field)))
+  bindTwitchFieldTracking()
 }

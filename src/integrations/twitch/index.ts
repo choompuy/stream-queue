@@ -34,6 +34,7 @@ let chat: TwitchChat | null = null
 let deviceAuthorizationPromise: Promise<TwitchUserInfo> | null = null
 let deviceAuthorizationGeneration = 0
 let lastControlCommandAt = 0
+let lastPlainCommandAt = 0
 
 export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = {}): void {
   if (oauth) {
@@ -98,6 +99,7 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
   const query = event.user_input.trim()
   if (!query) {
     log.error(`Empty song request in redemption: ${event.id}`)
+    await cancelRedemption(event, client)
     return
   }
 
@@ -110,6 +112,7 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
 
   if (result.outcome !== 'added') {
     log.error(`Song request failed for redemption ${event.id}: ${result.outcome}`)
+    await cancelRedemption(event, client)
     return
   }
 
@@ -174,7 +177,7 @@ async function replyInChat(message: string): Promise<void> {
   })
 }
 
-// skip/pause/resume/pause share one global (not per-user) cooldown so two different moderators
+// skip/pause/resume share one global (not per-user) cooldown so two different moderators
 // firing the same or different control commands back to back can't double up on the action
 async function handleControlCommand(
   message: TwitchChatMessage,
@@ -195,12 +198,32 @@ async function handleControlCommand(
   await replyInChat(reply)
 }
 
-type PlainCommandKey = 'now' | 'next'
+// now/queue share one global (not per-user) cooldown to prevent spam
+async function handlePlainCommand(
+  message: TwitchChatMessage,
+  permission: TwitchChatPermission,
+  cooldownSeconds: number,
+  action: () => Promise<string>
+): Promise<void> {
+  if (!hasPermission(message, permission)) return
+
+  const now = Date.now()
+  if (now - lastPlainCommandAt < cooldownSeconds * 1000) {
+    chatLog.log(`Ignored plain command from ${message.displayName}: cooldown active`)
+    return
+  }
+  lastPlainCommandAt = now
+
+  const reply = await action()
+  await replyInChat(reply)
+}
+
+type PlainCommandKey = 'now' | 'queue'
 type ControlCommandKey = 'skip' | 'pause' | 'resume'
 
 const PLAIN_COMMAND_HANDLERS: Record<PlainCommandKey, () => Promise<string>> = {
   now: async () => buildNowPlayingMessage(),
-  next: async () => buildQueueMessage()
+  queue: async () => buildQueueMessage()
 }
 
 const CONTROL_COMMAND_HANDLERS: Record<ControlCommandKey, () => string> = {
@@ -214,7 +237,7 @@ const CONTROL_COMMAND_HANDLERS: Record<ControlCommandKey, () => string> = {
   },
   resume: () => {
     setPaused(false)
-    return translateWithFallback('chat.resumed', undefined, 'Player resumed')
+    return translateWithFallback('chat.resumed', undefined, 'Playback resumed')
   }
 }
 
@@ -224,7 +247,7 @@ async function handleChatMessage(message: TwitchChatMessage): Promise<void> {
   for (const key of Object.keys(PLAIN_COMMAND_HANDLERS) as PlainCommandKey[]) {
     const config = commands[key]
     if (config.enabled && matchesCommand(message.text, config.command) && hasPermission(message, config.permission)) {
-      await replyInChat(await PLAIN_COMMAND_HANDLERS[key]())
+      await handlePlainCommand(message, config.permission, commands.plainCooldownSeconds, PLAIN_COMMAND_HANDLERS[key])
       return
     }
   }
@@ -354,6 +377,24 @@ async function fulfillRedemption(redemption: TwitchChannelPointsRedemption, twit
   }
 }
 
+async function cancelRedemption(redemption: TwitchChannelPointsRedemption, twitchClient: TwitchClient | null): Promise<void> {
+  if (!twitchClient) {
+    log.error(`Cannot cancel redemption ${redemption.id}: Twitch client not initialized`)
+    return
+  }
+
+  try {
+    await twitchClient.updateRedemptionStatus(redemption, 'CANCELED')
+    log.log(`Channel Points redemption canceled (points refunded): ${redemption.id}`)
+    
+    // Notify in chat that the request was rejected and points refunded
+    const rejectionMessage = translateWithFallback('chat.redemption.rejected', { user: redemption.user_name }, `@${redemption.user_name}, your song request was rejected. Points have been refunded.`)
+    await replyInChat(rejectionMessage)
+  } catch (error) {
+    log.error(`Failed to cancel redemption ${redemption.id}: ${error instanceof Error ? error.message : error}`)
+  }
+}
+
 export function isDeviceAuthorizationPending(): boolean {
   return deviceAuthorizationPromise !== null
 }
@@ -435,6 +476,7 @@ export const _test = {
   handleChatMessage,
   resetCooldown: () => {
     lastControlCommandAt = 0
+    lastPlainCommandAt = 0
   },
   setChat: (mock: TwitchChat | null) => {
     chat = mock
@@ -453,4 +495,5 @@ export async function _resetIntegration(): Promise<void> {
   deviceAuthorizationPromise = null
   deviceAuthorizationGeneration = 0
   lastControlCommandAt = 0
+  lastPlainCommandAt = 0
 }

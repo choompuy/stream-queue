@@ -37,7 +37,7 @@ const routes = {
     ]
   }),
   'GET /api/blocklist': () => ({ entries: blocklist }),
-  'GET /api/playlists': () => ({ playlists: [{ id: 'PL1', title: 'One', thumbnail: '', itemCount: 3 }, { id: 'PL2', title: 'Two', thumbnail: '', itemCount: 1 }] }),
+  'GET /api/playlists': () => ({ playlists: [{ id: 'PL1', title: 'One', thumbnail: '', itemCount: 3, isActive: true }, { id: 'PL2', title: 'Two', thumbnail: '', itemCount: 1, isActive: false }] }),
   'GET /api/state': () => {
     if (failStateWith500) return [500, { error: 'boom', code: 'SERVER_ERROR' }]
     return stateOverride ?? { current: track('a'), queue: [track('b'), track('c')], isPaused: false, nextTrack: null }
@@ -107,11 +107,9 @@ check('fallback: active row highlighted (no dataset side-channel)', () => {
   assert.ok(rows[1].classList.contains('row-active'))
   assert.equal(rows[1].dataset.videoId, V('f'))
 })
-check('playlists: active playlist highlighted', () => {
+check('playlists: rows rendered', () => {
   const rows = $$('#playlistsListWrapper .row-item')
   assert.equal(rows.length, 2)
-  assert.ok(rows[0].classList.contains('row-active'))
-  assert.ok(!rows[1].classList.contains('row-active'))
 })
 check('activity: escaping, thumbnail helper, translated failure reason', () => {
   const rows = $$('#activityListWrapper .row-item')

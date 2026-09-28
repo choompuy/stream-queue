@@ -155,6 +155,7 @@ export type PlayerActionResponse = StateResponse & { message: string }
 export type SettingsResponse = Settings
 export type OverlayStateResponse = { state: StateResponse; settings: Settings }
 export type ConfigResponse = Config
+export type ConfigUpdateResponse<T = Config> = { config: T; rejected: string[] }
 export type SearchResponse = { results: Song[] }
 export type AddedSong = {
   song: QueueItem

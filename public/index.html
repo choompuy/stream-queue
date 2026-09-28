@@ -540,7 +540,7 @@
             </div>
 
             <div class="settings-section text-muted text-xs" data-i18n="settings.twitchChat.note">
-              StreamQueue joins your channel's chat directly and responds to these commands. "now" and "next" only read state; the rest control
+              StreamQueue joins your channel's chat directly and responds to these commands. "now" and "queue" only read state; the rest control
               playback and default to moderators and you.
             </div>
 
@@ -560,18 +560,28 @@
                 </div>
               </div>
 
-              <div class="field" data-chat-command="next">
-                <label class="field-label" data-i18n="settings.twitchChat.commands.next">Queue</label>
+              <div class="field" data-chat-command="queue">
+                <label class="field-label" data-i18n="settings.twitchChat.commands.queue">Queue</label>
                 <div class="field-row">
                   <div class="checkbox-wrapper">
-                    <input class="checkbox" type="checkbox" id="chatCmdNextEnabled" />
+                    <input class="checkbox" type="checkbox" id="chatCmdQueueEnabled" />
                   </div>
-                  <input class="settings-input input" type="text" id="chatCmdNextCommand" placeholder="!sg next" />
-                  <select class="settings-input input select" id="chatCmdNextPermission">
+                  <input class="settings-input input" type="text" id="chatCmdQueueCommand" placeholder="!sg queue" />
+                  <select class="settings-input input select" id="chatCmdQueuePermission">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="chatCmdPlainCooldown" data-i18n="settings.twitchChat.plainCooldown">
+                  Queue command cooldown (seconds)
+                </label>
+                <input class="settings-input input" type="number" id="chatCmdPlainCooldown" min="0" max="300" style="max-width: 8rem" />
+                <div class="text-muted text-xs" data-i18n="settings.twitchChat.plainCooldownNote">
+                  Applies to "now"/"queue" commands to prevent spam.
                 </div>
               </div>
 
@@ -624,8 +634,7 @@
                 <label class="field-label" for="chatCmdCooldown" data-i18n="settings.twitchChat.cooldown">Control command cooldown (seconds)</label>
                 <input class="settings-input input" type="number" id="chatCmdCooldown" min="0" max="300" style="max-width: 8rem" />
                 <div class="text-muted text-xs" data-i18n="settings.twitchChat.cooldownNote">
-                  Applies only to skip/pause/resume/pause - a shared cooldown so two moderators can't trigger the same action back to back. Doesn't
-                  apply to "now"/"next".
+                  Applies only to skip/pause/resume - a shared cooldown so two moderators can't trigger the same action back to back.
                 </div>
               </div>
             </div>
