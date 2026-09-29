@@ -7,8 +7,10 @@ import { toastError, toastSuccess } from './toast.js'
  * entries: { input, path, changed } - `path` is how the server names the field in `rejected`,
  * `changed` says whether the value sent differs from the one that was stored before.
  * Refused -> red, stored with a new value -> green, unchanged -> nothing to show
+ * `successToast: false` keeps the fields' colours but skips the green toast, for a caller that has already
+ * shown its own (worse) news - the toast about refused fields is always shown
  */
-export function reportSaveResult(entries, rejected, successKey) {
+export function reportSaveResult(entries, rejected, successKey, { successToast = true } = {}) {
   let saved = 0
   let refused = 0
 
@@ -21,7 +23,9 @@ export function reportSaveResult(entries, rejected, successKey) {
     setFieldState(input, isRefused ? 'error' : changed ? 'saved' : null)
   }
 
-  if (refused === 0) toastSuccess(t(successKey))
+  if (refused === 0) {
+    if (successToast) toastSuccess(t(successKey))
+  }
   else toastError(t('toast.settingsPartiallySaved', { saved, rejected: refused }))
 }
 

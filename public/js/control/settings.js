@@ -197,6 +197,8 @@ export async function saveConfigSetting() {
       else setValue(input, serverValue)
     }
 
+    let apiKeyFailed = false
+
     if (youtubeApiKey) {
       try {
         await api.updateSecrets({ youtubeApiKey })
@@ -205,12 +207,13 @@ export async function saveConfigSetting() {
       } catch (error) {
         log('Error saving API key:', error)
         toastError(t('toast.apiKeyNotSaved'))
+        apiKeyFailed = true
       }
     }
 
     renderQueue()
     renderPlaylists()
-    reportSaveResult(entries, rejected, 'toast.settingsSaved')
+    reportSaveResult(entries, rejected, 'toast.settingsSaved', { successToast: !apiKeyFailed })
   })
 }
 

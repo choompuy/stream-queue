@@ -120,6 +120,7 @@ jsdom.window.open = (url) => {
 const { t: translate, loadTranslations } = await import(new URL('js/i18n.js', PUBLIC_DIR))
 const { state, dom, CHAT_COMMAND_FIELDS } = await import(new URL('js/control/state.js', PUBLIC_DIR))
 const settings = await import(new URL('js/control/twitch.js', PUBLIC_DIR))
+const configSettings = await import(new URL('js/control/settings.js', PUBLIC_DIR))
 
 await loadTranslations('en')
 
@@ -183,6 +184,8 @@ function reset() {
   }
   dom.chatCmdCooldown.value = ''
   dom.chatCmdCooldown.classList.remove('error')
+  dom.chatCmdPlainCooldown.value = ''
+  dom.chatCmdPlainCooldown.classList.remove('error')
 
   document.getElementById('toastContainer').innerHTML = ''
 }
@@ -505,7 +508,8 @@ const CHAT_COMMANDS_CONFIG = {
   skip: { enabled: true, command: '!sg skip', permission: 'moderator' },
   pause: { enabled: false, command: '!sg pause', permission: 'moderator' },
   resume: { enabled: true, command: '!sg resume', permission: 'broadcaster' },
-  controlCooldownSeconds: 7
+  controlCooldownSeconds: 7,
+  plainCooldownSeconds: 3
 }
 
 test('the reward id is saved from state, not from the select element', async (t) => {
@@ -619,6 +623,7 @@ test('loadTwitchConfig() fills in the chat command fields', async (t) => {
       assert.equal(dom[`${field.dom}Permission`].value, expected.permission, `${field.key}.permission`)
     }
     assert.equal(dom.chatCmdCooldown.value, '7')
+    assert.equal(dom.chatCmdPlainCooldown.value, '3')
   })
 
   await t.test('does nothing and does not throw when the config has no chatCommands yet', async () => {
@@ -647,6 +652,7 @@ test('saveTwitchChatCommands()', async (t) => {
       dom[`${field.dom}Permission`].value = expected.permission
     }
     dom.chatCmdCooldown.value = '7'
+    dom.chatCmdPlainCooldown.value = '3'
 
     await settings.saveTwitchChatCommands()
 
@@ -667,6 +673,32 @@ test('saveTwitchChatCommands()', async (t) => {
     await settings.saveTwitchChatCommands()
 
     assert.equal(sent.chatCommands.skip.command, '!sg skip')
+  })
+
+  await t.test('shows what the server stored, not what was typed (it lowercases and collapses spaces)', async () => {
+    handlers = { 'PUT /api/integrations/twitch/config': () => ({ config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] }) }
+    dom.chatCmdSkipCommand.value = '  !SG   Skip '
+
+    await settings.saveTwitchChatCommands()
+
+    assert.equal(dom.chatCmdSkipCommand.value, '!sg skip')
+  })
+
+  await t.test('a refused command keeps what was typed, so it can be corrected', async () => {
+    handlers = {
+      'PUT /api/integrations/twitch/config': () => {
+        throw new MockApiFailure('invalid config fields', 'INVALID_CONFIG', { fields: 'chatCommands.skip.command' }, {
+          config: { chatCommands: CHAT_COMMANDS_CONFIG },
+          rejected: ['chatCommands.skip.command']
+        })
+      }
+    }
+    dom.chatCmdSkipCommand.value = 'no-bang'
+
+    await settings.saveTwitchChatCommands()
+
+    assert.equal(dom.chatCmdSkipCommand.value, 'no-bang')
+    assert.ok(dom.chatCmdSkipCommand.classList.contains('error'))
   })
 
   await t.test('shows a success toast on success', async () => {
@@ -714,5 +746,39 @@ test('saveTwitchChatCommands()', async (t) => {
 
     assert.equal(dom.chatCmdSkipCommand.classList.contains('error'), false)
     assert.equal(dom.chatCmdCooldown.classList.contains('error'), false)
+  })
+})
+
+test('saveConfigSetting() and the YouTube API key', async (t) => {
+  t.beforeEach(reset)
+
+  const toasts = () => document.getElementById('toastContainer').textContent
+
+  await t.test('a key that saves fine ends with "Settings saved"', async () => {
+    handlers = {
+      'PUT /api/config': () => ({ config: {}, rejected: [] }),
+      'PUT /api/secrets': () => ({}),
+      'GET /api/secrets': () => ({ twitch: { configured: true }, hasYoutubeApiKey: true })
+    }
+    dom.secYoutubeKey.value = 'some-key'
+
+    await configSettings.saveConfigSetting()
+
+    assert.ok(toasts().includes(translate('toast.settingsSaved')))
+  })
+
+  await t.test('a key that fails to save shows only "API key was not saved" - no green "Settings saved" after it', async () => {
+    handlers = {
+      'PUT /api/config': () => ({ config: {}, rejected: [] }),
+      'PUT /api/secrets': () => {
+        throw new MockApiFailure('nope', 'SERVER_ERROR', undefined)
+      }
+    }
+    dom.secYoutubeKey.value = 'some-key'
+
+    await configSettings.saveConfigSetting()
+
+    assert.ok(toasts().includes(translate('toast.apiKeyNotSaved')))
+    assert.equal(toasts().includes(translate('toast.settingsSaved')), false)
   })
 })

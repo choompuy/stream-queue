@@ -1,5 +1,5 @@
 import { Response, Request, NextFunction, RequestHandler, ParamsDictionary } from 'express-serve-static-core'
-import { AppError, AppErrorCode, ApiOk, ApiError, ApiErrorCode } from './types.js'
+import { AppError, AppErrorCode, ApiOk, ApiError, ApiErrorCode, ConfigUpdateResponse } from './types.js'
 import { getSettings } from './settings.js'
 import { translateErrorCode } from './i18n.js'
 
@@ -13,6 +13,26 @@ export function fail(res: Response, error: string, code: ApiErrorCode, status: n
   const localized = translateErrorCode(locale, code, params)
   const body: ApiError = { success: false, error: localized ?? error, code, params }
   res.status(status).json(body)
+}
+
+export function sendConfigUpdate<T extends object>(res: Response, config: T, rejected: string[]): void {
+  const data: ConfigUpdateResponse<T> = { config, rejected }
+
+  if (rejected.length === 0) {
+    ok(res, data)
+    return
+  }
+
+  const params = { fields: rejected.join(', ') }
+  const localized = translateErrorCode(getSettings().locale, 'INVALID_CONFIG', params)
+  const body: ApiError & { data: ConfigUpdateResponse<T> } = {
+    success: false,
+    error: localized ?? 'invalid config fields',
+    code: 'INVALID_CONFIG',
+    params,
+    data
+  }
+  res.status(400).json(body)
 }
 
 const STATUS_BY_CODE: Record<AppErrorCode, number> = {

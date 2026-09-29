@@ -26,6 +26,13 @@ let port: number
 const app = express()
 app.use(express.json())
 app.use('/api/integrations/twitch', twitchRouter)
+// errors that reach Express (e.g. a handler answering twice -> ERR_HTTP_HEADERS_SENT) never show up in the
+// client's response, so they are collected here and asserted on
+const routeErrors: unknown[] = []
+app.use((err: unknown, _req: unknown, _res: unknown, next: (e?: unknown) => void) => {
+  routeErrors.push(err)
+  next(err)
+})
 server = app.listen(0)
 port = (server.address() as AddressInfo).port
 
@@ -129,6 +136,24 @@ test('twitch routes localOnly protection', async (t) => {
     assert.equal(response.status, 400)
     const body = (await response.json()) as Record<string, any>
     assert.equal(body.code, 'INVALID_CONFIG')
+  })
+
+  await t.test('PUT /config with one refused field stores the valid ones and returns both in the body, answering exactly once', async () => {
+    routeErrors.length = 0
+
+    const response = await api('/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channelPointsRewardId: 'r-partial', chatCommands: { skip: { command: 'no-bang' } } })
+    })
+    const body = (await response.json()) as Record<string, any>
+
+    assert.equal(response.status, 400)
+    assert.equal(body.code, 'INVALID_CONFIG')
+    assert.deepEqual(body.data.rejected, ['chatCommands.skip.command'])
+    assert.equal(body.data.config.channelPointsRewardId, 'r-partial')
+    assert.equal(getTwitchConfig().channelPointsRewardId, 'r-partial')
+    assert.deepEqual(routeErrors, [], 'the handler must not try to answer a second time')
   })
 })
 

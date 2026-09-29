@@ -119,6 +119,29 @@ test('PUT /api/config and the fallback playlist', async (t) => {
   })
 })
 
+test('PUT /api/config with a refused field (partial save)', async (t) => {
+  await t.test('stores the valid fields and returns them together with the refused ones', async () => {
+    const response = await putConfig({ minViews: 4242, maxQueueSize: 0 })
+    const body = (await response.json()) as Record<string, any>
+
+    assert.equal(response.status, 400)
+    assert.equal(body.code, 'INVALID_CONFIG')
+    assert.deepEqual(body.data.rejected, ['maxQueueSize'])
+    assert.equal(body.data.config.minViews, 4242)
+    assert.equal((await getConfig()).minViews, 4242)
+  })
+
+  await t.test('a playlist saved next to a refused field is still loaded, not just stored', async () => {
+    // there is no API key in the test environment, so the load fails - which is how we can tell it was attempted
+    const response = await putConfig({ minViews: -5, fallbackPlaylist: { playlistId: 'PLpartialsave01' } })
+    const body = (await response.json()) as Record<string, any>
+
+    assert.equal(response.status, 400)
+    assert.equal(body.code, 'NO_API_KEY', 'the load was tried (it used to be skipped and INVALID_CONFIG came back)')
+    assert.equal((await getConfig()).fallbackPlaylist.playlistId, null, 'and undone, exactly like a playlist-only save')
+  })
+})
+
 test('PUT /api/settings', async (t) => {
   const putSettings = (body: unknown) =>
     fetch(`${base}/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })

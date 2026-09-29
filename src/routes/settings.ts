@@ -1,6 +1,6 @@
 import express from 'express'
-import { ConfigResponse, ConfigUpdateResponse, SettingsResponse } from '../types.js'
-import { ok, fail, failFromError, asyncHandler } from '../http.js'
+import { ConfigResponse, SettingsResponse } from '../types.js'
+import { ok, fail, failFromError, asyncHandler, sendConfigUpdate } from '../http.js'
 import { localOnly } from '../local-only.js'
 import { getConfig, updateConfig, restoreConfig } from '../config.js'
 import { getSettings, updateSettings, validateSettingsUpdates } from '../settings.js'
@@ -53,7 +53,8 @@ router.put(
 
     if (body.fallbackPlaylist !== undefined) {
       if (typeof body.fallbackPlaylist !== 'object' || body.fallbackPlaylist === null || Array.isArray(body.fallbackPlaylist)) {
-        return fail(res, 'invalid fallbackPlaylist: must be an object', 'INVALID_CONFIG', 400, { fields: 'fallbackPlaylist' })
+        fail(res, 'invalid fallbackPlaylist: must be an object', 'INVALID_CONFIG', 400, { fields: 'fallbackPlaylist' })
+        return
       }
 
       if (typeof body.fallbackPlaylist.playlistId === 'string') {
@@ -62,7 +63,8 @@ router.put(
         if (rawPlaylistId) {
           const parsedId = parsePlaylistId(rawPlaylistId)
           if (!parsedId) {
-            return fail(res, 'invalid playlist ID or URL', 'INVALID_PLAYLIST_ID', 400)
+            fail(res, 'invalid playlist ID or URL', 'INVALID_PLAYLIST_ID', 400)
+            return
           }
           body.fallbackPlaylist = { ...body.fallbackPlaylist, playlistId: parsedId }
         } else {
@@ -74,16 +76,9 @@ router.put(
     const previous = getConfig()
     const { config: updated, rejected } = updateConfig(body)
 
-    if (rejected.length) {
-      return res.status(400).json({
-        success: false,
-        error: 'invalid config fields',
-        code: 'INVALID_CONFIG',
-        params: { fields: rejected.join(', ') },
-        data: { config: updated, rejected }
-      })
-    }
-
+    // The valid fields are already stored even when others were refused, so whatever they imply has to
+    // happen before the answer - otherwise a playlist saved next to a bad field would stay stored but never
+    // be loaded, and the next save (no difference to `previous` any more) would never load it either.
     if (updated.fallbackPlaylist.playlistId !== previous.fallbackPlaylist.playlistId) {
       try {
         await refreshFallback()
@@ -91,14 +86,15 @@ router.put(
         // the playlist could not be loaded: only the playlist change is undone, the other saved fields stay
         console.error(`[CONFIG] Failed to refresh fallback playlist: ${error instanceof Error ? error.message : error}`)
         restoreConfig({ ...getConfig(), fallbackPlaylist: previous.fallbackPlaylist })
-        return failFromError(res, error)
+        failFromError(res, error)
+        return
       }
     } else if (updated.fallbackPlaylist.shuffle !== previous.fallbackPlaylist.shuffle) {
       // updateConfig() already stored the new value: only the order has to follow it
       reorderFallback(updated.fallbackPlaylist.shuffle)
     }
 
-    ok<ConfigUpdateResponse>(res, { config: updated, rejected })
+    sendConfigUpdate(res, updated, rejected)
   })
 )
 

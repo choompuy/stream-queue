@@ -349,6 +349,12 @@ export async function saveTwitchChatCommands() {
     const { config, rejected } = await api.updateTwitchConfig({ chatCommands })
 
     state.twitch.chatCommands = config.chatCommands
+
+    for (const field of chatCommandFields()) {
+      const storedValue = field.stored()
+      if (!rejected.includes(field.path) && storedValue !== undefined) setValue(field.input, storedValue)
+    }
+
     reportSaveResult(entries, rejected, 'toast.twitchChatCommandsSaved')
   })
 }
