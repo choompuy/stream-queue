@@ -1,98 +1,82 @@
-import { createFileStore } from './persist.js'
+import { createFileStore, deepMerge, type DeepPartial } from './persist.js'
 
-export type FieldRule<T = unknown> = {
+export type FieldRule = {
   normalize?: (value: unknown) => unknown
   validate: (value: unknown) => boolean
 }
 
-export type ConfigValidation<T> = {
-  clean: Partial<T>
-  rejected: string[]
+// A tree: a FieldRule is a field, any other object is a nested group of fields
+export type Schema = { [key: string]: FieldRule | Schema }
+
+export const rules = {
+  boolean: { validate: (v) => typeof v === 'boolean' } as FieldRule,
+  number: (min: number, max = Infinity): FieldRule => ({ validate: (v) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max })
 }
 
-export type ConfigUpdateResult<T> = {
-  config: T
-  rejected: string[]
+const isPlainObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+const isRule = (entry: FieldRule | Schema): entry is FieldRule => typeof entry.validate === 'function'
+
+function validateSchema(schema: Schema, raw: unknown, path: string, rejected: string[]): Record<string, unknown> | undefined {
+  if (!isPlainObject(raw)) {
+    rejected.push(path || 'body')
+    return undefined
+  }
+
+  const clean: Record<string, unknown> = {}
+
+  for (const [key, value] of Object.entries(raw)) {
+    const entry = Object.hasOwn(schema, key) ? schema[key] : undefined
+    const at = path ? `${path}.${key}` : key
+
+    if (!entry) {
+      rejected.push(at)
+    } else if (isRule(entry)) {
+      const normalized = entry.normalize ? entry.normalize(value) : value
+      if (entry.validate(normalized)) clean[key] = normalized
+      else rejected.push(at)
+    } else {
+      const nested = validateSchema(entry, value, at, rejected)
+      if (nested) clean[key] = nested
+    }
+  }
+
+  return clean
 }
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-
-export function createConfigModule<T extends Record<string, unknown>>(options: {
+export function createConfigModule<T extends object>(options: {
   filePath: string
   defaults: T
-  rules: Record<keyof T, FieldRule<T>>
-  clone?: (source: T) => T
+  schema: Schema
+  refine?: (clean: DeepPartial<T>, current: T, reject: (path: string) => void) => void
 }) {
-  const { filePath, defaults, rules, clone } = options
+  const { filePath, defaults, schema, refine } = options
   const store = createFileStore<T>(filePath)
   let config: T = store.load(defaults)
 
-  function cloneConfig(source: T): T {
-    if (clone) return clone(source)
-    // Deep clone using JSON for configs
-    return JSON.parse(JSON.stringify(source)) as T
-  }
-
-  function saveConfig(): void {
+  const save = () =>
     store.scheduleSave(
       () => config,
       (error) => console.error(`[CONFIG ${filePath}] Failed to save config:`, error instanceof Error ? error.message : error)
     )
-  }
 
-  function getConfig(): T {
-    return cloneConfig(config)
-  }
-
-  function validateConfigUpdates(updates: unknown, current: T = config): ConfigValidation<T> {
-    const clean: Record<string, unknown> = {}
+  function validateConfigUpdates(updates: unknown, current: T = config) {
     const rejected: string[] = []
-
-    if (!isPlainObject(updates)) return { clean: {}, rejected: ['body'] }
-
-    for (const [key, raw] of Object.entries(updates)) {
-      const rule = Object.hasOwn(rules, key) ? rules[key as keyof T] : undefined
-      if (!rule) {
-        rejected.push(key)
-        continue
-      }
-
-      const value = rule.normalize ? rule.normalize(raw) : raw
-      if (rule.validate(value)) clean[key] = value
-      else rejected.push(key)
-    }
-
-    return {
-      clean: clean as Partial<T>,
-      rejected
-    }
+    const clean = (validateSchema(schema, updates, '', rejected) ?? {}) as DeepPartial<T>
+    refine?.(clean, current, (path) => rejected.push(path))
+    return { clean, rejected }
   }
 
-  function updateConfig(updates: Partial<T>): ConfigUpdateResult<T> {
-    const { clean, rejected } = validateConfigUpdates(updates, config)
-
-    config = {
-      ...config,
-      ...clean
-    }
-    saveConfig()
-
-    return {
-      config: cloneConfig(config),
-      rejected
-    }
+  function updateConfig(updates: DeepPartial<T>) {
+    const { clean, rejected } = validateConfigUpdates(updates)
+    config = deepMerge(config, clean)
+    save()
+    return { config: structuredClone(config), rejected }
   }
 
   function restoreConfig(snapshot: T): void {
-    config = cloneConfig(snapshot)
-    saveConfig()
+    config = structuredClone(snapshot)
+    save()
   }
 
-  return {
-    getConfig,
-    updateConfig,
-    validateConfigUpdates,
-    restoreConfig
-  }
+  return { getConfig: (): T => structuredClone(config), validateConfigUpdates, updateConfig, restoreConfig }
 }

@@ -13,7 +13,7 @@ const DEFAULT_SCOPES = ['chat:read', 'chat:edit', 'channel:manage:redemptions']
 const REFRESH_BUFFER_MS = 5 * 60 * 1000
 const POLL_REQUEST_TIMEOUT_MS = 10_000
 
-const log = createLogger('TWITCH EVENTSUB')
+const log = createLogger('TWITCH OAUTH')
 
 export class TwitchOAuth {
   private config: TwitchAuthConfig

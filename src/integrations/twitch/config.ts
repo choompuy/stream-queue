@@ -1,220 +1,72 @@
-import { DATA_DIR } from '../../persist.js'
-import { createConfigModule, type FieldRule } from '../../config-helper.js'
-import {
-  TwitchChatCommandConfig,
-  TwitchChatCommandsConfig,
-  TwitchChatCommandsUpdates,
-  TwitchChatCommandUpdates,
-  TwitchChatPermission,
-  TwitchConfig,
-  TwitchConfigUpdates
-} from './types.js'
+import { join } from 'node:path'
+import { createConfigModule, rules, type Schema } from '../../config-helper.js'
+import { DATA_DIR, deepMerge } from '../../persist.js'
+import type { TwitchChatCommandConfig, TwitchChatPermission, TwitchConfig } from './types.js'
 
-const COMMAND_WORD_PATTERN = /^![a-z0-9]+(?: [a-z0-9]+)*$/
-const CHAT_PERMISSIONS: TwitchChatPermission[] = ['everyone', 'moderator', 'broadcaster']
+const COMMAND_PATTERN = /^![a-z0-9]+(?: [a-z0-9]+)*$/
+const PERMISSIONS: TwitchChatPermission[] = ['everyone', 'moderator', 'broadcaster']
 
-function defaultChatCommand(command: string, permission: TwitchChatPermission): TwitchChatCommandConfig {
-  return { enabled: true, command, permission }
-}
+export const CHAT_COMMAND_KEYS = ['now', 'queue', 'skip', 'pause', 'resume'] as const
 
-const twitchConfigDefaults: TwitchConfig = {
-  channelPointsRewardId: null,
-  chatCommands: {
-    now: defaultChatCommand('!sg now', 'everyone'),
-    queue: defaultChatCommand('!sg queue', 'everyone'),
-    skip: defaultChatCommand('!sg skip', 'moderator'),
-    pause: defaultChatCommand('!sg pause', 'moderator'),
-    resume: defaultChatCommand('!sg resume', 'moderator'),
-    controlCooldownSeconds: 5,
-    plainCooldownSeconds: 5
-  }
-}
+const chatCommand = (command: string, permission: TwitchChatPermission): TwitchChatCommandConfig => ({ enabled: true, command, permission })
 
-export const CHAT_COMMAND_KEYS: Array<keyof Omit<TwitchChatCommandsConfig, 'controlCooldownSeconds' | 'plainCooldownSeconds'>> = ['now', 'queue', 'skip', 'pause', 'resume']
-
-const TWITCH_CONFIG_RULES: Record<keyof TwitchConfig, FieldRule> = {
-  channelPointsRewardId: {
-    normalize: (v: unknown) => (typeof v === 'string' ? v.trim() || null : v),
-    validate: (v: unknown) => v === null || (typeof v === 'string' && v.length > 0)
-  },
-  chatCommands: {
-    normalize: (v: unknown) => v,
-    validate: (v: unknown) => typeof v === 'object' && v !== null && !Array.isArray(v)
-  }
-}
-
-const CHAT_COMMAND_RULES: Record<keyof TwitchChatCommandConfig, FieldRule> = {
-  enabled: {
-    validate: (v: unknown) => typeof v === 'boolean'
-  },
+const commandSchema: Schema = {
+  enabled: rules.boolean,
   command: {
-    normalize: (v: unknown) => (typeof v === 'string' ? v.trim().toLowerCase().replace(/\s+/g, ' ') : v),
-    validate: (v: unknown) => typeof v === 'string' && COMMAND_WORD_PATTERN.test(v)
+    normalize: (v) => (typeof v === 'string' ? v.trim().toLowerCase().replace(/\s+/g, ' ') : v),
+    validate: (v) => typeof v === 'string' && COMMAND_PATTERN.test(v)
   },
-  permission: {
-    validate: (v: unknown) => typeof v === 'string' && CHAT_PERMISSIONS.includes(v as TwitchChatPermission)
-  }
+  permission: { validate: (v) => PERMISSIONS.includes(v as TwitchChatPermission) }
 }
 
-function cloneTwitchConfig(source: TwitchConfig): TwitchConfig {
-  // Deep clone using JSON.stringify/parse
-  return JSON.parse(JSON.stringify(source)) as TwitchConfig
-}
-
-const {
-  getConfig,
-  updateConfig: updateConfigModule,
-  validateConfigUpdates,
-  restoreConfig
+export const {
+  getConfig: getTwitchConfig,
+  updateConfig: updateTwitchConfig,
+  validateConfigUpdates: validateTwitchConfigUpdates,
+  restoreConfig: restoreTwitchConfig
 } = createConfigModule<TwitchConfig>({
-  filePath: `${DATA_DIR}/twitch-config.json`,
-  defaults: twitchConfigDefaults,
-  rules: TWITCH_CONFIG_RULES,
-  clone: cloneTwitchConfig
+  filePath: join(DATA_DIR, 'twitch-config.json'),
+  defaults: {
+    channelPointsRewardId: null,
+    chatCommands: {
+      now: chatCommand('!sg now', 'everyone'),
+      queue: chatCommand('!sg queue', 'everyone'),
+      skip: chatCommand('!sg skip', 'moderator'),
+      pause: chatCommand('!sg pause', 'moderator'),
+      resume: chatCommand('!sg resume', 'moderator'),
+      controlCooldownSeconds: 5,
+      plainCooldownSeconds: 5
+    }
+  },
+  schema: {
+    channelPointsRewardId: {
+      normalize: (v) => (typeof v === 'string' ? v.trim() || null : v),
+      validate: (v) => v === null || (typeof v === 'string' && v.length > 0)
+    },
+    chatCommands: {
+      ...Object.fromEntries(CHAT_COMMAND_KEYS.map((key) => [key, commandSchema])),
+      controlCooldownSeconds: rules.number(0, 300),
+      plainCooldownSeconds: rules.number(0, 300)
+    }
+  },
+
+  refine: (clean, current, reject) => {
+    if (!clean.chatCommands) return
+
+    const stored = current.chatCommands
+    const merged = deepMerge(stored, clean.chatCommands)
+    const collides = (key: (typeof CHAT_COMMAND_KEYS)[number]) =>
+      CHAT_COMMAND_KEYS.some((other) => other !== key && merged[other].command === merged[key].command)
+
+    for (let pass = 0; pass < CHAT_COMMAND_KEYS.length; pass++) {
+      const conflicting = CHAT_COMMAND_KEYS.filter((key) => collides(key) && merged[key].command !== stored[key].command)
+      if (conflicting.length === 0) return
+
+      for (const key of conflicting) {
+        merged[key] = { ...merged[key], command: stored[key].command }
+        delete clean.chatCommands[key]?.command
+        reject(`chatCommands.${key}.command`)
+      }
+    }
+  }
 })
-
-function validateChatCommandUpdates(commandKey: string, raw: unknown, rejected: string[]): TwitchChatCommandUpdates | undefined {
-  const path = `chatCommands.${commandKey}`
-
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-    rejected.push(path)
-    return undefined
-  }
-
-  const clean: Record<string, unknown> = {}
-
-  for (const [key, rawValue] of Object.entries(raw)) {
-    const rule = Object.hasOwn(CHAT_COMMAND_RULES, key) ? CHAT_COMMAND_RULES[key as keyof TwitchChatCommandConfig] : undefined
-
-    if (!rule) {
-      rejected.push(`${path}.${key}`)
-      continue
-    }
-
-    const value = rule.normalize ? rule.normalize(rawValue) : rawValue
-
-    if (rule.validate(value)) clean[key] = value
-    else rejected.push(`${path}.${key}`)
-  }
-
-  return clean as TwitchChatCommandUpdates
-}
-
-function validateChatCommandsUpdates(raw: unknown, rejected: string[]): TwitchChatCommandsUpdates | undefined {
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-    rejected.push('chatCommands')
-    return undefined
-  }
-
-  const clean: Record<string, unknown> = {}
-
-  for (const [key, rawValue] of Object.entries(raw)) {
-    if ((CHAT_COMMAND_KEYS as string[]).includes(key)) {
-      const nested = validateChatCommandUpdates(key, rawValue, rejected)
-      if (nested) clean[key] = nested
-      continue
-    }
-
-    if (key === 'controlCooldownSeconds') {
-      if (typeof rawValue === 'number' && Number.isFinite(rawValue) && rawValue >= 0 && rawValue <= 300) {
-        clean[key] = rawValue
-      } else {
-        rejected.push('chatCommands.controlCooldownSeconds')
-      }
-      continue
-    }
-
-    if (key === 'plainCooldownSeconds') {
-      if (typeof rawValue === 'number' && Number.isFinite(rawValue) && rawValue >= 0 && rawValue <= 300) {
-        clean[key] = rawValue
-      } else {
-        rejected.push('chatCommands.plainCooldownSeconds')
-      }
-      continue
-    }
-
-    rejected.push(`chatCommands.${key}`)
-  }
-
-  return clean as TwitchChatCommandsUpdates
-}
-
-export function validateTwitchConfigUpdates(updates: unknown): { clean: TwitchConfigUpdates; rejected: string[] } {
-  const clean: Record<string, unknown> = {}
-  const rejected: string[] = []
-
-  if (typeof updates !== 'object' || updates === null || Array.isArray(updates)) {
-    return { clean: {}, rejected: ['body'] }
-  }
-
-  for (const [key, raw] of Object.entries(updates)) {
-    if (key === 'chatCommands') {
-      const nested = validateChatCommandsUpdates(raw, rejected)
-      if (nested) clean.chatCommands = nested
-      continue
-    }
-
-    const rule = Object.hasOwn(TWITCH_CONFIG_RULES, key) ? TWITCH_CONFIG_RULES[key as keyof TwitchConfig] : undefined
-    if (!rule) {
-      rejected.push(key)
-      continue
-    }
-
-    const value = rule.normalize ? rule.normalize(raw) : raw
-    if (rule.validate(value)) clean[key] = value
-    else rejected.push(key)
-  }
-
-  return { clean: clean as TwitchConfigUpdates, rejected }
-}
-
-function duplicateCommandKeys(commands: TwitchChatCommandsConfig): typeof CHAT_COMMAND_KEYS {
-  return CHAT_COMMAND_KEYS.filter((key) => CHAT_COMMAND_KEYS.some((other) => other !== key && commands[other].command === commands[key].command))
-}
-
-export function updateTwitchConfig(updates: TwitchConfigUpdates): { config: TwitchConfig; rejected: string[] } {
-  const { clean, rejected } = validateTwitchConfigUpdates(updates)
-  const { chatCommands, ...rest } = clean
-
-  const current = getConfig()
-  const mergedChatCommands = { ...current.chatCommands }
-
-  if (chatCommands) {
-    for (const key of CHAT_COMMAND_KEYS) {
-      if (chatCommands[key]) mergedChatCommands[key] = { ...mergedChatCommands[key], ...chatCommands[key] }
-    }
-    if (chatCommands.controlCooldownSeconds !== undefined) {
-      mergedChatCommands.controlCooldownSeconds = chatCommands.controlCooldownSeconds
-    }
-    if (chatCommands.plainCooldownSeconds !== undefined) {
-      mergedChatCommands.plainCooldownSeconds = chatCommands.plainCooldownSeconds
-    }
-  }
-
-  const finalConfig: TwitchConfig = {
-    ...current,
-    ...rest,
-    chatCommands: mergedChatCommands
-  }
-
-  for (let pass = 0; pass < CHAT_COMMAND_KEYS.length; pass++) {
-    const conflicting = duplicateCommandKeys(finalConfig.chatCommands).filter((key) => finalConfig.chatCommands[key].command !== current.chatCommands[key].command)
-    if (conflicting.length === 0) break
-
-    for (const key of conflicting) {
-      finalConfig.chatCommands[key] = { ...finalConfig.chatCommands[key], command: current.chatCommands[key].command }
-
-      const path = `chatCommands.${key}.command`
-      if (!rejected.includes(path)) rejected.push(path)
-    }
-  }
-
-  updateConfigModule(finalConfig)
-
-  return {
-    config: cloneTwitchConfig(getConfig()),
-    rejected
-  }
-}
-
-export { getConfig as getTwitchConfig, restoreConfig as restoreTwitchConfig }

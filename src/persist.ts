@@ -22,7 +22,9 @@ export const BLOCKLIST_PATH = join(DATA_DIR, 'blocklist.json')
 export const STATE_FILE = join(CACHE_DIR, 'queue-state.json')
 export const CACHE_FILE = join(CACHE_DIR, 'youtube-cache.json')
 
-function deepMerge<T>(defaults: T, data: Partial<T>): T {
+export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
+
+export function deepMerge<T>(defaults: T, data: DeepPartial<T>): T {
   if (
     defaults === null ||
     data === null ||
@@ -48,7 +50,7 @@ function deepMerge<T>(defaults: T, data: Partial<T>): T {
       !Array.isArray(value) &&
       !Array.isArray(defaultValue)
     ) {
-      result[key] = deepMerge(defaultValue, value)
+      result[key] = deepMerge(defaultValue, value as DeepPartial<typeof defaultValue>)
     } else if (value !== undefined) {
       result[key] = value
     }

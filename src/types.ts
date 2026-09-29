@@ -117,7 +117,6 @@ export type AppErrorCode =
   | 'TWITCH_AUTH_ERROR'
   | 'TWITCH_REFRESH_ERROR'
   | 'TWITCH_NOT_CONNECTED'
-  | 'TWITCH_EVENTSUB_ERROR'
   | 'TWITCH_API_ERROR'
   | FilterFailureReason
 

@@ -11,18 +11,16 @@ import type {
   TwitchChatPermission
 } from './types.js'
 import { clearTwitchOAuthState, getPublicSecretsView, getSecrets, updateTwitchOAuthState } from '../../secrets.js'
-import { requestSong } from '../../queue.js'
-import { skipCurrent } from '../../player.js'
-import { setPaused } from '../../queue.js'
+import { requestSong, setPaused } from '../../queue.js'
 import { buildNowPlayingMessage, buildQueueMessage, buildSkipMessage, buildRedemptionRejectionMessage } from '../../chat-replies.js'
 import { translateWithFallback } from '../../i18n.js'
 import { getTwitchConfig, CHAT_COMMAND_KEYS } from './config.js'
-import { getState, registerChannelPointsPlaybackFailureHandler } from '../../player.js'
+import { getState, skipCurrent, registerChannelPointsPlaybackFailureHandler } from '../../player.js'
 import { AppError } from '../../types.js'
 import type { FailureReason, QueueItem, ActivityReasonCode } from '../../types.js'
 import { createLogger } from '../../logger.js'
 
-const log = createLogger('TWITCH EVENTSUB')
+const log = createLogger('TWITCH')
 const chatLog = createLogger('TWITCH CHAT')
 
 const REDEMPTION_RETRY_ATTEMPTS = 3
@@ -34,8 +32,7 @@ let eventSub: TwitchEventSub | null = null
 let chat: TwitchChat | null = null
 let deviceAuthorizationPromise: Promise<TwitchUserInfo> | null = null
 let deviceAuthorizationGeneration = 0
-let lastControlCommandAt = 0
-let lastPlainCommandAt = 0
+const lastRun = { plainCooldownSeconds: 0, controlCooldownSeconds: 0 }
 
 function isAuthError(error: unknown): boolean {
   return (
@@ -92,24 +89,6 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
   void startChat()
 }
 
-export async function reinitializeTwitchIntegration(): Promise<void> {
-  if (eventSub) {
-    await eventSub.disconnect()
-    eventSub = null
-  }
-
-  if (chat) {
-    await chat.disconnect()
-    chat = null
-  }
-
-  oauth = null
-  client = null
-  deviceAuthorizationPromise = null
-  deviceAuthorizationGeneration = 0
-  initializeTwitchIntegration()
-}
-
 async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemption): Promise<void> {
   log.log(`Channel Points redemption: ${event.reward.title} by ${event.user_name}`)
 
@@ -153,22 +132,18 @@ async function startEventSub(): Promise<void> {
   if (!oauth || !client) return
   if (eventSub) return
 
-  const userInfo = client.getCachedUserInfo()
-  if (!userInfo) {
+  if (!client.getCachedUserInfo()) {
     log.log('Twitch account not connected, EventSub will not start')
     return
   }
 
-  const clientId = oauth.getConfig().clientId
-  if (!clientId) {
+  if (!oauth.getConfig().clientId) {
     log.log('Twitch client ID not configured, EventSub will not start')
     return
   }
 
   eventSub = new TwitchEventSub({
-    clientId,
-    oauth,
-    broadcasterUserId: userInfo.id,
+    client,
     onChannelPointsRedemption: handleChannelPointsRedemption
   })
 
@@ -207,87 +182,55 @@ async function replyInChat(message: string): Promise<void> {
   })
 }
 
-// skip/pause/resume share one global (not per-user) cooldown so two different moderators
-// firing the same or different control commands back to back can't double up on the action
-async function handleControlCommand(
-  message: TwitchChatMessage,
-  permission: TwitchChatPermission,
-  cooldownSeconds: number,
-  action: () => string
-): Promise<void> {
-  if (!hasPermission(message, permission)) return
-
+// One global (not per-user) cooldown per kind of command: two moderators can't double up on skip/pause/resume,
+// and now/queue can't be spammed
+async function runCommand(message: TwitchChatMessage, cooldown: keyof typeof lastRun, cooldownSeconds: number, action: () => string): Promise<void> {
   const now = Date.now()
-  if (now - lastControlCommandAt < cooldownSeconds * 1000) {
-    chatLog.log(`Ignored control command from ${message.displayName}: cooldown active`)
+  if (now - lastRun[cooldown] < cooldownSeconds * 1000) {
+    chatLog.log(`Ignored a command from ${message.displayName}: cooldown active`)
     return
   }
-  lastControlCommandAt = now
+  lastRun[cooldown] = now
 
-  const reply = action()
-  await replyInChat(reply)
+  await replyInChat(action())
 }
 
-// now/queue share one global (not per-user) cooldown to prevent spam
-async function handlePlainCommand(
-  message: TwitchChatMessage,
-  permission: TwitchChatPermission,
-  cooldownSeconds: number,
-  action: () => Promise<string>
-): Promise<void> {
-  if (!hasPermission(message, permission)) return
-
-  const now = Date.now()
-  if (now - lastPlainCommandAt < cooldownSeconds * 1000) {
-    chatLog.log(`Ignored plain command from ${message.displayName}: cooldown active`)
-    return
-  }
-  lastPlainCommandAt = now
-
-  const reply = await action()
-  await replyInChat(reply)
-}
-
-type PlainCommandKey = 'now' | 'queue'
-type ControlCommandKey = 'skip' | 'pause' | 'resume'
-
-const PLAIN_COMMAND_HANDLERS: Record<PlainCommandKey, () => Promise<string>> = {
-  now: async () => buildNowPlayingMessage(),
-  queue: async () => buildQueueMessage()
-}
-
-const CONTROL_COMMAND_HANDLERS: Record<ControlCommandKey, () => string> = {
-  skip: () => {
-    skipCurrent()
-    return buildSkipMessage(getState())
+const COMMANDS: Record<(typeof CHAT_COMMAND_KEYS)[number], { cooldown: keyof typeof lastRun; run: () => string }> = {
+  now: { cooldown: 'plainCooldownSeconds', run: buildNowPlayingMessage },
+  queue: { cooldown: 'plainCooldownSeconds', run: buildQueueMessage },
+  skip: {
+    cooldown: 'controlCooldownSeconds',
+    run: () => {
+      skipCurrent()
+      return buildSkipMessage(getState())
+    }
   },
-  pause: () => {
-    setPaused(true)
-    return translateWithFallback('chat.paused', undefined, 'Player paused')
+  pause: {
+    cooldown: 'controlCooldownSeconds',
+    run: () => {
+      setPaused(true)
+      return translateWithFallback('chat.paused', undefined, 'Player paused')
+    }
   },
-  resume: () => {
-    setPaused(false)
-    return translateWithFallback('chat.resumed', undefined, 'Playback resumed')
+  resume: {
+    cooldown: 'controlCooldownSeconds',
+    run: () => {
+      setPaused(false)
+      return translateWithFallback('chat.resumed', undefined, 'Playback resumed')
+    }
   }
 }
 
 async function handleChatMessage(message: TwitchChatMessage): Promise<void> {
   const commands = getTwitchConfig().chatCommands
 
-  for (const key of Object.keys(PLAIN_COMMAND_HANDLERS) as PlainCommandKey[]) {
-    const config = commands[key]
-    if (config.enabled && matchesCommand(message.text, config.command) && hasPermission(message, config.permission)) {
-      await handlePlainCommand(message, config.permission, commands.plainCooldownSeconds, PLAIN_COMMAND_HANDLERS[key])
-      return
-    }
-  }
+  for (const key of CHAT_COMMAND_KEYS) {
+    const { enabled, command, permission } = commands[key]
+    if (!enabled || !matchesCommand(message.text, command) || !hasPermission(message, permission)) continue
 
-  for (const key of Object.keys(CONTROL_COMMAND_HANDLERS) as ControlCommandKey[]) {
-    const config = commands[key]
-    if (config.enabled && matchesCommand(message.text, config.command)) {
-      await handleControlCommand(message, config.permission, commands.controlCooldownSeconds, CONTROL_COMMAND_HANDLERS[key])
-      return
-    }
+    const { cooldown, run } = COMMANDS[key]
+    await runCommand(message, cooldown, commands[cooldown], run)
+    return
   }
 }
 
@@ -488,28 +431,12 @@ export function getClient(): TwitchClient | null {
 }
 
 // Export for testing purposes only
-export function _getOAuth(): TwitchOAuth | null {
-  return oauth
-}
-
-// Export for testing purposes only
-export function _getEventSub(): TwitchEventSub | null {
-  return eventSub
-}
-
-// Export for testing purposes only
-export function _getChat(): TwitchChat | null {
-  return chat
-}
-
-// Export for testing purposes only
 export const _test = {
   hasPermission,
   matchesCommand,
   handleChatMessage,
   resetCooldown: () => {
-    lastControlCommandAt = 0
-    lastPlainCommandAt = 0
+    lastRun.plainCooldownSeconds = lastRun.controlCooldownSeconds = 0
   },
   setChat: (mock: TwitchChat | null) => {
     chat = mock
@@ -527,6 +454,5 @@ export async function _resetIntegration(): Promise<void> {
   chat = null
   deviceAuthorizationPromise = null
   deviceAuthorizationGeneration = 0
-  lastControlCommandAt = 0
-  lastPlainCommandAt = 0
+  lastRun.plainCooldownSeconds = lastRun.controlCooldownSeconds = 0
 }

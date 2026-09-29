@@ -14,6 +14,8 @@ import { createLogger } from '../../logger.js'
 
 const log = createLogger('TWITCH CLIENT')
 
+export const CHANNEL_POINTS_REDEMPTION = 'channel.channel_points_custom_reward_redemption.add'
+
 export class TwitchClient {
   private readonly oauth: TwitchOAuth
   private userInfo: TwitchUserInfo | null = null
@@ -133,6 +135,23 @@ export class TwitchClient {
     )
 
     return response.data
+  }
+
+  // Subscribes a live EventSub WebSocket session to Channel Points redemptions of the connected channel
+  async subscribeToRedemptions(sessionId: string): Promise<void> {
+    const userInfo = this.userInfo
+    if (!userInfo) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
+
+    await this.makeAuthenticatedRequest('https://api.twitch.tv/helix/eventsub/subscriptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: CHANNEL_POINTS_REDEMPTION,
+        version: '1',
+        condition: { broadcaster_user_id: userInfo.id },
+        transport: { method: 'websocket', session_id: sessionId }
+      })
+    })
   }
 
   getCachedUserInfo(): TwitchUserInfo | null {

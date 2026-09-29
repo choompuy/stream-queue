@@ -12,12 +12,6 @@ export type TwitchUserInfo = {
   profileImageUrl: string
 }
 
-export type TwitchConnectionStatus = {
-  connected: boolean
-  user: TwitchUserInfo | null
-  connectedAt: number | null
-}
-
 export type TwitchAuthConfig = {
   clientId: string
   clientSecret: string
@@ -160,17 +154,6 @@ export type TwitchChatCommandsConfig = {
 export type TwitchConfig = {
   channelPointsRewardId: string | null
   chatCommands: TwitchChatCommandsConfig
-}
-
-export type TwitchConfigUpdates = Omit<Partial<TwitchConfig>, 'chatCommands'> & {
-  chatCommands?: TwitchChatCommandsUpdates
-}
-export type TwitchChatCommandUpdates = Partial<TwitchChatCommandConfig>
-export type TwitchChatCommandsUpdates = {
-  [K in keyof Omit<TwitchChatCommandsConfig, 'controlCooldownSeconds' | 'plainCooldownSeconds'>]?: TwitchChatCommandUpdates
-} & {
-  controlCooldownSeconds?: number
-  plainCooldownSeconds?: number
 }
 
 export type TwitchConnectionResponse = {
