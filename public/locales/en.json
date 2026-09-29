@@ -195,7 +195,21 @@
       "rewardNone": "Select reward",
       "rewardNote": "Redemptions of this reward will be used as song requests",
       "noRewards": "No eligible rewards found",
-      "authorizationInstructions": "Open Twitch and enter this code to authorize StreamQueue"
+      "authorizationInstructions": "Open Twitch and enter this code to authorize StreamQueue",
+      "createReward": "Create reward",
+      "editReward": "Edit reward",
+      "createRewardTitle": "Reward title",
+      "createRewardCost": "Cost (points)",
+      "createRewardPrompt": "Description (optional)",
+      "createRewardBackgroundColor": "Background color (hex, optional)",
+      "createRewardEnabled": "Enable reward",
+      "limitsSection": "Purchase limits",
+      "maxPerStream": "Max per stream",
+      "maxPerUserPerStream": "Max per user per stream",
+      "globalCooldown": "Global cooldown (seconds)",
+      "globalCooldownNote": "Minimum 60 seconds for display in Twitch UX",
+      "rewardCreated": "Reward created successfully",
+      "rewardCreateError": "Failed to create reward"
     },
     "twitchChat": {
       "title": "Twitch chat commands",

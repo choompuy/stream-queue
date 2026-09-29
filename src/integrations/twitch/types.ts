@@ -94,6 +94,47 @@ export type TwitchCustomReward = {
   prompt: string
   is_enabled: boolean
   is_user_input_required: boolean
+  background_color?: string
+  is_max_per_stream_enabled?: boolean
+  max_per_stream?: number
+  is_max_per_user_per_stream_enabled?: boolean
+  max_per_user_per_stream?: number
+  is_global_cooldown_enabled?: boolean
+  global_cooldown_seconds?: number
+}
+
+export type TwitchCreateCustomReward = {
+  title: string
+  cost: number
+  prompt?: string
+  is_enabled?: boolean
+  background_color?: string
+  is_user_input_required?: boolean
+  is_max_per_stream_enabled?: boolean
+  max_per_stream?: number
+  is_max_per_user_per_stream_enabled?: boolean
+  max_per_user_per_stream?: number
+  is_global_cooldown_enabled?: boolean
+  global_cooldown_seconds?: number
+}
+
+export type TwitchUpdateCustomReward = {
+  title?: string
+  cost?: number
+  prompt?: string
+  is_enabled?: boolean
+  background_color?: string
+  is_user_input_required?: boolean
+  is_max_per_stream_enabled?: boolean
+  max_per_stream?: number
+  is_max_per_user_per_stream_enabled?: boolean
+  max_per_user_per_stream?: number
+  is_global_cooldown_enabled?: boolean
+  global_cooldown_seconds?: number
+}
+
+export type TwitchCreateCustomRewardResponse = {
+  data: TwitchCustomReward[]
 }
 
 export type TwitchCustomRewardsResponse = {

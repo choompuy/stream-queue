@@ -49,6 +49,7 @@ async function request(url, options = {}) {
 
 const post = (url, body) => request(url, { method: 'POST', ...(body !== undefined && { body: JSON.stringify(body) }) })
 const put = (url, body) => request(url, { method: 'PUT', body: JSON.stringify(body) })
+const patch = (url, body) => request(url, { method: 'PATCH', body: JSON.stringify(body) })
 const del = (url) => request(url, { method: 'DELETE' })
 const id = encodeURIComponent
 
@@ -96,10 +97,12 @@ export const api = {
   getBlocklist: () => request('/api/blocklist'),
   blockTrack: (videoId, title) => post('/api/blocklist', { videoId, title }),
   unblockTrack: (videoId) => del(`/api/blocklist/${id(videoId)}`),
-  
+
   getTwitchStatus: () => request('/api/integrations/twitch'),
   connectTwitch: () => post('/api/integrations/twitch/connect'),
   getTwitchRewards: () => request('/api/integrations/twitch/rewards'),
+  createTwitchReward: (data) => post('/api/integrations/twitch/rewards', data),
+  updateTwitchReward: (id, data) => patch(`/api/integrations/twitch/rewards/${id}`, data),
   disconnectTwitch: () => post('/api/integrations/twitch/disconnect'),
   refreshTwitch: () => post('/api/integrations/twitch/refresh'),
   getTwitchConfig: () => request('/api/integrations/twitch/config'),

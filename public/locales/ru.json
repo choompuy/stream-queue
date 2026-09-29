@@ -195,7 +195,21 @@
       "rewardNone": "Выберите награду",
       "rewardNote": "Погашения этой награды будут использоваться как запросы песен",
       "noRewards": "Подходящие награды не найдены",
-      "authorizationInstructions": "Откройте Twitch и введите этот код, чтобы авторизовать StreamQueue"
+      "authorizationInstructions": "Откройте Twitch и введите этот код, чтобы авторизовать StreamQueue",
+      "createReward": "Создать награду",
+      "editReward": "Редактировать награду",
+      "createRewardTitle": "Название награды",
+      "createRewardCost": "Стоимость (баллы)",
+      "createRewardPrompt": "Описание (необязательно)",
+      "createRewardBackgroundColor": "Цвет фона (hex, необязательно)",
+      "createRewardEnabled": "Включить награду",
+      "limitsSection": "Лимиты покупок",
+      "maxPerStream": "Максимум за стрим",
+      "maxPerUserPerStream": "Максимум на пользователя за стрим",
+      "globalCooldown": "Глобальный кулдаун (секунды)",
+      "globalCooldownNote": "Минимум 60 секунд для отображения в Twitch UX",
+      "rewardCreated": "Награда успешно создана",
+      "rewardCreateError": "Не удалось создать награду"
     },
     "twitchChat": {
       "title": "Команды чата Twitch",

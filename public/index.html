@@ -525,10 +525,78 @@
             <div id="twitchRewardSection" class="settings-section hidden">
               <div class="field">
                 <label class="field-label" for="twitchRewardSelect" data-i18n="settings.twitch.reward">Channel Points reward</label>
-                <select class="settings-input input select" id="twitchRewardSelect">
-                  <option value="" data-i18n="settings.twitch.rewardNone">Select reward</option>
-                </select>
+                <div class="field-row">
+                  <select class="settings-input input select" id="twitchRewardSelect">
+                    <option value="" data-i18n="settings.twitch.rewardNone">Select reward</option>
+                  </select>
+                  <button class="btn btn-secondary" id="twitchCreateNewRewardBtn" data-i18n="settings.twitch.createReward">Create reward</button>
+                </div>
                 <div class="text-muted text-xs" data-i18n="settings.twitch.rewardNote">Redemptions of this reward will be used as song requests</div>
+              </div>
+            </div>
+
+            <div id="twitchRewardForm" class="settings-section hidden">
+              <div class="section-tab-header">
+                <h2 data-i18n="settings.twitch.editReward">Edit reward</h2>
+              </div>
+              <div class="field">
+                <label class="field-label" for="twitchRewardTitle" data-i18n="settings.twitch.createRewardTitle">Reward title</label>
+                <input class="settings-input input" type="text" id="twitchRewardTitle" maxlength="45" />
+              </div>
+              <div class="field">
+                <label class="field-label" for="twitchRewardCost" data-i18n="settings.twitch.createRewardCost">Cost (points)</label>
+                <input class="settings-input input" type="number" id="twitchRewardCost" min="1" />
+              </div>
+              <div class="field">
+                <label class="field-label" for="twitchRewardPrompt" data-i18n="settings.twitch.createRewardPrompt">Description (optional)</label>
+                <input class="settings-input input" type="text" id="twitchRewardPrompt" maxlength="140" />
+              </div>
+              <div class="field">
+                <label class="field-label" for="twitchRewardBackgroundColor" data-i18n="settings.twitch.createRewardBackgroundColor"
+                  >Background color (hex, optional)</label
+                >
+                <input class="settings-input input" type="text" id="twitchRewardBackgroundColor" maxlength="6" placeholder="00FF00" />
+              </div>
+              <div class="field">
+                <label class="field-row">
+                  <span data-i18n="settings.twitch.createRewardEnabled">Enable reward</span>
+                  <div class="checkbox-wrapper">
+                    <input class="checkbox" type="checkbox" id="twitchRewardEnabled" />
+                  </div>
+                </label>
+              </div>
+
+              <div class="field">
+                <label class="field-label" data-i18n="settings.twitch.maxPerStream">Max per stream</label>
+                <div class="field-row">
+                  <input class="settings-input input" type="number" id="twitchMaxPerStream" min="1" disabled />
+                  <div class="checkbox-wrapper">
+                    <input class="checkbox" type="checkbox" id="twitchMaxPerStreamEnabled" />
+                  </div>
+                </div>
+              </div>
+              <div class="field">
+                <label class="field-label" data-i18n="settings.twitch.maxPerUserPerStream">Max per user per stream</label>
+                <div class="field-row">
+                  <input class="settings-input input" type="number" id="twitchMaxPerUserPerStream" min="1" disabled />
+                  <div class="checkbox-wrapper">
+                    <input class="checkbox" type="checkbox" id="twitchMaxPerUserPerStreamEnabled" />
+                  </div>
+                </div>
+              </div>
+              <div class="field">
+                <label class="field-label" data-i18n="settings.twitch.globalCooldown">Global cooldown (seconds)</label>
+                <div class="field-row">
+                  <input class="settings-input input" type="number" id="twitchGlobalCooldownSeconds" min="1" disabled />
+                  <div class="checkbox-wrapper">
+                    <input class="checkbox" type="checkbox" id="twitchGlobalCooldownEnabled" />
+                  </div>
+                </div>
+                <div class="text-muted text-xs" data-i18n="settings.twitch.globalCooldownNote">Minimum 60 seconds for display in Twitch UX</div>
+              </div>
+              <div class="field-row">
+                <button class="btn btn-primary" id="twitchSaveRewardBtn" data-i18n="common.save">Save</button>
+                <button class="btn btn-secondary" id="twitchCancelRewardBtn" data-i18n="common.cancel">Cancel</button>
               </div>
             </div>
           </div>

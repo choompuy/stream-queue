@@ -91,3 +91,153 @@ router.get(
     })
   })
 )
+
+router.post(
+  '/rewards',
+  localOnly,
+  asyncHandler(async (req, res) => {
+    const client = getClient()
+
+    if (!client || !getPublicSecretsView().twitch.connected) {
+      throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
+    }
+
+    const {
+      title,
+      cost,
+      prompt,
+      is_enabled,
+      background_color,
+      is_max_per_stream_enabled,
+      max_per_stream,
+      is_max_per_user_per_stream_enabled,
+      max_per_user_per_stream,
+      is_global_cooldown_enabled,
+      global_cooldown_seconds
+    } = req.body
+
+    if (!title || typeof title !== 'string') {
+      throw new AppError('INVALID_INPUT', 'Title is required')
+    }
+
+    if (title.length > 45) {
+      throw new AppError('INVALID_INPUT', 'Title must be 45 characters or less')
+    }
+
+    if (!cost || typeof cost !== 'number' || cost < 1) {
+      throw new AppError('INVALID_INPUT', 'Cost must be a number greater than 0')
+    }
+
+    if (prompt && typeof prompt === 'string' && prompt.length > 140) {
+      throw new AppError('INVALID_INPUT', 'Prompt must be 140 characters or less')
+    }
+
+    if (background_color && typeof background_color === 'string') {
+      const hexRegex = /^[0-9A-Fa-f]{6}$/
+      if (!hexRegex.test(background_color)) {
+        throw new AppError('INVALID_INPUT', 'Background color must be 6 hex characters (e.g., 00FF00)')
+      }
+    }
+
+    if (is_max_per_stream_enabled && (typeof max_per_stream !== 'number' || max_per_stream < 1)) {
+      throw new AppError('INVALID_INPUT', 'Max per stream must be a number greater than 0 when enabled')
+    }
+
+    if (is_max_per_user_per_stream_enabled && (typeof max_per_user_per_stream !== 'number' || max_per_user_per_stream < 1)) {
+      throw new AppError('INVALID_INPUT', 'Max per user per stream must be a number greater than 0 when enabled')
+    }
+
+    if (is_global_cooldown_enabled && (typeof global_cooldown_seconds !== 'number' || global_cooldown_seconds < 1)) {
+      throw new AppError('INVALID_INPUT', 'Global cooldown must be a number greater than 0 when enabled')
+    }
+
+    const reward = await client.createCustomReward({
+      title,
+      cost,
+      prompt,
+      is_enabled,
+      background_color,
+      is_max_per_stream_enabled,
+      max_per_stream,
+      is_max_per_user_per_stream_enabled,
+      max_per_user_per_stream,
+      is_global_cooldown_enabled,
+      global_cooldown_seconds
+    })
+
+    ok(res, { reward })
+  })
+)
+
+router.patch(
+  '/rewards/:id',
+  localOnly,
+  asyncHandler<{ id: string }>(async (req, res) => {
+    const client = getClient()
+
+    if (!client || !getPublicSecretsView().twitch.connected) {
+      throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
+    }
+
+    const {
+      title,
+      cost,
+      prompt,
+      is_enabled,
+      background_color,
+      is_max_per_stream_enabled,
+      max_per_stream,
+      is_max_per_user_per_stream_enabled,
+      max_per_user_per_stream,
+      is_global_cooldown_enabled,
+      global_cooldown_seconds
+    } = req.body
+
+    if (title && typeof title === 'string' && title.length > 45) {
+      throw new AppError('INVALID_INPUT', 'Title must be 45 characters or less')
+    }
+
+    if (cost && (typeof cost !== 'number' || cost < 1)) {
+      throw new AppError('INVALID_INPUT', 'Cost must be a number greater than 0')
+    }
+
+    if (prompt && typeof prompt === 'string' && prompt.length > 140) {
+      throw new AppError('INVALID_INPUT', 'Prompt must be 140 characters or less')
+    }
+
+    if (background_color && typeof background_color === 'string') {
+      const hexRegex = /^#[0-9A-Fa-f]{6}$/
+      if (!hexRegex.test(background_color)) {
+        throw new AppError('INVALID_INPUT', 'Background color must be 6 hex characters (e.g., 00FF00)')
+      }
+    }
+
+    if (is_max_per_stream_enabled && (typeof max_per_stream !== 'number' || max_per_stream < 1)) {
+      throw new AppError('INVALID_INPUT', 'Max per stream must be a number greater than 0 when enabled')
+    }
+
+    if (is_max_per_user_per_stream_enabled && (typeof max_per_user_per_stream !== 'number' || max_per_user_per_stream < 1)) {
+      throw new AppError('INVALID_INPUT', 'Max per user per stream must be a number greater than 0 when enabled')
+    }
+
+    if (is_global_cooldown_enabled && (typeof global_cooldown_seconds !== 'number' || global_cooldown_seconds < 1)) {
+      throw new AppError('INVALID_INPUT', 'Global cooldown must be a number greater than 0 when enabled')
+    }
+
+    const reward = await client.updateCustomReward(req.params.id, {
+      title,
+      cost,
+      prompt,
+      is_enabled,
+      background_color,
+      is_max_per_stream_enabled,
+      max_per_stream,
+      is_max_per_user_per_stream_enabled,
+      max_per_user_per_stream,
+      is_global_cooldown_enabled,
+      global_cooldown_seconds
+    })
+
+    ok(res, { reward })
+  })
+)

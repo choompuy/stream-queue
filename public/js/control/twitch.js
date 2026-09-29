@@ -4,6 +4,7 @@ import { state, dom, log, CHAT_COMMAND_FIELDS } from './state.js'
 import { run } from './run.js'
 import { t } from '../i18n.js'
 import { reportSaveResult, trackChanges } from './save-result.js'
+import { setError } from '../shared.js'
 
 const TWITCH_POLL_INTERVAL_MS = 2000
 
@@ -140,6 +141,7 @@ export function disconnectTwitch() {
     state.twitch.connectedAt = null
     state.twitch.rewards = []
     show(dom.twitchAuthorization, false)
+    show(dom.twitchRewardForm, false)
     renderTwitchConnection()
     renderTwitchRewards()
   })
@@ -170,6 +172,7 @@ export function renderTwitchConnection() {
     show(dom.twitchConnectionControls, false)
     show(dom.twitchAuthorization, false)
     show(dom.twitchRewardSection, false)
+    show(dom.twitchRewardForm, false)
     return
   }
 
@@ -202,6 +205,7 @@ export function renderTwitchConnection() {
     show(dom.twitchDisconnectBtn, false)
     show(dom.twitchRewardSection, false)
     show(dom.twitchChatCommandsPanel, false)
+    show(dom.twitchRewardForm, false)
   }
 }
 
@@ -214,6 +218,10 @@ export function renderTwitchRewards() {
   }
 
   const selectedId = state.twitch.selectedRewardId ?? ''
+  if (selectedId) {
+    const reward = state.twitch.rewards.find((r) => r.id === selectedId)
+    if (reward) showRewardForm(true, reward)
+  }
 
   dom.twitchRewardSelect.innerHTML = `
     <option value="">${escapeHtml(t('settings.twitch.rewardNone'))}</option>
@@ -227,7 +235,18 @@ export function renderTwitchRewards() {
 }
 
 export function onTwitchRewardChange() {
-  state.twitch.selectedRewardId = dom.twitchRewardSelect?.value ?? ''
+  const selectedId = dom.twitchRewardSelect?.value ?? ''
+  state.twitch.selectedRewardId = selectedId
+
+  if (selectedId) {
+    const reward = state.twitch.rewards.find((r) => r.id === selectedId)
+    if (reward) {
+      showRewardForm(true, reward)
+    }
+  } else {
+    hideRewardForm()
+  }
+
   saveTwitchConfig()
 }
 
@@ -364,6 +383,226 @@ export function loadTwitchSecrets() {
     const data = await api.getSecrets()
     state.twitch.configured = Boolean(data.twitch?.configured)
     renderTwitchConnection()
+  })
+}
+
+let currentEditingRewardId = null
+
+function showRewardForm(isEdit = false, reward) {
+  show(dom.twitchRewardForm)
+
+  if (isEdit && reward) {
+    currentEditingRewardId = reward.id
+    setText(dom.twitchRewardForm.querySelector('h2'), t('settings.twitch.editReward'))
+    setValue(dom.twitchRewardTitle, reward.title || '')
+    setValue(dom.twitchRewardCost, reward.cost || '')
+    setValue(dom.twitchRewardPrompt, reward.prompt || '')
+    setValue(dom.twitchRewardBackgroundColor, reward.background_color?.replace('#', '') || '')
+    setChecked(dom.twitchRewardEnabled, reward.is_enabled || false)
+
+    const maxPerStreamSetting = reward.max_per_stream_setting
+    if (maxPerStreamSetting?.is_enabled) {
+      setChecked(dom.twitchMaxPerStreamEnabled, true)
+      setValue(dom.twitchMaxPerStream, maxPerStreamSetting.max_per_stream || '')
+      dom.twitchMaxPerStream.disabled = false
+    } else {
+      setChecked(dom.twitchMaxPerStreamEnabled, false)
+      setValue(dom.twitchMaxPerStream, '')
+      dom.twitchMaxPerStream.disabled = true
+    }
+
+    const maxPerUserSetting = reward.max_per_user_per_stream_setting
+    if (maxPerUserSetting?.is_enabled) {
+      setChecked(dom.twitchMaxPerUserPerStreamEnabled, true)
+      setValue(dom.twitchMaxPerUserPerStream, maxPerUserSetting.max_per_user_per_stream || '')
+      dom.twitchMaxPerUserPerStream.disabled = false
+    } else {
+      setChecked(dom.twitchMaxPerUserPerStreamEnabled, false)
+      setValue(dom.twitchMaxPerUserPerStream, '')
+      dom.twitchMaxPerUserPerStream.disabled = true
+    }
+
+    const cooldownSetting = reward.global_cooldown_setting
+    if (cooldownSetting?.is_enabled) {
+      setChecked(dom.twitchGlobalCooldownEnabled, true)
+      setValue(dom.twitchGlobalCooldownSeconds, cooldownSetting.global_cooldown_seconds || '')
+      dom.twitchGlobalCooldownSeconds.disabled = false
+    } else {
+      setChecked(dom.twitchGlobalCooldownEnabled, false)
+      setValue(dom.twitchGlobalCooldownSeconds, '')
+      dom.twitchGlobalCooldownSeconds.disabled = true
+    }
+  } else {
+    currentEditingRewardId = null
+    setText(dom.twitchRewardForm.querySelector('h2'), t('settings.twitch.createReward'))
+    setValue(dom.twitchRewardTitle, '')
+    setValue(dom.twitchRewardCost, '')
+    setValue(dom.twitchRewardPrompt, '')
+    setValue(dom.twitchRewardBackgroundColor, '')
+    setChecked(dom.twitchRewardEnabled, true)
+    setChecked(dom.twitchMaxPerStreamEnabled, false)
+    setValue(dom.twitchMaxPerStream, '')
+    dom.twitchMaxPerStream.disabled = true
+    setChecked(dom.twitchMaxPerUserPerStreamEnabled, false)
+    setValue(dom.twitchMaxPerUserPerStream, '')
+    dom.twitchMaxPerUserPerStream.disabled = true
+    setChecked(dom.twitchGlobalCooldownEnabled, false)
+    setValue(dom.twitchGlobalCooldownSeconds, '')
+    dom.twitchGlobalCooldownSeconds.disabled = true
+  }
+}
+
+function hideRewardForm() {
+  show(dom.twitchRewardForm, false)
+  currentEditingRewardId = null
+}
+
+function handleToggleSwitch(toggleId, inputId) {
+  const toggle = document.getElementById(toggleId)
+  const input = document.getElementById(inputId)
+  if (!toggle || !input) return
+
+  toggle.addEventListener('change', () => {
+    input.disabled = !toggle.checked
+    if (!toggle.checked) {
+      setValue(input, '')
+    }
+  })
+}
+
+async function saveReward() {
+  const title = dom.twitchRewardTitle?.value?.trim()
+  const cost = Number(dom.twitchRewardCost?.value)
+  const prompt = dom.twitchRewardPrompt?.value?.trim()
+  const backgroundColor = dom.twitchRewardBackgroundColor?.value?.trim()
+  const isEnabled = Boolean(dom.twitchRewardEnabled?.checked)
+  const isMaxPerStreamEnabled = Boolean(dom.twitchMaxPerStreamEnabled?.checked)
+  const maxPerStream = Number(dom.twitchMaxPerStream?.value)
+  const isMaxPerUserPerStreamEnabled = Boolean(dom.twitchMaxPerUserPerStreamEnabled?.checked)
+  const maxPerUserPerStream = Number(dom.twitchMaxPerUserPerStream?.value)
+  const isGlobalCooldownEnabled = Boolean(dom.twitchGlobalCooldownEnabled?.checked)
+  const globalCooldownSeconds = Number(dom.twitchGlobalCooldownSeconds?.value)
+
+  let hasError = false
+
+  if (!title) {
+    setError(dom.twitchRewardTitle, true)
+    hasError = true
+  } else if (title.length > 45) {
+    setError(dom.twitchRewardTitle, true)
+    hasError = true
+  } else {
+    setError(dom.twitchRewardTitle, false)
+  }
+
+  if (!cost || cost < 1) {
+    setError(dom.twitchRewardCost, true)
+    hasError = true
+  } else {
+    setError(dom.twitchRewardCost, false)
+  }
+
+  if (prompt && prompt.length > 140) {
+    setError(dom.twitchRewardPrompt, true)
+    hasError = true
+  } else {
+    setError(dom.twitchRewardPrompt, false)
+  }
+
+  if (backgroundColor && !/^[0-9A-Fa-f]{6}$/.test(backgroundColor)) {
+    setError(dom.twitchRewardBackgroundColor, true)
+    hasError = true
+  } else {
+    setError(dom.twitchRewardBackgroundColor, false)
+  }
+
+  if (isMaxPerStreamEnabled && (!maxPerStream || maxPerStream < 1)) {
+    setError(dom.twitchMaxPerStream, true)
+    hasError = true
+  } else {
+    setError(dom.twitchMaxPerStream, false)
+  }
+
+  if (isMaxPerUserPerStreamEnabled && (!maxPerUserPerStream || maxPerUserPerStream < 1)) {
+    setError(dom.twitchMaxPerUserPerStream, true)
+    hasError = true
+  } else {
+    setError(dom.twitchMaxPerUserPerStream, false)
+  }
+
+  if (isGlobalCooldownEnabled && (!globalCooldownSeconds || globalCooldownSeconds < 1)) {
+    setError(dom.twitchGlobalCooldownSeconds, true)
+    hasError = true
+  } else {
+    setError(dom.twitchGlobalCooldownSeconds, false)
+  }
+
+  if (hasError) return
+
+  const isEdit = currentEditingRewardId !== null
+  const actionName = isEdit ? 'updating Twitch reward' : 'creating Twitch reward'
+
+  await run(actionName, async () => {
+    const data = {
+      title,
+      cost,
+      prompt: prompt || undefined,
+      is_enabled: isEnabled,
+      background_color: '#' + backgroundColor || undefined,
+      is_max_per_stream_enabled: isMaxPerStreamEnabled,
+      max_per_stream: isMaxPerStreamEnabled ? maxPerStream : undefined,
+      is_max_per_user_per_stream_enabled: isMaxPerUserPerStreamEnabled,
+      max_per_user_per_stream: isMaxPerUserPerStreamEnabled ? maxPerUserPerStream : undefined,
+      is_global_cooldown_enabled: isGlobalCooldownEnabled,
+      global_cooldown_seconds: isGlobalCooldownEnabled ? globalCooldownSeconds : undefined
+    }
+
+    let response
+    if (isEdit) {
+      response = await api.updateTwitchReward(currentEditingRewardId, data)
+    } else {
+      response = await api.createTwitchReward(data)
+    }
+
+    if (response?.reward) {
+      await loadTwitchRewards()
+      if (!isEdit) {
+        state.twitch.selectedRewardId = response.reward.id
+        renderTwitchRewards()
+        await saveTwitchConfig()
+      }
+    }
+  })
+}
+
+export function bindTwitchRewardFormEvents() {
+  if (dom.twitchCreateNewRewardBtn) {
+    dom.twitchCreateNewRewardBtn.addEventListener('click', () => showRewardForm(false))
+  }
+
+  if (dom.twitchSaveRewardBtn) {
+    dom.twitchSaveRewardBtn.addEventListener('click', saveReward)
+  }
+
+  handleToggleSwitch('twitchMaxPerStreamEnabled', 'twitchMaxPerStream')
+  handleToggleSwitch('twitchMaxPerUserPerStreamEnabled', 'twitchMaxPerUserPerStream')
+  handleToggleSwitch('twitchGlobalCooldownEnabled', 'twitchGlobalCooldownSeconds')
+
+  const inputs = [
+    dom.twitchRewardTitle,
+    dom.twitchRewardCost,
+    dom.twitchRewardPrompt,
+    dom.twitchRewardBackgroundColor,
+    dom.twitchMaxPerStream,
+    dom.twitchMaxPerUserPerStream,
+    dom.twitchGlobalCooldownSeconds
+  ]
+
+  inputs.forEach((input) => {
+    if (input) {
+      input.addEventListener('input', () => setError(input, false))
+      input.addEventListener('change', () => setError(input, false))
+    }
   })
 }
 

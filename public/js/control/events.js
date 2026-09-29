@@ -5,7 +5,7 @@ import { bindMenus } from './menu.js'
 import { search } from './search.js'
 import { addPlaylist } from './playlists.js'
 import { saveOverlaySettings, onIpChange, changeLocale, isConfigFieldChanged } from './settings.js'
-import { onTwitchRewardChange, stopTwitchPolling, bindTwitchFieldTracking } from './twitch.js'
+import { onTwitchRewardChange, stopTwitchPolling, bindTwitchFieldTracking, bindTwitchRewardFormEvents } from './twitch.js'
 import { trackChanges } from './save-result.js'
 import { setError } from '../shared.js'
 
@@ -68,4 +68,5 @@ export function bindEvents() {
 
   CONFIG_FIELDS.forEach((field) => trackChanges(dom[field.dom], () => isConfigFieldChanged(field)))
   bindTwitchFieldTracking()
+  bindTwitchRewardFormEvents()
 }

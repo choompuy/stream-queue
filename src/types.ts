@@ -118,6 +118,7 @@ export type AppErrorCode =
   | 'TWITCH_REFRESH_ERROR'
   | 'TWITCH_NOT_CONNECTED'
   | 'TWITCH_API_ERROR'
+  | 'INVALID_INPUT'
   | FilterFailureReason
 
 // A reason a song request or an already-queued track's playback failed, with whatever the reason needs

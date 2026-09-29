@@ -54,19 +54,16 @@ export function updateSettings(updates: Partial<Settings>): Settings {
   }
 
   currentSettings = next
-  log.log(`Updated: ${currentSettings}`)
   notifyStateChange()
   return { ...currentSettings }
 }
 
 export function setSettings(settings: Settings): void {
   currentSettings = { ...settings }
-  log.log(`Set: ${currentSettings}`)
 }
 
 export function resetSettings(): Settings {
   currentSettings = { ...defaultSettings }
-  log.log('Reset to defaults')
   notifyStateChange()
   return { ...currentSettings }
 }
