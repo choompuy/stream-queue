@@ -2,7 +2,7 @@ import { getConfig } from './config.js'
 import { getVideoById, searchSongs, selectBestSong } from './youtube/index.js'
 import { parseYouTubeUrl } from './youtube/url.js'
 import { logRejection, logAcceptance } from './activity.js'
-import { QueueItem, Song, AppError, AddedSong } from './types.js'
+import { QueueItem, Song, AppError, AddedSong, FailureReason } from './types.js'
 import { isBlocked } from './blocklist.js'
 import { notifyStateChange } from './state-events.js'
 import { createLogger } from './logger.js'
@@ -116,14 +116,21 @@ export function assertCanAddSong(song: Song, requestedBy: string, addToQueue: bo
   assertCanRequestSong(requestedBy, addToQueue, bypassLimits)
 }
 
-export function addSong(song: Song, requestedBy: string, addToQueue: boolean = true, bypassLimits: boolean = false): QueueItem {
+export function addSong(
+  song: Song,
+  requestedBy: string,
+  addToQueue: boolean = true,
+  bypassLimits: boolean = false,
+  channelPointsRedemption?: QueueItem['channelPointsRedemption']
+): QueueItem {
   log.log(`[REQUEST] ${requestedBy} → "${song.title}"`)
 
   assertCanAddSong(song, requestedBy, addToQueue, bypassLimits)
 
   const item: QueueItem = {
     ...song,
-    requestedBy
+    requestedBy,
+    ...(channelPointsRedemption ? { channelPointsRedemption } : {})
   }
 
   if (addToQueue) {
@@ -187,9 +194,14 @@ export type RequestSongResult =
   | { outcome: 'invalid-url' }
   | { outcome: 'not-found' }
   | { outcome: 'added'; added: AddedSong }
-  | { outcome: 'error'; error: unknown }
+  | { outcome: 'error'; reason: FailureReason }
 
-export async function requestSong(query: string, requestedBy: string, bypassFilters: boolean): Promise<RequestSongResult> {
+export async function requestSong(
+  query: string,
+  requestedBy: string,
+  bypassFilters: boolean,
+  channelPointsRedemption?: QueueItem['channelPointsRedemption']
+): Promise<RequestSongResult> {
   let song: Song | null = null
 
   try {
@@ -221,7 +233,7 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
     }
 
     const wasEmpty = currentSong === null
-    const item = addSong(song, requestedBy, !wasEmpty, bypassFilters)
+    const item = addSong(song, requestedBy, !wasEmpty, bypassFilters, channelPointsRedemption)
 
     if (wasEmpty) {
       setCurrent(item)
@@ -240,6 +252,6 @@ export async function requestSong(query: string, requestedBy: string, bypassFilt
     const reasonCode = error instanceof AppError ? error.code : 'SERVER_ERROR'
     const reasonParams = error instanceof AppError ? error.params : undefined
     logRejection(requestedBy, query, reasonCode, { title: song?.title ?? null, videoId: song?.videoId ?? null, reasonParams })
-    return { outcome: 'error', error }
+    return { outcome: 'error', reason: { code: reasonCode, params: reasonParams } }
   }
 }

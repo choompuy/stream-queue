@@ -1,6 +1,7 @@
-import { translateWithFallback } from './i18n.js'
+import { translateWithFallback, t } from './i18n.js'
+import { getSettings } from './settings.js'
 import { getState } from './player.js'
-import type { PlayerState } from './types.js'
+import type { PlayerState, FailureReason } from './types.js'
 
 const truncate = (s: string, max = 40) => {
   const chars = Array.from(s)
@@ -51,4 +52,39 @@ export function buildQueueMessage(): string {
       ? translateWithFallback('chat.queueMore', { count: state.queue.length - maxShown }, ` [+${state.queue.length - maxShown}]`)
       : ''
   return base + more
+}
+
+const REDEMPTION_REASON_FALLBACKS: Partial<Record<FailureReason['code'], string>> = {
+  DUPLICATE: 'that track is already in the queue',
+  BLOCKED: 'that track is blocked',
+  QUEUE_FULL: 'the queue is full',
+  USER_LIMIT: 'you already have a track queued',
+  INVALID_YOUTUBE_URL: 'that is not a valid YouTube link',
+  SONG_NOT_FOUND: 'no matching track was found',
+  NOT_MUSIC: 'that video is not categorized as music',
+  NOT_PUBLIC: 'that video is not public',
+  NOT_EMBEDDABLE: 'that video cannot be embedded',
+  AGE_RESTRICTED: 'that video is age-restricted',
+  REGION_BLOCKED: 'that video is not available in this region',
+  NOT_PLAYABLE: 'that video cannot be played',
+  IS_LIVE: 'live streams cannot be queued',
+  IS_SHORT: 'shorts cannot be queued',
+  DURATION_OUT_OF_RANGE: 'that track does not meet the length requirement',
+  VIEWS_TOO_LOW: 'that track does not meet the view count requirement',
+  PLAYBACK_VIDEO_UNAVAILABLE: 'that video became unavailable during playback',
+  PLAYBACK_EMBED_DISALLOWED: 'that video stopped allowing embedded playback',
+  PLAYBACK_FAILED: 'playback failed'
+}
+
+// "@user, <reason>, points refunded" - one message per FailureReason, shared by the Channel Points
+// redemption flow (request rejected, or a later playback failure) wherever it needs to notify chat
+export function buildRedemptionRejectionMessage(userName: string, reason: FailureReason): string {
+  const fallbackReason = REDEMPTION_REASON_FALLBACKS[reason.code] ?? 'your request could not be completed'
+  const params = { user: userName, ...reason.params }
+  const locale = getSettings().locale
+
+  const specific = t(locale, `chat.redemption.${reason.code}`, params)
+  if (specific) return specific
+
+  return translateWithFallback('chat.redemption.generic', params, `@${userName}, ${fallbackReason}, points refunded`)
 }

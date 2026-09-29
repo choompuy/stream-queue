@@ -14,11 +14,12 @@ import { clearTwitchOAuthState, getPublicSecretsView, getSecrets, updateTwitchOA
 import { requestSong } from '../../queue.js'
 import { skipCurrent } from '../../player.js'
 import { setPaused } from '../../queue.js'
-import { buildNowPlayingMessage, buildQueueMessage, buildSkipMessage } from '../../chat-replies.js'
+import { buildNowPlayingMessage, buildQueueMessage, buildSkipMessage, buildRedemptionRejectionMessage } from '../../chat-replies.js'
 import { translateWithFallback } from '../../i18n.js'
 import { getTwitchConfig, CHAT_COMMAND_KEYS } from './config.js'
-import { getState } from '../../player.js'
+import { getState, registerChannelPointsPlaybackFailureHandler } from '../../player.js'
 import { AppError } from '../../types.js'
+import type { FailureReason, QueueItem, ActivityReasonCode } from '../../types.js'
 import { createLogger } from '../../logger.js'
 
 const log = createLogger('TWITCH EVENTSUB')
@@ -35,6 +36,25 @@ let deviceAuthorizationPromise: Promise<TwitchUserInfo> | null = null
 let deviceAuthorizationGeneration = 0
 let lastControlCommandAt = 0
 let lastPlainCommandAt = 0
+
+function isAuthError(error: unknown): boolean {
+  return (
+    error instanceof AppError &&
+    (error.code === 'TWITCH_AUTH_ERROR' || error.code === 'TWITCH_NOT_CONNECTED' || error.code === 'TWITCH_REFRESH_ERROR')
+  )
+}
+
+function toCancellableRedemption(tracked: NonNullable<QueueItem['channelPointsRedemption']>): TwitchChannelPointsRedemption {
+  return {
+    id: tracked.id,
+    user_name: tracked.userName,
+    reward: { id: tracked.rewardId }
+  } as TwitchChannelPointsRedemption
+}
+
+function handleChannelPointsPlaybackFailure(tracked: NonNullable<QueueItem['channelPointsRedemption']>, reasonCode: ActivityReasonCode): void {
+  void cancelRedemption(toCancellableRedemption(tracked), client, { code: reasonCode })
+}
 
 export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = {}): void {
   if (oauth) {
@@ -63,6 +83,8 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
     client.setCachedUserInfo(secrets.twitch.userInfo)
     log.log('Restored Twitch user info from storage')
   }
+
+  registerChannelPointsPlaybackFailureHandler(handleChannelPointsPlaybackFailure)
 
   log.log('Twitch integration initialized')
 
@@ -100,7 +122,7 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
   const query = event.user_input.trim()
   if (!query) {
     log.error(`Empty song request in redemption: ${event.id}`)
-    await cancelRedemption(event, client)
+    await cancelRedemption(event, client, { code: 'SONG_NOT_FOUND' })
     return
   }
 
@@ -109,11 +131,18 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
     return
   }
 
-  const result = await requestSong(query, event.user_name, false)
+  const result = await requestSong(query, event.user_name, false, {
+    id: event.id,
+    rewardId: event.reward.id,
+    userName: event.user_name
+  })
 
   if (result.outcome !== 'added') {
+    const reason: FailureReason =
+      result.outcome === 'invalid-url' ? { code: 'INVALID_YOUTUBE_URL' } : result.outcome === 'not-found' ? { code: 'SONG_NOT_FOUND' } : result.reason
+
     log.error(`Song request failed for redemption ${event.id}: ${result.outcome}`)
-    await cancelRedemption(event, client)
+    await cancelRedemption(event, client, reason)
     return
   }
 
@@ -374,26 +403,29 @@ async function fulfillRedemption(redemption: TwitchChannelPointsRedemption, twit
   }
 }
 
-async function cancelRedemption(redemption: TwitchChannelPointsRedemption, twitchClient: TwitchClient | null): Promise<void> {
+async function cancelRedemption(redemption: TwitchChannelPointsRedemption, twitchClient: TwitchClient | null, reason: FailureReason): Promise<void> {
+  const rejectionMessage = buildRedemptionRejectionMessage(redemption.user_name, reason)
   if (!twitchClient) {
     log.error(`Cannot cancel redemption ${redemption.id}: Twitch client not initialized`)
+    await replyInChat(rejectionMessage)
     return
   }
 
   try {
     await twitchClient.updateRedemptionStatus(redemption, 'CANCELED')
     log.log(`Channel Points redemption canceled (points refunded): ${redemption.id}`)
-
-    // Notify in chat that the request was rejected and points refunded
-    const rejectionMessage = translateWithFallback(
-      'chat.redemption.rejected',
-      { user: redemption.user_name },
-      `@${redemption.user_name}, your song request was rejected. Points have been refunded.`
-    )
     await replyInChat(rejectionMessage)
   } catch (error) {
-    log.error(`Failed to cancel redemption ${redemption.id}: ${error instanceof Error ? error.message : error}`)
+    if (!isAuthError(error)) {
+      log.error(`Failed to cancel redemption ${redemption.id}: ${error instanceof Error ? error.message : error}`)
+      return
+    }
+
+    // the API call couldn't go through, but the requester still gets told in chat that their points will be refunded
+    log.error(`Failed to cancel redemption ${redemption.id} (auth error, notifying chat only): ${error instanceof Error ? error.message : error}`)
   }
+
+  await replyInChat(rejectionMessage)
 }
 
 export function isDeviceAuthorizationPending(): boolean {

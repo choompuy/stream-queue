@@ -11,7 +11,27 @@
     "queueList": "Queue [{{count}}]: {{list}}",
     "queueMore": " [+{{count}}]",
     "redemption": {
-      "rejected": "@{{user}}, your song request was rejected. Points have been refunded."
+      "rejected": "@{{user}}, your song request was rejected. Points have been refunded.",
+      "generic": "@{{user}}, your request could not be completed, points refunded",
+      "DUPLICATE": "@{{user}}, that track is already in the queue, points refunded",
+      "BLOCKED": "@{{user}}, that track is blocked, points refunded",
+      "QUEUE_FULL": "@{{user}}, the queue is full, points refunded",
+      "USER_LIMIT": "@{{user}}, you already have a track queued, points refunded",
+      "INVALID_YOUTUBE_URL": "@{{user}}, that is not a valid YouTube link, points refunded",
+      "SONG_NOT_FOUND": "@{{user}}, no matching track was found, points refunded",
+      "NOT_MUSIC": "@{{user}}, that video is not categorized as music, points refunded",
+      "NOT_PUBLIC": "@{{user}}, that video is not public, points refunded",
+      "NOT_EMBEDDABLE": "@{{user}}, that video cannot be embedded, points refunded",
+      "AGE_RESTRICTED": "@{{user}}, that video is age-restricted, points refunded",
+      "REGION_BLOCKED": "@{{user}}, that video is not available in this region, points refunded",
+      "NOT_PLAYABLE": "@{{user}}, that video cannot be played, points refunded",
+      "IS_LIVE": "@{{user}}, live streams cannot be queued, points refunded",
+      "IS_SHORT": "@{{user}}, shorts cannot be queued, points refunded",
+      "DURATION_OUT_OF_RANGE": "@{{user}}, that track does not meet the length requirement, points refunded",
+      "VIEWS_TOO_LOW": "@{{user}}, that track does not meet the view count requirement, points refunded",
+      "PLAYBACK_VIDEO_UNAVAILABLE": "@{{user}}, that video became unavailable during playback, points refunded",
+      "PLAYBACK_EMBED_DISALLOWED": "@{{user}}, that video stopped allowing embedded playback, points refunded",
+      "PLAYBACK_FAILED": "@{{user}}, playback failed, points refunded"
     }
   },
   "common": {

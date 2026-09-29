@@ -57,6 +57,9 @@ export type Song = {
 export type QueueItem = Song & {
   requestedBy: string
   isFallback?: boolean
+  // set only when the song was added via a Twitch Channel Points redemption; carries what
+  // cancelRedemption() needs to refund the points and notify the requester in chat
+  channelPointsRedemption?: { id: string; rewardId: string; userName: string }
 }
 
 export type PlayerState = {
@@ -117,6 +120,10 @@ export type AppErrorCode =
   | 'TWITCH_EVENTSUB_ERROR'
   | 'TWITCH_API_ERROR'
   | FilterFailureReason
+
+// A reason a song request or an already-queued track's playback failed, with whatever the reason needs
+// to become a chat message ({{title}}, quota numbers, etc.) - shared by activity logging and Twitch chat replies
+export type FailureReason = { code: ActivityReasonCode; params?: Record<string, string | number> }
 
 export type ApiErrorCode =
   | ActivityReasonCode

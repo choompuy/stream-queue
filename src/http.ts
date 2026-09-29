@@ -56,6 +56,13 @@ export function failFromError(res: Response, error: unknown): void {
   fail(res, info.message, info.code as ApiErrorCode, info.status, info.params)
 }
 
+// same as failFromError, for callers that already have a structured { code, params } reason
+// instead of the original thrown error (e.g. RequestSongResult's 'error' outcome)
+export function failFromReason(res: Response, reason: { code: string; params?: Record<string, string | number> }): void {
+  const status = STATUS_BY_CODE[reason.code as AppErrorCode] ?? 500
+  fail(res, reason.code, reason.code as ApiErrorCode, status, reason.params)
+}
+
 export function asyncHandler<P = ParamsDictionary>(
   handler: (req: Request<P>, res: Response, next: NextFunction) => Promise<void>
 ): RequestHandler<P> {

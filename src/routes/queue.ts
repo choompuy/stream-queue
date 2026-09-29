@@ -1,6 +1,6 @@
 import express from 'express'
 import { StateResponse, QueueRemoveResponse, QueueRequestResponse } from '../types.js'
-import { ok, fail, failFromError, asyncHandler } from '../http.js'
+import { ok, fail, failFromReason, asyncHandler } from '../http.js'
 import { isLoopbackAddress } from '../local-only.js'
 import { createRateLimiter } from '../rate-limit.js'
 import { translateWithFallback } from '../i18n.js'
@@ -35,7 +35,7 @@ router.post(
       case 'not-found':
         return fail(res, 'could not find a suitable track', 'SONG_NOT_FOUND', 404)
       case 'error':
-        return failFromError(res, result.error)
+        return failFromReason(res, result.reason)
       case 'added': {
         const { added } = result
         const message = added.started
