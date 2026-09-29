@@ -330,10 +330,10 @@
             </div>
             <div class="settings-section">
               <label class="field-row">
+                <span data-i18n="settings.overlay.showVideo">Show video</span>
                 <div class="checkbox-wrapper">
                   <input class="checkbox" type="checkbox" id="showVideo" />
                 </div>
-                <span data-i18n="settings.overlay.showVideo">Show video</span>
               </label>
 
               <div class="field">
@@ -450,17 +450,17 @@
 
             <div class="settings-section">
               <label class="field-row">
+                <span data-i18n="settings.bot.limits.allowShorts">Shorts</span>
                 <div class="checkbox-wrapper">
                   <input class="checkbox" type="checkbox" id="cfgAllowShorts" />
                 </div>
-                <span data-i18n="settings.bot.limits.allowShorts">Shorts</span>
               </label>
 
               <label class="field-row">
+                <span data-i18n="settings.bot.limits.allowLiveStreams">Live Streams</span>
                 <div class="checkbox-wrapper">
                   <input class="checkbox" type="checkbox" id="cfgAllowLiveStreams" />
                 </div>
-                <span data-i18n="settings.bot.limits.allowLiveStreams">Live Streams</span>
               </label>
 
               <div class="field">
@@ -488,21 +488,29 @@
                 </div>
               </div>
 
-              <div id="twitchConnectionControls" class="field">
-                <button id="twitchConnectBtn" class="btn btn-primary" data-action="connect-twitch" data-i18n="settings.twitch.connect">
-                  Connect Twitch
-                </button>
+              <div class="field">
+                <div class="field-label" data-i18n="settings.twitch.chanel">Not connected</div>
+                <div class="field-row">
+                  <div class="start">
+                    <img id="twitchChanelImg" class="thumbnail" src="" alt="User avatar" />
+                    <div id="twitchChanelName" class="text-red truncate" data-i18n="settings.twitch.notConnected">Channel not linked</div>
+                  </div>
 
-                <button
-                  id="twitchDisconnectBtn"
-                  class="btn btn-secondary hidden"
-                  data-action="disconnect-twitch"
-                  data-i18n="settings.twitch.disconnect"
-                >
-                  Disconnect
-                </button>
+                  <div id="twitchConnectionControls">
+                    <button id="twitchConnectBtn" class="btn btn-primary" data-action="connect-twitch" data-i18n="settings.twitch.connect">
+                      Connect Twitch
+                    </button>
 
-                <div id="twitchConnectionStatus" class="text-muted text-xs" data-i18n="settings.twitch.notConnected">Not connected</div>
+                    <button
+                      id="twitchDisconnectBtn"
+                      class="btn btn-secondary btn-danger hidden"
+                      data-action="disconnect-twitch"
+                      data-i18n="settings.twitch.disconnect"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div id="twitchAuthorization" class="field hidden">
@@ -523,15 +531,6 @@
                 <div class="text-muted text-xs" data-i18n="settings.twitch.rewardNote">Redemptions of this reward will be used as song requests</div>
               </div>
             </div>
-
-            <button
-              id="twitchSaveBtn"
-              class="settings-section-btn btn btn-primary hidden"
-              data-action="save-twitch-config"
-              data-i18n="settings.twitch.save"
-            >
-              Save Twitch settings
-            </button>
           </div>
 
           <div id="twitchChatCommandsPanel" class="section-tab panel hidden">
@@ -539,39 +538,34 @@
               <h2 data-i18n="settings.twitchChat.title">Twitch chat commands</h2>
             </div>
 
-            <div class="settings-section text-muted text-xs" data-i18n="settings.twitchChat.note">
-              StreamQueue joins your channel's chat directly and responds to these commands. "now" and "queue" only read state; the rest control
-              playback and default to moderators and you.
-            </div>
-
             <div class="settings-section" id="twitchChatCommandRows">
               <div class="field" data-chat-command="now">
                 <label class="field-label" data-i18n="settings.twitchChat.commands.now">Now playing</label>
                 <div class="field-row">
-                  <div class="checkbox-wrapper">
-                    <input class="checkbox" type="checkbox" id="chatCmdNowEnabled" />
-                  </div>
                   <input class="settings-input input" type="text" id="chatCmdNowCommand" placeholder="!sg now" />
                   <select class="settings-input input select" id="chatCmdNowPermission">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
+                  <div class="checkbox-wrapper">
+                    <input class="checkbox" type="checkbox" id="chatCmdNowEnabled" />
+                  </div>
                 </div>
               </div>
 
               <div class="field" data-chat-command="queue">
                 <label class="field-label" data-i18n="settings.twitchChat.commands.queue">Queue</label>
                 <div class="field-row">
-                  <div class="checkbox-wrapper">
-                    <input class="checkbox" type="checkbox" id="chatCmdQueueEnabled" />
-                  </div>
                   <input class="settings-input input" type="text" id="chatCmdQueueCommand" placeholder="!sg queue" />
                   <select class="settings-input input select" id="chatCmdQueuePermission">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
+                  <div class="checkbox-wrapper">
+                    <input class="checkbox" type="checkbox" id="chatCmdQueueEnabled" />
+                  </div>
                 </div>
               </div>
 
@@ -584,49 +578,51 @@
                   Applies to "now"/"queue" commands to prevent spam.
                 </div>
               </div>
+            </div>
 
+            <div class="settings-section" id="twitchChatCommandRows">
               <div class="field" data-chat-command="skip">
                 <label class="field-label" data-i18n="settings.twitchChat.commands.skip">Skip track</label>
                 <div class="field-row">
-                  <div class="checkbox-wrapper">
-                    <input class="checkbox" type="checkbox" id="chatCmdSkipEnabled" />
-                  </div>
                   <input class="settings-input input" type="text" id="chatCmdSkipCommand" placeholder="!sg skip" />
                   <select class="settings-input input select" id="chatCmdSkipPermission">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
+                  <div class="checkbox-wrapper">
+                    <input class="checkbox" type="checkbox" id="chatCmdSkipEnabled" />
+                  </div>
                 </div>
               </div>
 
               <div class="field" data-chat-command="pause">
                 <label class="field-label" data-i18n="settings.twitchChat.commands.pause">Pause</label>
                 <div class="field-row">
-                  <div class="checkbox-wrapper">
-                    <input class="checkbox" type="checkbox" id="chatCmdPauseEnabled" />
-                  </div>
                   <input class="settings-input input" type="text" id="chatCmdPauseCommand" placeholder="!sg pause" />
                   <select class="settings-input input select" id="chatCmdPausePermission">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
+                  <div class="checkbox-wrapper">
+                    <input class="checkbox" type="checkbox" id="chatCmdPauseEnabled" />
+                  </div>
                 </div>
               </div>
 
               <div class="field" data-chat-command="resume">
                 <label class="field-label" data-i18n="settings.twitchChat.commands.resume">Resume</label>
                 <div class="field-row">
-                  <div class="checkbox-wrapper">
-                    <input class="checkbox" type="checkbox" id="chatCmdResumeEnabled" />
-                  </div>
                   <input class="settings-input input" type="text" id="chatCmdResumeCommand" placeholder="!sg resume" />
                   <select class="settings-input input select" id="chatCmdResumePermission">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
+                  <div class="checkbox-wrapper">
+                    <input class="checkbox" type="checkbox" id="chatCmdResumeEnabled" />
+                  </div>
                 </div>
               </div>
 

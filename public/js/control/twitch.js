@@ -1,4 +1,4 @@
-import { escapeHtml, show, setFieldState, setValue, setChecked } from '../shared.js'
+import { escapeHtml, show, setFieldState, setValue, setChecked, setText, setClass } from '../shared.js'
 import { api, ApiError } from './api.js'
 import { state, dom, log, CHAT_COMMAND_FIELDS } from './state.js'
 import { run } from './run.js'
@@ -97,10 +97,7 @@ export function connectTwitch() {
           return
         }
 
-        if (dom.twitchAuthorizationCode) {
-          dom.twitchAuthorizationCode.textContent = response.userCode
-        }
-
+        setText(dom.twitchAuthorizationCode, response.userCode)
         show(dom.twitchAuthorization)
         navigateAuthorizationWindow(authWindow, response.verificationUri)
         const expiresAt = Date.now() + response.expiresIn * 1000
@@ -168,14 +165,11 @@ export function loadTwitchSettings() {
 }
 
 export function renderTwitchConnection() {
-  if (!dom.twitchConnectionStatus) return
-
   if (!state.twitch.configured) {
     show(dom.twitchNotConfigured)
     show(dom.twitchConnectionControls, false)
     show(dom.twitchAuthorization, false)
     show(dom.twitchRewardSection, false)
-    show(dom.twitchSaveBtn, false)
     return
   }
 
@@ -183,20 +177,30 @@ export function renderTwitchConnection() {
   show(dom.twitchConnectionControls)
 
   if (state.twitch.connected && state.twitch.user) {
-    dom.twitchConnectionStatus.textContent = t('settings.twitch.connected', { user: state.twitch.user.displayName })
-    dom.twitchConnectionStatus.classList.remove('text-red')
+    setText(dom.twitchChanelName, '@' + state.twitch.user.displayName)
+    setClass(dom.twitchChanelName, 'text-green')
+    setClass(dom.twitchChanelName, 'text-red', false)
+    if (dom.twitchChanelImg) {
+      show(dom.twitchChanelImg)
+      dom.twitchChanelImg.src = state.twitch.user.profileImageUrl
+    }
+
     show(dom.twitchConnectBtn, false)
     show(dom.twitchDisconnectBtn)
     show(dom.twitchRewardSection)
-    show(dom.twitchSaveBtn)
     show(dom.twitchChatCommandsPanel)
   } else {
-    dom.twitchConnectionStatus.textContent = t('settings.twitch.notConnected')
-    dom.twitchConnectionStatus.classList.add('text-red')
+    setText(dom.twitchChanelName, t('settings.twitch.notConnected'))
+    setClass(dom.twitchChanelName, 'text-green', false)
+    setClass(dom.twitchChanelName, 'text-red')
+    if (dom.twitchChanelImg) {
+      show(dom.twitchChanelImg, false)
+      dom.twitchChanelImg.src = ''
+    }
+
     show(dom.twitchConnectBtn)
     show(dom.twitchDisconnectBtn, false)
     show(dom.twitchRewardSection, false)
-    show(dom.twitchSaveBtn, false)
     show(dom.twitchChatCommandsPanel, false)
   }
 }
@@ -222,10 +226,9 @@ export function renderTwitchRewards() {
   `
 }
 
-// the reward id lives in state, not in the <select>, so it survives a config load that happens
-// before the reward options exist
 export function onTwitchRewardChange() {
   state.twitch.selectedRewardId = dom.twitchRewardSelect?.value ?? ''
+  saveTwitchConfig()
 }
 
 function chatCommandFields() {
@@ -306,7 +309,13 @@ export function loadTwitchConfig() {
 
 export async function saveTwitchConfig() {
   const rewardId = state.twitch.selectedRewardId || ''
-  const entries = [{ input: dom.twitchRewardSelect, path: 'channelPointsRewardId', changed: rewardId !== state.twitch.savedRewardId }]
+  const entries = [
+    {
+      input: dom.twitchRewardSelect,
+      path: 'channelPointsRewardId',
+      changed: rewardId !== state.twitch.savedRewardId
+    }
+  ]
 
   await run('saving Twitch config', async () => {
     const { config, rejected } = await api.updateTwitchConfig({ channelPointsRewardId: rewardId || null })
@@ -353,7 +362,6 @@ export function loadTwitchSecrets() {
 }
 
 export const twitchActions = {
-  'save-twitch-config': saveTwitchConfig,
   'save-twitch-chat-commands': saveTwitchChatCommands,
   'connect-twitch': connectTwitch,
   'disconnect-twitch': disconnectTwitch

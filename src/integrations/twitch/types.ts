@@ -20,11 +20,13 @@ export type TwitchConnectionStatus = {
 
 export type TwitchAuthConfig = {
   clientId: string
+  clientSecret: string
   scopes: string[]
 }
 
 export type TwitchOAuthOptions = {
   clientId: string
+  clientSecret: string
   scopes?: string[]
   onTokenUpdated?: (tokenData: TwitchTokenData) => void
 }
@@ -44,7 +46,7 @@ export type TwitchSecrets = {
 }
 
 export type TwitchErrorResponse = {
-  error: string
+  status: string
   message: string
 }
 

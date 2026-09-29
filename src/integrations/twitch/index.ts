@@ -44,6 +44,7 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
 
   oauth = new TwitchOAuth({
     clientId: config.clientId || '',
+    clientSecret: config.clientSecret || '',
     scopes: config.scopes,
     onTokenUpdated: (tokenData) => {
       updateTwitchOAuthState({ tokenData })
@@ -331,10 +332,6 @@ export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeRespon
       log.log(`Twitch account connected: ${userInfo.displayName}`)
       return userInfo
     })
-    .catch((error) => {
-      log.error(`Device authorization failed: ${error instanceof Error ? error.message : error}`)
-      throw error
-    })
     .finally(() => {
       deviceAuthorizationPromise = null
     })
@@ -386,9 +383,13 @@ async function cancelRedemption(redemption: TwitchChannelPointsRedemption, twitc
   try {
     await twitchClient.updateRedemptionStatus(redemption, 'CANCELED')
     log.log(`Channel Points redemption canceled (points refunded): ${redemption.id}`)
-    
+
     // Notify in chat that the request was rejected and points refunded
-    const rejectionMessage = translateWithFallback('chat.redemption.rejected', { user: redemption.user_name }, `@${redemption.user_name}, your song request was rejected. Points have been refunded.`)
+    const rejectionMessage = translateWithFallback(
+      'chat.redemption.rejected',
+      { user: redemption.user_name },
+      `@${redemption.user_name}, your song request was rejected. Points have been refunded.`
+    )
     await replyInChat(rejectionMessage)
   } catch (error) {
     log.error(`Failed to cancel redemption ${redemption.id}: ${error instanceof Error ? error.message : error}`)

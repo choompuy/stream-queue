@@ -24,12 +24,13 @@ export class TwitchOAuth {
   constructor(config: TwitchOAuthOptions) {
     this.config = {
       clientId: config.clientId,
+      clientSecret: config.clientSecret,
       scopes: config.scopes || DEFAULT_SCOPES
     }
 
     this.onTokenUpdated = config.onTokenUpdated
 
-    if (!this.config.clientId) log.log('Twitch client ID not configured')
+    if (!this.config.clientId || !this.config.clientSecret) log.log('Twitch client ID not configured')
   }
 
   getConfig(): TwitchAuthConfig {
@@ -69,7 +70,7 @@ export class TwitchOAuth {
 
   async pollForToken(deviceCode: string, interval: number, expiresIn: number): Promise<TwitchTokenData> {
     if (!deviceCode) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch device code is required')
-    if (!this.config.clientId) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID not configured')
+    if (!this.config.clientId || !this.config.clientSecret) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID/Secret not configured')
 
     const deadline = Date.now() + expiresIn * 1000
     let pollInterval = interval * 1000
@@ -78,6 +79,7 @@ export class TwitchOAuth {
       await new Promise((resolve) => setTimeout(resolve, pollInterval))
       const params = new URLSearchParams({
         client_id: this.config.clientId,
+        client_secret: this.config.clientSecret,
         device_code: deviceCode,
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
       })
@@ -101,15 +103,15 @@ export class TwitchOAuth {
       }
 
       const error = (await response.json()) as TwitchErrorResponse
-      if (error.error === 'authorization_pending') continue
+      if (error.message === 'authorization_pending') continue
 
-      if (error.error === 'slow_down') {
+      if (error.message === 'slow_down') {
         pollInterval += 5000
         continue
       }
 
-      if (error.error === 'access_denied') throw new AppError('TWITCH_AUTH_ERROR', 'Twitch authorization was denied')
-      if (error.error === 'expired_token') throw new AppError('TWITCH_AUTH_ERROR', 'Twitch device code expired')
+      if (error.message === 'access_denied') throw new AppError('TWITCH_AUTH_ERROR', 'Twitch authorization was denied')
+      if (error.message === 'expired_token') throw new AppError('TWITCH_AUTH_ERROR', 'Twitch device code expired')
       throw new Error(error.message || 'Device authorization failed')
     }
 
@@ -118,7 +120,7 @@ export class TwitchOAuth {
 
   async refreshAccessToken(): Promise<TwitchTokenData> {
     if (this.refreshPromise) return this.refreshPromise
-    if (!this.config.clientId) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID not configured')
+    if (!this.config.clientId || !this.config.clientSecret) throw new AppError('TWITCH_REFRESH_ERROR', 'Twitch client ID/Secret not configured')
     if (!this.tokenData?.refreshToken) throw new AppError('TWITCH_REFRESH_ERROR', 'No refresh token available')
 
     this.refreshPromise = this.performRefresh()
@@ -185,6 +187,7 @@ export class TwitchOAuth {
 
     const params = new URLSearchParams({
       client_id: this.config.clientId,
+      client_secret: this.config.clientSecret,
       grant_type: 'refresh_token',
       refresh_token: refreshToken
     })
@@ -206,7 +209,7 @@ export class TwitchOAuth {
       log.log('Token refresh successful')
       return this.tokenData
     } catch (error) {
-      log.error(`Token refresh failed: ${error instanceof Error ? error.message : error}`)
+      log.error(`${error instanceof Error ? error.message : error}`)
       throw error
     }
   }
@@ -224,7 +227,7 @@ export class TwitchOAuth {
     try {
       const error = (await response.json()) as TwitchErrorResponse & { error?: string }
       return {
-        code: error.error || '',
+        code: error.status || '',
         message: error.message || `OAuth request failed with HTTP ${response.status}`
       }
     } catch {

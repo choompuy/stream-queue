@@ -164,8 +164,8 @@
     },
     "twitch": {
       "integration": "Twitch integration",
-      "connected": "Connected as {{user}}",
-      "notConnected": "Not connected",
+      "chanel": "Twitch channel",
+      "notConnected": "Channel not linked",
       "connect": "Connect Twitch",
       "disconnect": "Disconnect",
       "disconnectConfirm": "Disconnect Twitch? Chat commands and Channel Points integrations will stop working",
@@ -179,7 +179,6 @@
     },
     "twitchChat": {
       "title": "Twitch chat commands",
-      "note": "StreamQueue joins your channel's chat directly and responds to these commands. \"now\" and \"queue\" only read state; the rest control playback and default to moderators and you.",
       "save": "Save chat commands",
       "cooldown": "Control command cooldown (seconds)",
       "cooldownNote": "Applies only to skip/pause/resume - a shared cooldown so two moderators can't trigger the same action back to back.",

@@ -116,19 +116,24 @@ export function getTwitchClientId(): string {
   return process.env.TWITCH_CLIENT_ID?.trim() || ''
 }
 
+export function getTwitchClientSecret(): string {
+  return process.env.TWITCH_CLIENT_SECRET?.trim() || ''
+}
+
 export function getPublicSecretsView() {
-  const twitchClientId = getTwitchClientId()
+  const configured = Boolean(getTwitchClientId() != '' && getTwitchClientSecret() != '')
   return {
     youtubeApiKey: maskSecret(secrets.youtubeApiKey),
     hasYoutubeApiKey: secrets.youtubeApiKey.length > 0,
 
     twitch: {
-      configured: Boolean(twitchClientId),
+      configured,
       connected: secrets.twitch.tokenData !== null && secrets.twitch.userInfo !== null,
       user: secrets.twitch.userInfo
         ? {
             displayName: secrets.twitch.userInfo.displayName,
-            login: secrets.twitch.userInfo.login
+            login: secrets.twitch.userInfo.login,
+            profileImageUrl: secrets.twitch.userInfo.profileImageUrl
           }
         : null,
       connectedAt: secrets.twitch.connectedAt

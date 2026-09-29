@@ -239,6 +239,12 @@ select {
   object-fit: cover;
 }
 
+.thumbnail#twitchChanelImg {
+  height: 2rem;
+  border: 1px var(--border) solid;
+  aspect-ratio: 1 / 1;
+}
+
 .empty {
   margin: 1rem;
   padding: 1rem;
@@ -316,6 +322,10 @@ select {
 .section-tabs-wrapper .section-tab {
   height: 25rem;
   max-height: 25rem;
+}
+
+.settings-wrapper .section-tab {
+  height: fit-content;
 }
 
 .section-tab > :not(:first-child) {
@@ -631,7 +641,16 @@ select {
 
 .field-row {
   display: flex;
+  justify-content: space-between;
   align-items: center;
+  gap: 0.5rem;
+}
+
+.field-row .start,
+.field-row .end {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
   gap: 0.5rem;
 }
 

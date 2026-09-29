@@ -12,12 +12,10 @@ const jsdom = new JSDOM(
     <div id="twitchConnectionControls" class="hidden"></div>
     <div id="twitchAuthorization" class="hidden"></div>
     <span id="twitchAuthorizationCode"></span>
-    <div id="twitchConnectionStatus"></div>
     <button id="twitchConnectBtn"></button>
     <button id="twitchDisconnectBtn" class="hidden"></button>
     <div id="twitchRewardSection" class="hidden"></div>
     <select id="twitchRewardSelect"></select>
-    <button id="twitchSaveBtn" class="hidden"></button>
     <div id="twitchChatCommandsPanel" class="hidden"></div>
     <input type="checkbox" id="chatCmdNowEnabled" />
     <input id="chatCmdNowCommand" />
@@ -99,7 +97,15 @@ globalThis.fetch = async (url, options = {}) => {
 }
 
 jsdom.window.open = (url) => {
-  const opened = { url, href: null, closed: false, opener: {}, close() { this.closed = true } }
+  const opened = {
+    url,
+    href: null,
+    closed: false,
+    opener: {},
+    close() {
+      this.closed = true
+    }
+  }
   Object.defineProperty(opened, 'location', {
     value: {
       set href(value) {
@@ -167,7 +173,6 @@ function reset() {
   dom.twitchConnectBtn.classList.remove('hidden')
   dom.twitchDisconnectBtn.classList.add('hidden')
   dom.twitchRewardSection.classList.add('hidden')
-  dom.twitchSaveBtn.classList.add('hidden')
   dom.twitchChatCommandsPanel.classList.add('hidden')
 
   for (const field of CHAT_COMMAND_FIELDS) {
@@ -396,7 +401,6 @@ test('loadTwitchSettings', async (t) => {
 
     assert.ok(!dom.twitchConnectionControls.classList.contains('hidden'))
     assert.ok(!dom.twitchRewardSection.classList.contains('hidden'))
-    assert.ok(!dom.twitchSaveBtn.classList.contains('hidden'))
     assert.ok(!dom.twitchChatCommandsPanel.classList.contains('hidden'))
     assert.ok(dom.twitchConnectBtn.classList.contains('hidden'))
     assert.ok(!dom.twitchDisconnectBtn.classList.contains('hidden'))
@@ -541,7 +545,9 @@ test('the reward id is saved from state, not from the select element', async (t)
   })
 
   await t.test('shows a success toast on success', async () => {
-    handlers = { 'PUT /api/integrations/twitch/config': () => ({ config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] }) }
+    handlers = {
+      'PUT /api/integrations/twitch/config': () => ({ config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] })
+    }
 
     await settings.saveTwitchConfig()
 
@@ -555,10 +561,15 @@ test('saveTwitchConfig() highlights the reward select when the backend rejects i
   await t.test('a rejected channelPointsRewardId puts the error class on the select and toasts', async () => {
     handlers = {
       'PUT /api/integrations/twitch/config': () => {
-        throw new MockApiFailure('invalid config fields', 'INVALID_CONFIG', { fields: 'channelPointsRewardId' }, {
-          config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG },
-          rejected: ['channelPointsRewardId']
-        })
+        throw new MockApiFailure(
+          'invalid config fields',
+          'INVALID_CONFIG',
+          { fields: 'channelPointsRewardId' },
+          {
+            config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG },
+            rejected: ['channelPointsRewardId']
+          }
+        )
       }
     }
 
@@ -583,7 +594,9 @@ test('saveTwitchConfig() highlights the reward select when the backend rejects i
 
   await t.test('clears a previous error class when the next save goes through', async () => {
     dom.twitchRewardSelect.classList.add('error')
-    handlers = { 'PUT /api/integrations/twitch/config': () => ({ config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] }) }
+    handlers = {
+      'PUT /api/integrations/twitch/config': () => ({ config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] })
+    }
 
     await settings.saveTwitchConfig()
 

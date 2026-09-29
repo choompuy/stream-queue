@@ -1,4 +1,4 @@
-import { $, createLogger } from '../shared.js'
+import { $, createLogger, setText } from '../shared.js'
 
 export const log = createLogger('CONTROL')
 
@@ -106,12 +106,13 @@ export const dom = {
   twitchConnectionControls: $('twitchConnectionControls'),
   twitchAuthorization: $('twitchAuthorization'),
   twitchAuthorizationCode: $('twitchAuthorizationCode'),
-  twitchConnectionStatus: $('twitchConnectionStatus'),
+  twitchChanel: $('twitchChanel'),
+  twitchChanelImg: $('twitchChanelImg'),
+  twitchChanelName: $('twitchChanelName'),
   twitchConnectBtn: $('twitchConnectBtn'),
   twitchDisconnectBtn: $('twitchDisconnectBtn'),
   twitchRewardSection: $('twitchRewardSection'),
   twitchRewardSelect: $('twitchRewardSelect'),
-  twitchSaveBtn: $('twitchSaveBtn'),
 
   twitchChatCommandsPanel: $('twitchChatCommandsPanel'),
   chatCmdCooldown: $('chatCmdCooldown'),
@@ -164,7 +165,7 @@ export const selectors = {
 }
 
 export function renderStats() {
-  if (dom.tabPlaylistCount) dom.tabPlaylistCount.textContent = state.fallback?.sourceCount ?? 0
-  if (dom.tabActivityCount) dom.tabActivityCount.textContent = state.activity.length
-  if (dom.tabBlocklistCount) dom.tabBlocklistCount.textContent = state.blocklist.length
+  setText(dom.tabPlaylistCount, state.fallback?.sourceCount ?? 0)
+  setText(dom.tabActivityCount, state.activity.length)
+  setText(dom.tabBlocklistCount, state.blocklist.length)
 }
