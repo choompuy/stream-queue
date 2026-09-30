@@ -17,6 +17,13 @@ export function registerChannelPointsPlaybackFailureHandler(handler: ChannelPoin
   onChannelPointsPlaybackFailure = handler
 }
 
+type ChannelPointsSuccessHandler = (redemption: NonNullable<QueueItem['channelPointsRedemption']>) => void
+let onChannelPointsPlaybackSuccess: ChannelPointsSuccessHandler | null = null
+
+export function registerChannelPointsPlaybackSuccessHandler(handler: ChannelPointsSuccessHandler | null): void {
+  onChannelPointsPlaybackSuccess = handler
+}
+
 export function getNextTrack(): QueueItem | null {
   return getQueue().find((item) => !isBlocked(item.videoId)) ?? peekNextFallbackTrack()
 }
@@ -53,7 +60,9 @@ export function moveToNext(): QueueItem | null {
 
 export function skipCurrent(): QueueItem | null {
   const skipped = getCurrent()
-  if (skipped) log.log(`skipped "${skipped.title}"`)
+  if (skipped) {
+    log.log(`skipped "${skipped.title}"`)
+  }
   return moveToNext()
 }
 
@@ -87,6 +96,11 @@ export function endCurrent(videoId?: string): boolean {
   if (!isAboutCurrent(videoId)) {
     log.log(`ignored "ended" for ${videoId}: it is not the current track`)
     return false
+  }
+
+  const finished = getCurrent()
+  if (finished?.channelPointsRedemption) {
+    onChannelPointsPlaybackSuccess?.(finished.channelPointsRedemption)
   }
 
   moveToNext()

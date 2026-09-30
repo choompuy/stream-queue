@@ -16,10 +16,18 @@ export class TwitchEventSub extends ReconnectingSocket {
   protected readonly url = 'wss://eventsub.wss.twitch.tv/ws'
   protected readonly readyName = 'the EventSub session welcome'
   private readonly config: TwitchEventSubOptions
+  private isReconnect = false
+  private recentMessageIds: string[] = []
+  private static readonly MAX_RECENT_MESSAGE_IDS = 100
 
   constructor(config: TwitchEventSubOptions) {
     super()
     this.config = config
+  }
+
+  async connect(): Promise<void> {
+    this.isReconnect = false
+    await super.connect()
   }
 
   protected async onMessage(rawMessage: string): Promise<void> {
@@ -62,6 +70,13 @@ export class TwitchEventSub extends ReconnectingSocket {
 
     log.log(`Session connected: ${sessionId}`)
 
+    if (this.isReconnect) {
+      log.log('Reconnected session: subscription carries over, not re-subscribing')
+      this.isReconnect = false
+      this.markReady()
+      return
+    }
+
     try {
       await this.config.client.subscribeToRedemptions(sessionId)
       log.log('Subscribed to Channel Points redemptions')
@@ -81,6 +96,17 @@ export class TwitchEventSub extends ReconnectingSocket {
     }
 
     if (subscription.type !== CHANNEL_POINTS_REDEMPTION) return
+
+    const messageId = message.metadata.message_id
+    if (this.recentMessageIds.includes(messageId)) {
+      log.log(`Ignoring redelivered notification: ${messageId}`)
+      return
+    }
+
+    this.recentMessageIds.push(messageId)
+    if (this.recentMessageIds.length > TwitchEventSub.MAX_RECENT_MESSAGE_IDS) {
+      this.recentMessageIds.shift()
+    }
 
     await this.handleChannelPointsRedemption(message.payload.event)
   }
@@ -104,6 +130,7 @@ export class TwitchEventSub extends ReconnectingSocket {
     }
 
     const oldSocket = this.socket
+    this.isReconnect = true
     log.log('Twitch requested reconnect')
 
     try {
@@ -112,6 +139,7 @@ export class TwitchEventSub extends ReconnectingSocket {
       log.log('Reconnected')
     } catch (error) {
       log.error(`Reconnect failed: ${error instanceof Error ? error.message : error}`)
+      this.isReconnect = false
       this.scheduleReconnect()
     } finally {
       oldSocket?.removeAllListeners()

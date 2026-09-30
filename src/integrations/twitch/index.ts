@@ -15,7 +15,7 @@ import { requestSong, setPaused } from '../../queue.js'
 import { buildNowPlayingMessage, buildQueueMessage, buildSkipMessage, buildRedemptionRejectionMessage } from '../../chat-replies.js'
 import { translateWithFallback } from '../../i18n.js'
 import { getTwitchConfig, CHAT_COMMAND_KEYS } from './config.js'
-import { getState, skipCurrent, registerChannelPointsPlaybackFailureHandler } from '../../player.js'
+import { getState, skipCurrent, registerChannelPointsPlaybackFailureHandler, registerChannelPointsPlaybackSuccessHandler } from '../../player.js'
 import { AppError } from '../../types.js'
 import type { FailureReason, QueueItem, ActivityReasonCode } from '../../types.js'
 import { createLogger } from '../../logger.js'
@@ -34,13 +34,6 @@ let deviceAuthorizationPromise: Promise<TwitchUserInfo> | null = null
 let deviceAuthorizationGeneration = 0
 const lastRun = { plainCooldownSeconds: 0, controlCooldownSeconds: 0 }
 
-function isAuthError(error: unknown): boolean {
-  return (
-    error instanceof AppError &&
-    (error.code === 'TWITCH_AUTH_ERROR' || error.code === 'TWITCH_NOT_CONNECTED' || error.code === 'TWITCH_REFRESH_ERROR')
-  )
-}
-
 function toCancellableRedemption(tracked: NonNullable<QueueItem['channelPointsRedemption']>): TwitchChannelPointsRedemption {
   return {
     id: tracked.id,
@@ -51,6 +44,19 @@ function toCancellableRedemption(tracked: NonNullable<QueueItem['channelPointsRe
 
 function handleChannelPointsPlaybackFailure(tracked: NonNullable<QueueItem['channelPointsRedemption']>, reasonCode: ActivityReasonCode): void {
   void cancelRedemption(toCancellableRedemption(tracked), client, { code: reasonCode })
+}
+
+function handleChannelPointsPlaybackSuccess(tracked: NonNullable<QueueItem['channelPointsRedemption']>): void {
+  if (!getTwitchConfig().autoFulfillRedemptions) {
+    log.log(`Redemption ${tracked.id} finished playback, left unfulfilled (auto-fulfill disabled)`)
+    return
+  }
+
+  if (!client) {
+    log.error(`Cannot fulfill redemption ${tracked.id}: Twitch client not initialized`)
+    return
+  }
+  void fulfillRedemption(toCancellableRedemption(tracked), client)
 }
 
 export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = {}): void {
@@ -82,6 +88,7 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
   }
 
   registerChannelPointsPlaybackFailureHandler(handleChannelPointsPlaybackFailure)
+  registerChannelPointsPlaybackSuccessHandler(handleChannelPointsPlaybackSuccess)
 
   log.log('Twitch integration initialized')
 
@@ -125,7 +132,7 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
     return
   }
 
-  await fulfillRedemption(event, client)
+  log.log(`Redemption ${event.id} added to queue`)
 }
 
 async function startEventSub(): Promise<void> {
@@ -348,6 +355,7 @@ async function fulfillRedemption(redemption: TwitchChannelPointsRedemption, twit
 
 async function cancelRedemption(redemption: TwitchChannelPointsRedemption, twitchClient: TwitchClient | null, reason: FailureReason): Promise<void> {
   const rejectionMessage = buildRedemptionRejectionMessage(redemption.user_name, reason)
+
   if (!twitchClient) {
     log.error(`Cannot cancel redemption ${redemption.id}: Twitch client not initialized`)
     await replyInChat(rejectionMessage)
@@ -357,15 +365,8 @@ async function cancelRedemption(redemption: TwitchChannelPointsRedemption, twitc
   try {
     await twitchClient.updateRedemptionStatus(redemption, 'CANCELED')
     log.log(`Channel Points redemption canceled (points refunded): ${redemption.id}`)
-    await replyInChat(rejectionMessage)
   } catch (error) {
-    if (!isAuthError(error)) {
-      log.error(`Failed to cancel redemption ${redemption.id}: ${error instanceof Error ? error.message : error}`)
-      return
-    }
-
-    // the API call couldn't go through, but the requester still gets told in chat that their points will be refunded
-    log.error(`Failed to cancel redemption ${redemption.id} (auth error, notifying chat only): ${error instanceof Error ? error.message : error}`)
+    log.error(`Failed to cancel redemption ${redemption.id}, notifying chat only: ${error instanceof Error ? error.message : error}`)
   }
 
   await replyInChat(rejectionMessage)

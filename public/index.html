@@ -331,14 +331,14 @@
             <div class="settings-section">
               <label class="field-row">
                 <span data-i18n="settings.overlay.showVideo">Show video</span>
-                <div class="checkbox-wrapper">
+                <div class="checkbox-wrapper settings-input">
                   <input class="checkbox" type="checkbox" id="showVideo" />
                 </div>
               </label>
 
               <div class="field">
                 <label class="field-label" for="badgePosition" data-i18n="settings.overlay.badgePosition">Badge position</label>
-                <select class="settings-input input select" id="badgePosition">
+                <select class="settings-input input" id="badgePosition">
                   <option value="top-left" data-i18n="settings.overlay.positionTopLeft">Top Left</option>
                   <option value="top-right" data-i18n="settings.overlay.positionTopRight">Top Right</option>
                   <option value="bottom-left" data-i18n="settings.overlay.positionBottomLeft">Bottom Left</option>
@@ -369,7 +369,7 @@
               <div class="field">
                 <label class="field-label" for="selectIp" data-i18n="settings.overlay.ipSelector">IP selector</label>
                 <div class="field-row">
-                  <select class="settings-input input select hidden" id="selectIp"></select>
+                  <select class="settings-input input hidden" id="selectIp"></select>
                   <button class="btn btn-secondary btn-icon" data-action="toggle-qr" title="QR code" data-i18n-title="settings.overlay.qrCode">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                       <path
@@ -451,14 +451,14 @@
             <div class="settings-section">
               <label class="field-row">
                 <span data-i18n="settings.bot.limits.allowShorts">Shorts</span>
-                <div class="checkbox-wrapper">
+                <div class="checkbox-wrapper settings-input">
                   <input class="checkbox" type="checkbox" id="cfgAllowShorts" />
                 </div>
               </label>
 
               <label class="field-row">
                 <span data-i18n="settings.bot.limits.allowLiveStreams">Live Streams</span>
-                <div class="checkbox-wrapper">
+                <div class="checkbox-wrapper settings-input">
                   <input class="checkbox" type="checkbox" id="cfgAllowLiveStreams" />
                 </div>
               </label>
@@ -526,78 +526,90 @@
               <div class="field">
                 <label class="field-label" for="twitchRewardSelect" data-i18n="settings.twitch.reward">Channel Points reward</label>
                 <div class="field-row">
-                  <select class="settings-input input select" id="twitchRewardSelect">
+                  <select class="settings-input input" id="twitchRewardSelect">
                     <option value="" data-i18n="settings.twitch.rewardNone">Select reward</option>
                   </select>
                   <button class="btn btn-secondary" id="twitchCreateNewRewardBtn" data-i18n="settings.twitch.createReward">Create reward</button>
                 </div>
                 <div class="text-muted text-xs" data-i18n="settings.twitch.rewardNote">Redemptions of this reward will be used as song requests</div>
               </div>
+              <div class="field">
+                <label class="field-row">
+                  <span data-i18n="settings.twitch.autoFulfillRedemptions">Auto-fulfill redemptions</span>
+                  <div class="checkbox-wrapper settings-input">
+                    <input class="checkbox" type="checkbox" id="twitchAutoFulfillRedemptions" />
+                  </div>
+                </label>
+                <div class="text-muted text-xs" data-i18n="settings.twitch.autoFulfillRedemptionsNote">
+                  Automatically fulfill redemptions when the track finishes playing successfully
+                </div>
+              </div>
             </div>
 
-            <div id="twitchRewardForm" class="settings-section hidden">
+            <div id="twitchRewardForm" class="section-tab hidden">
               <div class="section-tab-header">
                 <h2 data-i18n="settings.twitch.editReward">Edit reward</h2>
               </div>
-              <div class="field">
-                <label class="field-label" for="twitchRewardTitle" data-i18n="settings.twitch.createRewardTitle">Reward title</label>
-                <input class="settings-input input" type="text" id="twitchRewardTitle" maxlength="45" />
-              </div>
-              <div class="field">
-                <label class="field-label" for="twitchRewardCost" data-i18n="settings.twitch.createRewardCost">Cost (points)</label>
-                <input class="settings-input input" type="number" id="twitchRewardCost" min="1" />
-              </div>
-              <div class="field">
-                <label class="field-label" for="twitchRewardPrompt" data-i18n="settings.twitch.createRewardPrompt">Description (optional)</label>
-                <input class="settings-input input" type="text" id="twitchRewardPrompt" maxlength="140" />
-              </div>
-              <div class="field">
-                <label class="field-label" for="twitchRewardBackgroundColor" data-i18n="settings.twitch.createRewardBackgroundColor"
-                  >Background color (hex, optional)</label
-                >
-                <input class="settings-input input" type="text" id="twitchRewardBackgroundColor" maxlength="6" placeholder="00FF00" />
-              </div>
-              <div class="field">
-                <label class="field-row">
-                  <span data-i18n="settings.twitch.createRewardEnabled">Enable reward</span>
-                  <div class="checkbox-wrapper">
-                    <input class="checkbox" type="checkbox" id="twitchRewardEnabled" />
+              <div class="settings-section">
+                <div class="field">
+                  <label class="field-label" for="twitchRewardTitle" data-i18n="settings.twitch.createRewardTitle">Reward title</label>
+                  <input class="settings-input input" type="text" id="twitchRewardTitle" maxlength="45" />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="twitchRewardCost" data-i18n="settings.twitch.createRewardCost">Cost (points)</label>
+                  <input class="settings-input input" type="number" id="twitchRewardCost" min="1" />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="twitchRewardPrompt" data-i18n="settings.twitch.createRewardPrompt">Description (optional)</label>
+                  <input class="settings-input input" type="text" id="twitchRewardPrompt" maxlength="140" />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="twitchRewardBackgroundColor" data-i18n="settings.twitch.createRewardBackgroundColor"
+                    >Background color (hex, optional)</label
+                  >
+                  <div class="field-row">
+                    <input class="settings-input input" type="color" id="twitchRewardBackgroundColorPicker" />
+                    <input class="settings-input input" type="text" id="twitchRewardBackgroundColor" maxlength="6" placeholder="00FF00" />
                   </div>
-                </label>
-              </div>
+                </div>
+                <div class="field">
+                  <label class="field-row">
+                    <span data-i18n="settings.twitch.createRewardEnabled">Enable reward</span>
+                    <div class="checkbox-wrapper settings-input">
+                      <input class="checkbox" type="checkbox" id="twitchRewardEnabled" />
+                    </div>
+                  </label>
+                </div>
 
-              <div class="field">
-                <label class="field-label" data-i18n="settings.twitch.maxPerStream">Max per stream</label>
-                <div class="field-row">
-                  <input class="settings-input input" type="number" id="twitchMaxPerStream" min="1" disabled />
-                  <div class="checkbox-wrapper">
-                    <input class="checkbox" type="checkbox" id="twitchMaxPerStreamEnabled" />
+                <div class="field">
+                  <label class="field-label" data-i18n="settings.twitch.maxPerStream">Max per stream</label>
+                  <div class="field-row">
+                    <input class="settings-input input" type="number" id="twitchMaxPerStream" min="1" disabled />
+                    <div class="checkbox-wrapper settings-input">
+                      <input class="checkbox" type="checkbox" id="twitchMaxPerStreamEnabled" />
+                    </div>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="field-label" data-i18n="settings.twitch.maxPerUserPerStream">Max per user per stream</label>
+                  <div class="field-row">
+                    <input class="settings-input input" type="number" id="twitchMaxPerUserPerStream" min="1" disabled />
+                    <div class="checkbox-wrapper settings-input">
+                      <input class="checkbox" type="checkbox" id="twitchMaxPerUserPerStreamEnabled" />
+                    </div>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="field-label" data-i18n="settings.twitch.globalCooldown">Global cooldown (seconds)</label>
+                  <div class="field-row">
+                    <input class="settings-input input" type="number" id="twitchGlobalCooldownSeconds" min="1" disabled />
+                    <div class="checkbox-wrapper settings-input">
+                      <input class="checkbox" type="checkbox" id="twitchGlobalCooldownEnabled" />
+                    </div>
                   </div>
                 </div>
               </div>
-              <div class="field">
-                <label class="field-label" data-i18n="settings.twitch.maxPerUserPerStream">Max per user per stream</label>
-                <div class="field-row">
-                  <input class="settings-input input" type="number" id="twitchMaxPerUserPerStream" min="1" disabled />
-                  <div class="checkbox-wrapper">
-                    <input class="checkbox" type="checkbox" id="twitchMaxPerUserPerStreamEnabled" />
-                  </div>
-                </div>
-              </div>
-              <div class="field">
-                <label class="field-label" data-i18n="settings.twitch.globalCooldown">Global cooldown (seconds)</label>
-                <div class="field-row">
-                  <input class="settings-input input" type="number" id="twitchGlobalCooldownSeconds" min="1" disabled />
-                  <div class="checkbox-wrapper">
-                    <input class="checkbox" type="checkbox" id="twitchGlobalCooldownEnabled" />
-                  </div>
-                </div>
-                <div class="text-muted text-xs" data-i18n="settings.twitch.globalCooldownNote">Minimum 60 seconds for display in Twitch UX</div>
-              </div>
-              <div class="field-row">
-                <button class="btn btn-primary" id="twitchSaveRewardBtn" data-i18n="common.save">Save</button>
-                <button class="btn btn-secondary" id="twitchCancelRewardBtn" data-i18n="common.cancel">Cancel</button>
-              </div>
+              <button class="btn btn-primary" id="twitchSaveRewardBtn" data-i18n="common.save">Save</button>
             </div>
           </div>
 
@@ -611,12 +623,12 @@
                 <label class="field-label" data-i18n="settings.twitchChat.commands.now">Now playing</label>
                 <div class="field-row">
                   <input class="settings-input input" type="text" id="chatCmdNowCommand" placeholder="!sg now" />
-                  <select class="settings-input input select" id="chatCmdNowPermission">
+                  <select class="settings-input input" id="chatCmdNowPermission">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <div class="checkbox-wrapper">
+                  <div class="checkbox-wrapper settings-input">
                     <input class="checkbox" type="checkbox" id="chatCmdNowEnabled" />
                   </div>
                 </div>
@@ -626,12 +638,12 @@
                 <label class="field-label" data-i18n="settings.twitchChat.commands.queue">Queue</label>
                 <div class="field-row">
                   <input class="settings-input input" type="text" id="chatCmdQueueCommand" placeholder="!sg queue" />
-                  <select class="settings-input input select" id="chatCmdQueuePermission">
+                  <select class="settings-input input" id="chatCmdQueuePermission">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <div class="checkbox-wrapper">
+                  <div class="checkbox-wrapper settings-input">
                     <input class="checkbox" type="checkbox" id="chatCmdQueueEnabled" />
                   </div>
                 </div>
@@ -653,12 +665,12 @@
                 <label class="field-label" data-i18n="settings.twitchChat.commands.skip">Skip track</label>
                 <div class="field-row">
                   <input class="settings-input input" type="text" id="chatCmdSkipCommand" placeholder="!sg skip" />
-                  <select class="settings-input input select" id="chatCmdSkipPermission">
+                  <select class="settings-input input" id="chatCmdSkipPermission">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <div class="checkbox-wrapper">
+                  <div class="checkbox-wrapper settings-input">
                     <input class="checkbox" type="checkbox" id="chatCmdSkipEnabled" />
                   </div>
                 </div>
@@ -668,12 +680,12 @@
                 <label class="field-label" data-i18n="settings.twitchChat.commands.pause">Pause</label>
                 <div class="field-row">
                   <input class="settings-input input" type="text" id="chatCmdPauseCommand" placeholder="!sg pause" />
-                  <select class="settings-input input select" id="chatCmdPausePermission">
+                  <select class="settings-input input" id="chatCmdPausePermission">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <div class="checkbox-wrapper">
+                  <div class="checkbox-wrapper settings-input">
                     <input class="checkbox" type="checkbox" id="chatCmdPauseEnabled" />
                   </div>
                 </div>
@@ -683,12 +695,12 @@
                 <label class="field-label" data-i18n="settings.twitchChat.commands.resume">Resume</label>
                 <div class="field-row">
                   <input class="settings-input input" type="text" id="chatCmdResumeCommand" placeholder="!sg resume" />
-                  <select class="settings-input input select" id="chatCmdResumePermission">
+                  <select class="settings-input input" id="chatCmdResumePermission">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <div class="checkbox-wrapper">
+                  <div class="checkbox-wrapper settings-input">
                     <input class="checkbox" type="checkbox" id="chatCmdResumeEnabled" />
                   </div>
                 </div>
@@ -720,7 +732,7 @@
             <div class="settings-section">
               <div class="field">
                 <label class="field-label" for="localeSelect" data-i18n="settings.language.description">Select interface language</label>
-                <select class="settings-input input select" id="localeSelect">
+                <select class="settings-input input" id="localeSelect">
                   <option value="en">English</option>
                   <option value="ru">Русский</option>
                 </select>

@@ -194,6 +194,7 @@ export type TwitchChatCommandsConfig = {
 
 export type TwitchConfig = {
   channelPointsRewardId: string | null
+  autoFulfillRedemptions: boolean
   chatCommands: TwitchChatCommandsConfig
 }
 

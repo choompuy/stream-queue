@@ -177,9 +177,31 @@ select {
   border-color: var(--accent-blue);
 }
 
+.input[type='color'] {
+  flex-shrink: 0;
+  width: 2.25rem;
+  padding: 0;
+}
+
+.input[type='color']::-webkit-color-swatch-wrapper {
+  padding: 0;
+  border: none;
+}
+
+.input[type='color']::-webkit-color-swatch {
+  padding: 0;
+  border: none;
+}
+
+.input[type='color']::-moz-color-swatch {
+  padding: 0;
+  border: none;
+}
+
 .checkbox-wrapper {
   position: relative;
   display: flex;
+  border: 1px solid var(--border);
 }
 
 .checkbox-wrapper .checkbox {
@@ -603,6 +625,10 @@ select {
 .settings-input {
   margin-top: auto;
   border-color: var(--border);
+}
+
+.settings-input.checkbox-wrapper {
+  margin-block: auto;
 }
 
 .settings-input.error {

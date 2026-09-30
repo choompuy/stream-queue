@@ -28,6 +28,7 @@ export const {
   filePath: join(DATA_DIR, 'twitch-config.json'),
   defaults: {
     channelPointsRewardId: null,
+    autoFulfillRedemptions: false,
     chatCommands: {
       now: chatCommand('!sg now', 'everyone'),
       queue: chatCommand('!sg queue', 'everyone'),
@@ -43,6 +44,7 @@ export const {
       normalize: (v) => (typeof v === 'string' ? v.trim() || null : v),
       validate: (v) => v === null || (typeof v === 'string' && v.length > 0)
     },
+    autoFulfillRedemptions: rules.boolean,
     chatCommands: {
       ...Object.fromEntries(CHAT_COMMAND_KEYS.map((key) => [key, commandSchema])),
       controlCooldownSeconds: rules.number(0, 300),

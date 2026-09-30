@@ -194,6 +194,8 @@
       "reward": "Награда Channel Points",
       "rewardNone": "Выберите награду",
       "rewardNote": "Погашения этой награды будут использоваться как запросы песен",
+      "autoFulfillRedemptions": "Автоподтверждение награды",
+      "autoFulfillRedemptionsNote": "Автоматически подтверждать награды при успешном завершении воспроизведения трека",
       "noRewards": "Подходящие награды не найдены",
       "authorizationInstructions": "Откройте Twitch и введите этот код, чтобы авторизовать StreamQueue",
       "createReward": "Создать награду",
@@ -207,7 +209,6 @@
       "maxPerStream": "Максимум за стрим",
       "maxPerUserPerStream": "Максимум на пользователя за стрим",
       "globalCooldown": "Глобальный кулдаун (секунды)",
-      "globalCooldownNote": "Минимум 60 секунд для отображения в Twitch UX",
       "rewardCreated": "Награда успешно создана",
       "rewardCreateError": "Не удалось создать награду"
     },
@@ -325,6 +326,8 @@
     "viewerRequest": "🎵 {{user}} добавил(а): {{title}}",
     "viewerRequestsMany": "🎵 Добавлено {{count}} новых треков от зрителей",
     "twitchSettingsSaved": "Настройки Twitch сохранены",
-    "twitchChatCommandsSaved": "Команды чата сохранены"
+    "twitchChatCommandsSaved": "Команды чата сохранены",
+    "twitchRewardCreated": "Награда успешно создана",
+    "twitchRewardUpdated": "Награда успешно обновлена"
   }
 }

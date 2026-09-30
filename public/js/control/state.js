@@ -30,7 +30,9 @@ export const state = {
     rewards: [],
     selectedRewardId: '',
     savedRewardId: '',
-    chatCommands: null
+    chatCommands: null,
+    currentEditingRewardId: null,
+    savedAutoFulfillRedemptions: false
   }
 }
 
@@ -114,11 +116,13 @@ export const dom = {
   twitchRewardSection: $('twitchRewardSection'),
   twitchRewardSelect: $('twitchRewardSelect'),
   twitchCreateNewRewardBtn: $('twitchCreateNewRewardBtn'),
+  twitchAutoFulfillRedemptions: $('twitchAutoFulfillRedemptions'),
   twitchRewardForm: $('twitchRewardForm'),
   twitchRewardTitle: $('twitchRewardTitle'),
   twitchRewardCost: $('twitchRewardCost'),
   twitchRewardPrompt: $('twitchRewardPrompt'),
   twitchRewardBackgroundColor: $('twitchRewardBackgroundColor'),
+  twitchRewardBackgroundColorPicker: $('twitchRewardBackgroundColorPicker'),
   twitchRewardEnabled: $('twitchRewardEnabled'),
   twitchMaxPerStreamEnabled: $('twitchMaxPerStreamEnabled'),
   twitchMaxPerStream: $('twitchMaxPerStream'),
@@ -127,7 +131,6 @@ export const dom = {
   twitchGlobalCooldownEnabled: $('twitchGlobalCooldownEnabled'),
   twitchGlobalCooldownSeconds: $('twitchGlobalCooldownSeconds'),
   twitchSaveRewardBtn: $('twitchSaveRewardBtn'),
-  twitchCancelRewardBtn: $('twitchCancelRewardBtn'),
 
   twitchChatCommandsPanel: $('twitchChatCommandsPanel'),
   chatCmdCooldown: $('chatCmdCooldown'),

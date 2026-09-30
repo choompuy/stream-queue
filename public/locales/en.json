@@ -194,6 +194,8 @@
       "reward": "Channel Points reward",
       "rewardNone": "Select reward",
       "rewardNote": "Redemptions of this reward will be used as song requests",
+      "autoFulfillRedemptions": "Auto-fulfill redemptions",
+      "autoFulfillRedemptionsNote": "Automatically fulfill redemptions when the track finishes playing successfully",
       "noRewards": "No eligible rewards found",
       "authorizationInstructions": "Open Twitch and enter this code to authorize StreamQueue",
       "createReward": "Create reward",
@@ -207,7 +209,6 @@
       "maxPerStream": "Max per stream",
       "maxPerUserPerStream": "Max per user per stream",
       "globalCooldown": "Global cooldown (seconds)",
-      "globalCooldownNote": "Minimum 60 seconds for display in Twitch UX",
       "rewardCreated": "Reward created successfully",
       "rewardCreateError": "Failed to create reward"
     },
@@ -325,6 +326,8 @@
     "viewerRequest": "🎵 {{user}} added: {{title}}",
     "viewerRequestsMany": "🎵 {{count}} new tracks added by viewers",
     "twitchSettingsSaved": "Twitch settings saved",
-    "twitchChatCommandsSaved": "Chat commands saved"
+    "twitchChatCommandsSaved": "Chat commands saved",
+    "twitchRewardCreated": "Reward created successfully",
+    "twitchRewardUpdated": "Reward updated successfully"
   }
 }
