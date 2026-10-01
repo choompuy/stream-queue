@@ -14,13 +14,11 @@ export type TwitchUserInfo = {
 
 export type TwitchAuthConfig = {
   clientId: string
-  clientSecret: string
   scopes: string[]
 }
 
 export type TwitchOAuthOptions = {
   clientId: string
-  clientSecret: string
   scopes?: string[]
   onTokenUpdated?: (tokenData: TwitchTokenData) => void
 }

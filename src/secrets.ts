@@ -112,16 +112,13 @@ function maskSecret(value: string): string {
   return `${value.slice(0, 4)}${'•'.repeat(value.length - 8)}${value.slice(-4)}`
 }
 
-export function getTwitchClientId(): string {
-  return process.env.TWITCH_CLIENT_ID?.trim() || ''
-}
+declare const __BAKED_ENV__: Record<string, string> | undefined
+const baked = (key: string) => (typeof __BAKED_ENV__ !== 'undefined' ? __BAKED_ENV__[key] : '')
 
-export function getTwitchClientSecret(): string {
-  return process.env.TWITCH_CLIENT_SECRET?.trim() || ''
-}
+export const getTwitchClientId = () => process.env.TWITCH_CLIENT_ID?.trim() || baked('TWITCH_CLIENT_ID')
 
 export function getPublicSecretsView() {
-  const configured = Boolean(getTwitchClientId() != '' && getTwitchClientSecret() != '')
+  const configured = Boolean(getTwitchClientId() != '')
   return {
     youtubeApiKey: maskSecret(secrets.youtubeApiKey),
     hasYoutubeApiKey: secrets.youtubeApiKey.length > 0,

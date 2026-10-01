@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import { execFileSync } from 'node:child_process'
 import { copyFileSync, chmodSync, mkdirSync, rmSync, readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -10,6 +11,7 @@ const BLOB = path.join(OUT_DIR, 'sea-prep.blob')
 const EXE_NAME = process.platform === 'win32' ? 'Service.exe' : 'Service'
 const EXE_PATH = path.join(OUT_DIR, EXE_NAME)
 const SENTINEL_FUSE = 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2'
+const BAKED = Object.fromEntries(['TWITCH_CLIENT_ID'].map((key) => [key, process.env[key]?.trim() ?? '']))
 
 rmSync(OUT_DIR, { recursive: true, force: true })
 mkdirSync(OUT_DIR, { recursive: true })
@@ -21,7 +23,8 @@ await esbuild.build({
   platform: 'node',
   target: 'node22',
   format: 'cjs',
-  outfile: BUNDLE
+  outfile: BUNDLE,
+  define: { __BAKED_ENV__: JSON.stringify(BAKED) }
 })
 
 console.log('> node --experimental-sea-config')

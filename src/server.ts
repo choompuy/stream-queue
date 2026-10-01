@@ -9,7 +9,7 @@ import { runStartupTasks } from './startup.js'
 import { errorHandler, ForbiddenOriginError } from './error-handler.js'
 import { apiRouter } from './routes/index.js'
 import { initializeTwitchIntegration } from './integrations/twitch/index.js'
-import { getTwitchClientId, getTwitchClientSecret } from './secrets.js'
+import { getTwitchClientId } from './secrets.js'
 import { createLogger } from './logger.js'
 
 const app = express()
@@ -60,12 +60,10 @@ async function main() {
 
   initState()
   const twitchClientId = getTwitchClientId()
-  const twitchClientSecret = getTwitchClientSecret()
 
   if (twitchClientId && twitchClientId) {
     initializeTwitchIntegration({
-      clientId: twitchClientId,
-      clientSecret: twitchClientSecret
+      clientId: twitchClientId
     })
   } else {
     log.warn('Twitch integration disabled: TWITCH_CLIENT_ID is not set')

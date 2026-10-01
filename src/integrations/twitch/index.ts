@@ -75,7 +75,6 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
 
   oauth = new TwitchOAuth({
     clientId: config.clientId || '',
-    clientSecret: config.clientSecret || '',
     scopes: config.scopes,
     onTokenUpdated: (tokenData) => {
       updateTwitchOAuthState({ tokenData })
