@@ -90,17 +90,17 @@ async function saveReward() {
   const data = readRewardForm()
   if (!data) return
 
-  const editingId = state.twitch.editingReward?.id
-  const isEdit = editingId !== null
+  const previous = state.twitch.editingReward
+  const isEdit = Boolean(previous)
 
   await run(isEdit ? 'updating Twitch reward' : 'creating Twitch reward', async () => {
-    const response = isEdit ? await api.updateTwitchReward(editingId, data) : await api.createTwitchReward(data)
+    const response = isEdit ? await api.updateTwitchReward(previous.id, data) : await api.createTwitchReward(data)
     if (!response?.reward) return
 
     await loadTwitchRewards()
 
     if (isEdit) {
-      markRewardSaved(response.reward)
+      markRewardSaved(response.reward, previous)
       toastSuccess(t('toast.twitchRewardUpdated'))
       return
     }

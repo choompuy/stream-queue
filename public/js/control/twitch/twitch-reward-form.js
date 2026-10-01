@@ -50,13 +50,17 @@ function readField(input, saved) {
   return input.type === 'color' ? input.value.toUpperCase() : input.value.trim()
 }
 
-function clearFieldStates(fieldState) {
-  for (const [input] of FIELDS) setFieldState(input, fieldState)
+function differs(input, saved, reward) {
+  const stored = saved(reward)
+  return readField(input, stored) !== stored
+}
+
+function clearFieldStates() {
+  for (const [input] of FIELDS) setFieldState(input, null)
 }
 
 // shows the form filled with `reward` to edit it, or blank to create a new one
 export function showRewardForm(reward = null) {
-  show(dom.twitchRewardForm)
   state.twitch.editingReward = reward && { ...reward }
 
   setText(dom.twitchRewardForm?.querySelector('h2'), t(reward ? 'settings.twitch.editReward' : 'settings.twitch.createReward'))
@@ -75,12 +79,13 @@ export function showRewardForm(reward = null) {
     if (input) input.disabled = !enabled
   }
 
-  clearFieldStates(null)
+  clearFieldStates()
 }
 
-export function markRewardSaved(reward) {
+// `previous` is the reward as it was before the save: only the inputs that differ from it were really saved
+export function markRewardSaved(reward, previous) {
   state.twitch.editingReward = { ...reward }
-  clearFieldStates('saved')
+  for (const [input, saved] of FIELDS) setFieldState(input, previous && differs(input, saved, previous) ? 'saved' : null)
 }
 
 function check(input, valid) {
@@ -156,10 +161,6 @@ export function bindRewardForm() {
   }
 
   for (const [input, saved] of FIELDS) {
-    trackChanges(input, () => {
-      if (!state.twitch.editingReward) return false
-      const stored = saved(state.twitch.editingReward)
-      return readField(input, stored) !== stored
-    })
+    trackChanges(input, () => Boolean(state.twitch.editingReward) && differs(input, saved, state.twitch.editingReward))
   }
 }

@@ -112,9 +112,9 @@ export function onIpChange() {
 export function toggleQr() {
   if (!dom.controlPanelQr) return
 
-  show(dom.controlPanelQr, false)
-
-  if (!dom.controlPanelQr.classList.contains('hidden')) renderQrUrl()
+  const isHidden = dom.controlPanelQr.classList.contains('hidden')
+  show(dom.controlPanelQr, isHidden)
+  renderQrUrl()
 }
 
 export function loadConfig() {
@@ -189,7 +189,7 @@ export async function saveConfigSetting() {
     for (const { input, path } of entries) {
       if (rejected.includes(path)) continue
 
-      const field = CONFIG_FIELDS.find((f) => f.path ? `${f.path}.${f.key}` === path : f.key === path)
+      const field = CONFIG_FIELDS.find((f) => (f.path ? `${f.path}.${f.key}` === path : f.key === path))
       if (!field) continue
 
       const serverValue = storedFieldValue(field)

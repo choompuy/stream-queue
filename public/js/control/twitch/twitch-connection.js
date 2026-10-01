@@ -183,6 +183,7 @@ export function renderTwitchConnection() {
   show(dom.twitchConnectBtn, !isConnected)
   show(dom.twitchDisconnectBtn, isConnected)
   show(dom.twitchRewardSection, isConnected)
+  show(dom.twitchRewardForm, isConnected)
   show(dom.twitchChatCommandsPanel, isConnected)
   if (!isConnected) show(dom.twitchRewardForm, false)
 }

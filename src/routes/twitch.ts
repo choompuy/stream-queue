@@ -57,7 +57,7 @@ function validateRewardPayload(body: unknown, { requireTitleAndCost }: { require
 
   if (background_color !== undefined && typeof background_color === 'string') {
     if (!/^#[0-9A-Fa-f]{6}$/.test(background_color)) {
-      throw new AppError('INVALID_INPUT', 'Background color must be a 6-character hex code (e.g., 00FF00)')
+      throw new AppError('INVALID_INPUT', 'Background color must be a 6-character hex code (e.g., #00FF00)')
     }
   }
 
@@ -168,7 +168,7 @@ router.get(
     const rewards = await client.getCustomRewards()
 
     ok(res, {
-      rewards: rewards.filter((reward) => reward.is_enabled && reward.is_user_input_required)
+      rewards: rewards.filter((reward) => reward.is_user_input_required)
     })
   })
 )

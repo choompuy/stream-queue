@@ -331,9 +331,7 @@
             <div class="settings-section">
               <label class="field-row">
                 <span data-i18n="settings.overlay.showVideo">Show video</span>
-                <div class="checkbox-wrapper settings-input">
-                  <input class="checkbox" type="checkbox" id="showVideo" />
-                </div>
+                <input class="settings-input checkbox" type="checkbox" id="showVideo" />
               </label>
 
               <div class="field">
@@ -451,16 +449,12 @@
             <div class="settings-section">
               <label class="field-row">
                 <span data-i18n="settings.bot.limits.allowShorts">Shorts</span>
-                <div class="checkbox-wrapper settings-input">
-                  <input class="checkbox" type="checkbox" id="cfgAllowShorts" />
-                </div>
+                <input class="settings-input checkbox" type="checkbox" id="cfgAllowShorts" />
               </label>
 
               <label class="field-row">
                 <span data-i18n="settings.bot.limits.allowLiveStreams">Live Streams</span>
-                <div class="checkbox-wrapper settings-input">
-                  <input class="checkbox" type="checkbox" id="cfgAllowLiveStreams" />
-                </div>
+                <input class="settings-input checkbox" type="checkbox" id="cfgAllowLiveStreams" />
               </label>
 
               <div class="field">
@@ -536,9 +530,7 @@
               <div class="field">
                 <label class="field-row">
                   <span data-i18n="settings.twitch.autoFulfillRedemptions">Auto-fulfill redemptions</span>
-                  <div class="checkbox-wrapper settings-input">
-                    <input class="checkbox" type="checkbox" id="twitchAutoFulfillRedemptions" />
-                  </div>
+                  <input class="settings-input checkbox" type="checkbox" id="twitchAutoFulfillRedemptions" />
                 </label>
                 <div class="text-muted text-xs" data-i18n="settings.twitch.autoFulfillRedemptionsNote">
                   Automatically fulfill redemptions when the track finishes playing successfully
@@ -575,9 +567,7 @@
                 <div class="field">
                   <label class="field-row">
                     <span data-i18n="settings.twitch.createRewardEnabled">Enable reward</span>
-                    <div class="checkbox-wrapper settings-input">
-                      <input class="checkbox" type="checkbox" id="twitchRewardEnabled" />
-                    </div>
+                    <input class="settings-input checkbox" type="checkbox" id="twitchRewardEnabled" />
                   </label>
                 </div>
 
@@ -585,27 +575,21 @@
                   <label class="field-label" data-i18n="settings.twitch.maxPerStream">Max per stream</label>
                   <div class="field-row">
                     <input class="settings-input input" type="number" id="twitchMaxPerStream" min="1" disabled />
-                    <div class="checkbox-wrapper settings-input">
-                      <input class="checkbox" type="checkbox" id="twitchMaxPerStreamEnabled" />
-                    </div>
+                    <input class="settings-input checkbox" type="checkbox" id="twitchMaxPerStreamEnabled" />
                   </div>
                 </div>
                 <div class="field">
                   <label class="field-label" data-i18n="settings.twitch.maxPerUserPerStream">Max per user per stream</label>
                   <div class="field-row">
                     <input class="settings-input input" type="number" id="twitchMaxPerUserPerStream" min="1" disabled />
-                    <div class="checkbox-wrapper settings-input">
-                      <input class="checkbox" type="checkbox" id="twitchMaxPerUserPerStreamEnabled" />
-                    </div>
+                    <input class="settings-input checkbox" type="checkbox" id="twitchMaxPerUserPerStreamEnabled" />
                   </div>
                 </div>
                 <div class="field">
                   <label class="field-label" data-i18n="settings.twitch.globalCooldown">Global cooldown (seconds)</label>
                   <div class="field-row">
                     <input class="settings-input input" type="number" id="twitchGlobalCooldownSeconds" min="1" disabled />
-                    <div class="checkbox-wrapper settings-input">
-                      <input class="checkbox" type="checkbox" id="twitchGlobalCooldownEnabled" />
-                    </div>
+                    <input class="settings-input checkbox" type="checkbox" id="twitchGlobalCooldownEnabled" />
                   </div>
                 </div>
               </div>
@@ -628,9 +612,7 @@
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <div class="checkbox-wrapper settings-input">
-                    <input class="checkbox" type="checkbox" id="chatCmdNowEnabled" />
-                  </div>
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdNowEnabled" />
                 </div>
               </div>
 
@@ -643,9 +625,7 @@
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <div class="checkbox-wrapper settings-input">
-                    <input class="checkbox" type="checkbox" id="chatCmdQueueEnabled" />
-                  </div>
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdQueueEnabled" />
                 </div>
               </div>
 
@@ -670,9 +650,7 @@
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <div class="checkbox-wrapper settings-input">
-                    <input class="checkbox" type="checkbox" id="chatCmdSkipEnabled" />
-                  </div>
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdSkipEnabled" />
                 </div>
               </div>
 
@@ -685,9 +663,7 @@
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <div class="checkbox-wrapper settings-input">
-                    <input class="checkbox" type="checkbox" id="chatCmdPauseEnabled" />
-                  </div>
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdPauseEnabled" />
                 </div>
               </div>
 
@@ -700,9 +676,7 @@
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <div class="checkbox-wrapper settings-input">
-                    <input class="checkbox" type="checkbox" id="chatCmdResumeEnabled" />
-                  </div>
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdResumeEnabled" />
                 </div>
               </div>
 
@@ -752,7 +726,7 @@
               <div class="field">
                 <div class="field-label">
                   <span data-i18n="settings.about.developedBy">Developed by</span>
-                  <span class="text-green">choompuy</span>
+                  <span class="text-green">@choompuy</span>
                 </div>
                 <a class="settings-input input text-blue" href="https://github.com/choompuy/stream-queue" target="_blank" rel="noopener noreferrer">
                   GitHub ↗

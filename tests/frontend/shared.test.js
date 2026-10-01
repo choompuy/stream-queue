@@ -1,6 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { escapeHtml, formatDuration, youtubeThumbnail, formatViews, getErrorMessage, translateErrorCode } from '../../public/js/shared.js'
+import {
+  escapeHtml,
+  formatDuration,
+  youtubeThumbnail,
+  formatViews,
+  getErrorMessage,
+  translateErrorCode,
+  setFieldState,
+  setError
+} from '../../public/js/shared.js'
 
 test('escapeHtml', async (t) => {
   await t.test('escapes the 5 HTML-significant characters', () => {
@@ -107,5 +116,49 @@ test('translateErrorCode', async (t) => {
   await t.test('returns the translation when one is actually found', () => {
     const fakeT = (key) => (key === 'api.errors.duplicate' ? 'This track is already in the queue' : key)
     assert.equal(translateErrorCode(fakeT, 'DUPLICATE', undefined, 'fallback text'), 'This track is already in the queue')
+  })
+})
+
+// a minimal element: only what setClass / setFieldState touch
+function fakeElement(wrapper = null) {
+  const classes = new Set()
+  return {
+    classes,
+    classList: { toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)) },
+    closest: (selector) => (selector === '.checkbox-wrapper' ? wrapper : null)
+  }
+}
+
+test('setFieldState / setError', async (t) => {
+  await t.test('plain input gets the state itself and only one at a time', () => {
+    const input = fakeElement()
+    setFieldState(input, 'changed')
+    setFieldState(input, 'saved')
+    assert.deepEqual([...input.classes], ['saved'])
+    setFieldState(input, null)
+    assert.equal(input.classes.size, 0)
+  })
+
+  await t.test('checkbox shows the state on its .checkbox-wrapper, not on the input', () => {
+    const wrapper = fakeElement()
+    const checkbox = fakeElement(wrapper)
+    setFieldState(checkbox, 'changed')
+    assert.deepEqual([...wrapper.classes], ['changed'])
+    assert.equal(checkbox.classes.size, 0)
+    setFieldState(checkbox, null)
+    assert.equal(wrapper.classes.size, 0)
+  })
+
+  await t.test('setError follows the same rule', () => {
+    const wrapper = fakeElement()
+    const checkbox = fakeElement(wrapper)
+    setError(checkbox)
+    assert.ok(wrapper.classes.has('error'))
+    setError(checkbox, false)
+    assert.equal(wrapper.classes.has('error'), false)
+  })
+
+  await t.test('missing element is ignored', () => {
+    assert.doesNotThrow(() => setFieldState(null, 'saved'))
   })
 })
