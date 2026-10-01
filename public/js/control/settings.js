@@ -120,18 +120,29 @@ export function toggleQr() {
 export function loadConfig() {
   return run('loading config', async () => {
     state.config = await api.getConfig()
-
-    for (const field of CONFIG_FIELDS) {
-      const input = dom[field.dom]
-      if (!input) continue
-      setFieldState(input, null)
-
-      const value = storedFieldValue(field)
-
-      if (field.type === 'checkbox') setChecked(input, value)
-      else setValue(input, value)
-    }
+    applyConfig()
   })
+}
+
+// puts the stored config into the inputs and clears their changed/saved/error marks
+function applyConfig() {
+  for (const field of CONFIG_FIELDS) {
+    const input = dom[field.dom]
+    if (!input) continue
+    setFieldState(input, null)
+
+    const value = storedFieldValue(field)
+
+    if (field.type === 'checkbox') setChecked(input, value)
+    else setValue(input, value)
+  }
+}
+
+export function cancelConfigChanges() {
+  if (!state.config) return
+
+  applyConfig()
+  setValue(dom.secYoutubeKey, '')
 }
 
 export function loadSecrets() {
@@ -220,5 +231,6 @@ export async function saveConfigSetting() {
 export const settingsActions = {
   'copy-overlay-url': copyOverlayUrl,
   'toggle-qr': toggleQr,
-  'save-config': saveConfigSetting
+  'save-config': saveConfigSetting,
+  'cancel-config': cancelConfigChanges
 }

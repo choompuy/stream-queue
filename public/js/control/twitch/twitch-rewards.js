@@ -86,6 +86,11 @@ export async function saveTwitchConfig() {
   })
 }
 
+// back to the reward as Twitch has it (or to a blank form while a new one is being created)
+export function cancelRewardChanges() {
+  showRewardForm(state.twitch.editingReward)
+}
+
 async function saveReward() {
   const data = readRewardForm()
   if (!data) return

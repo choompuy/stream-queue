@@ -467,7 +467,10 @@
               </div>
             </div>
 
-            <button class="settings-section-btn btn btn-primary" data-action="save-config" data-i18n="settings.bot.save">Save settings</button>
+            <div class="settings-section-actions">
+              <button class="btn btn-secondary" data-action="cancel-config" data-i18n="common.cancel">Cancel</button>
+              <button class="btn btn-primary" data-action="save-config" data-i18n="settings.bot.save">Save settings</button>
+            </div>
           </div>
 
           <div class="section-tab panel">
@@ -593,7 +596,10 @@
                   </div>
                 </div>
               </div>
-              <button class="btn btn-primary" id="twitchSaveRewardBtn" data-i18n="common.save">Save</button>
+              <div class="settings-section-actions">
+                <button class="btn btn-secondary" data-action="cancel-twitch-reward" data-i18n="common.cancel">Cancel</button>
+                <button class="btn btn-primary" id="twitchSaveRewardBtn" data-i18n="common.save">Save</button>
+              </div>
             </div>
           </div>
 
@@ -689,14 +695,17 @@
               </div>
             </div>
 
-            <button
-              id="twitchChatCommandsSaveBtn"
-              class="settings-section-btn btn btn-primary"
-              data-action="save-twitch-chat-commands"
-              data-i18n="settings.twitchChat.save"
-            >
-              Save chat commands
-            </button>
+            <div class="settings-section-actions">
+              <button class="btn btn-secondary" data-action="cancel-twitch-chat-commands" data-i18n="common.cancel">Cancel</button>
+              <button
+                id="twitchChatCommandsSaveBtn"
+                class="btn btn-primary"
+                data-action="save-twitch-chat-commands"
+                data-i18n="settings.twitchChat.save"
+              >
+                Save chat commands
+              </button>
+            </div>
           </div>
 
           <div class="section-tab panel">

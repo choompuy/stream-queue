@@ -1,15 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, symlinkSync } from 'node:fs'
+import { cpSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 // the modules read data/ and cache/ relative to the working directory: keep the test away from the real ones,
 // but give it the real locale files (the texts under test live there)
+// (copied, not symlinked: creating a symlink needs extra privileges on Windows)
 const locales = resolve('public/locales')
 const workDir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
-mkdirSync(join(workDir, 'public'))
-symlinkSync(locales, join(workDir, 'public/locales'), 'dir')
+cpSync(locales, join(workDir, 'public/locales'), { recursive: true })
 process.chdir(workDir)
 
 const { buildRedemptionAcceptedMessage, buildRedemptionRejectionMessage } = await import('../../src/chat-replies.js')

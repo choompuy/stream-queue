@@ -64,6 +64,10 @@ export function applyChatCommands(chatCommands) {
   }
 }
 
+export function cancelChatCommandChanges() {
+  applyChatCommands(state.twitch.chatCommands)
+}
+
 export async function saveTwitchChatCommands() {
   const chatCommands = {}
 

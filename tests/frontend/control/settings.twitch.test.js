@@ -706,6 +706,25 @@ test('saveTwitchChatCommands()', async (t) => {
     assert.equal(toggle.classList.contains('changed'), false)
   })
 
+  await t.test('cancelChatCommandChanges() puts the stored values back and clears the marks', async () => {
+    handlers = { 'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }) }
+    await settings.loadTwitchConfig()
+
+    dom.chatCmdSkipEnabled.checked = !CHAT_COMMANDS_CONFIG.skip.enabled
+    dom.chatCmdSkipCommand.value = '!typed'
+    dom.chatCmdCooldown.value = '99'
+    dom.chatCmdSkipCommand.classList.add('changed')
+    dom.chatCmdSkipEnabled.classList.add('saved')
+
+    settings.twitchActions['cancel-twitch-chat-commands']()
+
+    assert.equal(dom.chatCmdSkipEnabled.checked, CHAT_COMMANDS_CONFIG.skip.enabled)
+    assert.equal(dom.chatCmdSkipCommand.value, CHAT_COMMANDS_CONFIG.skip.command)
+    assert.equal(dom.chatCmdCooldown.value, '7')
+    assert.equal(dom.chatCmdSkipCommand.classList.contains('changed'), false)
+    assert.equal(dom.chatCmdSkipEnabled.classList.contains('saved'), false)
+  })
+
   await t.test('shows what the server stored, not what was typed (it lowercases and collapses spaces)', async () => {
     handlers = {
       'PUT /api/integrations/twitch/config': () => ({ config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] })
@@ -818,5 +837,27 @@ test('saveConfigSetting() and the YouTube API key', async (t) => {
 
     assert.ok(toasts().includes(translate('toast.apiKeyNotSaved')))
     assert.equal(toasts().includes(translate('toast.settingsSaved')), false)
+  })
+})
+
+test('cancelConfigChanges()', async (t) => {
+  t.beforeEach(reset)
+
+  await t.test('drops what was typed into the API key field', () => {
+    state.config = {}
+    dom.secYoutubeKey.value = 'typed-but-not-saved'
+
+    configSettings.cancelConfigChanges()
+
+    assert.equal(dom.secYoutubeKey.value, '')
+  })
+
+  await t.test('does nothing before the config has been loaded', () => {
+    state.config = null
+    dom.secYoutubeKey.value = 'typed'
+
+    configSettings.cancelConfigChanges()
+
+    assert.equal(dom.secYoutubeKey.value, 'typed')
   })
 })
