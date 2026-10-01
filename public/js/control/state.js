@@ -31,7 +31,7 @@ export const state = {
     selectedRewardId: '',
     savedRewardId: '',
     chatCommands: null,
-    currentEditingRewardId: null,
+    editingReward: null,
     savedAutoFulfillRedemptions: false
   }
 }

@@ -11,7 +11,7 @@ import { loadActivity } from './activity.js'
 import { loadBlocklist } from './blocklist.js'
 import { loadPlaylists } from './playlists.js'
 import { loadSecrets, loadConfig, loadOverlaySettings, loadNetworkInfo } from './settings.js'
-import { loadTwitchSettings, loadTwitchConfig, loadTwitchSecrets } from './twitch.js'
+import { loadTwitchSettings, loadTwitchConfig, loadTwitchSecrets } from './twitch/index.js'
 import { isDashboardActive } from './tabs.js'
 import { setError } from '../shared.js'
 

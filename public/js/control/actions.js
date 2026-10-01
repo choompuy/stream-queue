@@ -7,7 +7,7 @@ import { activityActions } from './activity.js'
 import { blocklistActions } from './blocklist.js'
 import { playlistActions } from './playlists.js'
 import { settingsActions } from './settings.js'
-import { twitchActions } from './twitch.js'
+import { twitchActions } from './twitch/index.js'
 import { menuActions } from './menu.js'
 
 export function createActionRegistry(...maps) {

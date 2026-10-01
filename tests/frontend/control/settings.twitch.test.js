@@ -119,7 +119,7 @@ jsdom.window.open = (url) => {
 
 const { t: translate, loadTranslations } = await import(new URL('js/i18n.js', PUBLIC_DIR))
 const { state, dom, CHAT_COMMAND_FIELDS } = await import(new URL('js/control/state.js', PUBLIC_DIR))
-const settings = await import(new URL('js/control/twitch.js', PUBLIC_DIR))
+const settings = await import(new URL('js/control/twitch/index.js', PUBLIC_DIR))
 const configSettings = await import(new URL('js/control/settings.js', PUBLIC_DIR))
 
 await loadTranslations('en')
