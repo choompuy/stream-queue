@@ -1,16 +1,20 @@
-import { $, formatDuration, createLogger, getErrorMessage } from './shared.js'
+import { $, formatDuration, createLogger, getErrorMessage, show, setClass, setText } from './shared.js'
 import { initI18n, t, getCurrentLocale } from './i18n.js'
 
 let player = null
 let currentState = null
 let isPlayerReady = false
 let isTransitioning = false
+let reportedFailureVideoId = null
+let renderedVideoId = null
 let settings = {}
 let localeLoaded = false
+let playerGeneration = 0
 
 const log = createLogger('PREVIEW')
 
 const isPlaybackSource = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+let fetchInFlight = false
 
 const dom = {
   nowPlayingVideo: $('nowPlayingVideo'),
@@ -26,11 +30,16 @@ const dom = {
 }
 
 async function fetchOverlayState() {
+  if (fetchInFlight) return
+  fetchInFlight = true
+
   try {
     const response = await fetch('/api/overlay-state')
-    const data = await response.json()
-    settings = data.settings
-    currentState = data.state
+    if (!response.ok) throw new Error(`overlay-state request failed: ${response.status}`)
+
+    const body = await response.json()
+    settings = body.data.settings
+    currentState = body.data.state
     const serverLocale = settings.locale || 'en'
     if (!localeLoaded || serverLocale !== getCurrentLocale()) {
       await initI18n(serverLocale)
@@ -40,39 +49,37 @@ async function fetchOverlayState() {
     renderState()
   } catch (error) {
     log('Error fetching settings:', error)
+  } finally {
+    fetchInFlight = false
   }
 }
 
 function updateMediaVisibility() {
-  if (!currentState.current || currentState.isPaused) {
-    dom.badge.classList.remove('visible')
+  if (!currentState?.current || currentState.isPaused) {
+    setClass(dom.badge, 'visible', false)
   } else {
-    if (settings.showVideo) {
-      dom.badge.classList.add('with-video')
-    } else {
-      dom.badge.classList.remove('with-video')
-    }
-    dom.badge.classList.add('visible')
+    setClass(dom.badge, 'with-video', settings.showVideo)
+    setClass(dom.badge, 'visible')
   }
 }
 
 function renderCurrent() {
-  if (!currentState.current) {
+  if (!currentState?.current) {
     updateMediaVisibility()
     return
   }
 
   dom.badge.dataset.position = settings.position
   dom.currentThumbnail.src = currentState.current.thumbnail
-  dom.currentTitle.textContent = currentState.current.title
-  dom.currentRequester.textContent = `@${currentState.current.requestedBy}`
+  setText(dom.currentTitle, currentState.current.title)
+  setText(dom.currentRequester, `@${currentState.current.requestedBy}`)
 
   if (currentState.nextTrack) {
-    dom.nextTitle.textContent = currentState.nextTrack.title
-    dom.nextElapsedTime.textContent = formatDuration(Math.floor(currentState.nextTrack.duration))
-    dom.nextPlaying.classList.remove('hidden')
+    setText(dom.nextTitle, currentState.nextTrack.title)
+    setText(dom.nextElapsedTime, formatDuration(Math.floor(currentState.nextTrack.duration)))
+    show(dom.nextPlaying)
   } else {
-    dom.nextPlaying.classList.add('hidden')
+    show(dom.nextPlaying, false)
   }
   updateMediaVisibility()
 }
@@ -80,13 +87,26 @@ function renderCurrent() {
 function renderState() {
   renderCurrent()
 
-  if (!isPlaybackSource || !isPlayerReady || !currentState) return
+  if (currentState && (!isPlaybackSource || isPlayerReady)) show(dom.badge)
+  if (!isPlaybackSource || !isPlayerReady || !currentState || !player) return
+
   if (!currentState.current) {
-    if (!isTransitioning) player.stopVideo()
+    renderedVideoId = null
+    reportedFailureVideoId = null
+
+    if (!isTransitioning) {
+      player.stopVideo()
+    }
+
     return
   }
 
   const videoId = currentState.current.videoId
+  if (renderedVideoId !== videoId) {
+    renderedVideoId = videoId
+    reportedFailureVideoId = null
+  }
+
   const currentVideoId = player.getVideoData()?.video_id
   const playerState = player.getPlayerState()
 
@@ -99,8 +119,7 @@ function renderState() {
       player.loadVideoById(videoId)
     }
 
-    player.setOption('captions', 'fontSize', 0)
-    player.unloadModule('captions')
+    configurePlayer()
     return
   }
 
@@ -118,27 +137,60 @@ function renderState() {
   }
 }
 
+function configurePlayer() {
+  if (!player) return
+
+  try {
+    player.setOption('captions', 'fontSize', 0)
+    player.unloadModule('captions')
+  } catch (error) {
+    log('Error configuring player:', error)
+  }
+}
+
 function updateProgress() {
   if (!isPlaybackSource || !player || !currentState?.current) {
     dom.progressBar.style.width = '0%'
-    dom.elapsedTime.textContent = '0:00 / 0:00'
+    setText(dom.elapsedTime, '0:00 / 0:00')
     return
   }
 
   const currentTime = player.getCurrentTime() || 0
   const duration = currentState.current.duration
-  const progress = ((currentTime / duration) * 100).toFixed(2)
-
+  const progress = duration > 0 ? ((currentTime / duration) * 100).toFixed(2) : 0
   dom.progressBar.style.width = `${progress}%`
-  dom.elapsedTime.textContent = `${formatDuration(Math.floor(currentTime))} / ${formatDuration(duration)}`
+  setText(dom.elapsedTime, `${formatDuration(Math.floor(currentTime))} / ${formatDuration(duration)}`)
 }
 
-async function notifyEnded() {
+async function notifyEnded(videoId) {
   try {
-    await fetch('/api/player/ended', { method: 'POST' })
+    await fetch('/api/player/ended', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ videoId })
+    })
     await fetchOverlayState()
   } catch (error) {
     log('Error notifying ended:', error)
+  }
+}
+
+async function reportFailure(errorCode, videoId) {
+  try {
+    await fetch('/api/player/report-failure', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ errorCode, videoId })
+    })
+
+    await fetchOverlayState()
+    log(`Playback failure reported for ${videoId}`)
+  } catch (error) {
+    log('Error reporting playback failure:', error)
   }
 }
 
@@ -146,6 +198,7 @@ function onPlayerReady(event) {
   log('Player ready')
   isPlayerReady = true
   event.target.setVolume(100)
+  configurePlayer()
   fetchOverlayState()
 }
 
@@ -155,10 +208,10 @@ function onPlayerStateChange(event) {
   if (event.data === YT.PlayerState.ENDED && !isTransitioning) {
     log('Video ended, requesting next')
     isTransitioning = true
-    notifyEnded().finally(() => {
-      setTimeout(() => {
-        isTransitioning = false
-      }, 1000)
+    // the track that actually finished in the player, which may differ from what the server considers current now
+    const endedVideoId = event.target.getVideoData?.().video_id || currentState?.current?.videoId
+    notifyEnded(endedVideoId).finally(() => {
+      isTransitioning = false
     })
   }
 }
@@ -166,42 +219,103 @@ function onPlayerStateChange(event) {
 function onPlayerError(event) {
   const message = getErrorMessage(event.data, t || ((key) => key))
   log(`Player error: ${message}`)
+  const videoId = currentState?.current?.videoId
 
-  if (!isTransitioning) {
-    isTransitioning = true
-
-    fetch('/api/player/skip', { method: 'POST' })
-      .then(() => fetchOverlayState())
-      .finally(() => {
-        setTimeout(() => {
-          isTransitioning = false
-        }, 1000)
-      })
+  if (!videoId) {
+    log('Player error without current video')
+    return
   }
+
+  if (reportedFailureVideoId === videoId) {
+    log(`Ignoring duplicate error for video: ${videoId}`)
+    return
+  }
+
+  reportedFailureVideoId = videoId
+  const generation = playerGeneration
+  resetPlayer().then(() => {
+    if (generation !== playerGeneration - 1) return
+
+    reportFailure(event.data, videoId)
+  })
+}
+
+function createPlayer() {
+  if (!isPlaybackSource || typeof YT === 'undefined' || !YT.Player) return
+
+  playerGeneration += 1
+  const generation = playerGeneration
+  player = new YT.Player('player', {
+    width: '100%',
+    height: '100%',
+
+    playerVars: {
+      autoplay: 0,
+      controls: 0,
+      rel: 0,
+      fs: 0,
+      cc_load_policy: 0,
+      iv_load_policy: 3,
+      disablekb: 1,
+      playsinline: 1
+    },
+
+    events: {
+      onReady: (event) => {
+        if (generation !== playerGeneration) return
+        onPlayerReady(event)
+      },
+
+      onStateChange: (event) => {
+        if (generation !== playerGeneration) return
+        onPlayerStateChange(event)
+      },
+
+      onError: (event) => {
+        if (generation !== playerGeneration) return
+        onPlayerError(event)
+      }
+    }
+  })
+
+  log(`YouTube player created: generation ${generation}`)
+}
+
+async function resetPlayer() {
+  const oldPlayer = player
+
+  player = null
+  isPlayerReady = false
+  renderedVideoId = null
+
+  if (oldPlayer) {
+    try {
+      oldPlayer.destroy()
+      log('YouTube player destroyed')
+    } catch (error) {
+      log('Error destroying YouTube player:', error)
+    }
+  }
+
+  const oldElement = $('player')
+
+  if (oldElement) {
+    const newElement = document.createElement('div')
+    newElement.id = 'player'
+    oldElement.replaceWith(newElement)
+  }
+
+  await new Promise((resolve) => requestAnimationFrame(resolve))
+
+  if (!isPlaybackSource || typeof YT === 'undefined' || !YT.Player) return
+
+  createPlayer()
 }
 
 if (isPlaybackSource) {
   window.onYouTubeIframeAPIReady = () => {
     log('YouTube API ready')
-    player = new YT.Player('player', {
-      width: '100%',
-      height: '100%',
-      playerVars: {
-        autoplay: 0,
-        controls: 0,
-        rel: 0,
-        fs: 0,
-        cc_load_policy: 0,
-        iv_load_policy: 3,
-        disablekb: 1,
-        playsinline: 1
-      },
-      events: {
-        onReady: onPlayerReady,
-        onStateChange: onPlayerStateChange,
-        onError: onPlayerError
-      }
-    })
+    createPlayer()
   }
 
   const tag = document.createElement('script')

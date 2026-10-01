@@ -1,25 +1,13 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { rename, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { isPackaged, getAppRoot } from './runtime.js'
 
-declare global {
-  namespace NodeJS {
-    interface Process {
-      pkg?: boolean
-    }
-  }
-}
-
-const isPackaged = Boolean(process.pkg)
 const SAVE_DEBOUNCE_MS = 250
 
 function getDir(dir: string): string {
-  if (!isPackaged) return join(process.cwd(), dir)
-
-  const appData = process.env.LOCALAPPDATA
-  if (!appData) return join(dirname(process.execPath), dir)
-
-  return join(appData, 'StreamQueue', dir)
+  if (!isPackaged()) return join(process.cwd(), dir)
+  return join(getAppRoot(), dir)
 }
 
 export const DATA_DIR = getDir('data')
@@ -34,7 +22,9 @@ export const BLOCKLIST_PATH = join(DATA_DIR, 'blocklist.json')
 export const STATE_FILE = join(CACHE_DIR, 'queue-state.json')
 export const CACHE_FILE = join(CACHE_DIR, 'youtube-cache.json')
 
-function deepMerge<T>(defaults: T, data: Partial<T>): T {
+export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
+
+export function deepMerge<T>(defaults: T, data: DeepPartial<T>): T {
   if (
     defaults === null ||
     data === null ||
@@ -60,7 +50,7 @@ function deepMerge<T>(defaults: T, data: Partial<T>): T {
       !Array.isArray(value) &&
       !Array.isArray(defaultValue)
     ) {
-      result[key] = deepMerge(defaultValue, value)
+      result[key] = deepMerge(defaultValue, value as DeepPartial<typeof defaultValue>)
     } else if (value !== undefined) {
       result[key] = value
     }
@@ -69,12 +59,15 @@ function deepMerge<T>(defaults: T, data: Partial<T>): T {
   return result as T
 }
 
+const activeStoreFlushers: Array<() => Promise<void>> = []
+
 export function createFileStore<T>(filePath: string) {
   const dir = dirname(filePath)
   const tmpPath = `${filePath}.tmp`
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null
   let saveChain: Promise<void> = Promise.resolve()
+  let pending: { getData: () => T; onError: (error: unknown) => void } | null = null
 
   function load(defaults: T): T {
     try {
@@ -98,16 +91,41 @@ export function createFileStore<T>(filePath: string) {
   }
 
   function scheduleSave(getData: () => T, onError: (error: unknown) => void): void {
+    pending = { getData, onError }
     if (saveTimer) clearTimeout(saveTimer)
 
     saveTimer = setTimeout(() => {
       saveTimer = null
-      saveChain = saveChain.then(() => persistNow(getData)).catch(onError)
+      const toSave = pending
+      pending = null
+      saveChain = saveChain.then(() => persistNow(toSave!.getData)).catch(toSave!.onError)
     }, SAVE_DEBOUNCE_MS)
   }
 
+  async function flush(): Promise<void> {
+    if (saveTimer) {
+      clearTimeout(saveTimer)
+      saveTimer = null
+    }
+
+    if (pending) {
+      const toSave = pending
+      pending = null
+      saveChain = saveChain.then(() => persistNow(toSave.getData)).catch(toSave.onError)
+    }
+
+    await saveChain
+  }
+
+  activeStoreFlushers.push(flush)
+
   return {
     load,
-    scheduleSave
+    scheduleSave,
+    flush
   }
+}
+
+export async function flushAllStores(): Promise<void> {
+  await Promise.allSettled(activeStoreFlushers.map((flush) => flush()))
 }

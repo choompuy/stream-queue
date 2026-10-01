@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { t, translateErrorCode } from './i18n.js'
+import { t, translateErrorCode } from '../../src/i18n.js'
 
 test('t()', async (test) => {
   await test.test('returns the English string for a known key', () => {

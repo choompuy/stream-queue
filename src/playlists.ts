@@ -26,11 +26,10 @@ export function upsertPlaylist(meta: { id: string; title: string; thumbnail: str
   const existing = playlists.find((p) => p.id === meta.id)
 
   if (existing) {
-    existing.title = meta.title
-    existing.thumbnail = meta.thumbnail
-    existing.itemCount = meta.itemCount
+    const updated: SavedPlaylist = { ...existing, title: meta.title, thumbnail: meta.thumbnail, itemCount: meta.itemCount }
+    playlists = playlists.map((p) => (p.id === meta.id ? updated : p))
     save()
-    return existing
+    return updated
   }
 
   const created: SavedPlaylist = { ...meta, addedAt: Date.now() }

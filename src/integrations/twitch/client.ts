@@ -1,0 +1,236 @@
+import type {
+  TwitchUserInfo,
+  TwitchUsersResponse,
+  TwitchErrorResponse,
+  TwitchChannelPointsRedemption,
+  TwitchRedemptionsResponse,
+  TwitchCustomReward,
+  TwitchCustomRewardsResponse,
+  TwitchRedemptionUpdateStatus,
+  TwitchCreateCustomReward,
+  TwitchCreateCustomRewardResponse,
+  TwitchUpdateCustomReward
+} from './types.js'
+import { TwitchOAuth } from './oauth.js'
+import { AppError } from '../../types.js'
+import { createLogger } from '../../logger.js'
+
+const log = createLogger('TWITCH CLIENT')
+
+export const CHANNEL_POINTS_REDEMPTION = 'channel.channel_points_custom_reward_redemption.add'
+
+export class TwitchClient {
+  private readonly oauth: TwitchOAuth
+  private userInfo: TwitchUserInfo | null = null
+
+  constructor(oauth: TwitchOAuth) {
+    this.oauth = oauth
+  }
+
+  private async makeAuthenticatedRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
+    if (!this.oauth.getConfig().clientId) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID not configured')
+
+    const accessToken = await this.oauth.getValidAccessToken()
+    if (!accessToken) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
+
+    const response = await this.request<T>(url, options, accessToken)
+    // 403 can mean a revoked/insufficient scope, same remedy as an expired token: refresh and retry once
+    if (response.status !== 401 && response.status !== 403) return this.handleResponse<T>(response)
+
+    try {
+      const refreshedToken = await this.oauth.refreshAccessToken()
+      const retryResponse = await this.request<T>(url, options, refreshedToken.accessToken)
+      return this.handleResponse<T>(retryResponse)
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+      log.error(`Authentication retry failed: ${reason}`)
+      throw new AppError('TWITCH_REFRESH_ERROR', `Authentication failed - please reconnect your Twitch account (${reason})`)
+    }
+  }
+
+  private async request<T>(url: string, options: RequestInit, accessToken: string): Promise<Response> {
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        Authorization: `Bearer ${accessToken}`,
+        'Client-Id': this.oauth.getConfig().clientId
+      }
+    })
+  }
+
+  private async handleResponse<T>(response: Response): Promise<T> {
+    if (response.ok) return response.json() as Promise<T>
+
+    let message = `HTTP ${response.status}`
+
+    try {
+      const error = (await response.json()) as TwitchErrorResponse
+      if (error.message) message = error.message
+    } catch {
+      // Ignore invalid/non-JSON responses.
+    }
+
+    throw new AppError('TWITCH_API_ERROR', `Twitch API error: ${message}`)
+  }
+
+  async getUserInfo(): Promise<TwitchUserInfo> {
+    try {
+      const response = await this.makeAuthenticatedRequest<TwitchUsersResponse>('https://api.twitch.tv/helix/users')
+      if (!response.data?.length) throw new AppError('TWITCH_API_ERROR', 'No user data returned from Twitch API')
+
+      const userData = response.data[0]
+      this.userInfo = {
+        id: userData.id,
+        login: userData.login,
+        displayName: userData.display_name,
+        profileImageUrl: userData.profile_image_url
+      }
+
+      log.log(`Retrieved user info for: ${this.userInfo.displayName}`)
+      return this.userInfo
+    } catch (error) {
+      log.error(`Failed to get user info: ${error instanceof Error ? error.message : error}`)
+      throw error
+    }
+  }
+
+  async updateRedemptionStatus(
+    redemption: TwitchChannelPointsRedemption,
+    status: TwitchRedemptionUpdateStatus
+  ): Promise<TwitchChannelPointsRedemption> {
+    const userInfo = this.userInfo
+    if (!userInfo) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
+
+    const params = new URLSearchParams({
+      broadcaster_id: userInfo.id,
+      reward_id: redemption.reward.id,
+      id: redemption.id
+    })
+
+    const response = await this.makeAuthenticatedRequest<TwitchRedemptionsResponse>(
+      `https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions?${params}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status })
+      }
+    )
+
+    const updatedRedemption = response.data[0]
+    if (!updatedRedemption) throw new AppError('TWITCH_API_ERROR', 'Twitch API returned no updated redemption')
+
+    return updatedRedemption
+  }
+
+  async getCustomRewards(onlyManageable: boolean = true): Promise<TwitchCustomReward[]> {
+    const userInfo = this.userInfo
+    if (!userInfo) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
+
+    const params = new URLSearchParams({
+      broadcaster_id: userInfo.id
+    })
+
+    if (onlyManageable) {
+      params.append('only_manageable_rewards', 'true')
+    }
+
+    const response = await this.makeAuthenticatedRequest<TwitchCustomRewardsResponse>(
+      `https://api.twitch.tv/helix/channel_points/custom_rewards?${params}`
+    )
+
+    return response.data
+  }
+
+  async createCustomReward(data: TwitchCreateCustomReward): Promise<TwitchCustomReward> {
+    const userInfo = this.userInfo
+    if (!userInfo) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
+
+    const params = new URLSearchParams({
+      broadcaster_id: userInfo.id
+    })
+
+    const requestBody = {
+      ...data,
+      is_user_input_required: true
+    }
+
+    const response = await this.makeAuthenticatedRequest<TwitchCreateCustomRewardResponse>(
+      `https://api.twitch.tv/helix/channel_points/custom_rewards?${params}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      }
+    )
+
+    const createdReward = response.data[0]
+    if (!createdReward) throw new AppError('TWITCH_API_ERROR', 'Twitch API returned no created reward')
+
+    return createdReward
+  }
+
+  async updateCustomReward(rewardId: string, data: TwitchUpdateCustomReward): Promise<TwitchCustomReward> {
+    const userInfo = this.userInfo
+    if (!userInfo) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
+
+    const params = new URLSearchParams({
+      broadcaster_id: userInfo.id,
+      id: rewardId
+    })
+
+    const requestBody = {
+      ...data,
+      is_user_input_required: true
+    }
+
+    const response = await this.makeAuthenticatedRequest<TwitchCreateCustomRewardResponse>(
+      `https://api.twitch.tv/helix/channel_points/custom_rewards?${params}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      }
+    )
+
+    const updatedReward = response.data[0]
+    if (!updatedReward) throw new AppError('TWITCH_API_ERROR', 'Twitch API returned no updated reward')
+
+    return updatedReward
+  }
+
+  // Subscribes a live EventSub WebSocket session to Channel Points redemptions of the connected channel
+  async subscribeToRedemptions(sessionId: string): Promise<void> {
+    const userInfo = this.userInfo
+    if (!userInfo) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
+
+    await this.makeAuthenticatedRequest('https://api.twitch.tv/helix/eventsub/subscriptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: CHANNEL_POINTS_REDEMPTION,
+        version: '1',
+        condition: { broadcaster_user_id: userInfo.id },
+        transport: { method: 'websocket', session_id: sessionId }
+      })
+    })
+  }
+
+  getCachedUserInfo(): TwitchUserInfo | null {
+    return this.userInfo
+  }
+
+  setCachedUserInfo(userInfo: TwitchUserInfo | null): void {
+    this.userInfo = userInfo
+  }
+
+  clearUserInfo(): void {
+    this.userInfo = null
+  }
+}

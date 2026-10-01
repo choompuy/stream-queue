@@ -1,7 +1,12 @@
 import { getConfig, updateConfig } from './config.js'
 import { fetchPlaylistSongs } from './youtube/index.js'
-import { Song, QueueItem, Config, FallbackStateResponse, FallbackTrackView } from './types.js'
-import { addSong, saveState, getCurrent, setCurrent } from './queue.js'
+import { Song, QueueItem, Config, FallbackStateResponse, AppError } from './types.js'
+import { addSong, getCurrent, setCurrent } from './queue.js'
+import { notifyStateChange } from './state-events.js'
+import { isBlocked } from './blocklist.js'
+import { createLogger } from './logger.js'
+
+const log = createLogger('FALLBACK')
 
 export type FallbackSnapshot = {
   sourceTracks: Song[]
@@ -16,10 +21,6 @@ let fallbackOrder: string[] = []
 let fallbackCursor = -1
 let loadedFallbackPlaylistId: string | null = null
 let lastFallbackRefreshAt: number | null = null
-
-function log(message: string): void {
-  console.log(`[FALLBACK] ${message}`)
-}
 
 function setSourceTracks(tracks: Song[]): void {
   fallbackTracksById = new Map(tracks.map((track) => [track.videoId, track]))
@@ -62,10 +63,10 @@ function toFallbackQueueItem(song: Song): QueueItem {
   }
 }
 
-function computeNextIndex(config: Config): number | null {
+function computeNextIndex(config: Config, cursor: number): number | null {
   if (!config.fallbackPlaylist.enabled || !fallbackOrder.length) return null
 
-  const nextIndex = fallbackCursor + 1
+  const nextIndex = cursor + 1
   if (nextIndex < fallbackOrder.length) return nextIndex
 
   return config.fallbackPlaylist.repeat ? 0 : null
@@ -73,25 +74,41 @@ function computeNextIndex(config: Config): number | null {
 
 export function peekNextFallbackTrack(): QueueItem | null {
   const config = getConfig()
-  const nextIndex = computeNextIndex(config)
-  if (nextIndex === null) return null
+  const attempts = fallbackOrder.length || 1
+  let cursor = fallbackCursor
 
-  const song = findTrack(fallbackOrder[nextIndex])
-  return song ? toFallbackQueueItem(song) : null
+  for (let i = 0; i < attempts; i++) {
+    const nextIndex = computeNextIndex(config, cursor)
+    if (nextIndex === null) return null
+
+    cursor = nextIndex
+    const song = findTrack(fallbackOrder[cursor])
+    if (song && !isBlocked(song.videoId)) return toFallbackQueueItem(song)
+  }
+
+  return null
 }
 
 export function advanceFallback(): QueueItem | null {
   const config = getConfig()
-  const nextIndex = computeNextIndex(config)
+  const attempts = fallbackOrder.length || 1
 
-  if (nextIndex === null) {
-    if (config.fallbackPlaylist.enabled && fallbackOrder.length) fallbackCursor = fallbackOrder.length
-    return null
+  for (let i = 0; i < attempts; i++) {
+    const nextIndex = computeNextIndex(config, fallbackCursor)
+
+    if (nextIndex === null) {
+      if (config.fallbackPlaylist.enabled && fallbackOrder.length) fallbackCursor = fallbackOrder.length
+      return null
+    }
+
+    fallbackCursor = nextIndex
+    const song = findTrack(fallbackOrder[fallbackCursor])
+    if (!song || isBlocked(song.videoId)) continue
+
+    return toFallbackQueueItem(song)
   }
 
-  fallbackCursor = nextIndex
-  const song = findTrack(fallbackOrder[fallbackCursor])
-  return song ? toFallbackQueueItem(song) : null
+  return null
 }
 
 export async function refreshFallback(): Promise<FallbackStateResponse> {
@@ -103,15 +120,18 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
     fallbackCursor = -1
     loadedFallbackPlaylistId = null
     lastFallbackRefreshAt = null
-    saveState()
+    notifyStateChange()
     return getFallbackState()
   }
 
-  const newTracks = await fetchPlaylistSongs(playlistId)
+  const { songs: newTracks, truncated } = await fetchPlaylistSongs(playlistId)
+  if (truncated) {
+    log.log(`Playlist was truncated due to page limit (${newTracks.length} tracks loaded)`)
+  }
   const config = getConfig()
 
   if (config.fallbackPlaylist.playlistId !== playlistId) {
-    log(`Refresh for "${playlistId}" discarded - playlist changed during load`)
+    log.log(`Refresh for "${playlistId}" discarded - playlist changed during load`)
     return getFallbackState()
   }
 
@@ -131,38 +151,44 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
 
     setSourceTracks(newTracks)
 
-    const activeIndexBefore = activeId ? fallbackOrder.indexOf(activeId) : -1
-    fallbackOrder = fallbackOrder.filter((id) => newIds.has(id))
+    const orderBefore = fallbackOrder
+    const activeIndexBefore = activeId ? orderBefore.indexOf(activeId) : -1
+    fallbackOrder = orderBefore.filter((id) => newIds.has(id))
     fallbackOrder.push(...(config.fallbackPlaylist.shuffle ? shuffle(addedIds) : addedIds))
 
     if (activeId && newIds.has(activeId)) {
       fallbackCursor = fallbackOrder.indexOf(activeId)
     } else if (activeIndexBefore >= 0) {
-      fallbackCursor = Math.min(activeIndexBefore, Math.max(fallbackOrder.length - 1, 0))
+      const survivedBeforeActive = orderBefore.slice(0, activeIndexBefore).filter((id) => newIds.has(id)).length
+      fallbackCursor = survivedBeforeActive - 1
     }
 
-    log(`Refreshed: +${addedIds.length} added, -${removedCount} removed, ${fallbackOrder.length} in rotation`)
+    log.log(`Refreshed: +${addedIds.length} added, -${removedCount} removed, ${fallbackOrder.length} in rotation`)
   }
 
   loadedFallbackPlaylistId = playlistId
   lastFallbackRefreshAt = Date.now()
 
-  log(`Loaded ${fallbackTracksById.size} tracks from playlist ${playlistId}`)
-  saveState()
+  log.log(`Loaded ${fallbackTracksById.size} tracks from playlist ${playlistId}`)
+  notifyStateChange()
   return getFallbackState()
 }
 
-export function toggleFallbackShuffle(): FallbackStateResponse {
-  const config = getConfig()
-  const shuffleOn = !config.fallbackPlaylist.shuffle
-  updateConfig({ fallbackPlaylist: { ...config.fallbackPlaylist, shuffle: shuffleOn } })
-
+/** Re-orders the rotation for the given shuffle mode, keeping the playing track in place. Does not touch the config. */
+export function reorderFallback(shuffleOn: boolean): void {
   const current = getCurrent()
   const activeId = current?.isFallback ? current.videoId : activeFallbackVideoId()
   fallbackOrder = buildOrder([...fallbackTracksById.values()], shuffleOn, activeId)
   fallbackCursor = activeId ? fallbackOrder.indexOf(activeId) : -1
+  notifyStateChange()
+}
 
-  log(`Shuffle: ${shuffleOn}`)
+export function toggleFallbackShuffle(): FallbackStateResponse {
+  const shuffleOn = !getConfig().fallbackPlaylist.shuffle
+  updateConfig({ fallbackPlaylist: { shuffle: shuffleOn } })
+  reorderFallback(shuffleOn)
+
+  log.log(`Shuffle: ${shuffleOn}`)
   return getFallbackState()
 }
 
@@ -170,7 +196,7 @@ export function toggleFallbackRepeat(): FallbackStateResponse {
   const config = getConfig()
   const repeat = !config.fallbackPlaylist.repeat
   updateConfig({ fallbackPlaylist: { ...config.fallbackPlaylist, repeat } })
-  log(`Repeat: ${repeat}`)
+  log.log(`Repeat: ${repeat}`)
   return getFallbackState()
 }
 
@@ -178,7 +204,7 @@ export function toggleFallbackEnabled(): FallbackStateResponse {
   const config = getConfig()
   const enabled = !config.fallbackPlaylist.enabled
   updateConfig({ fallbackPlaylist: { ...config.fallbackPlaylist, enabled } })
-  log(`Enabled: ${enabled}`)
+  log.log(`Enabled: ${enabled}`)
   return getFallbackState()
 }
 
@@ -191,7 +217,8 @@ export function clearFallback(): FallbackStateResponse {
 
   const config = getConfig()
   updateConfig({ fallbackPlaylist: { ...config.fallbackPlaylist, playlistId: null } })
-  log('cleared')
+  notifyStateChange()
+  log.log('cleared')
   return getFallbackState()
 }
 
@@ -208,12 +235,12 @@ export function getFallbackState(): FallbackStateResponse {
     sourceCount: fallbackTracksById.size,
     activeVideoId: current?.isFallback ? current.videoId : null,
     upNext: fallbackOrder
-      .map((videoId, index) => {
+      .map((videoId) => {
         const track = findTrack(videoId)
         if (!track) return null
-        return { ...track, isPlayed: index < fallbackCursor }
+        return { ...track }
       })
-      .filter((track): track is FallbackTrackView => track !== null)
+      .filter((track): track is Song => track !== null)
   }
 }
 
@@ -224,10 +251,14 @@ export function playFallbackTrackNow(videoId: string): QueueItem | null {
   const song = findTrack(videoId)
   if (!song) return null
 
+  if (isBlocked(videoId)) {
+    throw new AppError('BLOCKED', 'this track is blocked')
+  }
+
   fallbackCursor = index
   const item = toFallbackQueueItem(song)
   setCurrent(item)
-  log(`Play now: "${song.title}"`)
+  log.log(`Play now: "${song.title}"`)
   return item
 }
 

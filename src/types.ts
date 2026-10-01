@@ -1,11 +1,20 @@
-export type ActivityStatus = 'accepted' | 'rejected'
+export type ActivityReasonCode =
+  | AppErrorCode
+  | 'INVALID_YOUTUBE_URL'
+  | 'SONG_NOT_FOUND'
+  | 'SERVER_ERROR'
+  | 'PLAYBACK_VIDEO_UNAVAILABLE'
+  | 'PLAYBACK_EMBED_DISALLOWED'
+  | 'PLAYBACK_FAILED'
+
+export type ActivityStatus = 'accepted' | 'rejected' | 'failed'
 export type ActivityEntry = {
   requestedBy: string
   query: string
   title: string | null
   videoId: string | null
   status: ActivityStatus
-  reasonCode: string | null
+  reasonCode: ActivityReasonCode | null
   reasonParams?: Record<string, string | number>
   at: number
 }
@@ -16,6 +25,9 @@ export type Config = {
   maxDurationSeconds: number
   maxQueueSize: number
   maxRequestsPerUser: number
+  regionCode: string
+  allowShorts: boolean
+  allowLiveStreams: boolean
   fallbackPlaylist: FallbackPlaylist
 }
 
@@ -45,6 +57,9 @@ export type Song = {
 export type QueueItem = Song & {
   requestedBy: string
   isFallback?: boolean
+  // set only when the song was added via a Twitch Channel Points redemption; carries what
+  // cancelRedemption() needs to refund the points and notify the requester in chat
+  channelPointsRedemption?: { id: string; rewardId: string; userName: string }
 }
 
 export type PlayerState = {
@@ -61,6 +76,7 @@ type SearchCacheEntry = {
 
 type VideoCacheEntry = {
   song: Song | null
+  reason: FilterFailureReason | null
   expiresAt: number
   filtersVersion: string
 }
@@ -75,10 +91,62 @@ export type CacheFile = {
 }
 
 export type ApiError = { success: false; error: string; code: string; params?: Record<string, string | number> }
-export type ApiOk<T> = { success: true } & T
+export type ApiOk<T> = { success: true; data: T }
 export type ApiResult<T> = ApiOk<T> | ApiError
 
-export type AppErrorCode = 'DUPLICATE' | 'BLOCKED' | 'QUEUE_FULL' | 'USER_LIMIT' | 'YOUTUBE_QUOTA' | 'YOUTUBE_ERROR' | 'NO_API_KEY'
+export type FilterFailureReason =
+  | 'NOT_MUSIC'
+  | 'NOT_PUBLIC'
+  | 'NOT_EMBEDDABLE'
+  | 'AGE_RESTRICTED'
+  | 'REGION_BLOCKED'
+  | 'NOT_PLAYABLE'
+  | 'IS_LIVE'
+  | 'IS_SHORT'
+  | 'DURATION_OUT_OF_RANGE'
+  | 'VIEWS_TOO_LOW'
+
+export type AppErrorCode =
+  | 'DUPLICATE'
+  | 'BLOCKED'
+  | 'QUEUE_FULL'
+  | 'USER_LIMIT'
+  | 'YOUTUBE_QUOTA'
+  | 'YOUTUBE_ERROR'
+  | 'NO_API_KEY'
+  | 'TWITCH_AUTH_ERROR'
+  | 'TWITCH_REFRESH_ERROR'
+  | 'TWITCH_NOT_CONNECTED'
+  | 'TWITCH_API_ERROR'
+  | 'INVALID_INPUT'
+  | FilterFailureReason
+
+// A reason a song request or an already-queued track's playback failed, with whatever the reason needs
+// to become a chat message ({{title}}, quota numbers, etc.) - shared by activity logging and Twitch chat replies
+export type FailureReason = { code: ActivityReasonCode; params?: Record<string, string | number> }
+
+export type ApiErrorCode =
+  | ActivityReasonCode
+  | AppErrorCode
+  | 'INVALID_QUERY'
+  | 'INVALID_VIDEO_ID'
+  | 'USERNAME_REQUIRED'
+  | 'INVALID_INDEX'
+  | 'QUEUE_ITEM_NOT_FOUND'
+  | 'NOT_FOUND'
+  | 'INVALID_PLAYLIST_ID'
+  | 'PLAYLIST_NOT_FOUND'
+  | 'INVALID_SETTINGS'
+  | 'INVALID_CONFIG'
+  | 'INVALID_LOCALE'
+  | 'LOCAL_ONLY'
+  | 'FORBIDDEN_ORIGIN'
+  | 'INVALID_JSON'
+  | 'PAYLOAD_TOO_LARGE'
+  | 'INVALID_REQUEST'
+  | 'SERVER_ERROR'
+  | 'RATE_LIMITED'
+
 export class AppError extends Error {
   constructor(
     public code: AppErrorCode,
@@ -92,25 +160,22 @@ export class AppError extends Error {
 export type StateResponse = PlayerState & { nextTrack: QueueItem | null }
 export type PlayerActionResponse = StateResponse & { message: string }
 export type SettingsResponse = Settings
-export type OverlayStateResponse = { state: PlayerState; settings: Settings }
-export type ConfigResponse = Config & { fallbackPlaylistWarning?: string }
+export type OverlayStateResponse = { state: StateResponse; settings: Settings }
+export type ConfigResponse = Config
+export type ConfigUpdateResponse<T = Config> = { config: T; rejected: string[] }
 export type SearchResponse = { results: Song[] }
-export type QueueRequestResponse = {
-  message: string
+export type AddedSong = {
   song: QueueItem
   started: boolean
   position: number
-  state: PlayerState
 }
-export type FallbackTrackView = Song & {
-  isPlayed: boolean
-}
+export type QueueRequestResponse = AddedSong & { state: StateResponse; message: string }
+export type FallbackEnqueueResponse = { song: QueueItem; state: StateResponse }
 export type FallbackStateResponse = FallbackPlaylist & {
   lastRefreshedAt: number | null
-  upNext: FallbackTrackView[]
+  upNext: Song[]
   sourceCount: number
   activeVideoId: string | null
 }
-export type QueueRemoveResponse = { removed: QueueItem; state: PlayerState }
-export type SecretsResponse = { youtubeApiKey: string; hasYoutubeApiKey: boolean }
+export type QueueRemoveResponse = { removed: QueueItem; state: StateResponse }
 export type ActivityResponse = { entries: ActivityEntry[] }

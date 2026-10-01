@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isValidVideoId, parseYouTubeUrl, parsePlaylistId } from './url.js'
+import { isValidVideoId, parseYouTubeUrl, parsePlaylistId } from '../../../src/youtube/url.js'
 
 test('isValidVideoId', async (t) => {
   await t.test('accepts an 11-char id', () => {

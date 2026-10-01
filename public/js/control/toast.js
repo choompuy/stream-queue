@@ -1,4 +1,5 @@
 import { CLOSE_ICON } from '../icons.js'
+import { setClass } from '../shared.js'
 
 const DEFAULT_DURATION = 4000
 const MAX_TOASTS = 3
@@ -13,8 +14,8 @@ function getContainer() {
 function closeToast(toast) {
   if (!toast.isConnected || toast.classList.contains('toast-leaving')) return
 
-  toast.classList.remove('toast-entering')
-  toast.classList.add('toast-leaving')
+  setClass(toast, 'toast-entering', false)
+  setClass(toast, 'toast-leaving')
 
   const handleAnimationEnd = (event) => {
     if (event.animationName === 'toast-out') toast.remove()
@@ -33,11 +34,18 @@ function enforceMaxToasts(root) {
   }
 }
 
+function isShowing(root, message) {
+  return Array.from(root.querySelectorAll('.toast-wrapper:not(.toast-leaving) .toast-message')).some((node) => node.textContent === message)
+}
+
 export function showToast(message, options = {}) {
   const root = getContainer()
   if (!root || !message) return () => {}
 
   const { type = 'info', duration = DEFAULT_DURATION } = options
+
+  if (type === 'error' && isShowing(root, message)) return () => {}
+
   enforceMaxToasts(root)
 
   const toast = document.createElement('div')

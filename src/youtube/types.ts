@@ -24,15 +24,23 @@ export type VideoItem = {
       }
     }
     categoryId?: string
+    liveBroadcastContent?: string // 'live' | 'upcoming' | 'none'
   }
   contentDetails?: {
     duration?: string
+    regionRestriction?: {
+      allowed?: string[]
+      blocked?: string[]
+    }
+    contentRating?: { ytRating?: string } // 'ytAgeRestricted'
   }
   statistics?: {
     viewCount?: string
   }
   status?: {
     embeddable?: boolean
+    privacyStatus?: string // 'public' | 'private' | 'unlisted'
+    uploadStatus?: string // 'processed' | 'failed' | 'rejected' | 'deleted' | ...
   }
 }
 

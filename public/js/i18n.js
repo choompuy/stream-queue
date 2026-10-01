@@ -56,7 +56,7 @@ export function t(key, params = {}) {
   let result = value
 
   for (const [param, replacement] of Object.entries(params)) {
-    result = result.replace(new RegExp(`{{${param}}}`, 'g'), replacement)
+    result = result.replace(new RegExp(`{{${param}}}`, 'g'), () => String(replacement))
   }
 
   return result

@@ -1,5 +1,5 @@
 import { CACHE_FILE, createFileStore } from '../persist.js'
-import { CacheFile, Song } from '../types.js'
+import { CacheFile, Song, FilterFailureReason } from '../types.js'
 
 const store = createFileStore<CacheFile>(CACHE_FILE)
 const cache = store.load({
@@ -11,11 +11,14 @@ const cache = store.load({
 export const CACHE_LIMITS = {
   VIDEO_CACHE_TTL: 10 * 60 * 1000,
   SEARCH_CACHE_TTL: 3600 * 1000, // 1 hour
-  MAX_DAILY_SEARCHES: 80 // Maximum number of searches allowed per day
+  // Each search call costs 100 quota units of the default 10,000/day project quota;
+  // 90 searches/day (9,000 units) leaves headroom for other endpoints (1 unit each)
+  MAX_DAILY_SEARCHES: 90
 }
 
 const SWEEP_INTERVAL = 60 * 60 * 1000
 
+// YouTube resets daily API quota at midnight Pacific Time — do not change this timezone
 function getQuotaDate(): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Los_Angeles',
@@ -88,19 +91,22 @@ export function setSearchCache(query: string, results: Song[], filtersVersion: s
   saveCache()
 }
 
-export function getVideoCache(videoId: string, filtersVersion: string): Song | null | undefined {
+export type VideoCacheResult = { song: Song | null; reason: FilterFailureReason | null }
+
+export function getVideoCache(videoId: string, filtersVersion: string): VideoCacheResult | undefined {
   const entry = cache.videos[videoId]
 
   if (!entry || entry.expiresAt <= Date.now() || entry.filtersVersion !== filtersVersion) {
     return undefined
   }
 
-  return entry.song
+  return { song: entry.song, reason: entry.reason ?? null }
 }
 
-export function setVideoCache(videoId: string, song: Song | null, filtersVersion: string): void {
+export function setVideoCache(videoId: string, song: Song | null, filtersVersion: string, reason: FilterFailureReason | null = null): void {
   cache.videos[videoId] = {
     song,
+    reason,
     expiresAt: Date.now() + CACHE_LIMITS.VIDEO_CACHE_TTL,
     filtersVersion
   }

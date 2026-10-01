@@ -1,44 +1,44 @@
 import { api } from './api.js'
-import { state, dom, views, log, renderStats } from './state.js'
-import { toggleActive, formatDateTime, withLoading } from './ui.js'
-import { refreshState } from './queue.js'
+import { state, dom, selectors, renderStats } from './state.js'
+import { views } from './views/index.js'
+import { run } from './run.js'
+import { toggleActive, formatDateTime } from './ui.js'
 import { t } from '../i18n.js'
-import { toastSuccess } from './toast.js'
+import { setText } from '../shared.js'
 
-export async function refreshFallbackState(silent = false) {
-  try {
-    state.fallback = await api.getFallback(silent)
-    renderFallback()
-  } catch (error) {
-    log('Error fetching fallback playlist:', error)
-  }
+export function refreshFallbackState(silent = false) {
+  return run(
+    'fetching fallback playlist',
+    async () => {
+      state.fallback = await api.getFallback()
+      renderFallback()
+    },
+    { silent }
+  )
 }
 
 export function renderFallback() {
   const data = state.fallback
   const tracks = data?.upNext ?? []
   const activeVideoId = data?.activeVideoId ?? ''
-  const list = dom.fallbackListWrapper.querySelector('.row-list')
-
-  if (list) list.dataset.activeVideoId = activeVideoId
 
   toggleActive(dom.fallbackShuffleBtn, data?.shuffle)
   toggleActive(dom.fallbackRepeatBtn, data?.repeat)
   toggleActive(dom.fallbackEnabledBtn, data?.enabled)
-  dom.fallbackEnabledText.textContent = data?.enabled ? t('common.on') : t('common.off')
+  setText(dom.fallbackEnabledText, data?.enabled ? t('common.on') : t('common.off'))
 
   if (!tracks.length) {
-    dom.fallbackInfo.textContent = ''
+    setText(dom.fallbackInfo, '')
     views.fallback.render([])
     renderStats()
     return
   }
 
-  dom.fallbackInfo.textContent = t('fallback.info', {
+  setText(dom.fallbackInfo, t('fallback.info', {
     count: tracks.length,
     datetime: formatDateTime(data.lastRefreshedAt)
-  })
-  views.fallback.render(tracks)
+  }))
+  views.fallback.render(selectors.markBlocked(tracks).map((track) => ({ ...track, isActive: track.videoId === activeVideoId })))
   scrollToActiveFallback()
   renderStats()
 }
@@ -60,66 +60,4 @@ export function scrollToActiveFallback() {
     top: rowCenter - containerCenter,
     behavior: 'smooth'
   })
-}
-
-export async function refreshFallback() {
-  await withLoading(dom.fallbackRefreshBtn, async () => {
-    try {
-      await api.refreshFallback()
-      await refreshFallbackState()
-      toastSuccess(t('toast.fallbackRefreshed'))
-    } catch (error) {
-      log('Error refreshing fallback:', error)
-    }
-  })
-}
-
-export async function toggleFallbackShuffle() {
-  try {
-    state.fallback = await api.shuffleFallback()
-    views.fallback.invalidate()
-    renderFallback()
-  } catch (error) {
-    log('Failed to toggle shuffle:', error)
-  }
-}
-
-export async function toggleFallbackRepeat() {
-  try {
-    state.fallback = await api.repeatFallback()
-    renderFallback()
-  } catch (error) {
-    log('Failed to toggle repeat:', error)
-  }
-}
-
-export async function toggleFallbackEnabled() {
-  try {
-    state.fallback = await api.enabledFallback()
-    renderFallback()
-  } catch (error) {
-    log('Failed to toggle enabled:', error)
-  }
-}
-
-export async function playFallbackNow(videoId) {
-  const title = state.fallback?.upNext?.find((track) => track.videoId === videoId)?.title
-  try {
-    await api.playFallback(videoId)
-    await refreshState()
-    if (title) toastSuccess(t('toast.nowPlaying', { title }))
-  } catch (error) {
-    log('Error playing fallback track:', error)
-  }
-}
-
-export async function enqueueFallbackTrack(videoId) {
-  const title = state.fallback?.upNext?.find((track) => track.videoId === videoId)?.title
-  try {
-    await api.enqueueFallback(videoId)
-    await refreshState()
-    if (title) toastSuccess(t('toast.addedToQueue', { title, position: state.queue.length }))
-  } catch (error) {
-    log('Error queueing fallback track:', error)
-  }
 }

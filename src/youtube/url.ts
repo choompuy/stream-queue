@@ -16,7 +16,7 @@ export function parseYouTubeUrl(input: string): { isYouTube: boolean; videoId: s
     .replace(/^www\./, '')
     .replace(/^m\./, '')
 
-  const isYouTube = hostname === 'youtube.com' || hostname === 'youtube-nocookie.com' || hostname === 'youtu.be'
+  const isYouTube = hostname === 'youtube.com' || hostname === 'youtube-nocookie.com' || hostname === 'youtu.be' || hostname === 'music.youtube.com'
 
   if (!isYouTube) return { isYouTube: false, videoId: null }
 
@@ -35,6 +35,10 @@ export function parseYouTubeUrl(input: string): { isYouTube: boolean; videoId: s
 }
 
 const PLAYLIST_ID_PATTERN = /^(PL|RD|UU|LL|FL|OL)[A-Za-z0-9_-]+$/
+
+export function isValidPlaylistId(value: unknown): value is string {
+  return typeof value === 'string' && PLAYLIST_ID_PATTERN.test(value)
+}
 
 export function parsePlaylistId(input: string): string | null {
   const trimmed = input.trim()

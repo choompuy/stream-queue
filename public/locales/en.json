@@ -9,7 +9,32 @@
     "pausedSuffix": " (paused)",
     "queueEmpty": "The queue is empty",
     "queueList": "Queue [{{count}}]: {{list}}",
-    "queueMore": " [+{{count}}]"
+    "queueMore": " [+{{count}}]",
+    "redemption": {
+      "rejected": "@{{user}}, your song request was rejected. Points have been refunded.",
+      "accepted": "@{{user}}, “{{title}}” added to the queue [#{{position}}]",
+      "acceptedNowPlaying": "@{{user}}, “{{title}}” added, playing now",
+      "generic": "@{{user}}, your request could not be completed, points refunded",
+      "DUPLICATE": "@{{user}}, that track is already in the queue, points refunded",
+      "BLOCKED": "@{{user}}, that track is blocked, points refunded",
+      "QUEUE_FULL": "@{{user}}, the queue is full, points refunded",
+      "USER_LIMIT": "@{{user}}, you already have a track queued, points refunded",
+      "INVALID_YOUTUBE_URL": "@{{user}}, that is not a valid YouTube link, points refunded",
+      "SONG_NOT_FOUND": "@{{user}}, no matching track was found, points refunded",
+      "NOT_MUSIC": "@{{user}}, that video is not categorized as music, points refunded",
+      "NOT_PUBLIC": "@{{user}}, that video is not public, points refunded",
+      "NOT_EMBEDDABLE": "@{{user}}, that video cannot be embedded, points refunded",
+      "AGE_RESTRICTED": "@{{user}}, that video is age-restricted, points refunded",
+      "REGION_BLOCKED": "@{{user}}, that video is not available in this region, points refunded",
+      "NOT_PLAYABLE": "@{{user}}, that video cannot be played, points refunded",
+      "IS_LIVE": "@{{user}}, live streams cannot be queued, points refunded",
+      "IS_SHORT": "@{{user}}, shorts cannot be queued, points refunded",
+      "DURATION_OUT_OF_RANGE": "@{{user}}, that track does not meet the length requirement, points refunded",
+      "VIEWS_TOO_LOW": "@{{user}}, that track does not meet the view count requirement, points refunded",
+      "PLAYBACK_VIDEO_UNAVAILABLE": "@{{user}}, “{{title}}” could not be played: the video became unavailable, points refunded",
+      "PLAYBACK_EMBED_DISALLOWED": "@{{user}}, “{{title}}” could not be played: embedded playback is no longer allowed, points refunded",
+      "PLAYBACK_FAILED": "@{{user}}, “{{title}}” could not be played: playback failed, points refunded"
+    }
   },
   "common": {
     "save": "Save",
@@ -34,14 +59,14 @@
     "disabled": "Off",
     "on": "On",
     "off": "Off",
-    "play": "Play",
     "pause": "Pause",
     "resume": "Resume",
     "skip": "Skip",
     "shuffle": "Shuffle",
     "repeat": "Repeat",
     "next": "Next",
-    "previous": "Previous"
+    "previous": "Previous",
+    "more": "More actions"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -80,24 +105,24 @@
     "enable": "Enable playlist",
     "info": "{{count}} tracks ▪ updated {{datetime}}",
     "addToQueue": "Add to queue",
-    "playNow": "Play now"
+    "playNow": "Play now",
+    "playing": "Playing"
   },
   "activity": {
     "title": "Activity",
     "empty": "No requests yet",
     "clear": "Clear",
     "clearConfirm": "Clear Activity?",
-    "ban": "Block this track",
     "accepted": "accepted",
     "rejected": "rejected",
-    "filterAll": "All",
-    "filterAccepted": "Accepted",
-    "filterRejected": "Rejected"
+    "failed": "Playback failed"
   },
   "blocklist": {
     "title": "Blocklist",
     "empty": "No blocked tracks",
-    "unblock": "Unblock"
+    "block": "Block this track",
+    "unblock": "Unblock",
+    "blockedLabel": "Blocked"
   },
   "playlists": {
     "title": "Playlists",
@@ -141,9 +166,13 @@
         "minDuration": "Min duration (sec)",
         "maxDuration": "Max duration (sec)",
         "maxQueue": "Max queue size",
-        "maxPerUser": "Max requests per user"
+        "maxPerUser": "Max requests per user",
+        "regionCode": "Region code",
+        "allowShorts": "Shorts",
+        "allowLiveStreams": "Live streams"
       },
       "rateLimitNote": "Cooldowns and per-user rate limits are handled in Streamer.bot, not here",
+      "regionCodeNote": "Two-letter country code (ISO 3166-1, e.g. US, RU, DE). Tracks not licensed for this region are skipped instead of being queued. Leave empty to disable",
       "save": "Save settings"
     },
     "language": {
@@ -154,6 +183,56 @@
       "title": "About",
       "description": "Local music request manager for streamers",
       "developedBy": "Developed by"
+    },
+    "twitch": {
+      "integration": "Twitch integration",
+      "chanel": "Twitch channel",
+      "notConnected": "Channel not linked",
+      "connect": "Connect Twitch",
+      "disconnect": "Disconnect",
+      "disconnectConfirm": "Disconnect Twitch? Chat commands and Channel Points integrations will stop working",
+      "save": "Save Twitch settings",
+      "clientCredentialsNote": "Create an application in the Twitch Developer Console to get your Client ID and Client Secret",
+      "reward": "Channel Points reward",
+      "rewardNone": "Select reward",
+      "rewardNote": "Redemptions of this reward will be used as song requests",
+      "autoFulfillRedemptions": "Auto-fulfill redemptions",
+      "autoFulfillRedemptionsNote": "Automatically fulfill redemptions when the track finishes playing successfully",
+      "noRewards": "No eligible rewards found",
+      "authorizationInstructions": "Open Twitch and enter this code to authorize StreamQueue",
+      "createReward": "Create reward",
+      "editReward": "Edit reward",
+      "createRewardTitle": "Reward title",
+      "createRewardCost": "Cost (points)",
+      "createRewardPrompt": "Description (optional)",
+      "createRewardBackgroundColor": "Background color (hex, optional)",
+      "createRewardEnabled": "Enable reward",
+      "limitsSection": "Purchase limits",
+      "maxPerStream": "Max per stream",
+      "maxPerUserPerStream": "Max per user per stream",
+      "globalCooldown": "Global cooldown (seconds)",
+      "rewardCreated": "Reward created successfully",
+      "rewardCreateError": "Failed to create reward"
+    },
+    "twitchChat": {
+      "title": "Twitch chat commands",
+      "save": "Save chat commands",
+      "cooldown": "Control command cooldown (seconds)",
+      "cooldownNote": "Applies only to skip/pause/resume - a shared cooldown so two moderators can't trigger the same action back to back.",
+      "plainCooldown": "Queue command cooldown (seconds)",
+      "plainCooldownNote": "Applies to \"now\"/\"queue\" commands to prevent spam.",
+      "commands": {
+        "now": "Now playing",
+        "queue": "Queue",
+        "skip": "Skip track",
+        "pause": "Pause",
+        "resume": "Resume"
+      },
+      "permission": {
+        "everyone": "Everyone",
+        "moderator": "Moderators",
+        "broadcaster": "Broadcaster only"
+      }
     }
   },
   "player": {
@@ -167,6 +246,15 @@
   },
   "api": {
     "errors": {
+      "networkError": "Can't reach the server",
+      "invalidConfig": "Invalid settings: {{fields}}",
+      "invalidSettings": "Invalid overlay settings: {{fields}}",
+      "invalidVideoId": "Invalid video ID",
+      "invalidJson": "Request body is not valid JSON",
+      "payloadTooLarge": "Request body is too large",
+      "forbiddenOrigin": "This origin is not allowed",
+      "localOnly": "This action is only available from the computer the app is running on",
+      "rateLimited": "Too many requests, please wait a moment",
       "invalidLocale": "Invalid locale",
       "invalidPlaylistId": "Invalid playlist ID or URL",
       "playlistNotFound": "Playlist not found",
@@ -187,7 +275,25 @@
       "userLimit": "You can only queue {{count}} track(s) at a time",
       "youtubeQuota": "YouTube API quota exceeded",
       "youtubeError": "YouTube request failed",
-      "noApiKey": "YouTube API key is not configured, add it in the control panel"
+      "noApiKey": "YouTube API key is not configured, add it in the control panel",
+      "notMusic": "This video isn't in the YouTube Music category",
+      "notEmbeddable": "This video can't be embedded",
+      "durationOutOfRange": "Track duration must be between {{min}} and {{max}} seconds",
+      "viewsTooLow": "Track needs at least {{min}} views",
+      "regionBlocked": "This track isn't available in the configured region",
+      "notPublic": "This video is not public",
+      "ageRestricted": "This video is age-restricted",
+      "notPlayable": "This video is not playable",
+      "isLive": "Live streams are not allowed",
+      "isShort": "Shorts are not allowed",
+      "playbackFailed": "Playback failed in the player (error {{errorCode}})",
+      "playbackVideoUnavailable": "Video became unavailable (removed, made private, or deleted)",
+      "playbackEmbedDisallowed": "YouTube refused embedded playback (often age-restriction or an owner-side embed block not visible via the API)",
+      "twitchAuthError": "Failed to generate Twitch authorization URL",
+      "twitchOAuthError": "Failed to complete Twitch authorization",
+      "twitchAuthExpired": "Twitch authorization expired, try connecting again",
+      "twitchNotConnected": "Twitch account is not connected",
+      "twitchRefreshError": "Failed to refresh Twitch connection"
     }
   },
   "time": {
@@ -215,9 +321,15 @@
     "trackBlocked": "Track blocked",
     "trackUnblocked": "Track unblocked",
     "settingsSaved": "Settings saved",
+    "settingsPartiallySaved": "Saved {{saved}}, not saved {{rejected}} (invalid values)",
+    "apiKeyNotSaved": "Config saved, but API key was not",
     "nowPlaying": "Now playing: {{title}}",
     "addedToQueue": "Added to queue: {{title}} [#{{position}}]",
     "viewerRequest": "🎵 {{user}} added: {{title}}",
-    "viewerRequestsMany": "🎵 {{count}} new tracks added by viewers"
+    "viewerRequestsMany": "🎵 {{count}} new tracks added by viewers",
+    "twitchSettingsSaved": "Twitch settings saved",
+    "twitchChatCommandsSaved": "Chat commands saved",
+    "twitchRewardCreated": "Reward created successfully",
+    "twitchRewardUpdated": "Reward updated successfully"
   }
 }

@@ -1,48 +1,17 @@
-import { dom } from './state.js'
+import { CONFIG_FIELDS, dom } from './state.js'
 import { switchPageTab, switchSection } from './tabs.js'
-import { playPauseCurrent, skipCurrent } from './player.js'
-import { search, addSong, clearSearchResults } from './search.js'
-import { removeFromQueue, clearQueue } from './queue.js'
-import {
-  playFallbackNow,
-  enqueueFallbackTrack,
-  refreshFallback,
-  toggleFallbackShuffle,
-  toggleFallbackRepeat,
-  toggleFallbackEnabled
-} from './fallback.js'
-import { clearActivity, setActivityFilter, banTrack } from './activity.js'
-import { unblockTrack } from './blocklist.js'
-import { addPlaylist, activatePlaylist, deletePlaylist } from './playlists.js'
-import { saveOverlaySettings, copyOverlayUrl, onIpChange, toggleQr, saveConfigSetting, changeLocale } from './settings.js'
-
-const ACTIONS = {
-  'play-pause': playPauseCurrent,
-  skip: skipCurrent,
-  search: search,
-  'search-clear': clearSearchResults,
-  'clear-queue': clearQueue,
-  'queue-remove': (action) => removeFromQueue(Number(action.dataset.index)),
-  'search-add': (action) => addSong(`https://www.youtube.com/watch?v=${action.dataset.videoId}`),
-  'fallback-refresh': refreshFallback,
-  'fallback-shuffle': toggleFallbackShuffle,
-  'fallback-repeat': toggleFallbackRepeat,
-  'fallback-enabled': toggleFallbackEnabled,
-  'fallback-play': (action) => playFallbackNow(action.dataset.videoId),
-  'fallback-enqueue': (action) => enqueueFallbackTrack(action.dataset.videoId),
-  'add-playlist': addPlaylist,
-  'playlist-activate': (action) => activatePlaylist(action.dataset.id),
-  'playlist-delete': (action) => deletePlaylist(action.dataset.id),
-  'clear-activity': clearActivity,
-  'activity-filter': (action) => setActivityFilter(action.dataset.filter),
-  'ban-track': (action) => banTrack(action.dataset.videoId, action.dataset.title),
-  'unblock-track': (action) => unblockTrack(action.dataset.videoId),
-  'copy-overlay-url': copyOverlayUrl,
-  'toggle-qr': toggleQr,
-  'save-config': saveConfigSetting
-}
+import { dispatchAction } from './actions.js'
+import { bindMenus } from './menu.js'
+import { search } from './search.js'
+import { addPlaylist } from './playlists.js'
+import { saveOverlaySettings, onIpChange, changeLocale, isConfigFieldChanged } from './settings.js'
+import { onTwitchRewardChange, stopTwitchPolling, bindTwitchFieldTracking, bindTwitchRewardFormEvents } from './twitch/index.js'
+import { trackChanges } from './save-result.js'
+import { setError } from '../shared.js'
 
 export function bindEvents() {
+  bindMenus()
+
   document.addEventListener('click', (event) => {
     const pageTabButton = event.target.closest('[data-page-tab-target]')
     if (pageTabButton) {
@@ -56,10 +25,8 @@ export function bindEvents() {
       return
     }
 
-    const action = event.target.closest('[data-action]')
-    if (!action) return
-
-    ACTIONS[action.dataset.action]?.(action)
+    const actionElement = event.target.closest('[data-action]')
+    if (actionElement) dispatchAction(actionElement, event)
   })
 
   dom.searchInput?.addEventListener('keydown', (event) => {
@@ -73,5 +40,33 @@ export function bindEvents() {
   dom.showVideo?.addEventListener('change', saveOverlaySettings)
   dom.badgePosition?.addEventListener('change', saveOverlaySettings)
   dom.selectIp?.addEventListener('change', onIpChange)
-  dom.localeSelect?.addEventListener('change', (e) => changeLocale(e.target.value))
+  dom.twitchRewardSelect?.addEventListener('change', onTwitchRewardChange)
+  window.addEventListener('pagehide', stopTwitchPolling)
+  dom.localeSelect?.addEventListener('change', (event) => changeLocale(event.target.value))
+
+  const settingsInputs = [
+    dom.cfgMinViews,
+    dom.cfgMinDuration,
+    dom.cfgMaxDuration,
+    dom.cfgMaxQueue,
+    dom.cfgMaxPerUser,
+    dom.cfgRegionCode,
+    dom.cfgAllowShorts,
+    dom.cfgAllowLiveStreams,
+    dom.secYoutubeKey,
+    dom.showVideo,
+    dom.badgePosition,
+    dom.localeSelect
+  ]
+
+  settingsInputs.forEach((input) => {
+    if (input) {
+      input.addEventListener('input', () => setError(input, false))
+      input.addEventListener('change', () => setError(input, false))
+    }
+  })
+
+  CONFIG_FIELDS.forEach((field) => trackChanges(dom[field.dom], () => isConfigFieldChanged(field)))
+  bindTwitchFieldTracking()
+  bindTwitchRewardFormEvents()
 }

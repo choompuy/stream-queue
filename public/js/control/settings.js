@@ -1,41 +1,52 @@
-import { escapeHtml } from '../shared.js'
-import { api } from './api.js'
+import { escapeHtml, show, setError, setFieldState, setValue, setChecked } from '../shared.js'
+import { api, ApiError } from './api.js'
 import { state, dom, log, CONFIG_FIELDS } from './state.js'
+import { run } from './run.js'
 import { syncPlayer } from './player.js'
 import { renderQueue } from './queue.js'
 import { renderPlaylists } from './playlists.js'
 import { t } from '../i18n.js'
-import { toastSuccess } from './toast.js'
+import { toastError } from './toast.js'
+import { reportSaveResult } from './save-result.js'
 
-export async function changeLocale(locale) {
-  try {
+export function changeLocale(locale) {
+  return run('changing locale', async () => {
     await api.updateLocale(locale)
     location.reload()
-  } catch (error) {
-    log('Error changing locale:', error)
-  }
+  })
 }
 
-export async function loadOverlaySettings() {
-  try {
+export function loadOverlaySettings() {
+  return run('loading settings', async () => {
     state.settings = await api.getSettings()
 
-    if (dom.showVideo) dom.showVideo.checked = Boolean(state.settings.showVideo)
-    if (dom.badgePosition) dom.badgePosition.value = state.settings.position || 'bottom-right'
-  } catch (error) {
-    log('Error loading settings:', error)
-  }
+    setError(dom.showVideo, false)
+    setChecked(dom.showVideo, state.settings.showVideo)
+    setError(dom.badgePosition, false)
+    setValue(dom.badgePosition, state.settings.position || 'bottom-right')
+  })
 }
 
-export async function saveOverlaySettings() {
-  try {
-    state.settings.showVideo = dom.showVideo.checked
-    state.settings.position = dom.badgePosition ? dom.badgePosition.value : state.settings.position
-    await api.updateSettings(state.settings)
-    syncPlayer()
-  } catch (error) {
-    log('Error saving settings:', error)
-  }
+export function saveOverlaySettings() {
+  return run('saving settings', async () => {
+    setError(dom.showVideo, false)
+    setError(dom.badgePosition, false)
+
+    try {
+      state.settings.showVideo = dom.showVideo?.checked ?? state.settings.showVideo
+      state.settings.position = dom.badgePosition?.value ?? state.settings.position
+      await api.updateSettings(state.settings)
+      syncPlayer()
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'INVALID_SETTINGS' && error.params?.fields) {
+        const rejectedFields = error.params.fields.split(', ')
+
+        if (rejectedFields.includes('showVideo')) setError(dom.showVideo)
+        if (rejectedFields.includes('position')) setError(dom.badgePosition)
+      }
+      throw error
+    }
+  })
 }
 
 export function copyOverlayUrl() {
@@ -46,8 +57,8 @@ export function copyOverlayUrl() {
   })
 }
 
-export async function loadNetworkInfo() {
-  try {
+export function loadNetworkInfo() {
+  return run('loading network info', async () => {
     state.network = await api.getNetworkInfo()
     const ips = state.network?.ips ?? []
 
@@ -55,9 +66,7 @@ export async function loadNetworkInfo() {
     else if (!state.selectedIp || !ips.includes(state.selectedIp)) state.selectedIp = ips[0]
 
     renderQrUrl()
-  } catch (error) {
-    log('Error loading network info:', error)
-  }
+  })
 }
 
 export function renderQrUrl() {
@@ -68,7 +77,7 @@ export function renderQrUrl() {
   if (dom.selectIp) {
     const ips = state.network?.ips ?? []
     if (ips.length > 1) {
-      dom.selectIp.classList.remove('hidden')
+      show(dom.selectIp)
       dom.selectIp.innerHTML = ips
         .map(
           (ip) => `
@@ -79,7 +88,7 @@ export function renderQrUrl() {
         )
         .join('')
     } else {
-      dom.selectIp.classList.add('hidden')
+      show(dom.selectIp, false)
     }
   }
 
@@ -103,47 +112,75 @@ export function onIpChange() {
 export function toggleQr() {
   if (!dom.controlPanelQr) return
 
-  dom.controlPanelQr.classList.toggle('hidden')
-
-  if (!dom.controlPanelQr.classList.contains('hidden')) renderQrUrl()
+  const isHidden = dom.controlPanelQr.classList.contains('hidden')
+  show(dom.controlPanelQr, isHidden)
+  renderQrUrl()
 }
 
-export async function loadConfig() {
-  try {
+export function loadConfig() {
+  return run('loading config', async () => {
     state.config = await api.getConfig()
+    applyConfig()
+  })
+}
 
-    for (const field of CONFIG_FIELDS) {
-      const input = dom[field.dom]
-      if (!input) continue
+// puts the stored config into the inputs and clears their changed/saved/error marks
+function applyConfig() {
+  for (const field of CONFIG_FIELDS) {
+    const input = dom[field.dom]
+    if (!input) continue
+    setFieldState(input, null)
 
-      const value = field.path ? state.config[field.path]?.[field.key] : state.config[field.key]
-      input.value = value ?? ''
-    }
-  } catch (error) {
-    log('Error loading config:', error)
+    const value = storedFieldValue(field)
+
+    if (field.type === 'checkbox') setChecked(input, value)
+    else setValue(input, value)
   }
 }
 
-export async function loadSecrets() {
-  try {
+export function cancelConfigChanges() {
+  if (!state.config) return
+
+  applyConfig()
+  setValue(dom.secYoutubeKey, '')
+}
+
+export function loadSecrets() {
+  return run('loading secrets', async () => {
     const data = await api.getSecrets()
     const key = data.hasYoutubeApiKey ? 'settings.bot.apiKeyConfigured' : 'settings.bot.apiKeyNotConfigured'
     dom.secretsStatus.textContent = t(key)
     dom.secretsStatus.setAttribute('data-i18n', key)
     dom.secretsStatus.classList.toggle('text-red', !data.hasYoutubeApiKey)
-  } catch (error) {
-    log('Error loading secrets:', error)
-  }
+  })
+}
+
+function readFieldValue(field, input) {
+  if (field.type === 'checkbox') return input.checked
+  if (field.type === 'number') return Number(input.value)
+  if (field.type === 'nullableText') return input.value.trim() || null
+  return input.value.trim()
+}
+
+function storedFieldValue(field) {
+  return field.path ? state.config?.[field.path]?.[field.key] : state.config?.[field.key]
+}
+
+export function isConfigFieldChanged(field) {
+  const input = dom[field.dom]
+  return Boolean(input) && readFieldValue(field, input) !== storedFieldValue(field)
 }
 
 export async function saveConfigSetting() {
   const config = {}
+  const entries = []
 
   for (const field of CONFIG_FIELDS) {
     const input = dom[field.dom]
     if (!input) continue
 
-    const value = field.type === 'number' ? Number(input.value) : input.value.trim()
+    const value = readFieldValue(field, input)
+    entries.push({ input, path: field.path ? `${field.path}.${field.key}` : field.key, changed: value !== storedFieldValue(field) })
 
     if (field.path) {
       config[field.path] ??= {}
@@ -153,21 +190,47 @@ export async function saveConfigSetting() {
     }
   }
 
-  const youtubeApiKey = dom.secYoutubeKey.value.trim()
+  const youtubeApiKey = dom.secYoutubeKey?.value.trim() ?? ''
 
-  try {
-    state.config = await api.updateConfig(config)
+  await run('saving config', async () => {
+    // partial save: the server stores every valid field and lists the refused ones
+    const { config: saved, rejected } = await api.updateConfig(config)
+    state.config = saved
+
+    for (const { input, path } of entries) {
+      if (rejected.includes(path)) continue
+
+      const field = CONFIG_FIELDS.find((f) => (f.path ? `${f.path}.${f.key}` === path : f.key === path))
+      if (!field) continue
+
+      const serverValue = storedFieldValue(field)
+      if (field.type === 'checkbox') setChecked(input, serverValue)
+      else setValue(input, serverValue)
+    }
+
+    let apiKeyFailed = false
 
     if (youtubeApiKey) {
-      await api.updateSecrets({ youtubeApiKey })
-      dom.secYoutubeKey.value = ''
-      await loadSecrets()
+      try {
+        await api.updateSecrets({ youtubeApiKey })
+        dom.secYoutubeKey.value = ''
+        await loadSecrets()
+      } catch (error) {
+        log('Error saving API key:', error)
+        toastError(t('toast.apiKeyNotSaved'))
+        apiKeyFailed = true
+      }
     }
 
     renderQueue()
     renderPlaylists()
-    toastSuccess(t('toast.settingsSaved'))
-  } catch (error) {
-    log('Error saving settings:', error)
-  }
+    reportSaveResult(entries, rejected, 'toast.settingsSaved', { successToast: !apiKeyFailed })
+  })
+}
+
+export const settingsActions = {
+  'copy-overlay-url': copyOverlayUrl,
+  'toggle-qr': toggleQr,
+  'save-config': saveConfigSetting,
+  'cancel-config': cancelConfigChanges
 }

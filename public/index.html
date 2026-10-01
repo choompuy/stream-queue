@@ -16,7 +16,7 @@
   <body>
     <header class="box-shadow">
       <nav class="header-nav container">
-        <button class="row btn btn-tab btn-sm active" data-page-tab-target="dashboard">
+        <button class="page-tab-btn btn btn-tab btn-sm active" data-page-tab-target="dashboard">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
             <path
               stroke="currentColor"
@@ -29,7 +29,7 @@
           </svg>
           <span data-i18n="nav.dashboard">Dashboard</span>
         </button>
-        <button class="row btn btn-tab btn-sm" data-page-tab-target="playlists">
+        <button class="page-tab-btn btn btn-tab btn-sm" data-page-tab-target="playlists">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
             <path
               stroke="currentColor"
@@ -41,7 +41,7 @@
           </svg>
           <span data-i18n="nav.playlists">Playlists</span>
         </button>
-        <button class="row btn btn-tab btn-sm" data-page-tab-target="settings">
+        <button class="page-tab-btn btn btn-tab btn-sm" data-page-tab-target="settings">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
             <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0" />
             <path
@@ -77,7 +77,7 @@
                 <button
                   class="btn btn-lg btn-icon btn-primary"
                   id="playPauseBtn"
-                  data-action="play-pause"
+                  data-action="resume-pause"
                   title="Pause"
                   data-i18n-title="nowPlaying.pause"
                 >
@@ -109,7 +109,7 @@
           </div>
         </div>
 
-        <div class="song-search-wrapper panel section-panel">
+        <div class="song-search-wrapper panel section-tab">
           <div class="row">
             <input class="input" type="search" id="searchInput" placeholder="YouTube URL or search..." data-i18n-placeholder="search.placeholder" />
             <button class="song-search-btn btn" id="searchBtn" data-action="search" data-i18n="search.searchBtn">Search</button>
@@ -130,26 +130,26 @@
 
         <div class="section-tabs-wrapper panel column">
           <div class="section-tabs" id="sectionTabs">
-            <button class="section-tab btn btn-lg active" data-section-target="queue">
+            <button class="section-tab-btn btn btn-tab active" data-section-target="queue">
               <span data-i18n="queue.title">Queue</span>
               <span class="count-badge" id="tabQueueCount">0</span>
             </button>
-            <button class="section-tab btn btn-lg" data-section-target="playlist">
+            <button class="section-tab-btn btn btn-tab" data-section-target="playlist">
               <span data-i18n="fallback.title">Playlist</span>
               <span class="count-badge" id="tabPlaylistCount">0</span>
             </button>
-            <button class="section-tab btn btn-lg" data-section-target="activity">
+            <button class="section-tab-btn btn btn-tab" data-section-target="activity">
               <span data-i18n="activity.title">Activity</span>
               <span class="count-badge" id="tabActivityCount">0</span>
             </button>
-            <button class="section-tab btn btn-lg" data-section-target="blocklist">
+            <button class="section-tab-btn btn btn-tab" data-section-target="blocklist">
               <span data-i18n="blocklist.title">Blocklist</span>
               <span class="count-badge" id="tabBlocklistCount">0</span>
             </button>
           </div>
 
-          <div class="section-panel section-panel-queue" data-section="queue">
-            <div class="section-panel-header">
+          <div class="section-tab section-tab-queue" data-section="queue">
+            <div class="section-tab-header">
               <h2><span data-i18n="queue.title">Queue</span> <span class="text-sm text-secondary" id="queueCount">0/0</span></h2>
               <button id="clearQueueBtn" class="btn btn-secondary btn-danger" data-action="clear-queue" data-i18n-title="queue.clear">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
@@ -171,13 +171,13 @@
             </div>
           </div>
 
-          <div class="section-panel section-panel-fallback hidden" data-section="playlist">
-            <div class="section-panel-header">
+          <div class="section-tab section-tab-fallback hidden" data-section="playlist">
+            <div class="section-tab-header">
               <div>
                 <h2 data-i18n="fallback.title">Playlist</h2>
                 <div id="fallbackInfo" class="text-sm text-secondary"></div>
               </div>
-              <div class="section-panel-actions">
+              <div class="section-tab-actions">
                 <button
                   id="fallbackRefreshBtn"
                   class="btn btn-icon btn-secondary"
@@ -255,37 +255,10 @@
             </div>
           </div>
 
-          <div class="section-panel section-panel-activity hidden" data-section="activity">
-            <div class="section-panel-header">
+          <div class="section-tab section-tab-activity hidden" data-section="activity">
+            <div class="section-tab-header">
               <h2 data-i18n="activity.title">Activity</h2>
-              <div class="section-panel-actions">
-                <button
-                  id="activityFilterAllBtn"
-                  class="btn btn-secondary btn-sm active"
-                  data-action="activity-filter"
-                  data-filter="all"
-                  data-i18n="activity.filterAll"
-                >
-                  All
-                </button>
-                <button
-                  id="activityFilterAcceptedBtn"
-                  class="btn btn-secondary btn-sm"
-                  data-action="activity-filter"
-                  data-filter="accepted"
-                  data-i18n="activity.filterAccepted"
-                >
-                  Accepted
-                </button>
-                <button
-                  id="activityFilterRejectedBtn"
-                  class="btn btn-secondary btn-sm"
-                  data-action="activity-filter"
-                  data-filter="rejected"
-                  data-i18n="activity.filterRejected"
-                >
-                  Rejected
-                </button>
+              <div class="section-tab-actions">
                 <button id="clearActivityBtn" class="btn btn-secondary btn-danger" data-action="clear-activity" data-i18n-title="activity.clear">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                     <path
@@ -306,8 +279,8 @@
             </div>
           </div>
 
-          <div class="section-panel section-panel-blocklist hidden" data-section="blocklist">
-            <div class="section-panel-header">
+          <div class="section-tab section-tab-blocklist hidden" data-section="blocklist">
+            <div class="section-tab-header">
               <h2 data-i18n="blocklist.title">Blocklist</h2>
             </div>
             <div class="row-list-wrapper" id="blocklistListWrapper" data-list="blocklist">
@@ -323,7 +296,7 @@
           <h1 data-i18n="playlists.title">Playlists</h1>
         </div>
 
-        <div class="playlist-add-wrapper panel section-panel flex-1">
+        <div class="playlist-add-wrapper panel section-tab flex-1">
           <div class="row">
             <input
               id="playlistUrlInput"
@@ -351,21 +324,19 @@
           <h1 data-i18n="settings.title">Settings</h1>
         </div>
         <div class="settings-wrapper">
-          <div class="section-panel panel">
-            <div class="section-panel-header">
+          <div class="section-tab panel">
+            <div class="section-tab-header">
               <h2 data-i18n="settings.overlay.title">Overlay</h2>
             </div>
             <div class="settings-section">
               <label class="field-row">
-                <div class="checkbox-wrapper">
-                  <input class="checkbox" type="checkbox" id="showVideo" />
-                </div>
                 <span data-i18n="settings.overlay.showVideo">Show video</span>
+                <input class="settings-input checkbox" type="checkbox" id="showVideo" />
               </label>
 
               <div class="field">
                 <label class="field-label" for="badgePosition" data-i18n="settings.overlay.badgePosition">Badge position</label>
-                <select class="settings-input input select" id="badgePosition">
+                <select class="settings-input input" id="badgePosition">
                   <option value="top-left" data-i18n="settings.overlay.positionTopLeft">Top Left</option>
                   <option value="top-right" data-i18n="settings.overlay.positionTopRight">Top Right</option>
                   <option value="bottom-left" data-i18n="settings.overlay.positionBottomLeft">Bottom Left</option>
@@ -396,7 +367,7 @@
               <div class="field">
                 <label class="field-label" for="selectIp" data-i18n="settings.overlay.ipSelector">IP selector</label>
                 <div class="field-row">
-                  <select class="settings-input input select hidden" id="selectIp"></select>
+                  <select class="settings-input input hidden" id="selectIp"></select>
                   <button class="btn btn-secondary btn-icon" data-action="toggle-qr" title="QR code" data-i18n-title="settings.overlay.qrCode">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                       <path
@@ -422,8 +393,8 @@
             </div>
           </div>
 
-          <div class="section-panel panel">
-            <div class="section-panel-header">
+          <div class="section-tab panel">
+            <div class="section-tab-header">
               <h2 data-i18n="settings.bot.title">Bot Settings</h2>
             </div>
 
@@ -475,17 +446,276 @@
               </div>
             </div>
 
-            <button id="saveConfigSettingBtn" class="btn btn-primary" data-action="save-config" data-i18n="settings.bot.save">Save settings</button>
+            <div class="settings-section">
+              <label class="field-row">
+                <span data-i18n="settings.bot.limits.allowShorts">Shorts</span>
+                <input class="settings-input checkbox" type="checkbox" id="cfgAllowShorts" />
+              </label>
+
+              <label class="field-row">
+                <span data-i18n="settings.bot.limits.allowLiveStreams">Live Streams</span>
+                <input class="settings-input checkbox" type="checkbox" id="cfgAllowLiveStreams" />
+              </label>
+
+              <div class="field">
+                <label class="field-label" for="cfgRegionCode" data-i18n="settings.bot.limits.regionCode">Region code</label>
+                <input class="settings-input input" type="text" id="cfgRegionCode" maxlength="2" placeholder="US" style="text-transform: uppercase" />
+              </div>
+              <div class="text-muted text-xs" data-i18n="settings.bot.regionCodeNote">
+                Two-letter country code (ISO 3166-1, e.g. US, RU, DE). Tracks not licensed for this region are skipped instead of being queued. Leave
+                empty to disable.
+              </div>
+            </div>
+
+            <div class="settings-section-actions">
+              <button class="btn btn-secondary" data-action="cancel-config" data-i18n="common.cancel">Cancel</button>
+              <button class="btn btn-primary" data-action="save-config" data-i18n="settings.bot.save">Save settings</button>
+            </div>
           </div>
 
-          <div class="section-panel panel">
-            <div class="section-panel-header">
+          <div class="section-tab panel">
+            <div class="section-tab-header">
+              <h2 data-i18n="settings.twitch.integration">Twitch integration</h2>
+            </div>
+
+            <div class="settings-section">
+              <div id="twitchNotConfigured" class="field hidden">
+                <div class="text-muted text-xs" data-i18n="settings.twitch.clientCredentialsNote">
+                  Create an application in the Twitch Developer Console to get your Client ID and Client Secret
+                </div>
+              </div>
+
+              <div class="field">
+                <div class="field-label" data-i18n="settings.twitch.chanel">Not connected</div>
+                <div class="field-row">
+                  <div class="start">
+                    <img id="twitchChanelImg" class="thumbnail" src="" alt="User avatar" />
+                    <div id="twitchChanelName" class="text-red truncate" data-i18n="settings.twitch.notConnected">Channel not linked</div>
+                  </div>
+
+                  <div id="twitchConnectionControls">
+                    <button id="twitchConnectBtn" class="btn btn-primary" data-action="connect-twitch" data-i18n="settings.twitch.connect">
+                      Connect Twitch
+                    </button>
+
+                    <button
+                      id="twitchDisconnectBtn"
+                      class="btn btn-secondary btn-danger hidden"
+                      data-action="disconnect-twitch"
+                      data-i18n="settings.twitch.disconnect"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div id="twitchAuthorization" class="field hidden">
+                <div class="field-label" data-i18n="settings.twitch.authorizationInstructions">
+                  Open Twitch and enter this code to authorize StreamQueue
+                </div>
+
+                <div id="twitchAuthorizationCode" class="settings-input input text-blue"></div>
+              </div>
+            </div>
+
+            <div id="twitchRewardSection" class="settings-section hidden">
+              <div class="field">
+                <label class="field-label" for="twitchRewardSelect" data-i18n="settings.twitch.reward">Channel Points reward</label>
+                <div class="field-row">
+                  <select class="settings-input input" id="twitchRewardSelect">
+                    <option value="" data-i18n="settings.twitch.rewardNone">Select reward</option>
+                  </select>
+                  <button class="btn btn-secondary" id="twitchCreateNewRewardBtn" data-i18n="settings.twitch.createReward">Create reward</button>
+                </div>
+                <div class="text-muted text-xs" data-i18n="settings.twitch.rewardNote">Redemptions of this reward will be used as song requests</div>
+              </div>
+              <div class="field">
+                <label class="field-row">
+                  <span data-i18n="settings.twitch.autoFulfillRedemptions">Auto-fulfill redemptions</span>
+                  <input class="settings-input checkbox" type="checkbox" id="twitchAutoFulfillRedemptions" />
+                </label>
+                <div class="text-muted text-xs" data-i18n="settings.twitch.autoFulfillRedemptionsNote">
+                  Automatically fulfill redemptions when the track finishes playing successfully
+                </div>
+              </div>
+            </div>
+
+            <div id="twitchRewardForm" class="section-tab hidden">
+              <div class="section-tab-header">
+                <h2 data-i18n="settings.twitch.editReward">Edit reward</h2>
+              </div>
+              <div class="settings-section">
+                <div class="field">
+                  <label class="field-label" for="twitchRewardTitle" data-i18n="settings.twitch.createRewardTitle">Reward title</label>
+                  <input class="settings-input input" type="text" id="twitchRewardTitle" maxlength="45" />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="twitchRewardCost" data-i18n="settings.twitch.createRewardCost">Cost (points)</label>
+                  <input class="settings-input input" type="number" id="twitchRewardCost" min="1" />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="twitchRewardPrompt" data-i18n="settings.twitch.createRewardPrompt">Description (optional)</label>
+                  <input class="settings-input input" type="text" id="twitchRewardPrompt" maxlength="140" />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="twitchRewardBackgroundColor" data-i18n="settings.twitch.createRewardBackgroundColor"
+                    >Background color (hex, optional)</label
+                  >
+                  <div class="field-row">
+                    <input class="settings-input input" type="color" id="twitchRewardBackgroundColorPicker" />
+                    <input class="settings-input input" type="text" id="twitchRewardBackgroundColor" maxlength="6" placeholder="00FF00" />
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="field-row">
+                    <span data-i18n="settings.twitch.createRewardEnabled">Enable reward</span>
+                    <input class="settings-input checkbox" type="checkbox" id="twitchRewardEnabled" />
+                  </label>
+                </div>
+
+                <div class="field">
+                  <label class="field-label" data-i18n="settings.twitch.maxPerStream">Max per stream</label>
+                  <div class="field-row">
+                    <input class="settings-input input" type="number" id="twitchMaxPerStream" min="1" disabled />
+                    <input class="settings-input checkbox" type="checkbox" id="twitchMaxPerStreamEnabled" />
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="field-label" data-i18n="settings.twitch.maxPerUserPerStream">Max per user per stream</label>
+                  <div class="field-row">
+                    <input class="settings-input input" type="number" id="twitchMaxPerUserPerStream" min="1" disabled />
+                    <input class="settings-input checkbox" type="checkbox" id="twitchMaxPerUserPerStreamEnabled" />
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="field-label" data-i18n="settings.twitch.globalCooldown">Global cooldown (seconds)</label>
+                  <div class="field-row">
+                    <input class="settings-input input" type="number" id="twitchGlobalCooldownSeconds" min="1" disabled />
+                    <input class="settings-input checkbox" type="checkbox" id="twitchGlobalCooldownEnabled" />
+                  </div>
+                </div>
+              </div>
+              <div class="settings-section-actions">
+                <button class="btn btn-secondary" data-action="cancel-twitch-reward" data-i18n="common.cancel">Cancel</button>
+                <button class="btn btn-primary" id="twitchSaveRewardBtn" data-i18n="common.save">Save</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="twitchChatCommandsPanel" class="section-tab panel hidden">
+            <div class="section-tab-header">
+              <h2 data-i18n="settings.twitchChat.title">Twitch chat commands</h2>
+            </div>
+
+            <div class="settings-section" id="twitchChatCommandRows">
+              <div class="field" data-chat-command="now">
+                <label class="field-label" data-i18n="settings.twitchChat.commands.now">Now playing</label>
+                <div class="field-row">
+                  <input class="settings-input input" type="text" id="chatCmdNowCommand" placeholder="!sg now" />
+                  <select class="settings-input input" id="chatCmdNowPermission">
+                    <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
+                    <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
+                    <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
+                  </select>
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdNowEnabled" />
+                </div>
+              </div>
+
+              <div class="field" data-chat-command="queue">
+                <label class="field-label" data-i18n="settings.twitchChat.commands.queue">Queue</label>
+                <div class="field-row">
+                  <input class="settings-input input" type="text" id="chatCmdQueueCommand" placeholder="!sg queue" />
+                  <select class="settings-input input" id="chatCmdQueuePermission">
+                    <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
+                    <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
+                    <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
+                  </select>
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdQueueEnabled" />
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="chatCmdPlainCooldown" data-i18n="settings.twitchChat.plainCooldown">
+                  Queue command cooldown (seconds)
+                </label>
+                <input class="settings-input input" type="number" id="chatCmdPlainCooldown" min="0" max="300" style="max-width: 8rem" />
+                <div class="text-muted text-xs" data-i18n="settings.twitchChat.plainCooldownNote">
+                  Applies to "now"/"queue" commands to prevent spam.
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section" id="twitchChatCommandRows">
+              <div class="field" data-chat-command="skip">
+                <label class="field-label" data-i18n="settings.twitchChat.commands.skip">Skip track</label>
+                <div class="field-row">
+                  <input class="settings-input input" type="text" id="chatCmdSkipCommand" placeholder="!sg skip" />
+                  <select class="settings-input input" id="chatCmdSkipPermission">
+                    <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
+                    <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
+                    <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
+                  </select>
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdSkipEnabled" />
+                </div>
+              </div>
+
+              <div class="field" data-chat-command="pause">
+                <label class="field-label" data-i18n="settings.twitchChat.commands.pause">Pause</label>
+                <div class="field-row">
+                  <input class="settings-input input" type="text" id="chatCmdPauseCommand" placeholder="!sg pause" />
+                  <select class="settings-input input" id="chatCmdPausePermission">
+                    <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
+                    <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
+                    <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
+                  </select>
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdPauseEnabled" />
+                </div>
+              </div>
+
+              <div class="field" data-chat-command="resume">
+                <label class="field-label" data-i18n="settings.twitchChat.commands.resume">Resume</label>
+                <div class="field-row">
+                  <input class="settings-input input" type="text" id="chatCmdResumeCommand" placeholder="!sg resume" />
+                  <select class="settings-input input" id="chatCmdResumePermission">
+                    <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
+                    <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
+                    <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
+                  </select>
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdResumeEnabled" />
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="field-label" for="chatCmdCooldown" data-i18n="settings.twitchChat.cooldown">Control command cooldown (seconds)</label>
+                <input class="settings-input input" type="number" id="chatCmdCooldown" min="0" max="300" style="max-width: 8rem" />
+                <div class="text-muted text-xs" data-i18n="settings.twitchChat.cooldownNote">
+                  Applies only to skip/pause/resume - a shared cooldown so two moderators can't trigger the same action back to back.
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section-actions">
+              <button class="btn btn-secondary" data-action="cancel-twitch-chat-commands" data-i18n="common.cancel">Cancel</button>
+              <button
+                id="twitchChatCommandsSaveBtn"
+                class="btn btn-primary"
+                data-action="save-twitch-chat-commands"
+                data-i18n="settings.twitchChat.save"
+              >
+                Save chat commands
+              </button>
+            </div>
+          </div>
+
+          <div class="section-tab panel">
+            <div class="section-tab-header">
               <h2 data-i18n="settings.language.title">Language</h2>
             </div>
             <div class="settings-section">
               <div class="field">
                 <label class="field-label" for="localeSelect" data-i18n="settings.language.description">Select interface language</label>
-                <select class="settings-input input select" id="localeSelect">
+                <select class="settings-input input" id="localeSelect">
                   <option value="en">English</option>
                   <option value="ru">Русский</option>
                 </select>
@@ -493,8 +723,8 @@
             </div>
           </div>
 
-          <div class="section-panel panel">
-            <div class="section-panel-header">
+          <div class="section-tab panel">
+            <div class="section-tab-header">
               <h2 data-i18n="settings.about.title">About</h2>
             </div>
             <div class="settings-section">
@@ -505,7 +735,7 @@
               <div class="field">
                 <div class="field-label">
                   <span data-i18n="settings.about.developedBy">Developed by</span>
-                  <span class="text-green">choompuy</span>
+                  <span class="text-green">@choompuy</span>
                 </div>
                 <a class="settings-input input text-blue" href="https://github.com/choompuy/stream-queue" target="_blank" rel="noopener noreferrer">
                   GitHub ↗
