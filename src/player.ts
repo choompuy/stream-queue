@@ -1,4 +1,4 @@
-import { StateResponse, QueueItem, ActivityReasonCode } from './types.js'
+import { StateResponse, QueueItem, ActivityReasonCode, FailureReason } from './types.js'
 import { isBlocked } from './blocklist.js'
 import { logRejection, logFailure } from './activity.js'
 import { getQueue, getCurrent, getIsPaused, setCurrent, shiftQueue } from './queue.js'
@@ -10,7 +10,7 @@ const log = createLogger('PLAYER')
 // Set by the Twitch integration (if enabled) so a playback failure on a Channel Points track can
 // still be reported back to Twitch (refund the points, notify the requester) - player.ts stays
 // unaware of Twitch beyond this one hook, so it works the same with the integration off
-type ChannelPointsFailureHandler = (redemption: NonNullable<QueueItem['channelPointsRedemption']>, reasonCode: ActivityReasonCode) => void
+type ChannelPointsFailureHandler = (redemption: NonNullable<QueueItem['channelPointsRedemption']>, reason: FailureReason) => void
 let onChannelPointsPlaybackFailure: ChannelPointsFailureHandler | null = null
 
 export function registerChannelPointsPlaybackFailureHandler(handler: ChannelPointsFailureHandler | null): void {
@@ -122,7 +122,7 @@ export function reportPlaybackFailure(errorCode?: number, videoId?: string): boo
     logFailure(failed, reasonCode, errorCode !== undefined ? { errorCode } : undefined)
 
     if (failed.channelPointsRedemption) {
-      onChannelPointsPlaybackFailure?.(failed.channelPointsRedemption, reasonCode)
+      onChannelPointsPlaybackFailure?.(failed.channelPointsRedemption, { code: reasonCode, params: { title: failed.title } })
     }
   }
 

@@ -101,12 +101,7 @@ export function show(element, show = true) {
  * @param {boolean} hasError - If true, add 'error'; if false, remove 'error' (default: true)
  */
 export function setError(element, hasError = true) {
-  setClass(stateHolder(element), 'error', hasError)
-}
-
-// a checkbox is drawn by its `.checkbox-wrapper` (that one carries `.settings-input`), so the state classes belong there
-function stateHolder(element) {
-  return element?.closest?.('.checkbox-wrapper') ?? element
+  setClass(element, 'error', hasError)
 }
 
 /**
@@ -115,8 +110,7 @@ function stateHolder(element) {
  * @param {'changed'|'saved'|'error'|null} state - The state to show, null to clear
  */
 export function setFieldState(element, state = null) {
-  const holder = stateHolder(element)
-  for (const name of ['changed', 'saved', 'error']) setClass(holder, name, name === state)
+  for (const name of ['changed', 'saved', 'error']) setClass(element, name, name === state)
 }
 
 /**

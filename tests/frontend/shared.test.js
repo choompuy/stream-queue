@@ -120,17 +120,13 @@ test('translateErrorCode', async (t) => {
 })
 
 // a minimal element: only what setClass / setFieldState touch
-function fakeElement(wrapper = null) {
+function fakeElement() {
   const classes = new Set()
-  return {
-    classes,
-    classList: { toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)) },
-    closest: (selector) => (selector === '.checkbox-wrapper' ? wrapper : null)
-  }
+  return { classes, classList: { toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)) } }
 }
 
 test('setFieldState / setError', async (t) => {
-  await t.test('plain input gets the state itself and only one at a time', () => {
+  await t.test('shows only one state at a time and clears it with null', () => {
     const input = fakeElement()
     setFieldState(input, 'changed')
     setFieldState(input, 'saved')
@@ -139,23 +135,13 @@ test('setFieldState / setError', async (t) => {
     assert.equal(input.classes.size, 0)
   })
 
-  await t.test('checkbox shows the state on its .checkbox-wrapper, not on the input', () => {
-    const wrapper = fakeElement()
-    const checkbox = fakeElement(wrapper)
-    setFieldState(checkbox, 'changed')
-    assert.deepEqual([...wrapper.classes], ['changed'])
-    assert.equal(checkbox.classes.size, 0)
-    setFieldState(checkbox, null)
-    assert.equal(wrapper.classes.size, 0)
-  })
-
-  await t.test('setError follows the same rule', () => {
-    const wrapper = fakeElement()
-    const checkbox = fakeElement(wrapper)
-    setError(checkbox)
-    assert.ok(wrapper.classes.has('error'))
-    setError(checkbox, false)
-    assert.equal(wrapper.classes.has('error'), false)
+  await t.test('setError toggles only the error class', () => {
+    const input = fakeElement()
+    setFieldState(input, 'changed')
+    setError(input)
+    assert.deepEqual([...input.classes].sort(), ['changed', 'error'])
+    setError(input, false)
+    assert.deepEqual([...input.classes], ['changed'])
   })
 
   await t.test('missing element is ignored', () => {

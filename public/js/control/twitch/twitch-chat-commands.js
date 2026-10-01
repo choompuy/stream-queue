@@ -15,18 +15,20 @@ const COOLDOWNS = [
 const commandInputs = ({ dom: id }) => ({ enabled: dom[`${id}Enabled`], command: dom[`${id}Command`], permission: dom[`${id}Permission`] })
 
 // an input tied to a value stored in the config: `path` is how the server names it in `rejected`
-const field = (input, path, read) => ({
+const field = (input, path, read, write = setValue) => ({
   input,
   path: `chatCommands.${path}`,
   read,
+  write,
   stored: () => path.split('.').reduce((value, key) => value?.[key], state.twitch.chatCommands)
 })
 
 function chatCommandFields() {
   return [
     ...CHAT_COMMAND_FIELDS.flatMap((config) => {
-      const { command, permission } = commandInputs(config)
+      const { enabled, command, permission } = commandInputs(config)
       return [
+        field(enabled, `${config.key}.enabled`, (input) => input.checked, setChecked),
         field(command, `${config.key}.command`, (input) => input.value.trim()),
         field(permission, `${config.key}.permission`, (input) => input.value)
       ]
@@ -49,6 +51,7 @@ export function applyChatCommands(chatCommands) {
 
     const { enabled, command: commandInput, permission } = commandInputs(config)
     setChecked(enabled, command.enabled)
+    setFieldState(enabled, null)
     setValue(commandInput, command.command ?? '')
     setValue(permission, command.permission ?? DEFAULT_PERMISSION)
     setFieldState(commandInput, null)
@@ -85,7 +88,7 @@ export async function saveTwitchChatCommands() {
 
     for (const f of fields) {
       const stored = f.stored()
-      if (!rejected.includes(f.path) && stored !== undefined) setValue(f.input, stored)
+      if (!rejected.includes(f.path) && stored !== undefined) f.write(f.input, stored)
     }
 
     reportSaveResult(entries, rejected, 'toast.twitchChatCommandsSaved')

@@ -98,13 +98,7 @@ router.get('/', (_req, res) => {
 })
 
 router.get('/config', (_req, res) => {
-  const twitchConfig = getTwitchConfig()
-  const response = {
-    channelPointsRewardId: twitchConfig.channelPointsRewardId,
-    autoFulfillRedemptions: twitchConfig.autoFulfillRedemptions,
-    chatCommands: twitchConfig.chatCommands
-  }
-  ok(res, response)
+  ok(res, getTwitchConfig())
 })
 
 router.put(
@@ -113,15 +107,7 @@ router.put(
   asyncHandler(async (req, res) => {
     const { config, rejected } = updateTwitchConfig(req.body)
 
-    sendConfigUpdate(
-      res,
-      {
-        channelPointsRewardId: config.channelPointsRewardId,
-        autoFulfillRedemptions: config.autoFulfillRedemptions,
-        chatCommands: config.chatCommands
-      },
-      rejected
-    )
+    sendConfigUpdate(res, config, rejected)
   })
 )
 

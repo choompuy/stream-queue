@@ -531,7 +531,7 @@ test('the reward id is saved from state, not from the select element', async (t)
     settings.onTwitchRewardChange()
     await settings.saveTwitchConfig()
 
-    assert.deepEqual(sent, { channelPointsRewardId: 'reward-1' })
+    assert.deepEqual(sent, { channelPointsRewardId: 'reward-1', autoFulfillRedemptions: false })
   })
 
   await t.test('sends null when no reward is selected', async () => {
@@ -545,7 +545,7 @@ test('the reward id is saved from state, not from the select element', async (t)
 
     await settings.saveTwitchConfig()
 
-    assert.deepEqual(sent, { channelPointsRewardId: null })
+    assert.deepEqual(sent, { channelPointsRewardId: null, autoFulfillRedemptions: false })
   })
 
   await t.test('shows a success toast on success', async () => {
@@ -675,8 +675,41 @@ test('saveTwitchChatCommands()', async (t) => {
     assert.equal(sent.chatCommands.skip.command, '!sg skip')
   })
 
+  await t.test('marks only the toggles whose value really changed as saved', async () => {
+    handlers = { 'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }) }
+    await settings.loadTwitchConfig()
+
+    const flipped = structuredClone(CHAT_COMMANDS_CONFIG)
+    flipped.skip.enabled = !flipped.skip.enabled
+    handlers = { 'PUT /api/integrations/twitch/config': () => ({ config: { channelPointsRewardId: null, chatCommands: flipped }, rejected: [] }) }
+    dom.chatCmdSkipEnabled.checked = flipped.skip.enabled
+
+    await settings.saveTwitchChatCommands()
+
+    assert.ok(dom.chatCmdSkipEnabled.classList.contains('saved'))
+    assert.equal(dom.chatCmdNowEnabled.classList.contains('saved'), false)
+    assert.equal(dom.chatCmdSkipEnabled.checked, flipped.skip.enabled)
+  })
+
+  await t.test('a toggle is marked as changed while it differs from the stored value and cleared when it matches again', async () => {
+    handlers = { 'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }) }
+    await settings.loadTwitchConfig()
+    settings.bindTwitchFieldTracking()
+
+    const toggle = dom.chatCmdSkipEnabled
+    toggle.checked = !CHAT_COMMANDS_CONFIG.skip.enabled
+    toggle.dispatchEvent(new jsdom.window.Event('change'))
+    assert.ok(toggle.classList.contains('changed'))
+
+    toggle.checked = CHAT_COMMANDS_CONFIG.skip.enabled
+    toggle.dispatchEvent(new jsdom.window.Event('change'))
+    assert.equal(toggle.classList.contains('changed'), false)
+  })
+
   await t.test('shows what the server stored, not what was typed (it lowercases and collapses spaces)', async () => {
-    handlers = { 'PUT /api/integrations/twitch/config': () => ({ config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] }) }
+    handlers = {
+      'PUT /api/integrations/twitch/config': () => ({ config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] })
+    }
     dom.chatCmdSkipCommand.value = '  !SG   Skip '
 
     await settings.saveTwitchChatCommands()
@@ -687,10 +720,15 @@ test('saveTwitchChatCommands()', async (t) => {
   await t.test('a refused command keeps what was typed, so it can be corrected', async () => {
     handlers = {
       'PUT /api/integrations/twitch/config': () => {
-        throw new MockApiFailure('invalid config fields', 'INVALID_CONFIG', { fields: 'chatCommands.skip.command' }, {
-          config: { chatCommands: CHAT_COMMANDS_CONFIG },
-          rejected: ['chatCommands.skip.command']
-        })
+        throw new MockApiFailure(
+          'invalid config fields',
+          'INVALID_CONFIG',
+          { fields: 'chatCommands.skip.command' },
+          {
+            config: { chatCommands: CHAT_COMMANDS_CONFIG },
+            rejected: ['chatCommands.skip.command']
+          }
+        )
       }
     }
     dom.chatCmdSkipCommand.value = 'no-bang'

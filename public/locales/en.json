@@ -12,6 +12,8 @@
     "queueMore": " [+{{count}}]",
     "redemption": {
       "rejected": "@{{user}}, your song request was rejected. Points have been refunded.",
+      "accepted": "@{{user}}, “{{title}}” added to the queue [#{{position}}]",
+      "acceptedNowPlaying": "@{{user}}, “{{title}}” added, playing now",
       "generic": "@{{user}}, your request could not be completed, points refunded",
       "DUPLICATE": "@{{user}}, that track is already in the queue, points refunded",
       "BLOCKED": "@{{user}}, that track is blocked, points refunded",
@@ -29,9 +31,9 @@
       "IS_SHORT": "@{{user}}, shorts cannot be queued, points refunded",
       "DURATION_OUT_OF_RANGE": "@{{user}}, that track does not meet the length requirement, points refunded",
       "VIEWS_TOO_LOW": "@{{user}}, that track does not meet the view count requirement, points refunded",
-      "PLAYBACK_VIDEO_UNAVAILABLE": "@{{user}}, that video became unavailable during playback, points refunded",
-      "PLAYBACK_EMBED_DISALLOWED": "@{{user}}, that video stopped allowing embedded playback, points refunded",
-      "PLAYBACK_FAILED": "@{{user}}, playback failed, points refunded"
+      "PLAYBACK_VIDEO_UNAVAILABLE": "@{{user}}, “{{title}}” could not be played: the video became unavailable, points refunded",
+      "PLAYBACK_EMBED_DISALLOWED": "@{{user}}, “{{title}}” could not be played: embedded playback is no longer allowed, points refunded",
+      "PLAYBACK_FAILED": "@{{user}}, “{{title}}” could not be played: playback failed, points refunded"
     }
   },
   "common": {

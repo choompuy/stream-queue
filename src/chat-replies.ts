@@ -76,11 +76,22 @@ const REDEMPTION_REASON_FALLBACKS: Partial<Record<FailureReason['code'], string>
   PLAYBACK_FAILED: 'playback failed'
 }
 
+// "@user, <title> added to the queue [#N]" / "@user, <title> added, playing now" - confirmation of an accepted Channel Points request
+export function buildRedemptionAcceptedMessage(userName: string, added: { song: { title: string }; started: boolean; position: number }): string {
+  const params = { user: userName, title: truncate(added.song.title), position: added.position }
+
+  return added.started
+    ? translateWithFallback('chat.redemption.acceptedNowPlaying', params, `@${userName}, ${params.title} added, playing now`)
+    : translateWithFallback('chat.redemption.accepted', params, `@${userName}, ${params.title} added to the queue [#${added.position}]`)
+}
+
 // "@user, <reason>, points refunded" - one message per FailureReason, shared by the Channel Points
 // redemption flow (request rejected, or a later playback failure) wherever it needs to notify chat
 export function buildRedemptionRejectionMessage(userName: string, reason: FailureReason): string {
   const fallbackReason = REDEMPTION_REASON_FALLBACKS[reason.code] ?? 'your request could not be completed'
-  const params = { user: userName, ...reason.params }
+  // only a playback failure names the track (the one that could not be played); a request that was never queued has none
+  const title = typeof reason.params?.title === 'string' ? truncate(reason.params.title) : undefined
+  const params = { user: userName, ...reason.params, ...(title && { title }) }
   const locale = getSettings().locale
 
   const specific = t(locale, `chat.redemption.${reason.code}`, params)

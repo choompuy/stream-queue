@@ -12,12 +12,18 @@ import type {
 } from './types.js'
 import { clearTwitchOAuthState, getPublicSecretsView, getSecrets, updateTwitchOAuthState } from '../../secrets.js'
 import { requestSong, setPaused } from '../../queue.js'
-import { buildNowPlayingMessage, buildQueueMessage, buildSkipMessage, buildRedemptionRejectionMessage } from '../../chat-replies.js'
+import {
+  buildNowPlayingMessage,
+  buildQueueMessage,
+  buildSkipMessage,
+  buildRedemptionAcceptedMessage,
+  buildRedemptionRejectionMessage
+} from '../../chat-replies.js'
 import { translateWithFallback } from '../../i18n.js'
 import { getTwitchConfig, CHAT_COMMAND_KEYS } from './config.js'
 import { getState, skipCurrent, registerChannelPointsPlaybackFailureHandler, registerChannelPointsPlaybackSuccessHandler } from '../../player.js'
 import { AppError } from '../../types.js'
-import type { FailureReason, QueueItem, ActivityReasonCode } from '../../types.js'
+import type { FailureReason, QueueItem } from '../../types.js'
 import { createLogger } from '../../logger.js'
 
 const log = createLogger('TWITCH')
@@ -42,21 +48,23 @@ function toCancellableRedemption(tracked: NonNullable<QueueItem['channelPointsRe
   } as TwitchChannelPointsRedemption
 }
 
-function handleChannelPointsPlaybackFailure(tracked: NonNullable<QueueItem['channelPointsRedemption']>, reasonCode: ActivityReasonCode): void {
-  void cancelRedemption(toCancellableRedemption(tracked), client, { code: reasonCode })
-}
+function handleChannelPointsPlaybackOutcome(
+  tracked: NonNullable<QueueItem['channelPointsRedemption']>,
+  outcome: { status: 'failed'; reason: FailureReason } | { status: 'succeeded' }
+): void {
+  const redemption = toCancellableRedemption(tracked)
 
-function handleChannelPointsPlaybackSuccess(tracked: NonNullable<QueueItem['channelPointsRedemption']>): void {
+  if (outcome.status === 'failed') {
+    void cancelRedemption(redemption, client, outcome.reason)
+    return
+  }
+
   if (!getTwitchConfig().autoFulfillRedemptions) {
     log.log(`Redemption ${tracked.id} finished playback, left unfulfilled (auto-fulfill disabled)`)
     return
   }
 
-  if (!client) {
-    log.error(`Cannot fulfill redemption ${tracked.id}: Twitch client not initialized`)
-    return
-  }
-  void fulfillRedemption(toCancellableRedemption(tracked), client)
+  void fulfillRedemption(redemption, client)
 }
 
 export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = {}): void {
@@ -87,8 +95,8 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
     log.log('Restored Twitch user info from storage')
   }
 
-  registerChannelPointsPlaybackFailureHandler(handleChannelPointsPlaybackFailure)
-  registerChannelPointsPlaybackSuccessHandler(handleChannelPointsPlaybackSuccess)
+  registerChannelPointsPlaybackFailureHandler((tracked, reason) => handleChannelPointsPlaybackOutcome(tracked, { status: 'failed', reason }))
+  registerChannelPointsPlaybackSuccessHandler((tracked) => handleChannelPointsPlaybackOutcome(tracked, { status: 'succeeded' }))
 
   log.log('Twitch integration initialized')
 
@@ -133,6 +141,7 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
   }
 
   log.log(`Redemption ${event.id} added to queue`)
+  await replyInChat(buildRedemptionAcceptedMessage(event.user_name, result.added))
 }
 
 async function startEventSub(): Promise<void> {
@@ -322,7 +331,12 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function fulfillRedemption(redemption: TwitchChannelPointsRedemption, twitchClient: TwitchClient): Promise<void> {
+async function fulfillRedemption(redemption: TwitchChannelPointsRedemption, twitchClient: TwitchClient | null): Promise<void> {
+  if (!twitchClient) {
+    log.error(`Cannot fulfill redemption ${redemption.id}: Twitch client not initialized`)
+    return
+  }
+
   for (let attempt = 1; attempt <= REDEMPTION_RETRY_ATTEMPTS; attempt++) {
     try {
       await twitchClient.updateRedemptionStatus(redemption, 'FULFILLED')
