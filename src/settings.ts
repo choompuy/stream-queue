@@ -1,6 +1,13 @@
-import { Settings } from './types.js'
+import { existsSync } from 'node:fs'
+import { createConfigModule, rules } from './config-helper.js'
+import { dataPath } from './persist.js'
 import { notifyStateChange } from './state-events.js'
-import { createLogger } from './logger.js'
+import type { Settings } from './types.js'
+
+const POSITIONS = ['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const satisfies readonly Settings['position'][]
+
+// The one list of locales on the backend. The frontend has its own copy in public/js/i18n.js
+export const LOCALES = ['en', 'ru'] as const satisfies readonly Settings['locale'][]
 
 const defaultSettings: Settings = {
   showVideo: false,
@@ -10,64 +17,34 @@ const defaultSettings: Settings = {
   locale: 'en'
 }
 
-let currentSettings: Settings = { ...defaultSettings }
+const settingsPath = () => dataPath('settings.json')
 
-const log = createLogger('SETTINGS')
+const settings = createConfigModule<Settings>({
+  filePath: settingsPath,
+  defaults: defaultSettings,
+  schema: {
+    showVideo: rules.boolean,
+    hideOverlayInfo: rules.boolean,
+    opacity: rules.integer(0, 100),
+    position: rules.oneOf(POSITIONS),
+    locale: rules.oneOf(LOCALES)
+  }
+})
 
-export function getSettings(): Settings {
-  return { ...currentSettings }
-}
-
-const POSITIONS: Settings['position'][] = ['top-left', 'top-right', 'bottom-left', 'bottom-right']
-const LOCALES: Settings['locale'][] = ['en', 'ru']
-
-const SETTINGS_RULES: Record<keyof Settings, (value: unknown) => boolean> = {
-  showVideo: (v) => typeof v === 'boolean',
-  hideOverlayInfo: (v) => typeof v === 'boolean',
-  position: (v) => POSITIONS.includes(v as Settings['position']),
-  locale: (v) => LOCALES.includes(v as Settings['locale']),
-  opacity: (v) => typeof v === 'number' && v >= 0 && v <= 100
-}
-
-export type SettingsValidation = { clean: Partial<Settings>; rejected: string[] }
+export const getSettings = settings.getConfig
 
 /** Pure validation: what is safe to apply, and the names of every field that was refused (invalid or unknown). */
-export function validateSettingsUpdates(updates: unknown): SettingsValidation {
-  if (typeof updates !== 'object' || updates === null || Array.isArray(updates)) return { clean: {}, rejected: ['body'] }
-
-  const clean: Record<string, unknown> = {}
-  const rejected: string[] = []
-
-  for (const [key, value] of Object.entries(updates)) {
-    const rule = Object.hasOwn(SETTINGS_RULES, key) ? SETTINGS_RULES[key as keyof Settings] : undefined
-
-    if (rule?.(value)) clean[key] = value
-    else rejected.push(key)
-  }
-
-  return { clean: clean as Partial<Settings>, rejected }
-}
+export const validateSettingsUpdates = settings.validateConfigUpdates
 
 /** Applies the valid part of `updates`; the HTTP layer uses validateSettingsUpdates() to refuse the rest. */
 export function updateSettings(updates: Partial<Settings>): Settings {
-  const { clean } = validateSettingsUpdates(updates)
-  const next: Settings = { ...currentSettings, ...clean }
-
-  if (!next.locale) {
-    next.locale = 'en'
-  }
-
-  currentSettings = next
+  const { config } = settings.updateConfig(updates)
   notifyStateChange()
-  return { ...currentSettings }
-}
-
-export function setSettings(settings: Settings): void {
-  currentSettings = { ...settings }
+  return config
 }
 
 export function resetSettings(): Settings {
-  currentSettings = { ...defaultSettings }
+  settings.restoreConfig(defaultSettings)
   notifyStateChange()
-  return { ...currentSettings }
+  return getSettings()
 }

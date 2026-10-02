@@ -1,23 +1,20 @@
-import { STATE_FILE, createFileStore } from './persist.js'
-import { QueueItem, Settings, Song } from './types.js'
+import { cachePath, createFileStore } from './persist.js'
+import { QueueItem, Song } from './types.js'
 import { isValidPlaylistId, isValidVideoId } from './youtube/url.js'
-import { getSettings, setSettings, validateSettingsUpdates } from './settings.js'
 import { getQueue, getCurrent, hydrateQueue } from './queue.js'
 import { getFallbackSnapshot, hydrateFallback, FallbackSnapshot } from './fallback.js'
 import { onStateChange } from './state-events.js'
-import { createLogger } from './logger.js'
+import { createLogger, describeError } from './logger.js'
 
 export type StateFile = {
   current: QueueItem | null
   queue: QueueItem[]
-  settings: Settings
   fallback: FallbackSnapshot
 }
 
 export type SanitizedState = {
   current: QueueItem | null
   queue: QueueItem[]
-  settings: Partial<Settings>
   fallback: FallbackSnapshot | undefined
   problems: string[]
 }
@@ -84,8 +81,6 @@ function sanitizeFallback(raw: unknown, problems: string[]): FallbackSnapshot | 
   }
 }
 
-// Turns whatever was read from disk into something safe to load. Every part is repaired on its own:
-// a bad queue item, a bad setting or a bad fallback entry costs only itself, never the other parts
 export function sanitizeState(raw: unknown): SanitizedState {
   const data = isObject(raw) ? raw : {}
   const problems: string[] = []
@@ -118,17 +113,10 @@ export function sanitizeState(raw: unknown): SanitizedState {
   if (invalid) problems.push(`queue: dropped ${invalid} invalid item(s)`)
   if (duplicates) problems.push(`queue: dropped ${duplicates} duplicate item(s)`)
 
-  let settings: Partial<Settings> = {}
-  if (data.settings !== undefined) {
-    const validated = validateSettingsUpdates(data.settings)
-    settings = validated.clean
-    if (validated.rejected.length) problems.push(`settings: ignored ${validated.rejected.join(', ')}`)
-  }
-
-  return { current, queue, settings, fallback: sanitizeFallback(data.fallback, problems), problems }
+  return { current, queue, fallback: sanitizeFallback(data.fallback, problems), problems }
 }
 
-const store = createFileStore<Partial<StateFile>>(STATE_FILE)
+const store = createFileStore<Partial<StateFile>>(() => cachePath('queue-state.json'))
 
 const log = createLogger('STATE')
 
@@ -136,14 +124,13 @@ function stateSnapshot(): StateFile {
   return {
     current: getCurrent(),
     queue: getQueue(),
-    settings: getSettings(),
     fallback: getFallbackSnapshot()
   }
 }
 
 function persistState(): void {
   store.scheduleSave(stateSnapshot, (error) => {
-    log.error(`Failed to save state: ${error instanceof Error ? error.message : error}`)
+    log.error(`Failed to save state: ${describeError(error)}`)
   })
 }
 
@@ -151,17 +138,16 @@ function attempt(part: string, apply: () => void): void {
   try {
     apply()
   } catch (error) {
-    log.error(`Failed to load ${part}: ${error instanceof Error ? error.message : error}`)
+    log.error(`Failed to load ${part}: ${describeError(error)}`)
   }
 }
 
 export function loadState(): void {
-  const { current, queue, settings, fallback, problems } = sanitizeState(store.load({}))
+  const { current, queue, fallback, problems } = sanitizeState(store.load({}))
 
-  for (const problem of problems) log.warn(`${problem}`)
+  for (const problem of problems) log.warn(problem)
 
   attempt('queue', () => hydrateQueue({ current, queue }))
-  attempt('settings', () => setSettings({ ...getSettings(), ...settings }))
   attempt('fallback', () => hydrateFallback(fallback))
 
   log.log('State loaded from disk')

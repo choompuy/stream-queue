@@ -1,6 +1,7 @@
-import 'dotenv/config'
-import { SECRETS_PATH, createFileStore } from './persist.js'
-import type { TwitchSecrets, TwitchTokenData, TwitchUserInfo } from './integrations/twitch/types.js'
+import { dataPath, createFileStore } from './persist.js'
+import { field, validateUpdates, type FieldRule, type Schema } from './config-helper.js'
+import { createLogger, describeError } from './logger.js'
+import type { TwitchSecrets, TwitchTokenData, TwitchUserInfo } from './types.js'
 
 export type Secrets = {
   youtubeApiKey: string
@@ -11,42 +12,21 @@ export type SecretsUpdates = {
   youtubeApiKey?: string
 }
 
-const store = createFileStore<Secrets>(SECRETS_PATH)
+const log = createLogger('SECRETS')
+const store = createFileStore<Secrets>(() => dataPath('secrets.json'))
 
-let secrets: Secrets = store.load({
-  youtubeApiKey: '',
-  twitch: {
-    tokenData: null,
-    userInfo: null,
-    connectedAt: null
-  }
-})
+// read from disk on first use, not when the module is imported
+let secrets: Secrets | null = null
 
-export function getSecrets(): Secrets {
-  return structuredClone(secrets)
-}
-
-export function updateSecrets(updates: SecretsUpdates): Secrets {
-  let changed = false
-
-  if (updates.youtubeApiKey !== undefined) {
-    if (typeof updates.youtubeApiKey !== 'string') {
-      throw new Error('youtubeApiKey must be a string')
+function current(): Secrets {
+  return (secrets ??= store.load({
+    youtubeApiKey: '',
+    twitch: {
+      tokenData: null,
+      userInfo: null,
+      connectedAt: null
     }
-
-    const value = updates.youtubeApiKey.trim()
-    // Allow empty string to clear the key
-    if (value !== secrets.youtubeApiKey) {
-      secrets = {
-        ...secrets,
-        youtubeApiKey: value
-      }
-      changed = true
-    }
-  }
-
-  if (changed) scheduleSave()
-  return getSecrets()
+  }))
 }
 
 function isValidTokenData(value: unknown): value is TwitchTokenData {
@@ -69,26 +49,51 @@ function isValidUserInfo(value: unknown): value is TwitchUserInfo {
   return typeof v.id === 'string' && typeof v.login === 'string' && typeof v.displayName === 'string' && typeof v.profileImageUrl === 'string'
 }
 
+const nullable = (isValid: (value: unknown) => boolean): FieldRule => field({ validate: (v) => v === null || isValid(v) })
+
+// An empty string is allowed: it clears the key
+const API_SCHEMA: Schema = {
+  youtubeApiKey: field({ normalize: (v) => (typeof v === 'string' ? v.trim() : v), validate: (v) => typeof v === 'string' })
+}
+
+const TWITCH_SCHEMA: Schema = {
+  tokenData: nullable(isValidTokenData),
+  userInfo: nullable(isValidUserInfo),
+  connectedAt: nullable((v) => typeof v === 'number' && Number.isFinite(v))
+}
+
+function checked(schema: Schema, updates: unknown): Record<string, unknown> {
+  const { clean, rejected } = validateUpdates(schema, updates)
+  if (rejected.length) throw new Error(`invalid secrets: ${rejected.join(', ')}`)
+  return clean
+}
+
+export function getSecrets(): Secrets {
+  return structuredClone(current())
+}
+
+export function updateSecrets(updates: SecretsUpdates): Secrets {
+  const input = updates.youtubeApiKey === undefined ? {} : { youtubeApiKey: updates.youtubeApiKey }
+  const { youtubeApiKey } = checked(API_SCHEMA, input) as SecretsUpdates
+
+  if (youtubeApiKey !== undefined && youtubeApiKey !== current().youtubeApiKey) {
+    secrets = { ...current(), youtubeApiKey }
+    scheduleSave()
+  }
+
+  return getSecrets()
+}
+
 export function updateTwitchOAuthState(updates: Partial<TwitchSecrets>): void {
   if (Object.keys(updates).length === 0) return
 
-  if ('tokenData' in updates && updates.tokenData !== null && !isValidTokenData(updates.tokenData)) {
-    throw new Error('tokenData must be a valid TwitchTokenData object or null')
-  }
-
-  if ('userInfo' in updates && updates.userInfo !== null && !isValidUserInfo(updates.userInfo)) {
-    throw new Error('userInfo must be a valid TwitchUserInfo object or null')
-  }
-
-  if ('connectedAt' in updates && updates.connectedAt !== null && typeof updates.connectedAt !== 'number') {
-    throw new Error('connectedAt must be a number or null')
-  }
+  const clean = checked(TWITCH_SCHEMA, updates) as Partial<TwitchSecrets>
 
   secrets = {
-    ...secrets,
+    ...current(),
     twitch: {
-      ...secrets.twitch,
-      ...updates
+      ...current().twitch,
+      ...clean
     }
   }
 
@@ -96,7 +101,7 @@ export function updateTwitchOAuthState(updates: Partial<TwitchSecrets>): void {
 }
 
 export function clearTwitchOAuthState(): void {
-  const { tokenData, userInfo, connectedAt } = secrets.twitch
+  const { tokenData, userInfo, connectedAt } = current().twitch
   if (tokenData === null && userInfo === null && connectedAt === null) return
 
   updateTwitchOAuthState({
@@ -106,44 +111,44 @@ export function clearTwitchOAuthState(): void {
   })
 }
 
+// only the last 4 characters are shown
 function maskSecret(value: string): string {
   if (!value) return ''
-  if (value.length <= 8) return '•'.repeat(value.length)
-  return `${value.slice(0, 4)}${'•'.repeat(value.length - 8)}${value.slice(-4)}`
+  if (value.length <= 4) return '•'.repeat(value.length)
+  return `${'•'.repeat(value.length - 4)}${value.slice(-4)}`
 }
 
 declare const __BAKED_ENV__: Record<string, string> | undefined
 const baked = (key: string) => (typeof __BAKED_ENV__ !== 'undefined' ? __BAKED_ENV__[key] : '')
 
-export const getTwitchClientId = () => process.env.TWITCH_CLIENT_ID?.trim() || baked('TWITCH_CLIENT_ID')
+export const getTwitchClientId = (): string => process.env.TWITCH_CLIENT_ID?.trim() || baked('TWITCH_CLIENT_ID') || ''
 
 export function getPublicSecretsView() {
-  const configured = Boolean(getTwitchClientId() != '')
+  const { youtubeApiKey, twitch } = current()
+
   return {
-    youtubeApiKey: maskSecret(secrets.youtubeApiKey),
-    hasYoutubeApiKey: secrets.youtubeApiKey.length > 0,
+    youtubeApiKey: maskSecret(youtubeApiKey),
+    hasYoutubeApiKey: youtubeApiKey.length > 0,
 
     twitch: {
-      configured,
-      connected: secrets.twitch.tokenData !== null && secrets.twitch.userInfo !== null,
-      user: secrets.twitch.userInfo
+      configured: getTwitchClientId() !== '',
+      connected: twitch.tokenData !== null && twitch.userInfo !== null,
+      user: twitch.userInfo
         ? {
-            displayName: secrets.twitch.userInfo.displayName,
-            login: secrets.twitch.userInfo.login,
-            profileImageUrl: secrets.twitch.userInfo.profileImageUrl
+            displayName: twitch.userInfo.displayName,
+            login: twitch.userInfo.login,
+            profileImageUrl: twitch.userInfo.profileImageUrl
           }
         : null,
-      connectedAt: secrets.twitch.connectedAt
+      connectedAt: twitch.connectedAt
     }
   }
 }
 
 function scheduleSave(): void {
   store.scheduleSave(
-    () => secrets,
-    (error) => {
-      console.error('[SECRETS] Failed to save:', error instanceof Error ? error.message : error)
-    }
+    () => current(),
+    (error) => log.error(`Failed to save: ${describeError(error)}`)
   )
 }
 

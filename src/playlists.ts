@@ -1,4 +1,5 @@
-import { PLAYLISTS_PATH, createFileStore } from './persist.js'
+import { dataPath, createFileStore } from './persist.js'
+import { createLogger, describeError } from './logger.js'
 
 export type SavedPlaylist = {
   id: string
@@ -8,41 +9,45 @@ export type SavedPlaylist = {
   addedAt: number
 }
 
-const store = createFileStore<SavedPlaylist[]>(PLAYLISTS_PATH)
-let playlists: SavedPlaylist[] = store.load([])
+const log = createLogger('PLAYLISTS')
+const store = createFileStore<SavedPlaylist[]>(() => dataPath('playlists.json'))
+
+// read from disk on first use, not when the module is imported
+let loaded: SavedPlaylist[] | null = null
+const current = (): SavedPlaylist[] => (loaded ??= store.load([]))
 
 function save(): void {
   store.scheduleSave(
-    () => playlists,
-    (error) => console.error('[PLAYLISTS] Failed to save:', error instanceof Error ? error.message : error)
+    () => current(),
+    (error) => log.error(`Failed to save: ${describeError(error)}`)
   )
 }
 
 export function getPlaylists(): SavedPlaylist[] {
-  return [...playlists]
+  return [...current()]
 }
 
 export function upsertPlaylist(meta: { id: string; title: string; thumbnail: string; itemCount: number }): SavedPlaylist {
-  const existing = playlists.find((p) => p.id === meta.id)
+  const existing = current().find((p) => p.id === meta.id)
 
   if (existing) {
     const updated: SavedPlaylist = { ...existing, title: meta.title, thumbnail: meta.thumbnail, itemCount: meta.itemCount }
-    playlists = playlists.map((p) => (p.id === meta.id ? updated : p))
+    loaded = current().map((p) => (p.id === meta.id ? updated : p))
     save()
     return updated
   }
 
   const created: SavedPlaylist = { ...meta, addedAt: Date.now() }
-  playlists.push(created)
+  current().push(created)
   save()
   return created
 }
 
 export function removePlaylist(id: string): boolean {
-  const before = playlists.length
-  playlists = playlists.filter((p) => p.id !== id)
+  const before = current().length
+  loaded = current().filter((p) => p.id !== id)
 
-  if (playlists.length !== before) {
+  if (current().length !== before) {
     save()
     return true
   }

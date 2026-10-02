@@ -1,10 +1,14 @@
-import { createConfigModule, rules } from './config-helper.js'
-import { CONFIG_PATH } from './persist.js'
+import { createConfigModule, field, rules } from './config-helper.js'
+import { dataPath } from './persist.js'
 import { Config } from './types.js'
 import { isValidPlaylistId } from './youtube/url.js'
 
+const MAX_MIN_VIEWS = 1_000_000_000
+const MAX_DURATION_SECONDS = 24 * 60 * 60
+const MAX_COUNT = 1000
+
 export const { getConfig, updateConfig, validateConfigUpdates, restoreConfig } = createConfigModule<Config>({
-  filePath: CONFIG_PATH,
+  filePath: () => dataPath('config.json'),
   defaults: {
     minViews: 10000,
     minDurationSeconds: 60,
@@ -17,19 +21,19 @@ export const { getConfig, updateConfig, validateConfigUpdates, restoreConfig } =
     fallbackPlaylist: { playlistId: null, enabled: true, shuffle: false, repeat: false }
   },
   schema: {
-    minViews: rules.number(0),
-    minDurationSeconds: rules.number(0),
-    maxDurationSeconds: rules.number(1),
-    maxQueueSize: rules.number(1),
-    maxRequestsPerUser: rules.number(0),
-    regionCode: {
-      normalize: (v) => (typeof v === 'string' ? v.trim().toUpperCase() : ''),
-      validate: (v) => v === '' || /^[A-Z]{2}$/.test(v as string)
-    },
+    minViews: rules.integer(0, MAX_MIN_VIEWS),
+    minDurationSeconds: rules.integer(0, MAX_DURATION_SECONDS),
+    maxDurationSeconds: rules.integer(1, MAX_DURATION_SECONDS),
+    maxQueueSize: rules.integer(1, MAX_COUNT),
+    maxRequestsPerUser: rules.integer(0, MAX_COUNT),
+    regionCode: field({
+      normalize: (v) => (typeof v === 'string' ? v.trim().toUpperCase() : v),
+      validate: (v) => v === '' || (typeof v === 'string' && /^[A-Z]{2}$/.test(v))
+    }),
     allowShorts: rules.boolean,
     allowLiveStreams: rules.boolean,
     fallbackPlaylist: {
-      playlistId: { validate: (v) => v === null || isValidPlaylistId(v) },
+      playlistId: field({ validate: (v) => v === null || isValidPlaylistId(v) }),
       enabled: rules.boolean,
       shuffle: rules.boolean,
       repeat: rules.boolean

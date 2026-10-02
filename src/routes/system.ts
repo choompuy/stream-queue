@@ -6,6 +6,9 @@ import { getState } from '../player.js'
 import { getSettings } from '../settings.js'
 import { flushAllStores } from '../persist.js'
 import { localOnly } from '../local-only.js'
+import { createLogger, describeError, flushLogs } from '../logger.js'
+
+const log = createLogger('SHUTDOWN')
 
 export function lanAddresses(): string[] {
   return Object.values(os.networkInterfaces())
@@ -32,7 +35,8 @@ export function createSystemRouter({ exit = () => process.exit(0) }: { exit?: ()
   router.post('/shutdown', localOnly, (_req, res) => {
     res.on('finish', () => {
       flushAllStores()
-        .catch((error) => console.error('[SHUTDOWN] Flush failed:', error instanceof Error ? error.message : error))
+        .catch((error) => log.error(`Flush failed: ${describeError(error)}`))
+        .then(flushLogs)
         .finally(exit)
     })
     ok(res, {})

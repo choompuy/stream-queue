@@ -1,6 +1,5 @@
-import { join } from 'node:path'
-import { createConfigModule, rules, type Schema } from '../../config-helper.js'
-import { DATA_DIR, deepMerge } from '../../persist.js'
+import { createConfigModule, field, rules, type Schema } from '../../config-helper.js'
+import { dataPath, deepMerge } from '../../persist.js'
 import type { TwitchChatCommandConfig, TwitchChatPermission, TwitchConfig } from './types.js'
 
 const COMMAND_PATTERN = /^![a-z0-9]+(?: [a-z0-9]+)*$/
@@ -12,11 +11,11 @@ const chatCommand = (command: string, permission: TwitchChatPermission): TwitchC
 
 const commandSchema: Schema = {
   enabled: rules.boolean,
-  command: {
+  command: field({
     normalize: (v) => (typeof v === 'string' ? v.trim().toLowerCase().replace(/\s+/g, ' ') : v),
     validate: (v) => typeof v === 'string' && COMMAND_PATTERN.test(v)
-  },
-  permission: { validate: (v) => PERMISSIONS.includes(v as TwitchChatPermission) }
+  }),
+  permission: rules.oneOf(PERMISSIONS)
 }
 
 export const {
@@ -25,7 +24,7 @@ export const {
   validateConfigUpdates: validateTwitchConfigUpdates,
   restoreConfig: restoreTwitchConfig
 } = createConfigModule<TwitchConfig>({
-  filePath: join(DATA_DIR, 'twitch-config.json'),
+  filePath: () => dataPath('twitch-config.json'),
   defaults: {
     channelPointsRewardId: null,
     autoFulfillRedemptions: false,
@@ -40,10 +39,10 @@ export const {
     }
   },
   schema: {
-    channelPointsRewardId: {
+    channelPointsRewardId: field({
       normalize: (v) => (typeof v === 'string' ? v.trim() || null : v),
       validate: (v) => v === null || (typeof v === 'string' && v.length > 0)
-    },
+    }),
     autoFulfillRedemptions: rules.boolean,
     chatCommands: {
       ...Object.fromEntries(CHAT_COMMAND_KEYS.map((key) => [key, commandSchema])),

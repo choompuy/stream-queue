@@ -2,6 +2,9 @@ import { Response, Request, NextFunction, RequestHandler, ParamsDictionary } fro
 import { AppError, AppErrorCode, ApiOk, ApiError, ApiErrorCode, ConfigUpdateResponse } from './types.js'
 import { getSettings } from './settings.js'
 import { translateErrorCode } from './i18n.js'
+import { createLogger, describeError } from './logger.js'
+
+const log = createLogger('API')
 
 export function ok<T extends object>(res: Response, data: T, status = 200): void {
   const body: ApiOk<T> = { success: true, data }
@@ -67,7 +70,7 @@ export function getErrorInfo(error: unknown): ErrorInfo {
     return { code: error.code, status: STATUS_BY_CODE[error.code], message: error.message, params: error.params }
   }
 
-  console.error('[UNEXPECTED ERROR]', error)
+  log.error(`Unexpected error: ${describeError(error, true)}`)
   return { code: 'SERVER_ERROR', status: 500, message: 'internal server error' }
 }
 

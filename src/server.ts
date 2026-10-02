@@ -3,14 +3,14 @@ import cors from 'cors'
 import path from 'node:path'
 
 import { findAvailablePort } from './port.js'
-import { getAppRoot } from './runtime.js'
+import { getAppRoot, loadEnvFile } from './runtime.js'
 import { initState } from './state-file.js'
 import { runStartupTasks } from './startup.js'
 import { errorHandler, ForbiddenOriginError } from './error-handler.js'
 import { apiRouter } from './routes/index.js'
 import { initializeTwitchIntegration } from './integrations/twitch/index.js'
 import { getTwitchClientId } from './secrets.js'
-import { createLogger } from './logger.js'
+import { createLogger, describeError, enableFileLogging, flushLogs } from './logger.js'
 
 const app = express()
 let PORT: number
@@ -53,15 +53,18 @@ app.use('/api', apiRouter)
 app.use(errorHandler)
 
 async function main() {
+  loadEnvFile()
+  enableFileLogging()
+
   // a stray rejected promise must not stop the music mid-stream: log it and carry on
   process.on('unhandledRejection', (reason) => {
-    log.error(`[UNHANDLED REJECTION]: ${reason instanceof Error ? (reason.stack ?? reason.message) : reason}`)
+    log.error(`Unhandled rejection: ${describeError(reason, true)}`)
   })
 
   initState()
   const twitchClientId = getTwitchClientId()
 
-  if (twitchClientId && twitchClientId) {
+  if (twitchClientId) {
     initializeTwitchIntegration({
       clientId: twitchClientId
     })
@@ -77,12 +80,12 @@ async function main() {
   })
 
   server.on('error', (error) => {
-    log.error(`[FATAL] Server error: ${error.message}`)
-    process.exit(1)
+    log.error(`Fatal server error: ${error.message}`)
+    void flushLogs().finally(() => process.exit(1))
   })
 }
 
 main().catch((error) => {
-  log.error(`[FATAL]: ${error instanceof Error ? error.message : error}`)
-  process.exit(1)
+  log.error(`Fatal: ${describeError(error)}`)
+  void flushLogs().finally(() => process.exit(1))
 })

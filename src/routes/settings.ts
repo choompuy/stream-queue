@@ -3,12 +3,15 @@ import { ConfigResponse, SettingsResponse } from '../types.js'
 import { ok, fail, failFromError, asyncHandler, sendConfigUpdate } from '../http.js'
 import { localOnly } from '../local-only.js'
 import { getConfig, updateConfig, restoreConfig } from '../config.js'
-import { getSettings, updateSettings, validateSettingsUpdates } from '../settings.js'
+import { LOCALES, getSettings, updateSettings, validateSettingsUpdates } from '../settings.js'
 import { getPublicSecretsView, SecretsResponse, updateSecrets } from '../secrets.js'
 import { parsePlaylistId } from '../youtube/url.js'
 import { refreshFallback, reorderFallback } from '../fallback.js'
+import { createLogger, describeError } from '../logger.js'
 
 export const router = express.Router()
+
+const log = createLogger('CONFIG')
 
 router.get('/settings', (_req, res) => {
   ok<SettingsResponse>(res, getSettings())
@@ -32,13 +35,12 @@ router.get('/locale', (_req, res) => {
 
 router.put('/locale', (req, res) => {
   const { locale } = req.body ?? {}
-  const validLocales = ['en', 'ru']
 
-  if (typeof locale !== 'string' || !validLocales.includes(locale)) {
+  if (!LOCALES.includes(locale)) {
     return fail(res, 'Invalid locale', 'INVALID_LOCALE', 400)
   }
 
-  const updated = updateSettings({ locale: locale as 'en' | 'ru' })
+  const updated = updateSettings({ locale })
   ok<SettingsResponse>(res, updated)
 })
 
@@ -84,7 +86,7 @@ router.put(
         await refreshFallback()
       } catch (error) {
         // the playlist could not be loaded: only the playlist change is undone, the other saved fields stay
-        console.error(`[CONFIG] Failed to refresh fallback playlist: ${error instanceof Error ? error.message : error}`)
+        log.error(`Failed to refresh fallback playlist: ${describeError(error)}`)
         restoreConfig({ ...getConfig(), fallbackPlaylist: previous.fallbackPlaylist })
         failFromError(res, error)
         return

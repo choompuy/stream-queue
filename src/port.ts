@@ -1,5 +1,7 @@
 import net from 'node:net'
 
+// Checks the port the way the server will listen on it: without a host, so on every interface.
+// Checking only 127.0.0.1 let a foreign process on 0.0.0.0:<port> pass the check and then make listen() fail
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const server = net.createServer()
@@ -10,7 +12,7 @@ function isPortAvailable(port: number): Promise<boolean> {
       server.close(() => resolve(true))
     })
 
-    server.listen(port, '127.0.0.1')
+    server.listen(port)
   })
 }
 

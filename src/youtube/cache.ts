@@ -1,12 +1,9 @@
-import { CACHE_FILE, createFileStore } from '../persist.js'
+import { cachePath, createFileStore } from '../persist.js'
+import { createLogger, describeError } from '../logger.js'
 import { CacheFile, Song, FilterFailureReason } from '../types.js'
 
-const store = createFileStore<CacheFile>(CACHE_FILE)
-const cache = store.load({
-  searches: {},
-  videos: {},
-  quota: { date: getQuotaDate(), searches: 0 }
-})
+const log = createLogger('CACHE')
+const store = createFileStore<CacheFile>(() => cachePath('youtube-cache.json'))
 
 export const CACHE_LIMITS = {
   VIDEO_CACHE_TTL: 10 * 60 * 1000,
@@ -28,14 +25,31 @@ function getQuotaDate(): string {
   }).format(new Date())
 }
 
+// Loaded from disk, and the hourly sweep started, on first use - not when the module is imported
+let loadedCache: CacheFile | null = null
+
+function getCache(): CacheFile {
+  if (!loadedCache) {
+    loadedCache = store.load({
+      searches: {},
+      videos: {},
+      quota: { date: getQuotaDate(), searches: 0 }
+    })
+    setInterval(sweepExpired, SWEEP_INTERVAL).unref()
+  }
+
+  return loadedCache
+}
+
 function saveCache(): void {
   store.scheduleSave(
-    () => cache,
-    (error) => console.error('[CACHE] Failed to save cache:', error instanceof Error ? error.message : error)
+    () => getCache(),
+    (error) => log.error(`Failed to save cache: ${describeError(error)}`)
   )
 }
 
 function sweepExpired(): void {
+  const cache = getCache()
   const now = Date.now()
   let hasChanges = false
 
@@ -58,9 +72,8 @@ function sweepExpired(): void {
   }
 }
 
-setInterval(sweepExpired, SWEEP_INTERVAL).unref()
-
 function resetQuotaIfNeeded(): void {
+  const cache = getCache()
   const today = getQuotaDate()
 
   if (cache.quota.date === today) {
@@ -72,7 +85,7 @@ function resetQuotaIfNeeded(): void {
 }
 
 export function getSearchCache(query: string, filtersVersion: string): Song[] | null {
-  const entry = cache.searches[query]
+  const entry = getCache().searches[query]
 
   if (!entry || entry.expiresAt <= Date.now() || entry.filtersVersion !== filtersVersion) {
     return null
@@ -82,7 +95,7 @@ export function getSearchCache(query: string, filtersVersion: string): Song[] | 
 }
 
 export function setSearchCache(query: string, results: Song[], filtersVersion: string): void {
-  cache.searches[query] = {
+  getCache().searches[query] = {
     results,
     expiresAt: Date.now() + CACHE_LIMITS.SEARCH_CACHE_TTL,
     filtersVersion
@@ -94,7 +107,7 @@ export function setSearchCache(query: string, results: Song[], filtersVersion: s
 export type VideoCacheResult = { song: Song | null; reason: FilterFailureReason | null }
 
 export function getVideoCache(videoId: string, filtersVersion: string): VideoCacheResult | undefined {
-  const entry = cache.videos[videoId]
+  const entry = getCache().videos[videoId]
 
   if (!entry || entry.expiresAt <= Date.now() || entry.filtersVersion !== filtersVersion) {
     return undefined
@@ -104,7 +117,7 @@ export function getVideoCache(videoId: string, filtersVersion: string): VideoCac
 }
 
 export function setVideoCache(videoId: string, song: Song | null, filtersVersion: string, reason: FilterFailureReason | null = null): void {
-  cache.videos[videoId] = {
+  getCache().videos[videoId] = {
     song,
     reason,
     expiresAt: Date.now() + CACHE_LIMITS.VIDEO_CACHE_TTL,
@@ -116,12 +129,13 @@ export function setVideoCache(videoId: string, song: Song | null, filtersVersion
 
 export function canSearch(): boolean {
   resetQuotaIfNeeded()
-  return cache.quota.searches < CACHE_LIMITS.MAX_DAILY_SEARCHES
+  return getCache().quota.searches < CACHE_LIMITS.MAX_DAILY_SEARCHES
 }
 
 export function consumeSearchQuota(): void {
   resetQuotaIfNeeded()
-  cache.quota.searches += 1
+  const { quota } = getCache()
+  quota.searches += 1
   saveCache()
-  console.log(`[QUOTA] Search usage: ${cache.quota.searches}/${CACHE_LIMITS.MAX_DAILY_SEARCHES}`)
+  log.info(`Search quota usage: ${quota.searches}/${CACHE_LIMITS.MAX_DAILY_SEARCHES}`)
 }

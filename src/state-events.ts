@@ -1,4 +1,8 @@
+import { createLogger, describeError } from './logger.js'
+
 type Listener = () => void
+
+const log = createLogger('STATE')
 
 const listeners = new Set<Listener>()
 
@@ -19,7 +23,7 @@ export function notifyStateChange(): void {
     try {
       listener()
     } catch (error) {
-      console.error('[STATE] Listener failed:', error instanceof Error ? error.message : error)
+      log.error(`Listener failed: ${describeError(error)}`)
     }
   }
 }

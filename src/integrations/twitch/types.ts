@@ -1,16 +1,7 @@
-export type TwitchTokenData = {
-  accessToken: string
-  refreshToken: string
-  expiresAt: number
-  scope: string[]
-}
+import type { TwitchTokenData } from '../../types.js'
 
-export type TwitchUserInfo = {
-  id: string
-  login: string
-  displayName: string
-  profileImageUrl: string
-}
+// these three are stored in secrets.json, so they live in the shared types and are only re-exported here
+export type { TwitchTokenData, TwitchUserInfo, TwitchSecrets } from '../../types.js'
 
 export type TwitchAuthConfig = {
   clientId: string
@@ -29,12 +20,6 @@ export type TwitchDeviceCodeResponse = {
   verification_uri: string
   expires_in: number
   interval: number
-}
-
-export type TwitchSecrets = {
-  tokenData: TwitchTokenData | null
-  userInfo: TwitchUserInfo | null
-  connectedAt: number | null
 }
 
 export type TwitchErrorResponse = {

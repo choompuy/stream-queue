@@ -1,4 +1,5 @@
-import { BLOCKLIST_PATH, createFileStore } from './persist.js'
+import { dataPath, createFileStore } from './persist.js'
+import { createLogger, describeError } from './logger.js'
 
 export type BlockedTrack = {
   videoId: string
@@ -6,49 +7,64 @@ export type BlockedTrack = {
   blockedAt: number
 }
 
-const BLOCKLIST_LIMIT = 100
+// Entries older than the limit are dropped, which makes an old blocked track requestable again, so the limit is high and the drop is logged
+const BLOCKLIST_LIMIT = 1000
 const TITLE_MAX_LENGTH = 200
 
-const store = createFileStore<BlockedTrack[]>(BLOCKLIST_PATH)
-let blocked: BlockedTrack[] = store.load([])
-const blockedIds = new Set(blocked.map((t) => t.videoId))
+const log = createLogger('BLOCKLIST')
+const store = createFileStore<BlockedTrack[]>(() => dataPath('blocklist.json'))
+
+// read from disk on first use, not when the module is imported
+let blocked: BlockedTrack[] | null = null
+let blockedIds: Set<string> | null = null
+
+function ensureLoaded(): { list: BlockedTrack[]; ids: Set<string> } {
+  if (!blocked || !blockedIds) {
+    blocked = store.load([])
+    blockedIds = new Set(blocked.map((t) => t.videoId))
+  }
+  return { list: blocked, ids: blockedIds }
+}
 
 function save(): void {
   store.scheduleSave(
-    () => blocked,
-    (error) => console.error('[BLOCKLIST] Failed to save:', error instanceof Error ? error.message : error)
+    () => ensureLoaded().list,
+    (error) => log.error(`Failed to save: ${describeError(error)}`)
   )
 }
 
 export function getBlockedTracks(): BlockedTrack[] {
-  return [...blocked]
+  return [...ensureLoaded().list]
 }
 
 export function isBlocked(videoId: string): boolean {
-  return blockedIds.has(videoId)
+  return ensureLoaded().ids.has(videoId)
 }
 
 export function blockTrack(videoId: string, title: string): BlockedTrack {
-  if (!blockedIds.has(videoId)) {
-    const safeTitle = title.trim().slice(0, TITLE_MAX_LENGTH) || videoId
-    blocked.unshift({ videoId, title: safeTitle, blockedAt: Date.now() })
-    blockedIds.add(videoId)
+  const { list, ids } = ensureLoaded()
 
-    if (blocked.length > BLOCKLIST_LIMIT) {
-      for (const removed of blocked.splice(BLOCKLIST_LIMIT)) {
-        blockedIds.delete(removed.videoId)
-      }
+  if (!ids.has(videoId)) {
+    const safeTitle = title.trim().slice(0, TITLE_MAX_LENGTH) || videoId
+    list.unshift({ videoId, title: safeTitle, blockedAt: Date.now() })
+    ids.add(videoId)
+
+    if (list.length > BLOCKLIST_LIMIT) {
+      const dropped = list.splice(BLOCKLIST_LIMIT)
+      for (const removed of dropped) ids.delete(removed.videoId)
+      log.warn(`Limit of ${BLOCKLIST_LIMIT} reached, ${dropped.length} oldest block(s) dropped`)
     }
 
     save()
   }
-  return blocked.find((t) => t.videoId === videoId)!
+  return list.find((t) => t.videoId === videoId)!
 }
 
 export function unblockTrack(videoId: string): boolean {
-  const before = blocked.length
-  blocked = blocked.filter((t) => t.videoId !== videoId)
-  blockedIds.delete(videoId)
+  const { list, ids } = ensureLoaded()
+  const before = list.length
+  blocked = list.filter((t) => t.videoId !== videoId)
+  ids.delete(videoId)
 
   if (blocked.length !== before) {
     save()

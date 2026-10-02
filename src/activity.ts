@@ -1,35 +1,39 @@
 import { ActivityEntry, ActivityReasonCode, QueueItem } from './types.js'
-import { ACTIVITY_PATH, createFileStore } from './persist.js'
-import { createLogger } from './logger.js'
+import { dataPath, createFileStore } from './persist.js'
+import { createLogger, describeError } from './logger.js'
 
 const ACTIVITY_LIMIT = 100
 
-const store = createFileStore<ActivityEntry[]>(ACTIVITY_PATH)
-let activityLog: ActivityEntry[] = store.load([])
+const store = createFileStore<ActivityEntry[]>(() => dataPath('activity.json'))
+
+// read from disk on first use, not when the module is imported
+let loaded: ActivityEntry[] | null = null
+const entries = (): ActivityEntry[] => (loaded ??= store.load([]))
 
 const log = createLogger('ACTIVITY')
 
 function save(): void {
   store.scheduleSave(
-    () => activityLog,
-    (error) => log.error(`Failed to save: ${error instanceof Error ? error.message : error}`)
+    () => entries(),
+    (error) => log.error(`Failed to save: ${describeError(error)}`)
   )
 }
 
 export function logActivity(entry: Omit<ActivityEntry, 'at'>): void {
-  activityLog.unshift({ ...entry, at: Date.now() })
-  if (activityLog.length > ACTIVITY_LIMIT) {
-    activityLog.length = ACTIVITY_LIMIT
+  const list = entries()
+  list.unshift({ ...entry, at: Date.now() })
+  if (list.length > ACTIVITY_LIMIT) {
+    list.length = ACTIVITY_LIMIT
   }
   save()
 }
 
 export function getActivity(): ActivityEntry[] {
-  return [...activityLog]
+  return [...entries()]
 }
 
 export function clearActivity(): void {
-  activityLog.length = 0
+  entries().length = 0
   save()
   log.log('cleared')
 }

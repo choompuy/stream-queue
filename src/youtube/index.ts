@@ -14,6 +14,7 @@ import { normalize, combinedScore, formatViews } from './scoring.js'
 import { getSearchCache, setSearchCache, getVideoCache, setVideoCache, canSearch, consumeSearchQuota, CACHE_LIMITS } from './cache.js'
 import { VideoItem, SearchItem, PlaylistItem } from './types.js'
 import { getConfig } from '../config.js'
+import { createLogger, describeError } from '../logger.js'
 
 const pendingSearches = new Map<string, Promise<Song[]>>()
 const pendingVideos = new Map<string, Promise<Song | null>>()
@@ -22,16 +23,16 @@ const YOUTUBE_ID_BATCH_SIZE = 50
 const PLAYLIST_PAGE_SIZE = 50
 const MAX_PLAYLIST_PAGES = 3
 
-const DEBUG = process.env.YOUTUBE_DEBUG === 'true'
-function debugLog(message: string): void {
-  if (DEBUG) console.log(message)
-}
+const log = createLogger('YOUTUBE')
+
+// shown with LOG_LEVEL=debug
+const debugLog = (message: string): void => log.debug(message)
 
 async function withYouTubeErrorHandling<T>(label: string, fn: () => Promise<T>): Promise<T> {
   try {
     return await fn()
   } catch (error) {
-    console.error(`[ERROR] ${label}:`, error instanceof Error ? error.message : error)
+    log.error(`${label}: ${describeError(error)}`)
     if (error instanceof AppError) throw error
     throw new AppError('YOUTUBE_ERROR', `${label} failed`)
   }
@@ -120,7 +121,7 @@ export async function searchSongs(query: string, bypassFilters = false): Promise
   }
 
   if (!canSearch()) {
-    console.warn(`[QUOTA] Daily search limit reached: ${CACHE_LIMITS.MAX_DAILY_SEARCHES}`)
+    log.warn(`Daily search limit reached: ${CACHE_LIMITS.MAX_DAILY_SEARCHES}`)
     throw new AppError('YOUTUBE_QUOTA', 'daily YouTube search quota exceeded, use a direct link instead')
   }
 
@@ -223,14 +224,14 @@ async function performPlaylistFetch(playlistId: string): Promise<PlaylistFetchRe
       page++
 
       if (page >= MAX_PLAYLIST_PAGES) {
-        console.warn(`[PLAYLIST] Maximum page limit reached (${MAX_PLAYLIST_PAGES}), stopping`)
+        log.warn(`Playlist: maximum page limit reached (${MAX_PLAYLIST_PAGES}), stopping`)
         truncated = true
         break
       }
 
       if (pageToken) {
         if (seenPageTokens.has(pageToken)) {
-          console.warn(`[PLAYLIST] Repeated page token detected, stopping pagination`)
+          log.warn('Playlist: repeated page token detected, stopping pagination')
           break
         }
         seenPageTokens.add(pageToken)
@@ -266,7 +267,7 @@ async function performPlaylistFetch(playlistId: string): Promise<PlaylistFetchRe
 
       const nextPageToken = playlist.nextPageToken
       if (nextPageToken && seenPageTokens.has(nextPageToken)) {
-        console.warn(`[PLAYLIST] YouTube returned a repeated page token, stopping pagination`)
+        log.warn('Playlist: YouTube returned a repeated page token, stopping pagination')
         break
       }
 

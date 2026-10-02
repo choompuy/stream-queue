@@ -2,9 +2,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { getAppRoot } from './runtime.js'
 import { getSettings } from './settings.js'
+import { createLogger, describeError } from './logger.js'
 
 const LOCALES_DIR = path.join(getAppRoot(), 'public/locales')
 const DEFAULT_LOCALE = 'en'
+
+const log = createLogger('I18N')
 
 type Dict = { [key: string]: Dict | string }
 
@@ -20,7 +23,7 @@ function loadLocale(locale: string): Dict {
     cache.set(locale, dict)
     return dict
   } catch (error) {
-    console.error(`[I18N] Failed to load locale "${locale}":`, error instanceof Error ? error.message : error)
+    log.error(`Failed to load locale "${locale}": ${describeError(error)}`)
     return {} // Return empty object without caching - allows retry on subsequent calls
   }
 }
@@ -42,7 +45,7 @@ export function t(locale: string, key: string, params: Record<string, string | n
     return null
   }
 
-  return Object.entries(params).reduce((acc, [param, replacement]) => acc.replace(new RegExp(`{{${param}}}`, 'g'), () => String(replacement)), value)
+  return Object.entries(params).reduce((acc, [param, replacement]) => acc.replaceAll(`{{${param}}}`, () => String(replacement)), value)
 }
 
 export function translateWithFallback(key: string, params: Record<string, string | number> | undefined, fallback: string): string {

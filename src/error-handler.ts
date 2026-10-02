@@ -1,6 +1,9 @@
 import type { NextFunction, Request, Response } from 'express'
 import { fail, failFromError } from './http.js'
 import { AppError } from './types.js'
+import { createLogger } from './logger.js'
+
+const log = createLogger('SERVER')
 
 // A cross-origin request from an origin the CORS policy does not allow
 export class ForbiddenOriginError extends Error {
@@ -27,6 +30,6 @@ export function errorHandler(err: HttpError, _req: Request, res: Response, next:
   const status = err.status ?? err.statusCode
   if (typeof status === 'number' && status >= 400 && status < 500) return fail(res, 'bad request', 'INVALID_REQUEST', status)
 
-  console.log(`[SERVER] [ERROR] ${err.message}`)
+  log.error(err.message)
   fail(res, 'internal server error', 'SERVER_ERROR', 500)
 }

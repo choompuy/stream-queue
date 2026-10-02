@@ -94,7 +94,6 @@ export type CacheFile = {
 
 export type ApiError = { success: false; error: string; code: string; params?: Record<string, string | number> }
 export type ApiOk<T> = { success: true; data: T }
-export type ApiResult<T> = ApiOk<T> | ApiError
 
 export type FilterFailureReason =
   | 'NOT_MUSIC'
@@ -181,3 +180,23 @@ export type FallbackStateResponse = FallbackPlaylist & {
 }
 export type QueueRemoveResponse = { removed: QueueItem; state: StateResponse }
 export type ActivityResponse = { entries: ActivityEntry[] }
+
+export type TwitchTokenData = {
+  accessToken: string
+  refreshToken: string
+  expiresAt: number
+  scope: string[]
+}
+
+export type TwitchUserInfo = {
+  id: string
+  login: string
+  displayName: string
+  profileImageUrl: string
+}
+
+export type TwitchSecrets = {
+  tokenData: TwitchTokenData | null
+  userInfo: TwitchUserInfo | null
+  connectedAt: number | null
+}

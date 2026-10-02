@@ -1,5 +1,6 @@
 import express from 'express'
 import { fail } from '../http.js'
+import { createLogger } from '../logger.js'
 import { router as systemRouter } from './system.js'
 import { router as settingsRouter } from './settings.js'
 import { router as playlistsRouter } from './playlists.js'
@@ -11,6 +12,8 @@ import { router as playerRouter } from './player.js'
 import { router as fallbackRouter } from './fallback.js'
 import { router as chatRouter } from './chat.js'
 import { router as twitchRouter } from './twitch.js'
+
+const log = createLogger('API')
 
 export const apiRouter = express.Router()
 
@@ -28,6 +31,6 @@ apiRouter.use('/chat', chatRouter)
 apiRouter.use('/integrations/twitch', twitchRouter)
 
 apiRouter.use((req, res) => {
-  console.error(`[API] Unknown endpoint: ${req.method} ${req.originalUrl}`)
+  log.warn(`Unknown endpoint: ${req.method} ${req.originalUrl}`)
   fail(res, 'API endpoint not found', 'NOT_FOUND', 404)
 })
