@@ -214,3 +214,17 @@ body {
 .with-video .next-playing {
   padding: 0.375rem 0.5rem;
 }
+
+.badge.video-only {
+  background-color: transparent;
+  border: 0;
+}
+
+.video-only .now-playing,
+.video-only .next-playing {
+  display: none;
+}
+
+.badge.video-only .now-playing-video {
+  border: 0;
+}

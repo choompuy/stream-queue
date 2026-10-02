@@ -85,16 +85,22 @@ export async function saveTwitchChatCommands() {
   const fields = chatCommandFields()
   const entries = fields.map((f) => ({ input: f.input, path: f.path, changed: f.read(f.input) !== f.stored() }))
 
-  await run('saving Twitch chat commands', async () => {
-    const { config, rejected } = await api.updateTwitchConfig({ chatCommands })
+  await run(
+    'saving Twitch chat commands',
+    async () => {
+      const { config, rejected } = await api.updateTwitchConfig({ chatCommands })
 
-    state.twitch.chatCommands = config.chatCommands
+      state.twitch.chatCommands = config.chatCommands
 
-    for (const f of fields) {
-      const stored = f.stored()
-      if (!rejected.includes(f.path) && stored !== undefined) f.write(f.input, stored)
+      for (const f of fields) {
+        const stored = f.stored()
+        if (!rejected.includes(f.path) && stored !== undefined) f.write(f.input, stored)
+      }
+
+      reportSaveResult(entries, rejected, 'toast.twitchChatCommandsSaved')
+    },
+    {
+      button: dom.twitchChatCommandsSaveBtn
     }
-
-    reportSaveResult(entries, rejected, 'toast.twitchChatCommandsSaved')
-  })
+  )
 }

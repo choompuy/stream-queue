@@ -22,18 +22,31 @@ export function loadOverlaySettings() {
 
     setError(dom.showVideo, false)
     setChecked(dom.showVideo, state.settings.showVideo)
+    setError(dom.hideOverlayInfo, false)
+    setChecked(dom.hideOverlayInfo, state.settings.hideOverlayInfo)
+    syncHideOverlayInfoAvailability()
+    setError(dom.overlayOpacity, false)
+    setValue(dom.overlayOpacity, state.settings.opacity ?? 100)
     setError(dom.badgePosition, false)
     setValue(dom.badgePosition, state.settings.position || 'bottom-right')
   })
 }
 
+export function syncHideOverlayInfoAvailability() {
+  if (dom.hideOverlayInfo) dom.hideOverlayInfo.disabled = !dom.showVideo?.checked
+}
+
 export function saveOverlaySettings() {
   return run('saving settings', async () => {
     setError(dom.showVideo, false)
+    setError(dom.hideOverlayInfo, false)
+    setError(dom.overlayOpacity, false)
     setError(dom.badgePosition, false)
 
     try {
       state.settings.showVideo = dom.showVideo?.checked ?? state.settings.showVideo
+      state.settings.hideOverlayInfo = dom.hideOverlayInfo?.checked ?? state.settings.hideOverlayInfo
+      state.settings.opacity = parseInt(dom.overlayOpacity?.value) || state.settings.opacity
       state.settings.position = dom.badgePosition?.value ?? state.settings.position
       await api.updateSettings(state.settings)
       syncPlayer()
@@ -42,6 +55,8 @@ export function saveOverlaySettings() {
         const rejectedFields = error.params.fields.split(', ')
 
         if (rejectedFields.includes('showVideo')) setError(dom.showVideo)
+        if (rejectedFields.includes('hideOverlayInfo')) setError(dom.hideOverlayInfo)
+        if (rejectedFields.includes('opacity')) setError(dom.overlayOpacity)
         if (rejectedFields.includes('position')) setError(dom.badgePosition)
       }
       throw error
@@ -192,40 +207,44 @@ export async function saveConfigSetting() {
 
   const youtubeApiKey = dom.secYoutubeKey?.value.trim() ?? ''
 
-  await run('saving config', async () => {
-    // partial save: the server stores every valid field and lists the refused ones
-    const { config: saved, rejected } = await api.updateConfig(config)
-    state.config = saved
+  await run(
+    'saving config',
+    async () => {
+      // partial save: the server stores every valid field and lists the refused ones
+      const { config: saved, rejected } = await api.updateConfig(config)
+      state.config = saved
 
-    for (const { input, path } of entries) {
-      if (rejected.includes(path)) continue
+      for (const { input, path } of entries) {
+        if (rejected.includes(path)) continue
 
-      const field = CONFIG_FIELDS.find((f) => (f.path ? `${f.path}.${f.key}` === path : f.key === path))
-      if (!field) continue
+        const field = CONFIG_FIELDS.find((f) => (f.path ? `${f.path}.${f.key}` === path : f.key === path))
+        if (!field) continue
 
-      const serverValue = storedFieldValue(field)
-      if (field.type === 'checkbox') setChecked(input, serverValue)
-      else setValue(input, serverValue)
-    }
-
-    let apiKeyFailed = false
-
-    if (youtubeApiKey) {
-      try {
-        await api.updateSecrets({ youtubeApiKey })
-        dom.secYoutubeKey.value = ''
-        await loadSecrets()
-      } catch (error) {
-        log('Error saving API key:', error)
-        toastError(t('toast.apiKeyNotSaved'))
-        apiKeyFailed = true
+        const serverValue = storedFieldValue(field)
+        if (field.type === 'checkbox') setChecked(input, serverValue)
+        else setValue(input, serverValue)
       }
-    }
 
-    renderQueue()
-    renderPlaylists()
-    reportSaveResult(entries, rejected, 'toast.settingsSaved', { successToast: !apiKeyFailed })
-  })
+      let apiKeyFailed = false
+
+      if (youtubeApiKey) {
+        try {
+          await api.updateSecrets({ youtubeApiKey })
+          dom.secYoutubeKey.value = ''
+          await loadSecrets()
+        } catch (error) {
+          log('Error saving API key:', error)
+          toastError(t('toast.apiKeyNotSaved'))
+          apiKeyFailed = true
+        }
+      }
+
+      renderQueue()
+      renderPlaylists()
+      reportSaveResult(entries, rejected, 'toast.settingsSaved', { successToast: !apiKeyFailed })
+    },
+    { button: dom.cfgSaveBtn }
+  )
 }
 
 export const settingsActions = {

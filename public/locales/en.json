@@ -71,7 +71,8 @@
   "nav": {
     "dashboard": "Dashboard",
     "playlists": "Playlists",
-    "settings": "Settings"
+    "settings": "Settings",
+    "language": "Language"
   },
   "nowPlaying": {
     "nothingPlaying": "Nothing playing",
@@ -144,6 +145,8 @@
     "overlay": {
       "title": "Overlay",
       "showVideo": "Show video",
+      "hideOverlayInfo": "Video only (hide title and progress)",
+      "opacity": "Overlay opacity (%)",
       "badgePosition": "Badge position",
       "positionTopLeft": "Top Left",
       "positionTopRight": "Top Right",
@@ -171,13 +174,8 @@
         "allowShorts": "Shorts",
         "allowLiveStreams": "Live streams"
       },
-      "rateLimitNote": "Cooldowns and per-user rate limits are handled in Streamer.bot, not here",
       "regionCodeNote": "Two-letter country code (ISO 3166-1, e.g. US, RU, DE). Tracks not licensed for this region are skipped instead of being queued. Leave empty to disable",
       "save": "Save settings"
-    },
-    "language": {
-      "title": "Language",
-      "description": "Select interface language"
     },
     "about": {
       "title": "About",

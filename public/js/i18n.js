@@ -81,14 +81,6 @@ export function getSupportedLocales() {
   return SUPPORTED_LOCALES
 }
 
-export function getLocaleName(locale) {
-  const names = {
-    en: 'English',
-    ru: 'Русский'
-  }
-  return names[locale] || locale
-}
-
 export async function initI18n(locale = DEFAULT_LOCALE) {
   await loadTranslations(locale)
   document.documentElement.lang = currentLocale

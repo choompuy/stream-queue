@@ -2,44 +2,64 @@
 
 **Self-hosted YouTube song request queue for Twitch streams.** No cloud, no `.env` editing, no config files to hand-edit - everything is set up through a web control panel.
 
-Viewers request songs in Twitch chat (via Streamer.bot), StreamQueue searches YouTube, filters out junk (views/duration/embeddability/region), and plays the queue through an OBS Browser Source overlay. When the queue is empty, a looping fallback YouTube playlist keeps music going between requests.
+Viewers request songs in Twitch chat, StreamQueue searches YouTube, filters out unwanted videos, manages the queue, and plays it through an OBS Browser Source overlay. When the queue is empty, a fallback YouTube playlist keeps music going between requests.
 
 ## Features
 
-- 🎵 **Queue management** - search or paste a YouTube link/URL, duplicate detection, per-user request limits, admin bypass from the control panel
-- 🚫 **Blocklist** - ban a track from Activity, Queue, or the fallback list with one click; blocked tracks can't be re-added, and are skipped automatically if they're already queued or come up in the fallback rotation - including the one currently playing
-- 🎛 **Web control panel** - dashboard with live queue, play/pause/skip, all settings editable from the UI (API key, filters, overlay options) - nothing to configure by hand
-- 📺 **OBS overlay** - a `/overlay` Browser Source that plays the queue and shows a "Now Playing" badge (position + size configurable), with a read-only view for any other device on the network
-- 🔁 **Fallback playlist** - pick any YouTube playlist as background/filler music with shuffle and repeat, auto-refreshes to pick up new/removed tracks
-- 🤖 **Streamer.bot ready** - REST endpoints for `!sr <query>`, skip/pause/resume, and read-only "now playing" / "queue" chat replies
-- 📋 **Saved playlists** - keep a library of playlists and switch the active fallback playlist with one click
-- 📈 **Activity log** - see accepted/rejected/failed requests and why (quota, duplicate, blocked, filtered out, playback error, etc.)
-- 📱 **LAN access** - QR code + IP picker so you can manage the queue from your phone without typing an address
+- 🎵 **Song request queue** - search YouTube or paste a video URL, duplicate detection, per-user request limits, queue size limits, and admin controls
+- 📺 **Native Twitch integration** - connect Twitch directly from the control panel without Streamer.bot; configurable chat commands, permissions, cooldowns, and Channel Points redemptions
+- 🎁 **Channel Points rewards** - create and edit request rewards, configure cost/limits/cooldowns/color, select the reward used for song requests, and control automatic fulfillment
+- 🚫 **Blocklist** - block tracks from Activity, Queue, or the fallback list; blocked tracks cannot be re-added and are skipped automatically
+- 🎛 **Web control panel** - live queue, playback controls, fallback playlist, Twitch settings, filters, overlay options, blocklist, activity, and configuration
+- 📺 **OBS overlay** - a `/overlay` Browser Source that plays the queue and shows a compact Now Playing badge with configurable position and size
+- 🔁 **Fallback playlist** - use any YouTube playlist as background music with shuffle and repeat, with automatic refresh
+- 📋 **Saved playlists** - keep a library of playlists and switch the active fallback playlist from the control panel
+- 📈 **Activity log** - see accepted, rejected, blocked, and failed requests with structured failure reasons
+- 📱 **LAN access** - QR code and local network access for managing the queue from another device
 - 🌍 **RU/EN interface**
-- 🖥️ **Windows tray app** _(optional)_ - a small tray icon that starts/stops the server in the background, with "open panel" / "open logs" / "restart" shortcuts, so non-technical streamers don't need a terminal window at all
-- 💾 **Local-only storage** - state lives in JSON files on disk (`data/`, `cache/`), nothing leaves your machine except calls to the YouTube Data API
+- 🖥️ **Windows standalone build** - packaged `Service.exe` runs without Node.js installed; optional WinForms tray launcher provides a normal double-click workflow
+- 💾 **Local storage** - queue, settings, playlists, blocklist, and cache stay on disk next to the application
 
 ## How it works
 
-```
-Twitch chat "!sr never gonna give you up"
-        │
-        ▼
-  Streamer.bot  ──POST──▶  /api/queue/request  ──▶  YouTube Data API (search + filters)
-                                                              │
-                                                              ▼
-                                                     added to the queue
-                                                              │
-                                                              ▼
-                                              OBS Browser Source (/overlay) plays it
+```text
+Twitch chat / Channel Points
+          │
+          ▼
+   Native Twitch integration
+          │
+          ▼
+   StreamQueue request handling
+          │
+          ▼
+   YouTube Data API ── search + filters ──▶ queue
+                                           │
+                                           ▼
+                              OBS Browser Source (/overlay)
 ```
 
 ## Getting started
 
-### Requirements
+### Windows release
 
-- [Node.js](https://nodejs.org/) 20+ (22 recommended - matches the packaged build target)
-- A [YouTube Data API v3](https://console.cloud.google.com/apis/library/youtube.googleapis.com) key (free tier is enough for normal stream traffic)
+The easiest way to run StreamQueue on Windows is the standalone ZIP release.
+
+1. Download the latest release ZIP from GitHub Releases.
+2. Extract it to a folder.
+3. Run `Service.exe` or the optional `StreamQueueTray.exe`.
+4. Open the control panel shown by the application.
+5. Go to **Settings** and add your YouTube Data API key.
+6. Connect Twitch from the **Twitch** settings.
+7. Add the StreamQueue `/overlay` URL as an OBS Browser Source.
+
+The packaged build includes the Twitch client ID, so the released Windows build does not require you to create or enter a Twitch client secret.
+
+The application is portable: `data/`, `cache/`, and `logs/` are created next to the executable. No Node.js installation is required.
+
+### Requirements for development
+
+- [Node.js](https://nodejs.org/) 20+ (22 recommended)
+- A [YouTube Data API v3](https://console.cloud.google.com/apis/library/youtube.googleapis.com) key
 
 ### Run in development
 
@@ -50,88 +70,129 @@ npm install
 npm run dev
 ```
 
-The server picks a free port starting at `3000` and opens the control panel in your browser automatically. Go to **Settings → Bot Settings** and paste your YouTube API key - it's saved to `data/secrets.json` immediately, no restart needed.
+The server picks a free port starting at `3000`. Configure the YouTube API key from the web control panel; it is stored locally and takes effect without a restart.
 
-### Running the tests
-
-```bash
-npm test             # backend unit tests (Node's built-in test runner)
-npm run test:smoke   # end-to-end smoke test of the control panel UI, headless
-```
-
-### Building a standalone Windows build
+### Build the standalone Windows executable
 
 ```bash
 npm run build:sea
 ```
 
-Produces `dist-sea/Service.exe` - a single, self-contained executable (Node bundled in via Node's Single Executable Applications feature). Copy the `public/` folder next to it and it's ready to run standalone; no Node.js installation needed on the target machine.
+This produces `dist-sea/Service.exe`, a self-contained Node.js Single Executable Application. Copy the `public/` folder next to it.
 
-For a proper double-click, no-terminal-window experience, there's also an optional WinForms tray launcher in `tray/` that starts `Service.exe` in the background and gives you a tray icon with Open panel / Open logs / Restart / Exit. See [`tray/README.md`](tray/README.md) for how to build and assemble it - it wraps `Service.exe`, it doesn't replace it.
+For a no-terminal-window experience, build the optional WinForms tray launcher in `tray/`. It starts and stops the service in the background and provides shortcuts for opening the panel, logs, application folder, restart, and exit.
 
-Wherever it runs from, `data/`, `cache/`, and `logs/` are created **next to the executable** - the whole folder is self-contained and portable.
+### Running the tests
+
+```bash
+npm test
+npm run test:smoke
+```
 
 ## OBS setup
 
 1. Add a **Browser Source** in OBS.
-2. Copy the URL from **Settings → Overlay → OBS Browser Source URL** (or scan the QR code from another device on the same network).
-3. Recommended size: **362×283**.
+2. Copy the URL from **Settings → Overlay → OBS Browser Source URL**.
+3. Set the Browser Source size to match your overlay layout. **362×283** is a reasonable starting size.
 
-The overlay shows the video (optional, toggle in Settings) plus a "Now Playing" badge with title, requester, and progress - position is configurable (all four corners).
+The overlay can show the current video plus a compact Now Playing badge containing the title, requester, and progress. Its position can be configured in the control panel.
 
-## Streamer.bot integration
+## Twitch integration
 
-Point a Streamer.bot HTTP action at your local server for the `!sr` command:
+StreamQueue can connect directly to Twitch without requiring Streamer.bot.
 
-**POST** `http://localhost:<port>/api/queue/request`
+From the control panel you can:
 
-```json
-{
-  "query": "never gonna give you up",
-  "requestedBy": "SomeViewer"
-}
+- connect and disconnect a Twitch account;
+- configure chat commands for requests, queue/now-playing information, skip, pause, and resume;
+- configure command permissions and cooldowns;
+- create and edit Channel Points rewards;
+- select which configured reward creates song requests;
+- configure reward limits, cooldowns, cost, color, and automatic fulfillment;
+- receive request and playback status messages directly in Twitch chat.
+
+The released Windows build contains the Twitch client ID. Twitch OAuth tokens are stored locally with the rest of the application state.
+
+## Chat request flow
+
+A viewer can request a song through the configured Twitch command, for example:
+
+```text
+!sr never gonna give you up
 ```
 
-Every response is wrapped as `{ "success": true, "data": { ... } }` on success or `{ "success": false, "error": "...", "code": "..." }` on failure - read the actual payload from `data`. `query` can be a search term or a direct YouTube URL. `data.message` is a ready-to-echo chat line; `data` also tells you whether the track was queued or started playing immediately (`started`, `position`), or the request failed outright (duplicate, queue full, user limit, blocked, filtered out, quota exceeded - see `code`).
+StreamQueue searches YouTube, validates the result against the configured filters, and either adds it to the queue or starts playback when the queue is empty.
 
-Other useful endpoints for chat commands (skip / pause / resume - meant to be gated by Twitch permissions/cooldowns _inside Streamer.bot_, not by this server) and read-only chat replies:
-
-| Action                     | Endpoint                    |
-| -------------------------- | --------------------------- |
-| Skip current track         | `POST /api/player/skip`     |
-| Pause playback             | `POST /api/player/pause`    |
-| Resume playback            | `POST /api/player/resume`   |
-| "Now playing" chat reply   | `GET /api/chat/now-playing` |
-| "What's queued" chat reply | `GET /api/chat/queue`       |
-
-The two `GET /api/chat/*` endpoints return a single `data.message` string already formatted and length-capped for chat - point a `!nowplaying` / `!queue` command straight at them.
+Requests can be rejected for reasons such as duplicate tracks, queue limits, user limits, blocked videos, invalid/unavailable videos, duration/view filters, or YouTube API quota limits. Responses are localized and include a structured failure reason for the control panel and integrations.
 
 ## Configuration
 
-Everything below is editable from **Settings → Bot Settings** - no files to touch:
+Most configuration is editable from the web control panel.
 
-| Setting                      | Default             |
-| ---------------------------- | ------------------- |
-| Minimum views                | 10,000              |
-| Minimum duration             | 60s                 |
-| Maximum duration             | 480s (8 min)        |
-| Max queue size               | 20                  |
-| Max active requests per user | 4                   |
-| Region                       | none (unrestricted) |
+| Setting                      | Default                   |
+| ---------------------------- | ------------------------- |
+| Minimum views                | 10,000                    |
+| Minimum duration             | 60s                       |
+| Maximum duration             | 480s (8 min)              |
+| Max queue size               | 20                        |
+| Max active requests per user | 4                         |
+| Region                       | none                      |
+| Allow Shorts                 | disabled                  |
+| Allow live streams           | disabled                  |
+| Fallback playlist            | disabled until configured |
 
-Only embeddable videos in the YouTube Music category are accepted; duplicates and blocked tracks are rejected. Config updates are all-or-nothing - an invalid field in a request means nothing in that request is applied, and the response names which field(s) were rejected.
+YouTube requests are restricted to music-category, embeddable and syndicated videos by default, with additional validation for duration, availability, and other configured filters.
+
+Configuration updates support field-level validation: valid values can be saved even when another submitted field is rejected.
 
 ## Moderation
 
-Ban a track from its **⋮** menu in Activity, Queue, or the fallback list - it's added to the blocklist, removed if it's currently playing or queued, and can never be re-added or come up in the fallback rotation again until you unblock it from the **Blocklist** tab.
+Use the **Blocklist** controls from Activity, Queue, or fallback entries to block a track.
+
+Blocked tracks are:
+
+- rejected when requested again;
+- removed from the active queue when applicable;
+- skipped when encountered during fallback playback;
+- prevented from being selected again until they are unblocked.
+
+The activity log records block and playback events so moderation actions remain visible after the fact.
+
+## Playback and fallback reliability
+
+StreamQueue handles common playback failures without leaving the queue in a stuck state.
+
+- Player failures are reported with the affected video.
+- Duplicate failure reports are ignored.
+- Failed fallback tracks can advance to another track.
+- Blocked tracks are skipped during playback.
+- Playback and queue state are persisted locally.
+- The overlay reports player errors back to the local service.
 
 ## Data & privacy
 
-StreamQueue is designed to run **locally, on your own machine** - it's not meant to be deployed to a public host. All state (queue, settings, saved playlists, blocklist, YouTube cache) is stored as JSON next to wherever the app is running from (`data/`, `cache/`), git-ignored in this repo. The only outbound network calls are to the YouTube Data API.
+StreamQueue is designed to run locally on your own machine.
+
+Application state is stored as JSON next to the executable:
+
+```text
+data/
+  config.json
+  playlists.json
+  secrets.json
+
+cache/
+  queue-state.json
+  youtube-cache.json
+
+logs/
+```
+
+Your YouTube API key and Twitch OAuth state are stored locally. The application communicates with external services only when needed for its integrations, primarily the YouTube Data API and Twitch APIs.
 
 ## Tech stack
 
-Node.js · TypeScript · Express · vanilla JS (no frontend framework) · YouTube Data API v3 · YouTube IFrame Player API · optional C#/WinForms tray launcher for Windows
+Node.js · TypeScript · Express · vanilla JavaScript · YouTube Data API v3 · YouTube IFrame Player API · Twitch APIs · Twitch EventSub WebSocket · optional C#/WinForms tray launcher for Windows
 
 ## License
 

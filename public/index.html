@@ -54,6 +54,20 @@
           </svg>
           <span data-i18n="nav.settings">Settings</span>
         </button>
+
+        <label class="page-lang btn btn-tab btn-sm" for="localeSelect">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
+            <path
+              fill="currentColor"
+              d="m20.58 19.37-2.99-8.36c-.21-.55-.68-.89-1.22-.89s-1 .34-1.23.91l-2.98 8.34a.75.75 0 1 0 1.41.51l.62-1.73h4.35l.62 1.73c.11.31.4.5.71.5.08 0 .17-.01.25-.04a.75.75 0 0 0 .45-.96zm-5.84-2.73 1.64-4.59 1.64 4.59zm-2.55-8.79c-2.26 3.57-4.3 5.73-6.78 7.17a.746.746 0 0 1-1.02-.27.74.74 0 0 1 .27-1.02c2.1-1.22 3.82-2.97 5.75-5.87H4.12c-.41 0-.75-.34-.75-.75s.34-.75.75-.75h3.75V4.38c0-.41.34-.75.75-.75s.75.34.75.75v1.98h3.75c.41 0 .75.34.75.75s-.34.75-.75.75h-.94zm.04 7.27c-.13 0-.26-.03-.38-.1-.65-.38-1.28-.8-1.87-1.24a.75.75 0 0 1 .9-1.2c.54.41 1.13.79 1.73 1.14a.752.752 0 0 1-.38 1.4"
+            />
+          </svg>
+          <span data-i18n="nav.language">Language</span>
+          <select id="localeSelect">
+            <option value="en">English</option>
+            <option value="ru">Русский</option>
+          </select>
+        </label>
       </nav>
     </header>
     <main>
@@ -75,8 +89,8 @@
 
               <div class="now-playing-controls">
                 <button
-                  class="btn btn-lg btn-icon btn-primary"
                   id="playPauseBtn"
+                  class="btn btn-lg btn-icon btn-primary"
                   data-action="resume-pause"
                   title="Pause"
                   data-i18n-title="nowPlaying.pause"
@@ -85,7 +99,7 @@
                     <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5v14m8-14v14" />
                   </svg>
                 </button>
-                <button class="btn btn-lg btn-icon btn-secondary" data-action="skip" title="Skip" data-i18n-title="nowPlaying.skip">
+                <button id="skipBtn" class="btn btn-lg btn-icon btn-secondary" data-action="skip" title="Skip" data-i18n-title="nowPlaying.skip">
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
                     <path
                       stroke="currentColor"
@@ -330,22 +344,36 @@
             </div>
             <div class="settings-section">
               <label class="field-row">
-                <span data-i18n="settings.overlay.showVideo">Show video</span>
+                <span class="field-label" data-i18n="settings.overlay.showVideo">Show video</span>
                 <input class="settings-input checkbox" type="checkbox" id="showVideo" />
               </label>
 
-              <div class="field">
-                <label class="field-label" for="badgePosition" data-i18n="settings.overlay.badgePosition">Badge position</label>
+              <label class="field-row">
+                <span class="field-label" data-i18n="settings.overlay.hideOverlayInfo">Video only (hide title and progress)</span>
+                <input class="settings-input checkbox" type="checkbox" id="hideOverlayInfo" />
+              </label>
+            </div>
+
+            <div class="settings-section-column">
+              <label class="field">
+                <span class="field-label" data-i18n="settings.overlay.opacity">Overlay opacity (%)</span>
+                <input class="settings-input input" type="number" id="overlayOpacity" min="0" max="100" />
+              </label>
+
+              <label class="field">
+                <span class="field-label" data-i18n="settings.overlay.badgePosition">Badge position</span>
                 <select class="settings-input input" id="badgePosition">
                   <option value="top-left" data-i18n="settings.overlay.positionTopLeft">Top Left</option>
                   <option value="top-right" data-i18n="settings.overlay.positionTopRight">Top Right</option>
                   <option value="bottom-left" data-i18n="settings.overlay.positionBottomLeft">Bottom Left</option>
                   <option value="bottom-right" data-i18n="settings.overlay.positionBottomRight">Bottom Right</option>
                 </select>
-              </div>
+              </label>
+            </div>
 
+            <div class="settings-section">
               <div class="field">
-                <div class="field-label" data-i18n="settings.overlay.obsUrl">OBS Browser Source URL</div>
+                <span class="field-label" data-i18n="settings.overlay.obsUrl">OBS Browser Source URL</span>
                 <div class="field-row">
                   <a class="settings-input input text-blue" id="overlayUrl" href="/overlay" target="_blank" rel="noopener noreferrer">/overlay</a>
                   <button class="btn btn-secondary btn-icon" data-action="copy-overlay-url" title="Copy" data-i18n-title="settings.overlay.copy">
@@ -360,12 +388,11 @@
                     </svg>
                   </button>
                 </div>
-
                 <div class="text-muted text-xs" data-i18n="settings.overlay.obsSize">Recommended OBS source size: Width: 362, Height: 283</div>
               </div>
 
-              <div class="field">
-                <label class="field-label" for="selectIp" data-i18n="settings.overlay.ipSelector">IP selector</label>
+              <label class="field">
+                <span class="field-label" data-i18n="settings.overlay.ipSelector">IP selector</span>
                 <div class="field-row">
                   <select class="settings-input input hidden" id="selectIp"></select>
                   <button class="btn btn-secondary btn-icon" data-action="toggle-qr" title="QR code" data-i18n-title="settings.overlay.qrCode">
@@ -388,8 +415,8 @@
                     </svg>
                   </button>
                 </div>
-                <div id="controlPanelQr" class="control-panel-qr hidden"></div>
-              </div>
+                <span id="controlPanelQr" class="control-panel-qr hidden"></span>
+              </label>
             </div>
           </div>
 
@@ -399,8 +426,8 @@
             </div>
 
             <div class="settings-section">
-              <div class="field">
-                <label class="field-label" for="secYoutubeKey" data-i18n="settings.bot.apiKey">API Key</label>
+              <label class="field">
+                <span class="field-label" data-i18n="settings.bot.apiKey">API Key</span>
                 <input
                   class="settings-input input"
                   type="password"
@@ -410,66 +437,64 @@
                   autocomplete="off"
                 />
                 <div id="secretsStatus" class="text-muted text-xs"></div>
-              </div>
+              </label>
             </div>
 
-            <div class="settings-section">
-              <div class="settings-grid">
-                <div class="field">
-                  <label class="field-label" for="cfgMinViews" data-i18n="settings.bot.limits.minViews">Min views</label>
-                  <input class="settings-input input" type="number" id="cfgMinViews" min="0" />
-                </div>
-                <div class="field">
-                  <label class="field-label" for="cfgMinDuration" data-i18n="settings.bot.limits.minDuration">Min duration (sec)</label>
-                  <input class="settings-input input" type="number" id="cfgMinDuration" min="0" />
-                </div>
-                <div class="field">
-                  <label class="field-label" for="cfgMaxDuration" data-i18n="settings.bot.limits.maxDuration">Max duration (sec)</label>
-                  <input class="settings-input input" type="number" id="cfgMaxDuration" min="0" />
-                </div>
-              </div>
-            </div>
+            <div class="settings-section-column">
+              <label class="field">
+                <span class="field-label" data-i18n="settings.bot.limits.minViews">Min views</span>
+                <input class="settings-input input" type="number" id="cfgMinViews" min="0" />
+              </label>
+              <label class="field">
+                <span class="field-label" data-i18n="settings.bot.limits.minDuration">Min duration (sec)</span>
+                <input class="settings-input input" type="number" id="cfgMinDuration" min="0" />
+              </label>
+              <label class="field">
+                <span class="field-label" data-i18n="settings.bot.limits.maxDuration">Max duration (sec)</span>
+                <input class="settings-input input" type="number" id="cfgMaxDuration" min="0" />
+              </label>
 
-            <div class="settings-section">
-              <div class="settings-grid">
-                <div class="field">
-                  <label class="field-label" for="cfgMaxQueue" data-i18n="settings.bot.limits.maxQueue">Max queue size</label>
-                  <input class="settings-input input" type="number" id="cfgMaxQueue" min="1" />
-                </div>
-                <div class="field">
-                  <label class="field-label" for="cfgMaxPerUser" data-i18n="settings.bot.limits.maxPerUser">Max requests per user</label>
-                  <input class="settings-input input" type="number" id="cfgMaxPerUser" min="0" />
-                </div>
-              </div>
-              <div class="text-muted text-xs" data-i18n="settings.bot.rateLimitNote">
-                Cooldowns and per-user rate limits are handled in Streamer.bot, not here.
-              </div>
+              <label class="field">
+                <span class="field-label" data-i18n="settings.bot.limits.maxQueue">Max queue size</span>
+                <input class="settings-input input" type="number" id="cfgMaxQueue" min="1" />
+              </label>
+              <label class="field">
+                <span class="field-label" data-i18n="settings.bot.limits.maxPerUser">Max requests per user</span>
+                <input class="settings-input input" type="number" id="cfgMaxPerUser" min="0" />
+              </label>
             </div>
 
             <div class="settings-section">
               <label class="field-row">
-                <span data-i18n="settings.bot.limits.allowShorts">Shorts</span>
+                <span class="field-label" data-i18n="settings.bot.limits.allowShorts">Shorts</span>
                 <input class="settings-input checkbox" type="checkbox" id="cfgAllowShorts" />
               </label>
 
               <label class="field-row">
-                <span data-i18n="settings.bot.limits.allowLiveStreams">Live Streams</span>
+                <span class="field-label" data-i18n="settings.bot.limits.allowLiveStreams">Live Streams</span>
                 <input class="settings-input checkbox" type="checkbox" id="cfgAllowLiveStreams" />
               </label>
 
-              <div class="field">
-                <label class="field-label" for="cfgRegionCode" data-i18n="settings.bot.limits.regionCode">Region code</label>
-                <input class="settings-input input" type="text" id="cfgRegionCode" maxlength="2" placeholder="US" style="text-transform: uppercase" />
-              </div>
-              <div class="text-muted text-xs" data-i18n="settings.bot.regionCodeNote">
-                Two-letter country code (ISO 3166-1, e.g. US, RU, DE). Tracks not licensed for this region are skipped instead of being queued. Leave
-                empty to disable.
-              </div>
+              <label class="field">
+                <span class="field-label" data-i18n="settings.bot.limits.regionCode">Region code</span>
+                <input
+                  class="settings-input settings-input-short input"
+                  type="text"
+                  id="cfgRegionCode"
+                  maxlength="2"
+                  placeholder="US"
+                  style="text-transform: uppercase"
+                />
+                <span class="text-muted text-xs" data-i18n="settings.bot.regionCodeNote">
+                  Two-letter country code (ISO 3166-1, e.g. US, RU, DE). Tracks not licensed for this region are skipped instead of being queued.
+                  Leave empty to disable.
+                </span>
+              </label>
             </div>
 
             <div class="settings-section-actions">
               <button class="btn btn-secondary" data-action="cancel-config" data-i18n="common.cancel">Cancel</button>
-              <button class="btn btn-primary" data-action="save-config" data-i18n="settings.bot.save">Save settings</button>
+              <button class="btn btn-primary" id="cfgSaveBtn" data-action="save-config" data-i18n="common.save">Save</button>
             </div>
           </div>
 
@@ -479,18 +504,16 @@
             </div>
 
             <div class="settings-section">
-              <div id="twitchNotConfigured" class="field hidden">
-                <div class="text-muted text-xs" data-i18n="settings.twitch.clientCredentialsNote">
-                  Create an application in the Twitch Developer Console to get your Client ID and Client Secret
-                </div>
-              </div>
+              <span id="twitchNotConfigured" class="text-muted text-xs hidden" data-i18n="settings.twitch.clientCredentialsNote">
+                Create an application in the Twitch Developer Console to get your Client ID and Client Secret
+              </span>
 
               <div class="field">
-                <div class="field-label" data-i18n="settings.twitch.chanel">Not connected</div>
+                <span class="field-label" data-i18n="settings.twitch.chanel">Not connected</span>
                 <div class="field-row">
                   <div class="start">
                     <img id="twitchChanelImg" class="thumbnail" src="" alt="User avatar" />
-                    <div id="twitchChanelName" class="text-red truncate" data-i18n="settings.twitch.notConnected">Channel not linked</div>
+                    <span id="twitchChanelName" class="text-red truncate" data-i18n="settings.twitch.notConnected">Channel not linked</span>
                   </div>
 
                   <div id="twitchConnectionControls">
@@ -511,17 +534,17 @@
               </div>
 
               <div id="twitchAuthorization" class="field hidden">
-                <div class="field-label" data-i18n="settings.twitch.authorizationInstructions">
+                <span class="field-label" data-i18n="settings.twitch.authorizationInstructions">
                   Open Twitch and enter this code to authorize StreamQueue
-                </div>
+                </span>
 
-                <div id="twitchAuthorizationCode" class="settings-input input text-blue"></div>
+                <span id="twitchAuthorizationCode" class="settings-input input text-blue"></span>
               </div>
             </div>
 
             <div id="twitchRewardSection" class="settings-section hidden">
-              <div class="field">
-                <label class="field-label" for="twitchRewardSelect" data-i18n="settings.twitch.reward">Channel Points reward</label>
+              <label class="field">
+                <span class="field-label" data-i18n="settings.twitch.reward">Channel Points reward</span>
                 <div class="field-row">
                   <select class="settings-input input" id="twitchRewardSelect">
                     <option value="" data-i18n="settings.twitch.rewardNone">Select reward</option>
@@ -529,10 +552,11 @@
                   <button class="btn btn-secondary" id="twitchCreateNewRewardBtn" data-i18n="settings.twitch.createReward">Create reward</button>
                 </div>
                 <div class="text-muted text-xs" data-i18n="settings.twitch.rewardNote">Redemptions of this reward will be used as song requests</div>
-              </div>
+              </label>
+
               <div class="field">
                 <label class="field-row">
-                  <span data-i18n="settings.twitch.autoFulfillRedemptions">Auto-fulfill redemptions</span>
+                  <span class="field-label" data-i18n="settings.twitch.autoFulfillRedemptions">Auto-fulfill redemptions</span>
                   <input class="settings-input checkbox" type="checkbox" id="twitchAutoFulfillRedemptions" />
                 </label>
                 <div class="text-muted text-xs" data-i18n="settings.twitch.autoFulfillRedemptionsNote">
@@ -546,59 +570,56 @@
                 <h2 data-i18n="settings.twitch.editReward">Edit reward</h2>
               </div>
               <div class="settings-section">
-                <div class="field">
-                  <label class="field-label" for="twitchRewardTitle" data-i18n="settings.twitch.createRewardTitle">Reward title</label>
+                <label class="field">
+                  <span class="field-label" data-i18n="settings.twitch.createRewardTitle">Reward title</span>
                   <input class="settings-input input" type="text" id="twitchRewardTitle" maxlength="45" />
-                </div>
-                <div class="field">
-                  <label class="field-label" for="twitchRewardCost" data-i18n="settings.twitch.createRewardCost">Cost (points)</label>
-                  <input class="settings-input input" type="number" id="twitchRewardCost" min="1" />
-                </div>
-                <div class="field">
-                  <label class="field-label" for="twitchRewardPrompt" data-i18n="settings.twitch.createRewardPrompt">Description (optional)</label>
+                </label>
+                <label class="field">
+                  <span class="field-label" data-i18n="settings.twitch.createRewardCost">Cost (points)</span>
+                  <input class="settings-input settings-input-short input" type="number" id="twitchRewardCost" min="1" />
+                </label>
+                <label class="field">
+                  <span class="field-label" data-i18n="settings.twitch.createRewardPrompt">Description (optional)</span>
                   <input class="settings-input input" type="text" id="twitchRewardPrompt" maxlength="140" />
-                </div>
-                <div class="field">
-                  <label class="field-label" for="twitchRewardBackgroundColor" data-i18n="settings.twitch.createRewardBackgroundColor"
-                    >Background color (hex, optional)</label
-                  >
+                </label>
+                <label class="field" for="twitchRewardBackgroundColor">
+                  <span class="field-label" data-i18n="settings.twitch.createRewardBackgroundColor">Background color (hex, optional)</span>
                   <div class="field-row">
                     <input class="settings-input input" type="color" id="twitchRewardBackgroundColorPicker" />
                     <input class="settings-input input" type="text" id="twitchRewardBackgroundColor" maxlength="6" placeholder="00FF00" />
                   </div>
-                </div>
-                <div class="field">
-                  <label class="field-row">
-                    <span data-i18n="settings.twitch.createRewardEnabled">Enable reward</span>
-                    <input class="settings-input checkbox" type="checkbox" id="twitchRewardEnabled" />
-                  </label>
-                </div>
+                </label>
+                <label class="field-row">
+                  <span class="field-label" data-i18n="settings.twitch.createRewardEnabled">Enable reward</span>
+                  <input class="settings-input checkbox" type="checkbox" id="twitchRewardEnabled" />
+                </label>
 
-                <div class="field">
-                  <label class="field-label" data-i18n="settings.twitch.maxPerStream">Max per stream</label>
+                <label class="field" for="twitchMaxPerStream">
+                  <span class="field-label" data-i18n="settings.twitch.maxPerStream">Max per stream</span>
                   <div class="field-row">
                     <input class="settings-input input" type="number" id="twitchMaxPerStream" min="1" disabled />
                     <input class="settings-input checkbox" type="checkbox" id="twitchMaxPerStreamEnabled" />
                   </div>
-                </div>
-                <div class="field">
-                  <label class="field-label" data-i18n="settings.twitch.maxPerUserPerStream">Max per user per stream</label>
+                </label>
+                <label class="field" for="twitchMaxPerUserPerStream">
+                  <span class="field-label" data-i18n="settings.twitch.maxPerUserPerStream">Max per user per stream</span>
                   <div class="field-row">
                     <input class="settings-input input" type="number" id="twitchMaxPerUserPerStream" min="1" disabled />
                     <input class="settings-input checkbox" type="checkbox" id="twitchMaxPerUserPerStreamEnabled" />
                   </div>
-                </div>
-                <div class="field">
-                  <label class="field-label" data-i18n="settings.twitch.globalCooldown">Global cooldown (seconds)</label>
+                </label>
+                <label class="field" for="twitchGlobalCooldownSeconds">
+                  <span class="field-label" data-i18n="settings.twitch.globalCooldown">Global cooldown (seconds)</span>
                   <div class="field-row">
                     <input class="settings-input input" type="number" id="twitchGlobalCooldownSeconds" min="1" disabled />
                     <input class="settings-input checkbox" type="checkbox" id="twitchGlobalCooldownEnabled" />
                   </div>
-                </div>
+                </label>
               </div>
+
               <div class="settings-section-actions">
                 <button class="btn btn-secondary" data-action="cancel-twitch-reward" data-i18n="common.cancel">Cancel</button>
-                <button class="btn btn-primary" id="twitchSaveRewardBtn" data-i18n="common.save">Save</button>
+                <button id="twitchSaveRewardBtn" data-action="save-twitch-reward" class="btn btn-primary" data-i18n="common.save">Save</button>
               </div>
             </div>
           </div>
@@ -609,8 +630,8 @@
             </div>
 
             <div class="settings-section" id="twitchChatCommandRows">
-              <div class="field" data-chat-command="now">
-                <label class="field-label" data-i18n="settings.twitchChat.commands.now">Now playing</label>
+              <label class="field" for="chatCmdNowCommand" data-chat-command="now">
+                <span class="field-label" data-i18n="settings.twitchChat.commands.now">Now playing</span>
                 <div class="field-row">
                   <input class="settings-input input" type="text" id="chatCmdNowCommand" placeholder="!sg now" />
                   <select class="settings-input input" id="chatCmdNowPermission">
@@ -620,10 +641,10 @@
                   </select>
                   <input class="settings-input checkbox" type="checkbox" id="chatCmdNowEnabled" />
                 </div>
-              </div>
+              </label>
 
-              <div class="field" data-chat-command="queue">
-                <label class="field-label" data-i18n="settings.twitchChat.commands.queue">Queue</label>
+              <label class="field" for="chatCmdQueueCommand" data-chat-command="queue">
+                <span class="field-label" data-i18n="settings.twitchChat.commands.queue">Queue</span>
                 <div class="field-row">
                   <input class="settings-input input" type="text" id="chatCmdQueueCommand" placeholder="!sg queue" />
                   <select class="settings-input input" id="chatCmdQueuePermission">
@@ -633,22 +654,20 @@
                   </select>
                   <input class="settings-input checkbox" type="checkbox" id="chatCmdQueueEnabled" />
                 </div>
-              </div>
+              </label>
 
-              <div class="field">
-                <label class="field-label" for="chatCmdPlainCooldown" data-i18n="settings.twitchChat.plainCooldown">
-                  Queue command cooldown (seconds)
-                </label>
-                <input class="settings-input input" type="number" id="chatCmdPlainCooldown" min="0" max="300" style="max-width: 8rem" />
+              <label class="field" for="chatCmdPlainCooldown">
+                <span class="field-label" data-i18n="settings.twitchChat.plainCooldown">Queue command cooldown (seconds)</span>
+                <input class="settings-input settings-input-short input" type="number" id="chatCmdPlainCooldown" min="0" />
                 <div class="text-muted text-xs" data-i18n="settings.twitchChat.plainCooldownNote">
                   Applies to "now"/"queue" commands to prevent spam.
                 </div>
-              </div>
+              </label>
             </div>
 
             <div class="settings-section" id="twitchChatCommandRows">
-              <div class="field" data-chat-command="skip">
-                <label class="field-label" data-i18n="settings.twitchChat.commands.skip">Skip track</label>
+              <label class="field" for="chatCmdSkipCommand" data-chat-command="skip">
+                <span class="field-label" data-i18n="settings.twitchChat.commands.skip">Skip track</span>
                 <div class="field-row">
                   <input class="settings-input input" type="text" id="chatCmdSkipCommand" placeholder="!sg skip" />
                   <select class="settings-input input" id="chatCmdSkipPermission">
@@ -658,10 +677,10 @@
                   </select>
                   <input class="settings-input checkbox" type="checkbox" id="chatCmdSkipEnabled" />
                 </div>
-              </div>
+              </label>
 
-              <div class="field" data-chat-command="pause">
-                <label class="field-label" data-i18n="settings.twitchChat.commands.pause">Pause</label>
+              <label class="field" for="chatCmdPauseCommand" data-chat-command="pause">
+                <span class="field-label" data-i18n="settings.twitchChat.commands.pause">Pause</span>
                 <div class="field-row">
                   <input class="settings-input input" type="text" id="chatCmdPauseCommand" placeholder="!sg pause" />
                   <select class="settings-input input" id="chatCmdPausePermission">
@@ -671,10 +690,10 @@
                   </select>
                   <input class="settings-input checkbox" type="checkbox" id="chatCmdPauseEnabled" />
                 </div>
-              </div>
+              </label>
 
-              <div class="field" data-chat-command="resume">
-                <label class="field-label" data-i18n="settings.twitchChat.commands.resume">Resume</label>
+              <label class="field" for="chatCmdResumeCommand" data-chat-command="resume">
+                <span class="field-label" data-i18n="settings.twitchChat.commands.resume">Resume</span>
                 <div class="field-row">
                   <input class="settings-input input" type="text" id="chatCmdResumeCommand" placeholder="!sg resume" />
                   <select class="settings-input input" id="chatCmdResumePermission">
@@ -684,42 +703,22 @@
                   </select>
                   <input class="settings-input checkbox" type="checkbox" id="chatCmdResumeEnabled" />
                 </div>
-              </div>
+              </label>
 
-              <div class="field">
-                <label class="field-label" for="chatCmdCooldown" data-i18n="settings.twitchChat.cooldown">Control command cooldown (seconds)</label>
-                <input class="settings-input input" type="number" id="chatCmdCooldown" min="0" max="300" style="max-width: 8rem" />
+              <label class="field" for="chatCmdCooldown">
+                <span class="field-label" data-i18n="settings.twitchChat.cooldown">Control command cooldown (seconds)</span>
+                <input class="settings-input settings-input-short input" type="number" id="chatCmdCooldown" min="0" />
                 <div class="text-muted text-xs" data-i18n="settings.twitchChat.cooldownNote">
                   Applies only to skip/pause/resume - a shared cooldown so two moderators can't trigger the same action back to back.
                 </div>
-              </div>
+              </label>
             </div>
 
             <div class="settings-section-actions">
               <button class="btn btn-secondary" data-action="cancel-twitch-chat-commands" data-i18n="common.cancel">Cancel</button>
-              <button
-                id="twitchChatCommandsSaveBtn"
-                class="btn btn-primary"
-                data-action="save-twitch-chat-commands"
-                data-i18n="settings.twitchChat.save"
-              >
-                Save chat commands
+              <button id="twitchChatCommandsSaveBtn" class="btn btn-primary" data-action="save-twitch-chat-commands" data-i18n="common.save">
+                Save
               </button>
-            </div>
-          </div>
-
-          <div class="section-tab panel">
-            <div class="section-tab-header">
-              <h2 data-i18n="settings.language.title">Language</h2>
-            </div>
-            <div class="settings-section">
-              <div class="field">
-                <label class="field-label" for="localeSelect" data-i18n="settings.language.description">Select interface language</label>
-                <select class="settings-input input" id="localeSelect">
-                  <option value="en">English</option>
-                  <option value="ru">Русский</option>
-                </select>
-              </div>
             </div>
           </div>
 
@@ -729,15 +728,19 @@
             </div>
             <div class="settings-section">
               <div class="field">
-                <div class="field-label">StreamQueue</div>
+                <span class="field-label">StreamQueue</span>
                 <div class="text-sm text-muted" data-i18n="settings.about.description">Local music request manager for streamers</div>
               </div>
               <div class="field">
-                <div class="field-label">
-                  <span data-i18n="settings.about.developedBy">Developed by</span>
-                  <span class="text-green">@choompuy</span>
-                </div>
-                <a class="settings-input input text-blue" href="https://github.com/choompuy/stream-queue" target="_blank" rel="noopener noreferrer">
+                <span class="field-label">
+                  <span data-i18n="settings.about.developedBy">Developed by</span> <span class="text-green">@choompuy</span>
+                </span>
+                <a
+                  class="settings-input settings-input-short input"
+                  href="https://github.com/choompuy/stream-queue"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   GitHub ↗
                 </a>
               </div>

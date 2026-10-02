@@ -91,30 +91,34 @@ export function cancelRewardChanges() {
   showRewardForm(state.twitch.editingReward)
 }
 
-async function saveReward() {
+export async function saveReward() {
   const data = readRewardForm()
   if (!data) return
 
   const previous = state.twitch.editingReward
   const isEdit = Boolean(previous)
 
-  await run(isEdit ? 'updating Twitch reward' : 'creating Twitch reward', async () => {
-    const response = isEdit ? await api.updateTwitchReward(previous.id, data) : await api.createTwitchReward(data)
-    if (!response?.reward) return
+  await run(
+    isEdit ? 'updating Twitch reward' : 'creating Twitch reward',
+    async () => {
+      const response = isEdit ? await api.updateTwitchReward(previous.id, data) : await api.createTwitchReward(data)
+      if (!response?.reward) return
 
-    await loadTwitchRewards()
+      await loadTwitchRewards()
 
-    if (isEdit) {
-      markRewardSaved(response.reward, previous)
-      toastSuccess(t('toast.twitchRewardUpdated'))
-      return
-    }
+      if (isEdit) {
+        markRewardSaved(response.reward, previous)
+        toastSuccess(t('toast.twitchRewardUpdated'))
+        return
+      }
 
-    state.twitch.selectedRewardId = response.reward.id
-    renderTwitchRewards()
-    await saveTwitchConfig()
-    toastSuccess(t('toast.twitchRewardCreated'))
-  })
+      state.twitch.selectedRewardId = response.reward.id
+      renderTwitchRewards()
+      await saveTwitchConfig()
+      toastSuccess(t('toast.twitchRewardCreated'))
+    },
+    { button: dom.twitchSaveRewardBtn }
+  )
 }
 
 export function bindTwitchRewardTracking() {
@@ -129,6 +133,5 @@ export function bindTwitchRewardFormEvents() {
     state.twitch.selectedRewardId = ''
     showRewardForm()
   })
-  dom.twitchSaveRewardBtn?.addEventListener('click', saveReward)
   bindRewardForm()
 }

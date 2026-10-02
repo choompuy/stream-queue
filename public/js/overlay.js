@@ -59,6 +59,8 @@ function updateMediaVisibility() {
     setClass(dom.badge, 'visible', false)
   } else {
     setClass(dom.badge, 'with-video', settings.showVideo)
+    setClass(dom.badge, 'video-only', settings.showVideo && settings.hideOverlayInfo)
+    dom.badge.style.opacity = `${settings.opacity}%`
     setClass(dom.badge, 'visible')
   }
 }

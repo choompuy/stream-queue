@@ -4,7 +4,7 @@ import { dispatchAction } from './actions.js'
 import { bindMenus } from './menu.js'
 import { search } from './search.js'
 import { addPlaylist } from './playlists.js'
-import { saveOverlaySettings, onIpChange, changeLocale, isConfigFieldChanged } from './settings.js'
+import { saveOverlaySettings, syncHideOverlayInfoAvailability, onIpChange, changeLocale, isConfigFieldChanged } from './settings.js'
 import { onTwitchRewardChange, stopTwitchPolling, bindTwitchFieldTracking, bindTwitchRewardFormEvents } from './twitch/index.js'
 import { trackChanges } from './save-result.js'
 import { setError } from '../shared.js'
@@ -37,7 +37,12 @@ export function bindEvents() {
     if (event.key === 'Enter') addPlaylist()
   })
 
-  dom.showVideo?.addEventListener('change', saveOverlaySettings)
+  dom.showVideo?.addEventListener('change', () => {
+    syncHideOverlayInfoAvailability()
+    saveOverlaySettings()
+  })
+  dom.hideOverlayInfo?.addEventListener('change', saveOverlaySettings)
+  dom.overlayOpacity?.addEventListener('change', saveOverlaySettings)
   dom.badgePosition?.addEventListener('change', saveOverlaySettings)
   dom.selectIp?.addEventListener('change', onIpChange)
   dom.twitchRewardSelect?.addEventListener('change', onTwitchRewardChange)
@@ -55,6 +60,8 @@ export function bindEvents() {
     dom.cfgAllowLiveStreams,
     dom.secYoutubeKey,
     dom.showVideo,
+    dom.hideOverlayInfo,
+    dom.overlayOpacity,
     dom.badgePosition,
     dom.localeSelect
   ]

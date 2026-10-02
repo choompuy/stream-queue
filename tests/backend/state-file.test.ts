@@ -143,7 +143,7 @@ test('initState()', async (t) => {
 
     assert.equal(queue.getCurrent()?.videoId, A)
     assert.deepEqual(queue.getQueue().map((entry) => entry.videoId), [B])
-    assert.deepEqual(getSettings(), { showVideo: true, position: 'top-left', locale: 'ru' })
+    assert.deepEqual(getSettings(), { showVideo: true, hideOverlayInfo: false, opacity: 100, position: 'top-left', locale: 'ru' })
     assert.equal(fallback.getFallbackSnapshot().playlistId, 'PLstate0000001')
     assert.deepEqual(fallback.getFallbackSnapshot().order, [F1, F2])
   })

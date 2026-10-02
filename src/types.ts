@@ -40,6 +40,8 @@ export type FallbackPlaylist = {
 
 export type Settings = {
   showVideo: boolean
+  hideOverlayInfo: boolean
+  opacity: number
   position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
   locale: 'en' | 'ru'
 }

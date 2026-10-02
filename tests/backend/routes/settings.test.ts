@@ -151,7 +151,7 @@ test('PUT /api/settings', async (t) => {
     const response = await putSettings({ showVideo: true, position: 'top-left' })
 
     assert.equal(response.status, 200)
-    assert.deepEqual(await getSettings(), { showVideo: true, position: 'top-left', locale: 'en' })
+    assert.deepEqual(await getSettings(), { showVideo: true, hideOverlayInfo: false, opacity: 100, position: 'top-left', locale: 'en' })
   })
 
   await t.test('invalid and unknown fields are a 400 that names them, and nothing is applied', async () => {

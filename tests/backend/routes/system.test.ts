@@ -49,7 +49,7 @@ test('system routes', async (t) => {
     const body = (await (await api('/overlay-state')).json()) as Record<string, any>
 
     assert.ok('nextTrack' in body.data.state)
-    assert.deepEqual(Object.keys(body.data.settings).sort(), ['locale', 'position', 'showVideo'])
+    assert.deepEqual(Object.keys(body.data.settings).sort(), ['hideOverlayInfo', 'locale', 'opacity', 'position', 'showVideo'])
   })
 
   await t.test('GET /network-info reports the port the server is listening on', async () => {
@@ -70,7 +70,19 @@ test('system routes', async (t) => {
 
 test('the /api route table', async (t) => {
   await t.test('every group of routes is reachable', async () => {
-    const paths = ['/state', '/overlay-state', '/network-info', '/settings', '/locale', '/config', '/secrets', '/playlists', '/blocklist', '/activity', '/fallback']
+    const paths = [
+      '/state',
+      '/overlay-state',
+      '/network-info',
+      '/settings',
+      '/locale',
+      '/config',
+      '/secrets',
+      '/playlists',
+      '/blocklist',
+      '/activity',
+      '/fallback'
+    ]
 
     for (const path of paths) {
       const response = await fetch(`${fullBase}${path}`)

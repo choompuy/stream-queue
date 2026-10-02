@@ -10,6 +10,8 @@ export const state = {
 
   settings: {
     showVideo: true,
+    hideOverlayInfo: false,
+    opacity: 100,
     position: 'bottom-right'
   },
 
@@ -38,6 +40,8 @@ export const state = {
 
 export const dom = {
   showVideo: $('showVideo'),
+  hideOverlayInfo: $('hideOverlayInfo'),
+  overlayOpacity: $('overlayOpacity'),
   badgePosition: $('badgePosition'),
   overlayUrl: $('overlayUrl'),
   selectIp: $('selectIp'),
@@ -52,6 +56,7 @@ export const dom = {
   cfgRegionCode: $('cfgRegionCode'),
   cfgAllowShorts: $('cfgAllowShorts'),
   cfgAllowLiveStreams: $('cfgAllowLiveStreams'),
+  cfgSaveBtn: $('cfgSaveBtn'),
 
   secYoutubeKey: $('secYoutubeKey'),
   secretsStatus: $('secretsStatus'),
@@ -69,6 +74,7 @@ export const dom = {
   nextDuration: $('nextDuration'),
 
   playPauseBtn: $('playPauseBtn'),
+  skipBtn: $('skipBtn'),
   clearQueueBtn: $('clearQueueBtn'),
 
   searchInput: $('searchInput'),
@@ -149,7 +155,8 @@ export const dom = {
   chatCmdPausePermission: $('chatCmdPausePermission'),
   chatCmdResumeEnabled: $('chatCmdResumeEnabled'),
   chatCmdResumeCommand: $('chatCmdResumeCommand'),
-  chatCmdResumePermission: $('chatCmdResumePermission')
+  chatCmdResumePermission: $('chatCmdResumePermission'),
+  twitchChatCommandsSaveBtn: $('twitchChatCommandsSaveBtn')
 }
 
 export const CONFIG_FIELDS = [

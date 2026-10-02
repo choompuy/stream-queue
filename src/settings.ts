@@ -4,6 +4,8 @@ import { createLogger } from './logger.js'
 
 const defaultSettings: Settings = {
   showVideo: false,
+  hideOverlayInfo: false,
+  opacity: 100,
   position: 'bottom-right',
   locale: 'en'
 }
@@ -21,8 +23,10 @@ const LOCALES: Settings['locale'][] = ['en', 'ru']
 
 const SETTINGS_RULES: Record<keyof Settings, (value: unknown) => boolean> = {
   showVideo: (v) => typeof v === 'boolean',
+  hideOverlayInfo: (v) => typeof v === 'boolean',
   position: (v) => POSITIONS.includes(v as Settings['position']),
-  locale: (v) => LOCALES.includes(v as Settings['locale'])
+  locale: (v) => LOCALES.includes(v as Settings['locale']),
+  opacity: (v) => typeof v === 'number' && v >= 0 && v <= 100
 }
 
 export type SettingsValidation = { clean: Partial<Settings>; rejected: string[] }

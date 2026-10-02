@@ -32,7 +32,7 @@ test('updateSettings()', async (t) => {
     resetSettings()
     const result = updateSettings({ position: 'top-right', showVideo: 'yes' as never, locale: 'xx' as never })
 
-    assert.deepEqual(result, { showVideo: false, position: 'top-right', locale: 'en' })
+    assert.deepEqual(result, { showVideo: false, hideOverlayInfo: false, opacity: 100, position: 'top-right', locale: 'en' })
     assert.deepEqual(getSettings(), result)
   })
 })
