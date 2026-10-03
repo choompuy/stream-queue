@@ -57,6 +57,8 @@ export function buildQueueMessage(): string {
 const REDEMPTION_REASON_FALLBACKS: Partial<Record<FailureReason['code'], string>> = {
   DUPLICATE: 'that track is already in the queue',
   BLOCKED: 'that track is blocked',
+  TRACK_REMOVED: 'your track was removed from the queue',
+  QUEUE_CLEARED: 'the queue was cleared',
   QUEUE_FULL: 'the queue is full',
   USER_LIMIT: 'you already have a track queued',
   INVALID_YOUTUBE_URL: 'that is not a valid YouTube link',
@@ -98,4 +100,9 @@ export function buildRedemptionRejectionMessage(userName: string, reason: Failur
   if (specific) return specific
 
   return translateWithFallback('chat.redemption.generic', params, `@${userName}, ${fallbackReason}, points refunded`)
+}
+
+// Sent instead of the "points refunded" message when Twitch did not accept the cancellation: it must not promise a refund
+export function buildRedemptionRefundFailedMessage(userName: string): string {
+  return translateWithFallback('chat.redemption.refundFailed', { user: userName }, `@${userName}, your request could not be completed and the points could not be refunded automatically, the streamer will sort it out`)
 }

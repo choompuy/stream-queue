@@ -1,20 +1,26 @@
 import { cachePath, createFileStore } from './persist.js'
-import { QueueItem, Song } from './types.js'
+import { QueueItem, Settings, Song } from './types.js'
 import { isValidPlaylistId, isValidVideoId } from './youtube/url.js'
+import { importLegacySettings, validateSettingsUpdates } from './settings.js'
 import { getQueue, getCurrent, hydrateQueue } from './queue.js'
-import { getFallbackSnapshot, hydrateFallback, FallbackSnapshot } from './fallback.js'
+import { getFallbackProgress, getFallbackSourceTracks, getFallbackSourceVersion, hydrateFallback, FallbackSnapshot } from './fallback.js'
 import { onStateChange } from './state-events.js'
 import { createLogger, describeError } from './logger.js'
 
+// Settings are not part of the saved state any more (they live in data/settings.json), but older files still carry them.
+// The playlist tracks are not part of it either: they are large and rarely change, so they have a file of their own
 export type StateFile = {
   current: QueueItem | null
   queue: QueueItem[]
-  fallback: FallbackSnapshot
+  fallback: Omit<FallbackSnapshot, 'sourceTracks'>
 }
+
+type TracksFile = { sourceTracks: Song[] }
 
 export type SanitizedState = {
   current: QueueItem | null
   queue: QueueItem[]
+  settings: Partial<Settings>
   fallback: FallbackSnapshot | undefined
   problems: string[]
 }
@@ -39,12 +45,30 @@ export function sanitizeSong(raw: unknown): Song | null {
   }
 }
 
+function sanitizeRedemption(raw: unknown): QueueItem['channelPointsRedemption'] {
+  if (!isObject(raw)) return undefined
+
+  const id = text(raw.id).trim()
+  const rewardId = text(raw.rewardId).trim()
+  const userName = text(raw.userName).trim()
+
+  return id && rewardId && userName ? { id, rewardId, userName } : undefined
+}
+
 export function sanitizeQueueItem(raw: unknown): QueueItem | null {
   const song = sanitizeSong(raw)
   const requestedBy = isObject(raw) ? text(raw.requestedBy).trim() : ''
   if (!song || !requestedBy) return null
 
-  return { ...song, requestedBy, ...(isObject(raw) && raw.isFallback === true ? { isFallback: true } : {}) }
+  // without the redemption a restored track would play, but its Channel Points reward would never be closed
+  const redemption = isObject(raw) ? sanitizeRedemption(raw.channelPointsRedemption) : undefined
+
+  return {
+    ...song,
+    requestedBy,
+    ...(isObject(raw) && raw.isFallback === true ? { isFallback: true } : {}),
+    ...(redemption ? { channelPointsRedemption: redemption } : {})
+  }
 }
 
 function sanitizeFallback(raw: unknown, problems: string[]): FallbackSnapshot | undefined {
@@ -81,6 +105,8 @@ function sanitizeFallback(raw: unknown, problems: string[]): FallbackSnapshot | 
   }
 }
 
+// Turns whatever was read from disk into something safe to load. Every part is repaired on its own:
+// a bad queue item, a bad setting or a bad fallback entry costs only itself, never the other parts
 export function sanitizeState(raw: unknown): SanitizedState {
   const data = isObject(raw) ? raw : {}
   const problems: string[] = []
@@ -113,10 +139,18 @@ export function sanitizeState(raw: unknown): SanitizedState {
   if (invalid) problems.push(`queue: dropped ${invalid} invalid item(s)`)
   if (duplicates) problems.push(`queue: dropped ${duplicates} duplicate item(s)`)
 
-  return { current, queue, fallback: sanitizeFallback(data.fallback, problems), problems }
+  let settings: Partial<Settings> = {}
+  if (data.settings !== undefined) {
+    const validated = validateSettingsUpdates(data.settings)
+    settings = validated.clean
+    if (validated.rejected.length) problems.push(`settings: ignored ${validated.rejected.join(', ')}`)
+  }
+
+  return { current, queue, settings, fallback: sanitizeFallback(data.fallback, problems), problems }
 }
 
 const store = createFileStore<Partial<StateFile>>(() => cachePath('queue-state.json'))
+const tracksStore = createFileStore<TracksFile>(() => cachePath('fallback-tracks.json'))
 
 const log = createLogger('STATE')
 
@@ -124,14 +158,23 @@ function stateSnapshot(): StateFile {
   return {
     current: getCurrent(),
     queue: getQueue(),
-    fallback: getFallbackSnapshot()
+    fallback: getFallbackProgress()
   }
 }
 
+// -1 until the track list has been saved (or read from its own file), so an older state file gets migrated
+let savedTracksVersion = -1
+
 function persistState(): void {
-  store.scheduleSave(stateSnapshot, (error) => {
-    log.error(`Failed to save state: ${describeError(error)}`)
-  })
+  const onError = (error: unknown) => log.error(`Failed to save state: ${describeError(error)}`)
+
+  store.scheduleSave(stateSnapshot, onError)
+
+  const version = getFallbackSourceVersion()
+  if (version !== savedTracksVersion) {
+    savedTracksVersion = version
+    tracksStore.scheduleSave(() => ({ sourceTracks: getFallbackSourceTracks() }), onError)
+  }
 }
 
 function attempt(part: string, apply: () => void): void {
@@ -143,12 +186,19 @@ function attempt(part: string, apply: () => void): void {
 }
 
 export function loadState(): void {
-  const { current, queue, fallback, problems } = sanitizeState(store.load({}))
+  const saved = store.load({})
+  const tracks = tracksStore.load({ sourceTracks: [] }).sourceTracks
+
+  // an older state file still carries the tracks inside `fallback`: they are used until the track file exists
+  const raw = tracks.length > 0 && isObject(saved.fallback) ? { ...saved, fallback: { ...saved.fallback, sourceTracks: tracks } } : saved
+  const { current, queue, settings, fallback, problems } = sanitizeState(raw)
 
   for (const problem of problems) log.warn(problem)
 
   attempt('queue', () => hydrateQueue({ current, queue }))
+  attempt('settings', () => importLegacySettings(settings))
   attempt('fallback', () => hydrateFallback(fallback))
+  savedTracksVersion = tracks.length > 0 ? getFallbackSourceVersion() : -1
 
   log.log('State loaded from disk')
 }

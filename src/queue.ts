@@ -5,35 +5,26 @@ import { logRejection, logAcceptance } from './activity.js'
 import { QueueItem, Song, AppError, AddedSong, FailureReason } from './types.js'
 import { isBlocked } from './blocklist.js'
 import { notifyStateChange } from './state-events.js'
-import { createLogger } from './logger.js'
+import { finishItem } from './finish.js'
+import { createLogger, describeError } from './logger.js'
 
 let currentSong: QueueItem | null = null
 const queue: QueueItem[] = []
-const queueVideoIds = new Set<string>()
-const userQueueCounts = new Map<string, number>()
 
 let isPaused = false
 
 const log = createLogger('QUEUE')
 
-function incUserCount(requestedBy: string): void {
-  const key = requestedBy.toLowerCase()
-  userQueueCounts.set(key, (userQueueCounts.get(key) ?? 0) + 1)
-}
-
-function decUserCount(requestedBy: string): void {
-  const key = requestedBy.toLowerCase()
-  const count = (userQueueCounts.get(key) ?? 0) - 1
-  if (count > 0) {
-    userQueueCounts.set(key, count)
-  } else {
-    if (count < 0) log.warn(`user count went negative for "${key}", resetting to 0`)
-    userQueueCounts.delete(key)
-  }
-}
+// Everything below is derived from `queue` on demand, so there is no second copy that could drift apart from it
+const isQueued = (videoId: string): boolean => queue.some((item) => item.videoId === videoId)
 
 function getUserActiveCount(username: string): number {
-  return userQueueCounts.get(username.toLowerCase()) ?? 0
+  const key = username.toLowerCase()
+  return queue.filter((item) => item.requestedBy.toLowerCase() === key).length
+}
+
+function isActiveNonFallback(videoId: string): boolean {
+  return currentSong?.videoId === videoId && !currentSong.isFallback
 }
 
 export function hydrateQueue(data: { current?: QueueItem | null; queue?: QueueItem[] }): void {
@@ -41,13 +32,17 @@ export function hydrateQueue(data: { current?: QueueItem | null; queue?: QueueIt
 
   if (Array.isArray(data.queue)) {
     queue.length = 0
-    queueVideoIds.clear()
-    userQueueCounts.clear()
+    let dropped = 0
+
     for (const item of data.queue) {
+      if (isQueued(item.videoId) || isActiveNonFallback(item.videoId)) {
+        dropped++
+        continue
+      }
       queue.push(item)
-      queueVideoIds.add(item.videoId)
-      incUserCount(item.requestedBy)
     }
+
+    if (dropped) log.warn(`dropped ${dropped} duplicate item(s) while restoring the queue`)
   }
 }
 
@@ -69,15 +64,16 @@ export function getIsPaused(): boolean {
 }
 
 export function shiftQueue(): QueueItem | null {
-  const next = queue.shift() ?? null
-  if (next) {
-    queueVideoIds.delete(next.videoId)
-    decUserCount(next.requestedBy)
-  }
-  return next
+  return queue.shift() ?? null
 }
 
-function assertCanRequestSong(requestedBy: string, addToQueue: boolean, bypassLimits: boolean): void {
+export type AddOptions = {
+  addToQueue?: boolean
+  bypassLimits?: boolean
+  channelPointsRedemption?: QueueItem['channelPointsRedemption']
+}
+
+function assertCanRequestSong(requestedBy: string, { addToQueue = true, bypassLimits = false }: AddOptions = {}): void {
   const config = getConfig()
 
   if (addToQueue && queue.length >= config.maxQueueSize) {
@@ -95,11 +91,7 @@ function assertCanRequestSong(requestedBy: string, addToQueue: boolean, bypassLi
 }
 
 function assertNotDuplicate(videoId: string): void {
-  if (currentSong?.videoId === videoId && !currentSong.isFallback) {
-    throw new AppError('DUPLICATE', 'this track is already in the queue')
-  }
-
-  if (queueVideoIds.has(videoId)) {
+  if (isActiveNonFallback(videoId) || isQueued(videoId)) {
     throw new AppError('DUPLICATE', 'this track is already in the queue')
   }
 }
@@ -110,22 +102,16 @@ function assertNotBlocked(videoId: string): void {
   }
 }
 
-export function assertCanAddSong(song: Song, requestedBy: string, addToQueue: boolean, bypassLimits: boolean = false): void {
+export function assertCanAddSong(song: Song, requestedBy: string, options: AddOptions = {}): void {
   assertNotBlocked(song.videoId)
   assertNotDuplicate(song.videoId)
-  assertCanRequestSong(requestedBy, addToQueue, bypassLimits)
+  assertCanRequestSong(requestedBy, options)
 }
 
-export function addSong(
-  song: Song,
-  requestedBy: string,
-  addToQueue: boolean = true,
-  bypassLimits: boolean = false,
-  channelPointsRedemption?: QueueItem['channelPointsRedemption']
-): QueueItem {
-  log.log(`[REQUEST] ${requestedBy} → "${song.title}"`)
+export function addSong(song: Song, requestedBy: string, options: AddOptions = {}): QueueItem {
+  const { addToQueue = true, channelPointsRedemption } = options
 
-  assertCanAddSong(song, requestedBy, addToQueue, bypassLimits)
+  assertCanAddSong(song, requestedBy, options)
 
   const item: QueueItem = {
     ...song,
@@ -135,8 +121,6 @@ export function addSong(
 
   if (addToQueue) {
     queue.push(item)
-    queueVideoIds.add(item.videoId)
-    incUserCount(requestedBy)
     log.log(`added "${song.title}" at position ${queue.length}`)
   } else {
     log.log(`"${song.title}" will be set as current (not added to queue)`)
@@ -148,12 +132,11 @@ export function addSong(
 }
 
 export function setCurrent(item: QueueItem | null): void {
+  const previous = currentSong
   currentSong = item
 
-  if (item) {
-    log.log(`[PLAYER] resumed "${item.title}"`)
-  } else {
-    log.log(`[PLAYER] paused`)
+  if (item?.videoId !== previous?.videoId) {
+    log.log(item ? `now playing "${item.title}"` : 'nothing is playing')
   }
 
   notifyStateChange()
@@ -167,9 +150,8 @@ export function removeAt(index: number): QueueItem | null {
   const [item] = queue.splice(index, 1)
 
   if (item) {
-    queueVideoIds.delete(item.videoId)
-    decUserCount(item.requestedBy)
     log.log(`removed "${item.title}" at position ${index + 1}`)
+    finishItem(item, { code: 'TRACK_REMOVED' })
   }
 
   notifyStateChange()
@@ -180,10 +162,10 @@ export function removeAt(index: number): QueueItem | null {
 export function clearQueue(): QueueItem[] {
   const cleared = [...queue]
   queue.length = 0
-  queueVideoIds.clear()
-  userQueueCounts.clear()
 
   log.log(`cleared ${cleared.length} songs`)
+
+  for (const item of cleared) finishItem(item, { code: 'QUEUE_CLEARED' })
 
   notifyStateChange()
 
@@ -205,7 +187,7 @@ export async function requestSong(
   let song: Song | null = null
 
   try {
-    assertCanRequestSong(requestedBy, currentSong !== null, bypassFilters)
+    assertCanRequestSong(requestedBy, { addToQueue: currentSong !== null, bypassLimits: bypassFilters })
 
     const { isYouTube, videoId } = parseYouTubeUrl(query)
 
@@ -233,7 +215,7 @@ export async function requestSong(
     }
 
     const wasEmpty = currentSong === null
-    const item = addSong(song, requestedBy, !wasEmpty, bypassFilters, channelPointsRedemption)
+    const item = addSong(song, requestedBy, { addToQueue: !wasEmpty, bypassLimits: bypassFilters, channelPointsRedemption })
 
     if (wasEmpty) {
       setCurrent(item)
@@ -248,7 +230,9 @@ export async function requestSong(
 
     return { outcome: 'added', added: { song: item, started: wasEmpty, position } }
   } catch (error) {
-    log.error(`[REJECT] ${requestedBy} → error while adding song`)
+    if (error instanceof AppError) log.log(`[REJECT] ${requestedBy} → ${error.code}`)
+    else log.error(`[REJECT] ${requestedBy} → unexpected error while adding song: ${describeError(error, true)}`)
+
     const reasonCode = error instanceof AppError ? error.code : 'SERVER_ERROR'
     const reasonParams = error instanceof AppError ? error.params : undefined
     logRejection(requestedBy, query, reasonCode, { title: song?.title ?? null, videoId: song?.videoId ?? null, reasonParams })

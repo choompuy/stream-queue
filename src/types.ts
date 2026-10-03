@@ -6,6 +6,8 @@ export type ActivityReasonCode =
   | 'PLAYBACK_VIDEO_UNAVAILABLE'
   | 'PLAYBACK_EMBED_DISALLOWED'
   | 'PLAYBACK_FAILED'
+  | 'TRACK_REMOVED'
+  | 'QUEUE_CLEARED'
 
 export type ActivityStatus = 'accepted' | 'rejected' | 'failed'
 export type ActivityEntry = {

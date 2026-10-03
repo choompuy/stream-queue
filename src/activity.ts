@@ -64,7 +64,7 @@ export function logAcceptance(requestedBy: string, query: string, title: string,
 export function logFailure(item: QueueItem, reasonCode: ActivityReasonCode, reasonParams?: ReasonParams): void {
   logActivity({
     requestedBy: item.requestedBy,
-    query: item.title,
+    query: item.url,
     title: item.title,
     videoId: item.videoId,
     status: 'failed',

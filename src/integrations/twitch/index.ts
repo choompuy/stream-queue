@@ -17,11 +17,13 @@ import {
   buildQueueMessage,
   buildSkipMessage,
   buildRedemptionAcceptedMessage,
-  buildRedemptionRejectionMessage
+  buildRedemptionRejectionMessage,
+  buildRedemptionRefundFailedMessage
 } from '../../chat-replies.js'
 import { translateWithFallback } from '../../i18n.js'
 import { getTwitchConfig, CHAT_COMMAND_KEYS } from './config.js'
-import { getState, skipCurrent, registerChannelPointsPlaybackFailureHandler, registerChannelPointsPlaybackSuccessHandler } from '../../player.js'
+import { getState, skipCurrent } from '../../player.js'
+import { registerRedemptionHandler, type RedemptionOutcome } from '../../finish.js'
 import { AppError } from '../../types.js'
 import type { FailureReason, QueueItem } from '../../types.js'
 import { createLogger } from '../../logger.js'
@@ -50,7 +52,7 @@ function toCancellableRedemption(tracked: NonNullable<QueueItem['channelPointsRe
 
 function handleChannelPointsPlaybackOutcome(
   tracked: NonNullable<QueueItem['channelPointsRedemption']>,
-  outcome: { status: 'failed'; reason: FailureReason } | { status: 'succeeded' }
+  outcome: RedemptionOutcome
 ): void {
   const redemption = toCancellableRedemption(tracked)
 
@@ -94,8 +96,7 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
     log.log('Restored Twitch user info from storage')
   }
 
-  registerChannelPointsPlaybackFailureHandler((tracked, reason) => handleChannelPointsPlaybackOutcome(tracked, { status: 'failed', reason }))
-  registerChannelPointsPlaybackSuccessHandler((tracked) => handleChannelPointsPlaybackOutcome(tracked, { status: 'succeeded' }))
+  registerRedemptionHandler(handleChannelPointsPlaybackOutcome)
 
   log.log('Twitch integration initialized')
 
@@ -330,59 +331,64 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+// Sets the status with retries and backoff. Returns whether Twitch accepted it
+async function setRedemptionStatus(
+  redemption: TwitchChannelPointsRedemption,
+  twitchClient: TwitchClient,
+  status: 'FULFILLED' | 'CANCELED'
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= REDEMPTION_RETRY_ATTEMPTS; attempt++) {
+    try {
+      await twitchClient.updateRedemptionStatus(redemption, status)
+      return true
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+
+      if (attempt === REDEMPTION_RETRY_ATTEMPTS) {
+        log.error(`Failed to set redemption ${redemption.id} to ${status} after ${attempt} attempts: ${reason}`)
+        return false
+      }
+
+      const delay = REDEMPTION_RETRY_DELAY_MS * 2 ** (attempt - 1)
+      log.error(`Failed to set redemption ${redemption.id} to ${status} (attempt ${attempt}/${REDEMPTION_RETRY_ATTEMPTS}): ${reason}. Retrying in ${delay}ms`)
+      await wait(delay)
+    }
+  }
+
+  return false
+}
+
 async function fulfillRedemption(redemption: TwitchChannelPointsRedemption, twitchClient: TwitchClient | null): Promise<void> {
   if (!twitchClient) {
     log.error(`Cannot fulfill redemption ${redemption.id}: Twitch client not initialized`)
     return
   }
 
-  for (let attempt = 1; attempt <= REDEMPTION_RETRY_ATTEMPTS; attempt++) {
-    try {
-      await twitchClient.updateRedemptionStatus(redemption, 'FULFILLED')
-      log.log(`Channel Points redemption fulfilled: ${redemption.id}`)
-      return
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error)
-
-      if (attempt === REDEMPTION_RETRY_ATTEMPTS) {
-        log.error(`Failed to fulfill redemption ${redemption.id} after ${attempt} attempts: ${reason}`)
-
-        // Mark as failed after exhausting retry attempts
-        try {
-          await twitchClient.updateRedemptionStatus(redemption, 'CANCELED')
-          log.log(`Channel Points redemption marked as failed/canceled: ${redemption.id}`)
-        } catch (cancelError) {
-          log.error(`Failed to mark redemption ${redemption.id} as failed: ${cancelError instanceof Error ? cancelError.message : cancelError}`)
-        }
-        return
-      }
-
-      const delay = REDEMPTION_RETRY_DELAY_MS * 2 ** (attempt - 1)
-
-      log.error(`Failed to fulfill redemption ${redemption.id} (attempt ${attempt}/${REDEMPTION_RETRY_ATTEMPTS}): ${reason}. Retrying in ${delay}ms`)
-
-      await wait(delay)
-    }
-  }
-}
-
-async function cancelRedemption(redemption: TwitchChannelPointsRedemption, twitchClient: TwitchClient | null, reason: FailureReason): Promise<void> {
-  const rejectionMessage = buildRedemptionRejectionMessage(redemption.user_name, reason)
-
-  if (!twitchClient) {
-    log.error(`Cannot cancel redemption ${redemption.id}: Twitch client not initialized`)
-    await replyInChat(rejectionMessage)
+  if (await setRedemptionStatus(redemption, twitchClient, 'FULFILLED')) {
+    log.log(`Channel Points redemption fulfilled: ${redemption.id}`)
     return
   }
 
-  try {
-    await twitchClient.updateRedemptionStatus(redemption, 'CANCELED')
-    log.log(`Channel Points redemption canceled (points refunded): ${redemption.id}`)
-  } catch (error) {
-    log.error(`Failed to cancel redemption ${redemption.id}, notifying chat only: ${error instanceof Error ? error.message : error}`)
+  // The track was played: refunding the points now would give the viewer the song for free.
+  // The redemption stays UNFULFILLED for the streamer or a moderator to close in the Twitch rewards queue
+  log.error(`Redemption ${redemption.id} was played but could not be fulfilled, it is left for a manual decision`)
+}
+
+async function cancelRedemption(redemption: TwitchChannelPointsRedemption, twitchClient: TwitchClient | null, reason: FailureReason): Promise<void> {
+  if (!twitchClient) {
+    log.error(`Cannot cancel redemption ${redemption.id}: Twitch client not initialized`)
+    await replyInChat(buildRedemptionRefundFailedMessage(redemption.user_name))
+    return
   }
 
-  await replyInChat(rejectionMessage)
+  // "points refunded" goes to chat only when Twitch confirmed it: the points stay held otherwise
+  if (await setRedemptionStatus(redemption, twitchClient, 'CANCELED')) {
+    log.log(`Channel Points redemption canceled (points refunded): ${redemption.id}`)
+    await replyInChat(buildRedemptionRejectionMessage(redemption.user_name, reason))
+    return
+  }
+
+  await replyInChat(buildRedemptionRefundFailedMessage(redemption.user_name))
 }
 
 export function isDeviceAuthorizationPending(): boolean {

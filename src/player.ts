@@ -1,28 +1,12 @@
-import { StateResponse, QueueItem, ActivityReasonCode, FailureReason } from './types.js'
+import { StateResponse, QueueItem, ActivityReasonCode } from './types.js'
 import { isBlocked } from './blocklist.js'
 import { logRejection, logFailure } from './activity.js'
 import { getQueue, getCurrent, getIsPaused, setCurrent, shiftQueue } from './queue.js'
 import { peekNextFallbackTrack, advanceFallback } from './fallback.js'
+import { finishItem } from './finish.js'
 import { createLogger } from './logger.js'
 
 const log = createLogger('PLAYER')
-
-// Set by the Twitch integration (if enabled) so a playback failure on a Channel Points track can
-// still be reported back to Twitch (refund the points, notify the requester) - player.ts stays
-// unaware of Twitch beyond this one hook, so it works the same with the integration off
-type ChannelPointsFailureHandler = (redemption: NonNullable<QueueItem['channelPointsRedemption']>, reason: FailureReason) => void
-let onChannelPointsPlaybackFailure: ChannelPointsFailureHandler | null = null
-
-export function registerChannelPointsPlaybackFailureHandler(handler: ChannelPointsFailureHandler | null): void {
-  onChannelPointsPlaybackFailure = handler
-}
-
-type ChannelPointsSuccessHandler = (redemption: NonNullable<QueueItem['channelPointsRedemption']>) => void
-let onChannelPointsPlaybackSuccess: ChannelPointsSuccessHandler | null = null
-
-export function registerChannelPointsPlaybackSuccessHandler(handler: ChannelPointsSuccessHandler | null): void {
-  onChannelPointsPlaybackSuccess = handler
-}
 
 export function getNextTrack(): QueueItem | null {
   return getQueue().find((item) => !isBlocked(item.videoId)) ?? peekNextFallbackTrack()
@@ -43,6 +27,7 @@ export function moveToNext(): QueueItem | null {
   while (next && isBlocked(next.videoId)) {
     log.log(`skipped blocked track in queue: "${next.title}"`)
     logRejection(next.requestedBy, next.title, 'BLOCKED', { title: next.title, videoId: next.videoId })
+    finishItem(next, { code: 'BLOCKED' })
     next = shiftQueue()
   }
 
@@ -71,6 +56,7 @@ export function skipIfCurrent(videoId: string): boolean {
   if (current?.videoId !== videoId) return false
 
   log.log(`current track was blocked, skipping: "${current.title}"`)
+  finishItem(current, { code: 'BLOCKED' })
   moveToNext()
   return true
 }
@@ -98,11 +84,7 @@ export function endCurrent(videoId?: string): boolean {
     return false
   }
 
-  const finished = getCurrent()
-  if (finished?.channelPointsRedemption) {
-    onChannelPointsPlaybackSuccess?.(finished.channelPointsRedemption)
-  }
-
+  finishItem(getCurrent(), 'played')
   moveToNext()
   return true
 }
@@ -121,9 +103,7 @@ export function reportPlaybackFailure(errorCode?: number, videoId?: string): boo
     log.error(`playback failed: "${failed.title}" (error ${errorCode ?? 'unknown'})`)
     logFailure(failed, reasonCode, errorCode !== undefined ? { errorCode } : undefined)
 
-    if (failed.channelPointsRedemption) {
-      onChannelPointsPlaybackFailure?.(failed.channelPointsRedemption, { code: reasonCode, params: { title: failed.title } })
-    }
+    finishItem(failed, { code: reasonCode })
   }
 
   moveToNext()
