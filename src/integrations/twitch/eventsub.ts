@@ -1,5 +1,5 @@
 import { CHANNEL_POINTS_REDEMPTION, type TwitchClient } from './client.js'
-import { ReconnectingSocket } from './socket.js'
+import { ReconnectingSocket, closeQuietly } from './socket.js'
 import type { EventSubMessage, TwitchChannelPointsRedemption } from './types.js'
 import { createLogger } from '../../logger.js'
 
@@ -74,6 +74,7 @@ export class TwitchEventSub extends ReconnectingSocket {
       log.log('Reconnected session: subscription carries over, not re-subscribing')
       this.isReconnect = false
       this.markReady()
+      this.watchKeepalive(message)
       return
     }
 
@@ -81,11 +82,19 @@ export class TwitchEventSub extends ReconnectingSocket {
       await this.config.client.subscribeToRedemptions(sessionId)
       log.log('Subscribed to Channel Points redemptions')
       this.markReady()
+      this.watchKeepalive(message)
     } catch (error) {
       const normalized = error instanceof Error ? error : new Error(String(error))
       this.abort(normalized)
       throw normalized
     }
+  }
+
+  // Twitch promises a message (a keepalive at the least) within keepalive_timeout_seconds; with a margin, silence means a dead session
+  private watchKeepalive(welcome: EventSubMessage): void {
+    const seconds = welcome.payload.session?.keepalive_timeout_seconds
+    const timeoutSeconds = typeof seconds === 'number' && seconds > 0 ? seconds : 10
+    this.startWatchdog(Math.max(timeoutSeconds * 1.5, 15) * 1000)
   }
 
   private async handleNotification(message: EventSubMessage): Promise<void> {
@@ -142,8 +151,7 @@ export class TwitchEventSub extends ReconnectingSocket {
       this.isReconnect = false
       this.scheduleReconnect()
     } finally {
-      oldSocket?.removeAllListeners()
-      oldSocket?.close()
+      if (oldSocket !== this.socket) closeQuietly(oldSocket)
     }
   }
 

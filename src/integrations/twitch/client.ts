@@ -17,6 +17,8 @@ import { createLogger } from '../../logger.js'
 
 const log = createLogger('TWITCH CLIENT')
 
+const REQUEST_TIMEOUT_MS = 15_000
+
 export const CHANNEL_POINTS_REDEMPTION = 'channel.channel_points_custom_reward_redemption.add'
 
 export class TwitchClient {
@@ -51,6 +53,7 @@ export class TwitchClient {
   private async request<T>(url: string, options: RequestInit, accessToken: string): Promise<Response> {
     return fetch(url, {
       ...options,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers: {
         ...options.headers,
         Authorization: `Bearer ${accessToken}`,

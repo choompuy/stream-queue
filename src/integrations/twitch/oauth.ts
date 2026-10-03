@@ -11,14 +11,26 @@ import type {
 
 const DEFAULT_SCOPES = ['chat:read', 'chat:edit', 'channel:manage:redemptions']
 const REFRESH_BUFFER_MS = 5 * 60 * 1000
-const POLL_REQUEST_TIMEOUT_MS = 10_000
+const REQUEST_TIMEOUT_MS = 15_000
 
 const log = createLogger('TWITCH OAUTH')
+
+const TOKEN_URL = 'https://id.twitch.tv/oauth2/token'
+
+function postForm(url: string, params: URLSearchParams): Promise<Response> {
+  return fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString(),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+  })
+}
 
 export class TwitchOAuth {
   private config: TwitchAuthConfig
   private tokenData: TwitchTokenData | null = null
   private refreshPromise: Promise<TwitchTokenData> | null = null
+  private authFailed = false
   private onTokenUpdated?: (tokenData: TwitchTokenData) => void
 
   constructor(config: TwitchOAuthOptions) {
@@ -48,13 +60,7 @@ export class TwitchOAuth {
     })
 
     try {
-      const response = await fetch('https://id.twitch.tv/oauth2/device', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: params.toString()
-      })
+      const response = await postForm('https://id.twitch.tv/oauth2/device', params)
 
       if (!response.ok) throw await this.createOAuthError(response, 'Device authorization failed')
 
@@ -82,25 +88,26 @@ export class TwitchOAuth {
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
       })
 
-      const response = await fetch('https://id.twitch.tv/oauth2/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: params.toString(),
-        signal: AbortSignal.timeout(POLL_REQUEST_TIMEOUT_MS)
-      })
+      let response: Response
+      try {
+        response = await postForm(TOKEN_URL, params)
+      } catch (error) {
+        // a dropped connection or a timeout while the user is still entering the code must not end the authorization
+        log.warn(`Device authorization poll failed, will retry: ${error instanceof Error ? error.message : error}`)
+        continue
+      }
 
       if (response.ok) {
         const data = (await response.json()) as TwitchTokenResponse
         this.tokenData = this.createTokenData(data)
+        this.authFailed = false
         this.onTokenUpdated?.(this.tokenData)
 
         log.log('Device authorization successful')
         return this.tokenData
       }
 
-      const error = (await response.json()) as TwitchErrorResponse
+      const error = (await response.json().catch(() => ({}))) as TwitchErrorResponse
       if (error.message === 'authorization_pending') continue
 
       if (error.message === 'slow_down') {
@@ -164,7 +171,13 @@ export class TwitchOAuth {
   clearTokenData(): void {
     this.tokenData = null
     this.refreshPromise = null
+    this.authFailed = false
     log.log('Token data cleared')
+  }
+
+  /** True once Twitch has refused the refresh token: the account has to be connected again. */
+  needsReauthorization(): boolean {
+    return this.authFailed
   }
 
   isAuthenticated(): boolean {
@@ -190,18 +203,18 @@ export class TwitchOAuth {
     })
 
     try {
-      const response = await fetch('https://id.twitch.tv/oauth2/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: params.toString()
-      })
+      const response = await postForm(TOKEN_URL, params)
 
-      if (!response.ok) throw await this.createOAuthError(response, 'Token refresh failed')
+      if (!response.ok) {
+        // Twitch refused the refresh token itself (expired after 30 days of a public client, revoked, password changed):
+        // retrying is pointless, the account has to be connected again. A network error or a 5xx is not that
+        if (response.status === 400 || response.status === 401) this.authFailed = true
+        throw await this.createOAuthError(response, 'Token refresh failed')
+      }
 
       const data = (await response.json()) as TwitchTokenResponse
       this.tokenData = this.createTokenData(data)
+      this.authFailed = false
       this.onTokenUpdated?.(this.tokenData)
       log.log('Token refresh successful')
       return this.tokenData

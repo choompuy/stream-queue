@@ -64,6 +64,7 @@ function applyStatus(status) {
   state.twitch.connected = Boolean(status?.connected)
   state.twitch.user = status?.user ?? null
   state.twitch.connectedAt = status?.connectedAt ?? null
+  state.twitch.health = status?.health ?? null
 }
 
 export function connectTwitch() {
@@ -159,6 +160,20 @@ export function loadTwitchSecrets() {
   })
 }
 
+// Shows what the plain "connected" label hides: a saved token Twitch no longer accepts, or a connection that is down
+function renderTwitchHealth(isConnected) {
+  const { health } = state.twitch
+  let key = ''
+
+  if (isConnected && health) {
+    if (health.auth === 'reauthorize') key = 'settings.twitch.healthReauthorize'
+    else if (!health.eventSub || !health.chat) key = 'settings.twitch.healthOffline'
+  }
+
+  setText(dom.twitchHealthWarning, key ? t(key) : '')
+  show(dom.twitchHealthWarning, Boolean(key))
+}
+
 export function renderTwitchConnection() {
   const { configured, connected, user } = state.twitch
 
@@ -171,6 +186,7 @@ export function renderTwitchConnection() {
   }
 
   const isConnected = Boolean(connected && user)
+  renderTwitchHealth(isConnected)
 
   setText(dom.twitchChanelName, isConnected ? '@' + user.displayName : t('settings.twitch.notConnected'))
   setClass(dom.twitchChanelName, 'text-green', isConnected)

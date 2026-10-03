@@ -1,11 +1,29 @@
 import WebSocket from 'ws'
 import type { createLogger } from '../../logger.js'
 
+/**
+ * Closes a socket that may still be connecting. ws emits 'error' when a CONNECTING socket is closed; with the listeners
+ * removed that error would be unhandled and take the whole process down, so an empty listener stays behind.
+ */
+export function closeQuietly(socket: WebSocket | null | undefined): void {
+  if (!socket) return
+
+  socket.removeAllListeners()
+  socket.on('error', () => {})
+
+  try {
+    socket.close()
+  } catch {
+    // already closed
+  }
+}
+
 export abstract class ReconnectingSocket {
   protected socket: WebSocket | null = null
   protected ready = false
   protected stopped = false
-  protected timing = { initialDelayMs: 5_000, maxDelayMs: 60_000, maxAttempts: 10, readyTimeoutMs: 10_000 }
+  // maxAttempts is unlimited on purpose: after a sleep or a network outage the connection must come back by itself, however long it took
+  protected timing = { initialDelayMs: 5_000, maxDelayMs: 60_000, maxAttempts: Infinity, readyTimeoutMs: 10_000 }
 
   protected abstract readonly log: ReturnType<typeof createLogger>
   protected abstract readonly url: string
@@ -18,6 +36,8 @@ export abstract class ReconnectingSocket {
   private connecting = false
   private attempts = 0
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private watchdogTimer: ReturnType<typeof setTimeout> | null = null
+  private watchdogMs = 0
   private pending: { promise: Promise<void>; resolve: () => void; reject: (error: Error) => void } | null = null
 
   async connect(): Promise<void> {
@@ -46,14 +66,17 @@ export abstract class ReconnectingSocket {
 
     const socket = this.socket
     this.socket = null
-    this.ready = false
-    this.onClosed()
+    this.teardown()
 
     if (!socket) return
 
-    socket.removeAllListeners()
-    socket.close()
+    closeQuietly(socket)
     this.log.log('Disconnected')
+  }
+
+  retryInBackground(): void {
+    this.stopped = false
+    this.scheduleReconnect()
   }
 
   isConnected(): boolean {
@@ -74,9 +97,40 @@ export abstract class ReconnectingSocket {
   protected dropSocket(): void {
     const socket = this.socket
     this.socket = null
+    this.teardown()
+    closeQuietly(socket)
+  }
+
+  private teardown(): void {
     this.ready = false
+    this.stopWatchdog()
     this.onClosed()
-    socket?.close()
+  }
+
+  /**
+   * Silence for longer than `ms` means the connection is dead even though the socket still looks open
+   * (sleep, a changed network): it is dropped and reconnected. Any incoming message counts as a sign of life.
+   */
+  protected startWatchdog(ms: number): void {
+    this.watchdogMs = ms
+    this.armWatchdog()
+  }
+
+  protected stopWatchdog(): void {
+    if (this.watchdogTimer) clearTimeout(this.watchdogTimer)
+    this.watchdogTimer = null
+    this.watchdogMs = 0
+  }
+
+  private armWatchdog(): void {
+    if (!this.watchdogMs) return
+    if (this.watchdogTimer) clearTimeout(this.watchdogTimer)
+
+    this.watchdogTimer = setTimeout(() => {
+      this.watchdogTimer = null
+      this.log.warn(`No data for ${Math.round(this.watchdogMs / 1000)}s, the connection is considered dead, reconnecting`)
+      this.restart()
+    }, this.watchdogMs)
   }
 
   protected restart(): void {
@@ -109,6 +163,8 @@ export abstract class ReconnectingSocket {
       })
 
       socket.on('message', (data) => {
+        if (this.socket === socket) this.armWatchdog()
+
         Promise.resolve()
           .then(() => this.onMessage(data.toString()))
           .catch((error) => this.log.error(`Failed to handle message: ${error instanceof Error ? error.message : error}`))
@@ -144,11 +200,6 @@ export abstract class ReconnectingSocket {
   protected scheduleReconnect(): void {
     if (this.stopped || this.reconnectTimer || this.connecting) return
 
-    if (this.attempts >= this.timing.maxAttempts) {
-      this.log.error(`Max reconnect attempts (${this.timing.maxAttempts}) reached, giving up`)
-      return
-    }
-
     const delay = Math.min(this.timing.initialDelayMs * 2 ** this.attempts, this.timing.maxDelayMs)
     this.attempts++
 
@@ -156,7 +207,7 @@ export abstract class ReconnectingSocket {
       this.reconnectTimer = null
 
       this.connect().catch((error) => {
-        this.log.error(`Reconnect failed (attempt ${this.attempts}/${this.timing.maxAttempts}): ${error instanceof Error ? error.message : error}`)
+        this.log.error(`Reconnect failed (attempt ${this.attempts}): ${error instanceof Error ? error.message : error}`)
         this.scheduleReconnect()
       })
     }, delay)
@@ -166,9 +217,8 @@ export abstract class ReconnectingSocket {
     if (this.socket !== socket) return
 
     this.socket = null
-    this.ready = false
     this.pending = null
-    this.onClosed()
+    this.teardown()
 
     if (this.stopped) return
 

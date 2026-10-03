@@ -29,6 +29,7 @@ export const state = {
     connected: false,
     user: null,
     connectedAt: null,
+    health: null,
     rewards: [],
     selectedRewardId: '',
     savedRewardId: '',
@@ -112,6 +113,7 @@ export const dom = {
 
   twitchNotConfigured: $('twitchNotConfigured'),
   twitchConnectionControls: $('twitchConnectionControls'),
+  twitchHealthWarning: $('twitchHealthWarning'),
   twitchAuthorization: $('twitchAuthorization'),
   twitchAuthorizationCode: $('twitchAuthorizationCode'),
   twitchChanel: $('twitchChanel'),

@@ -189,6 +189,8 @@
       "integration": "Twitch integration",
       "chanel": "Twitch channel",
       "notConnected": "Channel not linked",
+      "healthReauthorize": "Twitch no longer accepts the saved login. Disconnect and connect the account again.",
+      "healthOffline": "No live connection to Twitch right now (redemptions and chat commands are paused). Reconnecting automatically.",
       "connect": "Connect Twitch",
       "disconnect": "Disconnect",
       "disconnectConfirm": "Disconnect Twitch? Chat commands and Channel Points integrations will stop working",

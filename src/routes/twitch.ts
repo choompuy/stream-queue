@@ -2,7 +2,7 @@ import express from 'express'
 import { ok, asyncHandler, sendConfigUpdate } from '../http.js'
 import type { TwitchConnectionResponse, TwitchCreateCustomReward, TwitchUpdateCustomReward } from '../integrations/twitch/types.js'
 import { AppError } from '../types.js'
-import { startDeviceAuthorization, disconnect, refreshConnection, getClient } from '../integrations/twitch/index.js'
+import { startDeviceAuthorization, disconnect, refreshConnection, getClient, getTwitchHealth } from '../integrations/twitch/index.js'
 import { getTwitchConfig, updateTwitchConfig } from '../integrations/twitch/config.js'
 import { localOnly } from '../local-only.js'
 import { getPublicSecretsView } from '../secrets.js'
@@ -94,7 +94,7 @@ function validateRewardPayload(body: unknown, { requireTitleAndCost }: { require
 export const router = express.Router()
 
 router.get('/', (_req, res) => {
-  ok<TwitchConnectionResponse>(res, getPublicSecretsView().twitch)
+  ok<TwitchConnectionResponse>(res, { ...getPublicSecretsView().twitch, health: getTwitchHealth() })
 })
 
 router.get('/config', (_req, res) => {

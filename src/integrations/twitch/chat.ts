@@ -7,7 +7,10 @@ import { createLogger } from '../../logger.js'
 const log = createLogger('TWITCH CHAT')
 
 const IRC_WS_URL = 'wss://irc-ws.chat.twitch.tv:443'
-const PING_INTERVAL_MS = 4 * 60 * 1000
+const PING_INTERVAL_MS = 2 * 60 * 1000
+// Twitch answers our PING at once: no data at all for this long means the connection is dead
+const WATCHDOG_MS = PING_INTERVAL_MS + 60_000
+const MAX_MESSAGE_LENGTH = 500
 
 export type TwitchChatOptions = {
   oauth: TwitchOAuth
@@ -85,7 +88,11 @@ export class TwitchChat extends ReconnectingSocket {
       return
     }
 
-    this.socket.send(`PRIVMSG #${this.config.channelLogin} :${text}`)
+    // a line break would end the IRC command and let the rest be read as a new one; Twitch drops anything over 500 characters
+    const clean = text.replace(/[\r\n]+/g, ' ').trim().slice(0, MAX_MESSAGE_LENGTH)
+    if (!clean) return
+
+    this.socket.send(`PRIVMSG #${this.config.channelLogin} :${clean}`)
   }
 
   protected async beforeOpen(): Promise<void> {
@@ -110,6 +117,7 @@ export class TwitchChat extends ReconnectingSocket {
   // Twitch pings us already; our own ping keeps the connection alive through proxies that drop an idle socket
   private startPingLoop(): void {
     this.pingTimer ??= setInterval(() => this.socket?.send('PING :tmi.twitch.tv'), PING_INTERVAL_MS)
+    this.startWatchdog(WATCHDOG_MS)
   }
 
   // Twitch IRC frames may contain more than one line, each separated by \r\n

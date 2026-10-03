@@ -38,7 +38,7 @@ let oauth: TwitchOAuth | null = null
 let client: TwitchClient | null = null
 let eventSub: TwitchEventSub | null = null
 let chat: TwitchChat | null = null
-let deviceAuthorizationPromise: Promise<TwitchUserInfo> | null = null
+let deviceAuthorizationPromise: Promise<unknown> | null = null
 let deviceAuthorizationGeneration = 0
 const lastRun = { plainCooldownSeconds: 0, controlCooldownSeconds: 0 }
 
@@ -146,7 +146,12 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
 
 async function startEventSub(): Promise<void> {
   if (!oauth || !client) return
-  if (eventSub) return
+
+  // already created: if it is down (it gave up earlier, or the first connect failed) it is woken up, not replaced
+  if (eventSub) {
+    if (!eventSub.isConnected()) await eventSub.connect().catch(() => eventSub?.retryInBackground())
+    return
+  }
 
   if (!client.getCachedUserInfo()) {
     log.log('Twitch account not connected, EventSub will not start')
@@ -167,8 +172,9 @@ async function startEventSub(): Promise<void> {
     await eventSub.connect()
     log.log('Twitch EventSub connected')
   } catch (error) {
-    eventSub = null
-    log.error(`Failed to start EventSub: ${error instanceof Error ? error.message : error}`)
+    // without a network at startup the integration must not stay dead: the same instance keeps retrying by itself
+    log.error(`Failed to start EventSub, will keep retrying: ${error instanceof Error ? error.message : error}`)
+    eventSub.retryInBackground()
   }
 }
 
@@ -252,7 +258,11 @@ async function handleChatMessage(message: TwitchChatMessage): Promise<void> {
 
 async function startChat(): Promise<void> {
   if (!oauth || !client) return
-  if (chat) return
+
+  if (chat) {
+    if (!chat.isConnected()) await chat.connect().catch(() => chat?.retryInBackground())
+    return
+  }
 
   const userInfo = client.getCachedUserInfo()
   if (!userInfo) {
@@ -260,13 +270,8 @@ async function startChat(): Promise<void> {
     return
   }
 
-  const commands = getTwitchConfig().chatCommands
-  const anyEnabled = CHAT_COMMAND_KEYS.some((key) => commands[key].enabled)
-  if (!anyEnabled) {
-    chatLog.log('All chat commands disabled, chat will not start')
-    return
-  }
-
+  // Started whenever the account is connected, with or without enabled commands: the replies to redemptions
+  // (accepted, refunded) go through the chat too, and which commands react is decided per message
   chat = new TwitchChat({
     oauth,
     channelLogin: userInfo.login,
@@ -278,8 +283,8 @@ async function startChat(): Promise<void> {
     await chat.connect()
     chatLog.log('Twitch chat connected')
   } catch (error) {
-    chat = null
-    chatLog.error(`Failed to start chat: ${error instanceof Error ? error.message : error}`)
+    chatLog.error(`Failed to start chat, will keep retrying: ${error instanceof Error ? error.message : error}`)
+    chat.retryInBackground()
   }
 }
 
@@ -320,8 +325,13 @@ export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeRespon
       log.log(`Twitch account connected: ${userInfo.displayName}`)
       return userInfo
     })
+    // nobody awaits this promise: a refusal, an expired code or a cancel is logged here instead of becoming an unhandled rejection
+    .catch((error) => {
+      if (generation === deviceAuthorizationGeneration) log.error(`Twitch authorization failed: ${error instanceof Error ? error.message : error}`)
+      else log.log('Twitch authorization was cancelled')
+    })
     .finally(() => {
-      deviceAuthorizationPromise = null
+      if (generation === deviceAuthorizationGeneration) deviceAuthorizationPromise = null
     })
 
   return device
@@ -389,6 +399,21 @@ async function cancelRedemption(redemption: TwitchChannelPointsRedemption, twitc
   }
 
   await replyInChat(buildRedemptionRefundFailedMessage(redemption.user_name))
+}
+
+export type TwitchHealth = {
+  /** 'reauthorize': Twitch refused the saved token (a public client's refresh token lives 30 days), the account has to be connected again */
+  auth: 'ok' | 'reauthorize'
+  eventSub: boolean
+  chat: boolean
+}
+
+export function getTwitchHealth(): TwitchHealth {
+  return {
+    auth: oauth?.needsReauthorization() ? 'reauthorize' : 'ok',
+    eventSub: eventSub?.isConnected() ?? false,
+    chat: chat?.isConnected() ?? false
+  }
 }
 
 export function isDeviceAuthorizationPending(): boolean {
