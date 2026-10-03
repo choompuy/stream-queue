@@ -19,7 +19,10 @@ test('blockTrack()', async (t) => {
 
     assert.equal(isBlocked('aaaaaaaaaaa'), true)
     assert.equal(isBlocked('bbbbbbbbbbb'), true)
-    assert.deepEqual(getBlockedTracks().map((t) => t.videoId), ['bbbbbbbbbbb', 'aaaaaaaaaaa'])
+    assert.deepEqual(
+      getBlockedTracks().map((t) => t.videoId),
+      ['bbbbbbbbbbb', 'aaaaaaaaaaa']
+    )
   })
 
   await t.test('blocking the same id again is a no-op: no duplicate, no updated title or timestamp', () => {
@@ -54,15 +57,15 @@ test('blockTrack()', async (t) => {
     assert.equal(second.title, 'Title')
   })
 
-  await t.test('over the 100-entry limit, the oldest entries are evicted and forgotten by isBlocked too', () => {
-    for (let i = 0; i < 101; i++) blockTrack(`id${String(i).padStart(9, '0')}`, `Track ${i}`)
+  await t.test('over the 1000-entry limit, the oldest entries are evicted and forgotten by isBlocked too', () => {
+    for (let i = 0; i < 1001; i++) blockTrack(`id${String(i).padStart(9, '0')}`, `Track ${i}`)
 
     const tracks = getBlockedTracks()
-    assert.equal(tracks.length, 100)
-    // most recently blocked (id100) is kept, the very first one (id000) is evicted
-    assert.equal(tracks[0].videoId, 'id000000100')
+    assert.equal(tracks.length, 1000)
+    // most recently blocked (id1000) is kept, the very first one (id000) is evicted
+    assert.equal(tracks[0].videoId, 'id000001000')
     assert.equal(isBlocked('id000000000'), false)
-    assert.equal(isBlocked('id000000100'), true)
+    assert.equal(isBlocked('id000001000'), true)
   })
 })
 

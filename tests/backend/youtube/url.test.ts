@@ -17,6 +17,22 @@ test('isValidVideoId', async (t) => {
   })
 })
 
+test('parseYouTubeUrl: path formats', async (t) => {
+  await t.test('/live/<id> is a video link', () => {
+    assert.deepEqual(parseYouTubeUrl('https://www.youtube.com/live/dQw4w9WgXcQ'), { isYouTube: true, videoId: 'dQw4w9WgXcQ' })
+  })
+
+  await t.test('shorts, embed and v links work with a trailing slash or query', () => {
+    for (const path of ['shorts/dQw4w9WgXcQ', 'embed/dQw4w9WgXcQ/', 'v/dQw4w9WgXcQ?feature=x']) {
+      assert.equal(parseYouTubeUrl(`https://youtube.com/${path}`).videoId, 'dQw4w9WgXcQ', path)
+    }
+  })
+
+  await t.test('a longer segment is not cut down to its first 11 characters', () => {
+    assert.equal(parseYouTubeUrl('https://youtube.com/shorts/dQw4w9WgXcQXYZ123').videoId, null)
+  })
+})
+
 test('parseYouTubeUrl', async (t) => {
   await t.test('watch URL', () => {
     assert.deepEqual(parseYouTubeUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ'), {

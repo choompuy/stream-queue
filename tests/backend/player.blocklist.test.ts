@@ -29,7 +29,7 @@ function setFallback(ids: string[], repeat = false) {
   fallback.hydrateFallback({ sourceTracks: ids.map(song), order: ids, cursor: -1, playlistId: 'PLtest0000001', lastRefreshedAt: null })
   updateConfig({ fallbackPlaylist: { playlistId: 'PLtest0000001', enabled: true, shuffle: false, repeat } })
 }
-const enqueue = (...ids: string[]) => ids.forEach((id) => queue.addSong(song(id), 'viewer', true, true))
+const enqueue = (...ids: string[]) => ids.forEach((id) => queue.addSong(song(id), 'viewer', { bypassLimits: true }))
 const block = (...ids: string[]) => ids.forEach((id) => blocklist.blockTrack(id, `Track ${id}`))
 
 beforeEach(() => {

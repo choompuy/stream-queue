@@ -16,16 +16,19 @@ test('activity entry helpers', async (t) => {
   await t.test('logRejection: a request that was refused, with nulls for what is not known', () => {
     logRejection('bob', 'some query', 'SONG_NOT_FOUND')
 
-    assert.deepEqual({ ...last(), at: 0 }, {
-      requestedBy: 'bob',
-      query: 'some query',
-      title: null,
-      videoId: null,
-      status: 'rejected',
-      reasonCode: 'SONG_NOT_FOUND',
-      reasonParams: undefined,
-      at: 0
-    })
+    assert.deepEqual(
+      { ...last(), at: 0 },
+      {
+        requestedBy: 'bob',
+        query: 'some query',
+        title: null,
+        videoId: null,
+        status: 'rejected',
+        reasonCode: 'SONG_NOT_FOUND',
+        reasonParams: undefined,
+        at: 0
+      }
+    )
   })
 
   await t.test('logRejection: title, video and reason parameters are kept when known', () => {
@@ -45,11 +48,16 @@ test('activity entry helpers', async (t) => {
   })
 
   await t.test('logFailure: a queued track that could not be played, attributed to whoever requested it', () => {
-    logFailure({ videoId: 'ccccccccccc', title: 'Broken', channelTitle: '', thumbnail: '', duration: 1, views: 1, url: 'u', requestedBy: 'zed' }, 'PLAYBACK_EMBED_DISALLOWED', { errorCode: 101 })
+    logFailure(
+      { videoId: 'ccccccccccc', title: 'Broken', channelTitle: '', thumbnail: '', duration: 1, views: 1, url: 'u', requestedBy: 'zed' },
+      'PLAYBACK_EMBED_DISALLOWED',
+      { errorCode: 101 }
+    )
 
     assert.equal(last().status, 'failed')
     assert.equal(last().requestedBy, 'zed')
-    assert.equal(last().query, 'Broken')
+    // the title is in `title` already; `query` keeps what identifies the track
+    assert.equal(last().query, 'u')
     assert.deepEqual(last().reasonParams, { errorCode: 101 })
   })
 })

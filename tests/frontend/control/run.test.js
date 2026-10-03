@@ -37,9 +37,13 @@ test('run', async (t) => {
   })
 
   await t.test('a silent failure resolves to undefined without throwing', async () => {
-    const result = await run('doing a thing', () => {
-      throw new Error('boom')
-    }, { silent: true })
+    const result = await run(
+      'doing a thing',
+      () => {
+        throw new Error('boom')
+      },
+      { silent: true }
+    )
     assert.equal(result, undefined)
   })
 

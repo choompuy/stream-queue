@@ -186,4 +186,5 @@ export type TwitchConnectionResponse = {
   connected: boolean
   user: { displayName: string; login: string } | null
   connectedAt: number | null
+  health: { auth: 'ok' | 'reauthorize'; eventSub: boolean; chat: boolean }
 }

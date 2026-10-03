@@ -12,7 +12,15 @@ const { setCurrent } = await import('../../src/queue.js')
 const { onStateChange } = await import('../../src/state-events.js')
 
 const IDS = Array.from({ length: 12 }, (_, i) => `track${String(i).padStart(2, '0')}`)
-const song = (videoId: string) => ({ videoId, title: videoId, channelTitle: 'C', thumbnail: '', duration: 100, views: 1, url: `https://youtu.be/${videoId}` })
+const song = (videoId: string) => ({
+  videoId,
+  title: videoId,
+  channelTitle: 'C',
+  thumbnail: '',
+  duration: 100,
+  views: 1,
+  url: `https://youtu.be/${videoId}`
+})
 
 beforeEach(() => {
   setCurrent(null)
@@ -61,15 +69,24 @@ test('state persistence hooks', async (t) => {
   }
 
   await t.test('re-ordering the rotation is announced so it gets saved', () => {
-    assert.equal(countNotifications(() => fallback.reorderFallback(true)), 1)
+    assert.equal(
+      countNotifications(() => fallback.reorderFallback(true)),
+      1
+    )
   })
 
   await t.test('toggling shuffle is announced once', () => {
-    assert.equal(countNotifications(() => fallback.toggleFallbackShuffle()), 1)
+    assert.equal(
+      countNotifications(() => fallback.toggleFallbackShuffle()),
+      1
+    )
   })
 
   await t.test('clearing the fallback is announced, and leaves nothing to be saved but the empty state', () => {
-    assert.equal(countNotifications(() => fallback.clearFallback()), 1)
+    assert.equal(
+      countNotifications(() => fallback.clearFallback()),
+      1
+    )
     assert.deepEqual(fallback.getFallbackSnapshot().order, [])
     assert.equal(fallback.getFallbackSnapshot().playlistId, null)
   })

@@ -34,6 +34,20 @@ test('normalize', async (t) => {
   })
 })
 
+test('isoDurationToSeconds: live streams and long videos', async (t) => {
+  await t.test('P0D (a live stream or premiere without a length yet) is 0, not Infinity', () => {
+    assert.equal(isoDurationToSeconds('P0D'), 0)
+  })
+
+  await t.test('days are counted', () => {
+    assert.equal(isoDurationToSeconds('P1DT2H'), 93600)
+  })
+
+  await t.test('something that is not a duration is Infinity (out of any allowed range)', () => {
+    for (const value of ['', 'x', 'P', 'PT', 'PT5']) assert.equal(isoDurationToSeconds(value), Infinity, JSON.stringify(value))
+  })
+})
+
 test('isoDurationToSeconds', async (t) => {
   await t.test('minutes and seconds', () => {
     assert.equal(isoDurationToSeconds('PT4M13S'), 253)

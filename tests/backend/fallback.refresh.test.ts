@@ -31,10 +31,10 @@ function stubPlaylist(ids: string[]) {
     if (url.hostname !== 'www.googleapis.com') return realFetch(input, init)
 
     if (url.pathname.endsWith('/playlistItems')) {
-      return new Response(
-        JSON.stringify({ items: ids.map((id) => ({ snippet: { resourceId: { videoId: id } } })) }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({ items: ids.map((id) => ({ snippet: { resourceId: { videoId: id } } })) }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
     }
 
     // /videos

@@ -203,38 +203,37 @@ test('getPublicSecretsView()', async (t) => {
     process.env.TWITCH_CLIENT_ID = 'test_client_id'
   })
 
-  await t.test('a short key (8 chars or fewer) is fully masked, same length as the original', () => {
-    updateSecrets({ youtubeApiKey: 'abcd1234' }) // exactly 8
+  await t.test('a short key (4 chars or fewer) is fully masked, same length as the original', () => {
+    updateSecrets({ youtubeApiKey: 'abcd' })
     const view = getPublicSecretsView()
 
-    assert.equal(view.youtubeApiKey, '•'.repeat(8))
+    assert.equal(view.youtubeApiKey, '•'.repeat(4))
     assert.equal(view.hasYoutubeApiKey, true)
   })
 
-  await t.test('a key of 7 chars (just under the boundary) is also fully masked', () => {
-    updateSecrets({ youtubeApiKey: 'abcd123' })
-    assert.equal(getPublicSecretsView().youtubeApiKey, '•'.repeat(7))
+  await t.test('a key of 3 chars (just under the boundary) is also fully masked', () => {
+    updateSecrets({ youtubeApiKey: 'abc' })
+    assert.equal(getPublicSecretsView().youtubeApiKey, '•'.repeat(3))
   })
 
-  await t.test('a key of 9 chars (just over the boundary) shows first 4 and last 4, masking the middle', () => {
-    updateSecrets({ youtubeApiKey: 'abcd12345' })
-    assert.equal(getPublicSecretsView().youtubeApiKey, 'abcd•2345')
+  await t.test('a key of 5 chars (just over the boundary) shows only the last 4 characters', () => {
+    updateSecrets({ youtubeApiKey: 'abcde' })
+    assert.equal(getPublicSecretsView().youtubeApiKey, '•bcde')
   })
 
-  await t.test('a long, realistic-looking key never exposes more than its first and last 4 characters', () => {
+  await t.test('a long, realistic-looking key only exposes its last 4 characters', () => {
     const key = 'AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBc'
     updateSecrets({ youtubeApiKey: key })
     const view = getPublicSecretsView()
 
-    assert.equal(view.youtubeApiKey.startsWith(key.slice(0, 4)), true)
-    assert.equal(view.youtubeApiKey.endsWith(key.slice(-4)), true)
-    assert.equal(view.youtubeApiKey.slice(4, -4), '•'.repeat(key.length - 8))
-    assert.equal(view.youtubeApiKey.includes(key.slice(4, -4)), false, 'no middle segment of the real key should leak through')
+    assert.equal(view.youtubeApiKey, `${'•'.repeat(key.length - 4)}${key.slice(-4)}`)
+    assert.equal(view.youtubeApiKey.includes(key.slice(0, -4)), false)
   })
 
   await t.test('hasYoutubeApiKey reflects whether a key is set, independent of masking', () => {
     updateSecrets({ youtubeApiKey: 'x'.repeat(20) })
     const view = getPublicSecretsView()
+
     assert.equal(view.hasYoutubeApiKey, true)
     assert.equal(view.twitch.connected, false)
     assert.equal(view.twitch.user, null)
@@ -250,8 +249,9 @@ test('getPublicSecretsView()', async (t) => {
       expiresAt: Date.now() + 3600000,
       scope: ['channel:read:subscriptions']
     }
+
     updateTwitchOAuthState({ tokenData })
-    assert.equal(getPublicSecretsView().twitch.connected, false) // Still false without userInfo
+    assert.equal(getPublicSecretsView().twitch.connected, false)
   })
 
   await t.test('twitchConnected is true when both tokenData and userInfo are present', () => {
@@ -264,12 +264,14 @@ test('getPublicSecretsView()', async (t) => {
       expiresAt: Date.now() + 3600000,
       scope: ['channel:read:subscriptions']
     }
+
     const userInfo: TwitchUserInfo = {
       id: '12345',
       login: 'testuser',
       displayName: 'TestUser',
       profileImageUrl: 'https://example.com/avatar.jpg'
     }
+
     updateTwitchOAuthState({ tokenData, userInfo })
     assert.equal(getPublicSecretsView().twitch.connected, true)
   })
@@ -284,8 +286,10 @@ test('getPublicSecretsView()', async (t) => {
       displayName: 'TestUser',
       profileImageUrl: 'https://example.com/avatar.jpg'
     }
+
     updateTwitchOAuthState({ userInfo })
     const view = getPublicSecretsView()
+
     assert.equal(view.twitch.user?.displayName, 'TestUser')
     assert.equal(view.twitch.user?.login, 'testuser')
   })

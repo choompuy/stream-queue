@@ -8,6 +8,8 @@ const logged: string[] = []
 
 class TestSocket extends ReconnectingSocket {
   protected readonly log = {
+    debug: (m: string) => void logged.push(m),
+    info: (m: string) => void logged.push(m),
     log: (m: string) => void logged.push(m),
     warn: (m: string) => void logged.push(m),
     error: (m: string) => void logged.push(m)
@@ -115,15 +117,19 @@ test('ReconnectingSocket', async (t) => {
     }
   })
 
-  await t.test('stops after maxAttempts consecutive failures', async () => {
+  await t.test('never gives up: keeps retrying long after the old attempt limit', async () => {
     const { server, socket } = await connected()
     await socket.connect()
     logged.length = 0
 
     await server.stop() // nothing to reconnect to any more
-    await until(() => logged.some((line) => line.includes('giving up')), 'the socket to give up')
+    await until(() => logged.filter((line) => line.startsWith('Reconnect failed')).length >= 6, 'more failed attempts than the old limit of 3')
 
-    assert.equal(logged.filter((line) => line.startsWith('Reconnect failed')).length, 3)
+    assert.equal(
+      logged.some((line) => line.includes('giving up')),
+      false
+    )
+    await socket.disconnect() // stops the retries
   })
 
   await t.test('does not reconnect after disconnect(), and can be connected again afterwards', async () => {

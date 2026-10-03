@@ -26,17 +26,29 @@ const B = 'bbbbbbbbbbb'
 const C = 'ccccccccccc'
 const D = 'ddddddddddd'
 
-const song = (videoId: string) => ({ videoId, title: `Track ${videoId[0]}`, channelTitle: 'C', thumbnail: '', duration: 100, views: 1, url: `https://youtu.be/${videoId}` })
+const song = (videoId: string) => ({
+  videoId,
+  title: `Track ${videoId[0]}`,
+  channelTitle: 'C',
+  thumbnail: '',
+  duration: 100,
+  views: 1,
+  url: `https://youtu.be/${videoId}`
+})
 
 beforeEach(() => {
   queue.clearQueue()
   queue.setCurrent({ ...song(A), requestedBy: 'viewer' })
-  for (const id of [B, C, D]) queue.addSong(song(id), 'viewer', true, true)
+  for (const id of [B, C, D]) queue.addSong(song(id), 'viewer', { bypassLimits: true })
   clearActivity()
 })
 
 const post = (path: string, body?: unknown) =>
-  fetch(`${base}/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+  fetch(`${base}/${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  })
 const currentId = () => player.getState().current?.videoId
 
 test('POST /api/player/ended', async (t) => {

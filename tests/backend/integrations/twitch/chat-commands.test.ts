@@ -43,6 +43,7 @@ beforeEach(async () => {
   const { restoreTwitchConfig } = await import('../../../../src/integrations/twitch/config.js')
   restoreTwitchConfig({
     channelPointsRewardId: null,
+    autoFulfillRedemptions: false,
     chatCommands: {
       now: { enabled: true, command: '!sg now', permission: 'everyone' },
       queue: { enabled: true, command: '!sg queue', permission: 'everyone' },
