@@ -3,6 +3,7 @@ import cors from 'cors'
 import path from 'node:path'
 
 import { findAvailablePort } from './port.js'
+import { getServerConfig, updateServerConfig } from './server-config.js'
 import { getAppRoot, loadEnvFile } from './runtime.js'
 import { initState } from './state-file.js'
 import { runStartupTasks } from './startup.js'
@@ -72,7 +73,14 @@ async function main() {
     log.warn('Twitch integration disabled: TWITCH_CLIENT_ID is not set')
   }
 
-  PORT = await findAvailablePort(3000, 65535)
+  const preferredPort = getServerConfig().port
+  PORT = await findAvailablePort(preferredPort, 65535)
+
+  if (PORT !== preferredPort) {
+    // remembered, so the link does not change again on the next launch
+    log.warn(`Port ${preferredPort} is busy, using ${PORT} instead. The overlay URL in OBS is now http://localhost:${PORT}/overlay.html`)
+    updateServerConfig({ port: PORT })
+  }
 
   const server = app.listen(PORT, () => {
     log.log(`Server running on http://localhost:${PORT}`)

@@ -194,6 +194,7 @@ export async function requestSong(
     assertCanRequestSong(requestedBy, { addToQueue: currentSong !== null, bypassLimits: bypassFilters })
 
     const { isYouTube, videoId } = parseYouTubeUrl(query)
+    log.log(`[REQUEST] ${requestedBy} → ${videoId ? `YouTube URL: ${videoId}` : `Search: "${query}"`}`)
 
     if (isYouTube && !videoId) {
       log.log(`[REJECT] ${requestedBy} → INVALID_YOUTUBE_URL`)
@@ -204,10 +205,8 @@ export async function requestSong(
     if (videoId) {
       assertNotBlocked(videoId)
       assertNotDuplicate(videoId)
-      log.log(`[REQUEST] ${requestedBy} → YouTube URL: ${videoId}`)
       song = await getVideoById(videoId, bypassFilters)
     } else {
-      log.log(`[REQUEST] ${requestedBy} → Search: "${query}"`)
       const songs = await searchSongs(query, bypassFilters)
       song = selectBestSong(songs)
     }

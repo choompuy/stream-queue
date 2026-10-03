@@ -2,7 +2,7 @@ import { createConfigModule, field, rules, type Schema } from '../../config-help
 import { dataPath, deepMerge } from '../../persist.js'
 import type { TwitchChatCommandConfig, TwitchChatPermission, TwitchConfig } from './types.js'
 
-const COMMAND_PATTERN = /^![a-z0-9]+(?: [a-z0-9]+)*$/
+const COMMAND_PATTERN = /^![\p{L}\p{N}]+(?: [\p{L}\p{N}]+)*$/u
 const PERMISSIONS: TwitchChatPermission[] = ['everyone', 'moderator', 'broadcaster']
 
 export const CHAT_COMMAND_KEYS = ['now', 'queue', 'skip', 'pause', 'resume'] as const
@@ -56,8 +56,9 @@ export const {
 
     const stored = current.chatCommands
     const merged = deepMerge(stored, clean.chatCommands)
+    const overlaps = (a: string, b: string) => a === b || a.startsWith(`${b} `) || b.startsWith(`${a} `)
     const collides = (key: (typeof CHAT_COMMAND_KEYS)[number]) =>
-      CHAT_COMMAND_KEYS.some((other) => other !== key && merged[other].command === merged[key].command)
+      CHAT_COMMAND_KEYS.some((other) => other !== key && overlaps(merged[other].command, merged[key].command))
 
     for (let pass = 0; pass < CHAT_COMMAND_KEYS.length; pass++) {
       const conflicting = CHAT_COMMAND_KEYS.filter((key) => collides(key) && merged[key].command !== stored[key].command)

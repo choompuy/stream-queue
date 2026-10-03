@@ -250,6 +250,7 @@ async function handleChatMessage(message: TwitchChatMessage): Promise<void> {
     const { enabled, command, permission } = commands[key]
     if (!enabled || !matchesCommand(message.text, command) || !hasPermission(message, permission)) continue
 
+    chatLog.log(`Command "${command}" from ${message.displayName}`)
     const { cooldown, run } = COMMANDS[key]
     await runCommand(message, cooldown, commands[cooldown], run)
     return

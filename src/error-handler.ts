@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 import { fail, failFromError } from './http.js'
 import { AppError } from './types.js'
-import { createLogger } from './logger.js'
+import { createLogger, describeError } from './logger.js'
 
 const log = createLogger('SERVER')
 
@@ -30,6 +30,6 @@ export function errorHandler(err: HttpError, _req: Request, res: Response, next:
   const status = err.status ?? err.statusCode
   if (typeof status === 'number' && status >= 400 && status < 500) return fail(res, 'bad request', 'INVALID_REQUEST', status)
 
-  log.error(err.message)
+  log.error(describeError(err, true))
   fail(res, 'internal server error', 'SERVER_ERROR', 500)
 }

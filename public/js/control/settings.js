@@ -43,10 +43,16 @@ export function saveOverlaySettings() {
     setError(dom.overlayOpacity, false)
     setError(dom.badgePosition, false)
 
+    const opacity = Number.parseInt(dom.overlayOpacity?.value, 10)
+    if (dom.overlayOpacity && Number.isNaN(opacity)) {
+      setError(dom.overlayOpacity)
+      return
+    }
+
     try {
       state.settings.showVideo = dom.showVideo?.checked ?? state.settings.showVideo
       state.settings.hideOverlayInfo = dom.hideOverlayInfo?.checked ?? state.settings.hideOverlayInfo
-      state.settings.opacity = parseInt(dom.overlayOpacity?.value) || state.settings.opacity
+      state.settings.opacity = dom.overlayOpacity ? opacity : state.settings.opacity
       state.settings.position = dom.badgePosition?.value ?? state.settings.position
       await api.updateSettings(state.settings)
       syncPlayer()

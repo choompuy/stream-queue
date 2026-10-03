@@ -176,7 +176,7 @@ export class TwitchChat extends ReconnectingSocket {
       isBroadcaster
     }
 
-    log.log(`${message.displayName}: ${message.text}`)
+    log.debug(`${message.displayName}: ${message.text}`)
 
     void Promise.resolve(this.config.onMessage?.(message)).catch((error) => {
       log.error(`Chat message handler failed: ${error instanceof Error ? error.message : error}`)

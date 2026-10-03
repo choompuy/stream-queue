@@ -60,7 +60,8 @@ const STATUS_BY_CODE: Record<AppErrorCode, number> = {
   NOT_PLAYABLE: 404,
   IS_LIVE: 404,
   IS_SHORT: 404,
-  INVALID_INPUT: 400
+  INVALID_INPUT: 400,
+  INVALID_REWARD: 400
 }
 
 export type ErrorInfo = { code: string; status: number; message: string; params?: Record<string, string | number> }

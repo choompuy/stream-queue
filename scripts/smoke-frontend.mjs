@@ -7,7 +7,7 @@ import assert from 'node:assert/strict'
 
 const ROOT = fileURLToPath(new URL('../public', import.meta.url))
 const html = readFileSync(`${ROOT}/index.html`, 'utf8').replace(/<script[^>]*><\/script>/g, '')
-const dom = new JSDOM(html, { url: 'http://localhost:3000/' })
+const dom = new JSDOM(html, { url: 'http://localhost:4747/' })
 const { window } = dom
 
 globalThis.window = window
@@ -29,7 +29,7 @@ const routes = {
   'GET /api/settings': () => ({ showVideo: true, position: 'bottom-right' }),
   'GET /api/config': () => ({ maxQueueSize: 20, fallbackPlaylist: { playlistId: 'PL1' } }),
   'GET /api/secrets': () => ({ hasYoutubeApiKey: true }),
-  'GET /api/network-info': () => ({ ips: ['192.168.0.2'], port: 3000 }),
+  'GET /api/network-info': () => ({ ips: ['192.168.0.2'], port: 4747 }),
   'GET /api/activity': () => ({
     entries: [
       { at: Date.now(), videoId: V('a'), title: 'A $$ "quoted" & <b>', query: 'q', status: 'accepted', requestedBy: 'bob', reasonCode: null },

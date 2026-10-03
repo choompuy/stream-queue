@@ -85,7 +85,7 @@ internal sealed class TrayContext : ApplicationContext
 
     private void OpenPanel()
     {
-        var port = _server.Port ?? 3000;
+        var port = _server.Port ?? 4747;
         OpenUrl($"http://localhost:{port}");
     }
 

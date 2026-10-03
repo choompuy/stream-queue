@@ -24,56 +24,60 @@ function requireClient() {
 
 type RewardPayload = TwitchCreateCustomReward | TwitchUpdateCustomReward
 
+// The message is for the log (English); the panel shows the translated INVALID_REWARD text with the name of the field
+function invalid(field: string, detail: string): never {
+  throw new AppError('INVALID_REWARD', detail, { field })
+}
+
+const isPositiveInteger = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 1
+
+function optional<T>(field: string, value: unknown, isValid: (v: unknown) => v is T, detail: string): T | undefined {
+  if (value === undefined) return undefined
+  if (!isValid(value)) invalid(field, detail)
+  return value as T
+}
+
+const isString = (value: unknown): value is string => typeof value === 'string'
+const isBoolean = (value: unknown): value is boolean => typeof value === 'boolean'
+
 function validateRewardPayload(body: unknown, { requireTitleAndCost }: { requireTitleAndCost: boolean }): RewardPayload {
-  const {
-    title,
-    cost,
-    prompt,
-    is_enabled,
-    background_color,
-    is_max_per_stream_enabled,
-    max_per_stream,
-    is_max_per_user_per_stream_enabled,
-    max_per_user_per_stream,
-    is_global_cooldown_enabled,
-    global_cooldown_seconds
-  } = (body ?? {}) as Record<string, unknown>
+  const input = (body ?? {}) as Record<string, unknown>
+
+  const title = optional('title', input.title, isString, 'Title must be a string')?.trim()
+  const cost = optional('cost', input.cost, isPositiveInteger, 'Cost must be a whole number greater than 0')
 
   if (requireTitleAndCost) {
-    if (!title || typeof title !== 'string') throw new AppError('INVALID_INPUT', 'Title is required')
-    if (!cost || typeof cost !== 'number' || cost < 1) throw new AppError('INVALID_INPUT', 'Cost must be a number greater than 0')
-  } else {
-    if (title !== undefined && typeof title !== 'string') throw new AppError('INVALID_INPUT', 'Title must be a string')
-    if (cost !== undefined && (typeof cost !== 'number' || cost < 1)) throw new AppError('INVALID_INPUT', 'Cost must be a number greater than 0')
+    if (!title) invalid('title', 'Title is required')
+    if (cost === undefined) invalid('cost', 'Cost is required')
+  } else if (title !== undefined && !title) {
+    invalid('title', 'Title must not be empty')
   }
 
-  if (title !== undefined && (title as string).length > 45) {
-    throw new AppError('INVALID_INPUT', 'Title must be 45 characters or less')
+  if (title !== undefined && title.length > 45) invalid('title', 'Title must be 45 characters or less')
+
+  const prompt = optional('prompt', input.prompt, isString, 'Prompt must be a string')
+  if (prompt !== undefined && prompt.length > 140) invalid('prompt', 'Prompt must be 140 characters or less')
+
+  const background_color = optional('background_color', input.background_color, isString, 'Background color must be a string')
+  if (background_color !== undefined && !/^#[0-9A-Fa-f]{6}$/.test(background_color)) {
+    invalid('background_color', 'Background color must be a 6-character hex code (e.g., #00FF00)')
   }
 
-  if (prompt !== undefined && typeof prompt === 'string' && prompt.length > 140) {
-    throw new AppError('INVALID_INPUT', 'Prompt must be 140 characters or less')
-  }
+  const is_enabled = optional('is_enabled', input.is_enabled, isBoolean, 'is_enabled must be true or false')
+  const is_max_per_stream_enabled = optional('is_max_per_stream_enabled', input.is_max_per_stream_enabled, isBoolean, 'Must be true or false')
+  const is_max_per_user_per_stream_enabled = optional(
+    'is_max_per_user_per_stream_enabled',
+    input.is_max_per_user_per_stream_enabled,
+    isBoolean,
+    'Must be true or false'
+  )
+  const is_global_cooldown_enabled = optional('is_global_cooldown_enabled', input.is_global_cooldown_enabled, isBoolean, 'Must be true or false')
 
-  if (background_color !== undefined && typeof background_color === 'string') {
-    if (!/^#[0-9A-Fa-f]{6}$/.test(background_color)) {
-      throw new AppError('INVALID_INPUT', 'Background color must be a 6-character hex code (e.g., #00FF00)')
-    }
-  }
-
-  if (is_max_per_stream_enabled && (typeof max_per_stream !== 'number' || max_per_stream < 1)) {
-    throw new AppError('INVALID_INPUT', 'Max per stream must be a number greater than 0 when enabled')
-  }
-
-  if (is_max_per_user_per_stream_enabled && (typeof max_per_user_per_stream !== 'number' || max_per_user_per_stream < 1)) {
-    throw new AppError('INVALID_INPUT', 'Max per user per stream must be a number greater than 0 when enabled')
-  }
-
-  if (
-    is_global_cooldown_enabled &&
-    (typeof global_cooldown_seconds !== 'number' || !Number.isInteger(global_cooldown_seconds) || global_cooldown_seconds < 1)
-  ) {
-    throw new AppError('INVALID_INPUT', 'Global cooldown must be an integer greater than 0 when enabled')
+  // a limit is a whole number greater than 0 whenever it is given, and has to be given when its switch is on
+  const limit = (field: string, enabled: boolean | undefined): number | undefined => {
+    const value = optional(field, input[field], isPositiveInteger, 'Must be a whole number greater than 0')
+    if (enabled && value === undefined) invalid(field, 'Must be set when enabled')
+    return value
   }
 
   return {
@@ -83,11 +87,11 @@ function validateRewardPayload(body: unknown, { requireTitleAndCost }: { require
     is_enabled,
     background_color,
     is_max_per_stream_enabled,
-    max_per_stream,
+    max_per_stream: limit('max_per_stream', is_max_per_stream_enabled),
     is_max_per_user_per_stream_enabled,
-    max_per_user_per_stream,
+    max_per_user_per_stream: limit('max_per_user_per_stream', is_max_per_user_per_stream_enabled),
     is_global_cooldown_enabled,
-    global_cooldown_seconds
+    global_cooldown_seconds: limit('global_cooldown_seconds', is_global_cooldown_enabled)
   } as RewardPayload
 }
 

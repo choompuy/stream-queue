@@ -70,7 +70,7 @@ npm install
 npm run dev
 ```
 
-The server picks a free port starting at `3000`. Configure the YouTube API key from the web control panel; it is stored locally and takes effect without a restart.
+The server uses port `4747`; if it is busy, the next free port is taken and remembered, so the overlay link stays the same afterwards. To pick another port, edit `data/server.json`. Configure the YouTube API key from the web control panel; it is stored locally and takes effect without a restart.
 
 ### Build the standalone Windows executable
 

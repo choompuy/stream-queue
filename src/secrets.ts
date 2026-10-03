@@ -1,7 +1,7 @@
 import { dataPath, createFileStore } from './persist.js'
 import { field, validateUpdates, type FieldRule, type Schema } from './config-helper.js'
 import { createLogger, describeError } from './logger.js'
-import type { TwitchSecrets, TwitchTokenData, TwitchUserInfo } from './types.js'
+import { AppError, type TwitchSecrets, type TwitchTokenData, type TwitchUserInfo } from './types.js'
 
 export type Secrets = {
   youtubeApiKey: string
@@ -64,7 +64,7 @@ const TWITCH_SCHEMA: Schema = {
 
 function checked(schema: Schema, updates: unknown): Record<string, unknown> {
   const { clean, rejected } = validateUpdates(schema, updates)
-  if (rejected.length) throw new Error(`invalid secrets: ${rejected.join(', ')}`)
+  if (rejected.length) throw new AppError('INVALID_INPUT', `invalid secrets: ${rejected.join(', ')}`, { fields: rejected.join(', ') })
   return clean
 }
 

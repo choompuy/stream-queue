@@ -15,7 +15,7 @@ export function run(label, action, { button = null, silent = false, onError = nu
       return await action()
     } catch (error) {
       log(`Error ${label}:`, error)
-      if (!silent && error instanceof ApiError) toastError(errorMessage(error))
+      if (!silent) toastError(error instanceof ApiError ? errorMessage(error) : t('api.errors.unexpectedError'))
       await onError?.(error)
       return undefined
     }

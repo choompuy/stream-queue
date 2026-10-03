@@ -123,6 +123,7 @@ export type AppErrorCode =
   | 'TWITCH_NOT_CONNECTED'
   | 'TWITCH_API_ERROR'
   | 'INVALID_INPUT'
+  | 'INVALID_REWARD'
   | FilterFailureReason
 
 // A reason a song request or an already-queued track's playback failed, with whatever the reason needs
@@ -135,7 +136,6 @@ export type ApiErrorCode =
   | 'INVALID_QUERY'
   | 'INVALID_VIDEO_ID'
   | 'USERNAME_REQUIRED'
-  | 'INVALID_INDEX'
   | 'QUEUE_ITEM_NOT_FOUND'
   | 'NOT_FOUND'
   | 'INVALID_PLAYLIST_ID'
