@@ -14,7 +14,17 @@ let playerGeneration = 0
 const log = createLogger('PREVIEW')
 
 const isPlaybackSource = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
-let fetchInFlight = false
+
+const REQUEST_TIMEOUT_MS = 8000
+const STALE_POLL_MS = 15000
+let fetchStartedAt = 0
+
+// The YouTube player reports error 5 for a problem of the player itself (not of the video); a retry usually fixes it
+const TEMPORARY_PLAYER_ERROR = 5
+const MAX_TEMPORARY_ERROR_RETRIES = 2
+const temporaryErrorRetries = new Map()
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const dom = {
   nowPlayingVideo: $('nowPlayingVideo'),
@@ -30,11 +40,12 @@ const dom = {
 }
 
 async function fetchOverlayState() {
-  if (fetchInFlight) return
-  fetchInFlight = true
+  if (fetchStartedAt && Date.now() - fetchStartedAt < STALE_POLL_MS) return
+  const startedAt = Date.now()
+  fetchStartedAt = startedAt
 
   try {
-    const response = await fetch('/api/overlay-state')
+    const response = await fetch('/api/overlay-state', { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
     if (!response.ok) throw new Error(`overlay-state request failed: ${response.status}`)
 
     const body = await response.json()
@@ -50,7 +61,7 @@ async function fetchOverlayState() {
   } catch (error) {
     log('Error fetching settings:', error)
   } finally {
-    fetchInFlight = false
+    if (fetchStartedAt === startedAt) fetchStartedAt = 0
   }
 }
 
@@ -107,6 +118,7 @@ function renderState() {
   if (renderedVideoId !== videoId) {
     renderedVideoId = videoId
     reportedFailureVideoId = null
+    temporaryErrorRetries.clear()
   }
 
   const currentVideoId = player.getVideoData()?.video_id
@@ -164,36 +176,77 @@ function updateProgress() {
   setText(dom.elapsedTime, `${formatDuration(Math.floor(currentTime))} / ${formatDuration(duration)}`)
 }
 
-async function notifyEnded(videoId) {
-  try {
-    await fetch('/api/player/ended', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ videoId })
-    })
-    await fetchOverlayState()
-  } catch (error) {
-    log('Error notifying ended:', error)
+// The server only listens to these two reports, so a lost one stalls the whole queue: they are retried until they get through.
+// Repeating is safe, the server ignores a report about a track that is no longer the current one.
+// It stops early when the server is seen to have moved on to another track, and on a refusal that a retry cannot fix.
+async function postWithRetry(url, body, videoId) {
+  const movedOn = () => currentState?.current?.videoId !== videoId
+
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+      })
+
+      if (response.ok) return true
+
+      if (response.status < 500 && response.status !== 429) {
+        log(`${url} was refused with ${response.status}, not retrying`)
+        return false
+      }
+
+      log(`${url} failed with ${response.status}`)
+    } catch (error) {
+      log(`${url} failed:`, error)
+    }
+
+    if (movedOn()) return false
+
+    await sleep(Math.min(500 * 2 ** Math.min(attempt, 6), 15000))
+    if (movedOn()) return false
   }
 }
 
-async function reportFailure(errorCode, videoId) {
-  try {
-    await fetch('/api/player/report-failure', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ errorCode, videoId })
-    })
+async function notifyEnded(videoId) {
+  await postWithRetry('/api/player/ended', { videoId }, videoId)
+  await fetchOverlayState()
+}
 
-    await fetchOverlayState()
+async function reportFailure(errorCode, videoId) {
+  if (await postWithRetry('/api/player/report-failure', { errorCode, videoId }, videoId)) {
     log(`Playback failure reported for ${videoId}`)
-  } catch (error) {
-    log('Error reporting playback failure:', error)
   }
+
+  await fetchOverlayState()
+}
+
+// Returns true when a retry has been scheduled, so the failure is not reported yet
+function retryTemporaryError(errorCode, videoId, generation) {
+  if (errorCode !== TEMPORARY_PLAYER_ERROR) return false
+
+  const retries = temporaryErrorRetries.get(videoId) ?? 0
+  if (retries >= MAX_TEMPORARY_ERROR_RETRIES) return false
+
+  temporaryErrorRetries.set(videoId, retries + 1)
+  log(`Temporary player error, retry ${retries + 1}/${MAX_TEMPORARY_ERROR_RETRIES} for ${videoId}`)
+
+  setTimeout(
+    () => {
+      const stillCurrent = generation === playerGeneration && player && currentState?.current?.videoId === videoId
+      if (!stillCurrent) return
+
+      if (currentState.isPaused) player.cueVideoById(videoId)
+      else player.loadVideoById(videoId)
+    },
+    2000 * (retries + 1)
+  )
+
+  return true
 }
 
 function onPlayerReady(event) {
@@ -232,6 +285,8 @@ function onPlayerError(event) {
     log(`Ignoring duplicate error for video: ${videoId}`)
     return
   }
+
+  if (retryTemporaryError(event.data, videoId, playerGeneration)) return
 
   reportedFailureVideoId = videoId
   const generation = playerGeneration
@@ -314,16 +369,29 @@ async function resetPlayer() {
   createPlayer()
 }
 
+// OBS often starts before the network is up: a failed load of the API script is retried, with growing pauses, until it works
+function loadYouTubeApi(attempt = 0) {
+  const tag = document.createElement('script')
+  tag.src = 'https://www.youtube.com/iframe_api'
+
+  tag.onerror = () => {
+    tag.remove()
+    const delay = Math.min(2000 * 2 ** Math.min(attempt, 5), 30000)
+    log(`YouTube API failed to load, retrying in ${delay / 1000}s`)
+    setTimeout(() => loadYouTubeApi(attempt + 1), delay)
+  }
+
+  const firstScriptTag = document.getElementsByTagName('script')[0]
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag)
+}
+
 if (isPlaybackSource) {
   window.onYouTubeIframeAPIReady = () => {
     log('YouTube API ready')
     createPlayer()
   }
 
-  const tag = document.createElement('script')
-  tag.src = 'https://www.youtube.com/iframe_api'
-  const firstScriptTag = document.getElementsByTagName('script')[0]
-  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag)
+  loadYouTubeApi()
 } else {
   log('Non-localhost origin: read-only widget, no embedded player')
   dom.nowPlayingVideo.classList.add('hidden')

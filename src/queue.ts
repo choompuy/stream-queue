@@ -142,6 +142,10 @@ export function setCurrent(item: QueueItem | null): void {
   notifyStateChange()
 }
 
+export function removeByVideoId(videoId: string): QueueItem | null {
+  return removeAt(queue.findIndex((item) => item.videoId === videoId))
+}
+
 export function removeAt(index: number): QueueItem | null {
   if (index < 0 || index >= queue.length) {
     return null
@@ -230,6 +234,7 @@ export async function requestSong(
 
     return { outcome: 'added', added: { song: item, started: wasEmpty, position } }
   } catch (error) {
+    // an expected refusal (duplicate, limit, filter) is routine; anything else is a bug or an outage and keeps its details
     if (error instanceof AppError) log.log(`[REJECT] ${requestedBy} → ${error.code}`)
     else log.error(`[REJECT] ${requestedBy} → unexpected error while adding song: ${describeError(error, true)}`)
 

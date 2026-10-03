@@ -43,9 +43,9 @@ export function renderQueue() {
   views.queue.render(selectors.markBlocked(state.queue))
 }
 
-export function removeFromQueue(index) {
+export function removeFromQueue(videoId) {
   return run('removing from queue', async () => {
-    await api.removeFromQueue(index)
+    await api.removeFromQueue(videoId)
     await refreshState()
     toastSuccess(t('toast.removedFromQueue'))
   })
@@ -65,6 +65,6 @@ export async function clearQueue() {
 }
 
 export const queueActions = {
-  'queue-remove': (element) => removeFromQueue(Number(element.dataset.index)),
+  'queue-remove': (element) => removeFromQueue(element.dataset.videoId),
   'clear-queue': clearQueue
 }

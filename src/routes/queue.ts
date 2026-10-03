@@ -4,7 +4,8 @@ import { ok, fail, failFromReason, asyncHandler } from '../http.js'
 import { isLoopbackAddress } from '../local-only.js'
 import { createRateLimiter } from '../rate-limit.js'
 import { translateWithFallback } from '../i18n.js'
-import { requestSong, removeAt, clearQueue } from '../queue.js'
+import { requestSong, removeByVideoId, clearQueue } from '../queue.js'
+import { isValidVideoId } from '../youtube/url.js'
 import { getState } from '../player.js'
 
 export const router = express.Router()
@@ -51,14 +52,14 @@ router.post(
   })
 )
 
-router.delete('/:index', (req, res) => {
-  const index = Number(req.params.index)
+router.delete('/video/:videoId', (req, res) => {
+  const { videoId } = req.params
 
-  if (!Number.isInteger(index) || index < 0) {
-    return fail(res, 'invalid index', 'INVALID_INDEX', 400)
+  if (!isValidVideoId(videoId)) {
+    return fail(res, 'a valid videoId is required', 'INVALID_VIDEO_ID', 400)
   }
 
-  const removed = removeAt(index)
+  const removed = removeByVideoId(videoId)
 
   if (!removed) {
     return fail(res, 'queue item not found', 'QUEUE_ITEM_NOT_FOUND', 404)

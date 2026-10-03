@@ -24,7 +24,7 @@ export const queueView = createListView(dom.queueListWrapper, {
         ? unblockTrackItem(item.videoId)
         : rowMenu([
             blockTrackItem(item.videoId, item.title),
-            { action: 'queue-remove', data: { index }, icon: DELETE_ICON, label: t('queue.remove'), danger: true }
+            { action: 'queue-remove', data: { videoId: item.videoId }, icon: DELETE_ICON, label: t('queue.remove'), danger: true }
           ]),
       attributes: `data-queue-index="${index}"`
     })

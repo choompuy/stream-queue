@@ -69,7 +69,7 @@ export const api = {
   getState: () => request('/api/state'),
   search: (query) => request(`/api/search?q=${id(query)}&admin=1`),
   requestSong: (query) => post('/api/queue/request', { query, requestedBy: 'ControlPanel', admin: true }),
-  removeFromQueue: (index) => del(`/api/queue/${index}`),
+  removeFromQueue: (videoId) => del(`/api/queue/video/${id(videoId)}`),
   clearQueue: () => post('/api/queue/clear'),
 
   skip: () => post('/api/player/skip'),
