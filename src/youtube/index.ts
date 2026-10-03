@@ -8,6 +8,7 @@ import {
   fetchPlaylistMeta,
   PlaylistMeta,
   VIDEO_DETAILS_PART,
+  MUSIC_CATEGORY_ID,
   PlaylistFetchResult
 } from './client.js'
 import { normalize, combinedScore, formatViews } from './scoring.js'
@@ -52,7 +53,7 @@ function dedupInFlight<T>(pending: Map<string, Promise<T>>, key: string, run: ()
 
 function filtersVersion(): string {
   const c = getConfig()
-  return `${c.minViews}:${c.minDurationSeconds}:${c.maxDurationSeconds}:${c.regionCode}:${c.allowShorts}:${c.allowLiveStreams}`
+  return `${c.minViews}:${c.minDurationSeconds}:${c.maxDurationSeconds}:${c.regionCode}:${c.allowShorts}:${c.allowLiveStreams}:${c.contentMode}`
 }
 
 export async function getVideoById(videoId: string, bypassFilters = false): Promise<Song | null> {
@@ -141,7 +142,8 @@ async function performSearch(query: string, bypassFilters: boolean): Promise<Son
       part: 'snippet',
       q: query,
       type: 'video',
-      videoCategoryId: '10',
+      // 'any' searches every category; clips filed outside Music are reachable by link only in 'music' mode
+      ...(getConfig().contentMode === 'music' ? { videoCategoryId: MUSIC_CATEGORY_ID } : {}),
       videoEmbeddable: 'true',
       videoSyndicated: 'true',
       maxResults: '20',
@@ -178,13 +180,15 @@ async function performSearch(query: string, bypassFilters: boolean): Promise<Son
   })
 }
 
-export function selectBestSong(songs: Song[], query: string): Song | null {
-  if (!songs.length) {
-    return null
-  }
+/**
+ * The best match of a result list from searchSongs(). That list is already sorted best-first by the score that also
+ * counts YouTube's own relevance rank, which is only known during the search: scoring the songs again here, without
+ * it, could pick a different track than the one the list shows first.
+ */
+export function selectBestSong(songs: Song[]): Song | null {
+  const selected = songs[0]
+  if (!selected) return null
 
-  const ranked = songs.map((song) => ({ song, score: combinedScore(song, query) })).sort((a, b) => b.score - a.score)
-  const selected = ranked[0].song
   debugLog(`[SELECT] "${selected.title}" - ${formatViews(selected.views)} views`)
   return selected
 }
@@ -223,12 +227,6 @@ async function performPlaylistFetch(playlistId: string): Promise<PlaylistFetchRe
     do {
       page++
 
-      if (page >= MAX_PLAYLIST_PAGES) {
-        log.warn(`Playlist: maximum page limit reached (${MAX_PLAYLIST_PAGES}), stopping`)
-        truncated = true
-        break
-      }
-
       if (pageToken) {
         if (seenPageTokens.has(pageToken)) {
           log.warn('Playlist: repeated page token detected, stopping pagination')
@@ -265,13 +263,14 @@ async function performPlaylistFetch(playlistId: string): Promise<PlaylistFetchRe
 
       debugLog(`[PLAYLIST] Page ${page}: ${items.length} items, ${newItems} new, ${duplicateItems} duplicates, total unique IDs: ${videoIds.length}`)
 
-      const nextPageToken = playlist.nextPageToken
-      if (nextPageToken && seenPageTokens.has(nextPageToken)) {
-        log.warn('Playlist: YouTube returned a repeated page token, stopping pagination')
+      pageToken = playlist.nextPageToken
+
+      // the limit is checked after a page was loaded, so exactly MAX_PLAYLIST_PAGES pages are read, and "truncated" means there was more
+      if (pageToken && page >= MAX_PLAYLIST_PAGES) {
+        log.warn(`Playlist: maximum page limit reached (${MAX_PLAYLIST_PAGES}), the rest is not loaded`)
+        truncated = true
         break
       }
-
-      pageToken = nextPageToken
     } while (pageToken)
 
     if (!videoIds.length) {
@@ -293,6 +292,10 @@ async function performPlaylistFetch(playlistId: string): Promise<PlaylistFetchRe
       allVideoItems.push(...(details.items ?? []))
       debugLog(`[PLAYLIST] Video batch ${i + 1}/${batches.length} complete, total details: ${allVideoItems.length}`)
     }
+
+    // videos.list answers in no guaranteed order: the playlist keeps its own
+    const position = new Map(videoIds.map((id, index) => [id, index]))
+    allVideoItems.sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0))
 
     const songs = mapValidSongs(allVideoItems)
     debugLog(`[PLAYLIST] Fetched ${songs.length} valid unique songs from playlist: ${playlistId}`)

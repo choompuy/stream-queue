@@ -175,8 +175,12 @@
         "maxPerUser": "Max requests per user",
         "regionCode": "Region code",
         "allowShorts": "Shorts",
-        "allowLiveStreams": "Live streams"
+        "allowLiveStreams": "Live streams",
+        "contentMode": "Content",
+        "contentModeMusic": "Music only",
+        "contentModeAny": "Any video"
       },
+      "contentModeNote": "Music only: category Music, or a music topic. Search looks in Music only; other clips can be added by link",
       "regionCodeNote": "Two-letter country code (ISO 3166-1, e.g. US, RU, DE). Tracks not licensed for this region are skipped instead of being queued. Leave empty to disable",
       "save": "Save settings"
     },

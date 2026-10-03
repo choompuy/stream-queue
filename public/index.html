@@ -476,6 +476,17 @@
               </label>
 
               <label class="field">
+                <span class="field-label" data-i18n="settings.bot.limits.contentMode">Content</span>
+                <select class="settings-input input" id="cfgContentMode">
+                  <option value="music" data-i18n="settings.bot.limits.contentModeMusic">Music only</option>
+                  <option value="any" data-i18n="settings.bot.limits.contentModeAny">Any video</option>
+                </select>
+                <span class="text-muted text-xs" data-i18n="settings.bot.contentModeNote">
+                  Music only: category Music, or a music topic. Search looks in Music only; other clips can be added by link
+                </span>
+              </label>
+
+              <label class="field">
                 <span class="field-label" data-i18n="settings.bot.limits.regionCode">Region code</span>
                 <input
                   class="settings-input settings-input-short input"

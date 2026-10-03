@@ -30,12 +30,47 @@ type FilterRule = {
 
 const SHORTS_MAX_DURATION_SECONDS = 60
 
-export const VIDEO_DETAILS_PART = 'snippet,contentDetails,statistics,status'
+export const VIDEO_DETAILS_PART = 'snippet,contentDetails,statistics,status,topicDetails'
+
+// YouTube's own category for music
+export const MUSIC_CATEGORY_ID = '10'
+
+// The last part of the Wikipedia topic links YouTube uses for music (topicDetails.topicCategories).
+// Many official clips are filed by the uploader under another category (Entertainment, People & Blogs) but still carry one of these
+const MUSIC_TOPICS = new Set([
+  'music',
+  'christian_music',
+  'classical_music',
+  'country_music',
+  'electronic_music',
+  'hip_hop_music',
+  'independent_music',
+  'jazz',
+  'music_of_asia',
+  'music_of_latin_america',
+  'pop_music',
+  'reggae',
+  'rhythm_and_blues',
+  'rock_music',
+  'soul_music'
+])
+
+export function isMusicVideo(video: VideoItem): boolean {
+  if (video.snippet?.categoryId === MUSIC_CATEGORY_ID) return true
+
+  return (video.topicDetails?.topicCategories ?? []).some((link) => {
+    const topic = link.split('/').pop()?.toLowerCase()
+    return topic !== undefined && MUSIC_TOPICS.has(topic)
+  })
+}
+
+// 'live' or 'upcoming'; its duration is not known yet, so the duration rules do not apply to it
+const isLiveBroadcast = (video: VideoItem): boolean => Boolean(video.snippet?.liveBroadcastContent) && video.snippet!.liveBroadcastContent !== 'none'
 
 const FILTER_RULES: FilterRule[] = [
   {
     reason: 'NOT_MUSIC',
-    check: (_s, v) => v.snippet?.categoryId !== '10',
+    check: (_s, v, c) => c.contentMode === 'music' && !isMusicVideo(v),
     message: 'this video is not categorized as Music'
   },
   {
@@ -64,6 +99,11 @@ const FILTER_RULES: FilterRule[] = [
     message: 'this video is not playable'
   },
   {
+    reason: 'IS_LIVE',
+    check: (_s, v, c) => !c.allowLiveStreams && isLiveBroadcast(v),
+    message: 'live streams are not allowed'
+  },
+  {
     reason: 'VIEWS_TOO_LOW',
     check: (s, _v, c) => s.views < c.minViews,
     message: 'this track does not have enough views',
@@ -71,14 +111,9 @@ const FILTER_RULES: FilterRule[] = [
   },
   {
     reason: 'DURATION_OUT_OF_RANGE',
-    check: (s, _v, c) => s.duration < c.minDurationSeconds || s.duration > c.maxDurationSeconds,
+    check: (s, v, c) => !isLiveBroadcast(v) && (s.duration < c.minDurationSeconds || s.duration > c.maxDurationSeconds),
     message: "this track's duration is outside the allowed range",
     params: (c) => ({ min: c.minDurationSeconds, max: c.maxDurationSeconds })
-  },
-  {
-    reason: 'IS_LIVE',
-    check: (_s, v, c) => !c.allowLiveStreams && Boolean(v.snippet?.liveBroadcastContent) && v.snippet!.liveBroadcastContent !== 'none',
-    message: 'live streams are not allowed'
   },
   {
     reason: 'IS_SHORT',

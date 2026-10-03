@@ -54,6 +54,7 @@ export const dom = {
   cfgMaxDuration: $('cfgMaxDuration'),
   cfgMaxQueue: $('cfgMaxQueue'),
   cfgMaxPerUser: $('cfgMaxPerUser'),
+  cfgContentMode: $('cfgContentMode'),
   cfgRegionCode: $('cfgRegionCode'),
   cfgAllowShorts: $('cfgAllowShorts'),
   cfgAllowLiveStreams: $('cfgAllowLiveStreams'),
@@ -169,7 +170,8 @@ export const CONFIG_FIELDS = [
   { key: 'maxRequestsPerUser', dom: 'cfgMaxPerUser', type: 'number' },
   { key: 'regionCode', dom: 'cfgRegionCode', type: 'text' },
   { key: 'allowShorts', dom: 'cfgAllowShorts', type: 'checkbox' },
-  { key: 'allowLiveStreams', dom: 'cfgAllowLiveStreams', type: 'checkbox' }
+  { key: 'allowLiveStreams', dom: 'cfgAllowLiveStreams', type: 'checkbox' },
+  { key: 'contentMode', dom: 'cfgContentMode', type: 'text' }
 ]
 
 // Each Twitch chat command has three sub-fields (enabled/command/permission), rendered from

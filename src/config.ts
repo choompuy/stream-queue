@@ -15,9 +15,10 @@ export const { getConfig, updateConfig, validateConfigUpdates, restoreConfig } =
     maxDurationSeconds: 480,
     maxQueueSize: 20,
     maxRequestsPerUser: 4,
-    regionCode: '',
     allowShorts: false,
     allowLiveStreams: false,
+    contentMode: 'music',
+    regionCode: '',
     fallbackPlaylist: { playlistId: null, enabled: true, shuffle: false, repeat: false }
   },
   schema: {
@@ -26,12 +27,16 @@ export const { getConfig, updateConfig, validateConfigUpdates, restoreConfig } =
     maxDurationSeconds: rules.integer(1, MAX_DURATION_SECONDS),
     maxQueueSize: rules.integer(1, MAX_COUNT),
     maxRequestsPerUser: rules.integer(0, MAX_COUNT),
+    allowShorts: rules.boolean,
+    allowLiveStreams: rules.boolean,
+    contentMode: field({
+      normalize: (v) => (typeof v === 'string' ? v.trim().toLowerCase() : v),
+      validate: (v) => v === 'music' || v === 'any'
+    }),
     regionCode: field({
       normalize: (v) => (typeof v === 'string' ? v.trim().toUpperCase() : v),
       validate: (v) => v === '' || (typeof v === 'string' && /^[A-Z]{2}$/.test(v))
     }),
-    allowShorts: rules.boolean,
-    allowLiveStreams: rules.boolean,
     fallbackPlaylist: {
       playlistId: field({ validate: (v) => v === null || isValidPlaylistId(v) }),
       enabled: rules.boolean,

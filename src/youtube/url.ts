@@ -2,6 +2,8 @@ export function isValidVideoId(value: string | null | undefined): value is strin
   return Boolean(value && /^[a-zA-Z0-9_-]{11}$/.test(value))
 }
 
+const VIDEO_PATH_KINDS = new Set(['shorts', 'embed', 'v', 'live'])
+
 export function parseYouTubeUrl(input: string): { isYouTube: boolean; videoId: string | null } {
   let url: URL
 
@@ -30,8 +32,10 @@ export function parseYouTubeUrl(input: string): { isYouTube: boolean; videoId: s
     return { isYouTube: true, videoId: isValidVideoId(id) ? id : null }
   }
 
-  const pathMatch = url.pathname.match(/^\/(?:shorts|embed|v)\/([a-zA-Z0-9_-]{11})/)
-  return { isYouTube: true, videoId: pathMatch ? pathMatch[1] : null }
+  // /shorts/<id>, /embed/<id>, /v/<id>, /live/<id>: the whole segment has to be an id, not just its first 11 characters
+  const [kind, segment] = url.pathname.split('/').filter(Boolean)
+  const id = kind && VIDEO_PATH_KINDS.has(kind) ? segment : undefined
+  return { isYouTube: true, videoId: isValidVideoId(id) ? id : null }
 }
 
 const PLAYLIST_ID_PATTERN = /^(PL|RD|UU|LL|FL|OL)[A-Za-z0-9_-]+$/

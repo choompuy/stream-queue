@@ -55,6 +55,7 @@ export function bindEvents() {
     dom.cfgMaxDuration,
     dom.cfgMaxQueue,
     dom.cfgMaxPerUser,
+    dom.cfgContentMode,
     dom.cfgRegionCode,
     dom.cfgAllowShorts,
     dom.cfgAllowLiveStreams,

@@ -27,9 +27,10 @@ export type Config = {
   maxDurationSeconds: number
   maxQueueSize: number
   maxRequestsPerUser: number
-  regionCode: string
   allowShorts: boolean
   allowLiveStreams: boolean
+  contentMode: 'music' | 'any'
+  regionCode: string
   fallbackPlaylist: FallbackPlaylist
 }
 

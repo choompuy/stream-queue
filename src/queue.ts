@@ -209,7 +209,7 @@ export async function requestSong(
     } else {
       log.log(`[REQUEST] ${requestedBy} → Search: "${query}"`)
       const songs = await searchSongs(query, bypassFilters)
-      song = selectBestSong(songs, query)
+      song = selectBestSong(songs)
     }
 
     if (!song) {

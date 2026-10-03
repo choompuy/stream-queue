@@ -26,6 +26,9 @@ export type VideoItem = {
     categoryId?: string
     liveBroadcastContent?: string // 'live' | 'upcoming' | 'none'
   }
+  topicDetails?: {
+    topicCategories?: string[]
+  }
   contentDetails?: {
     duration?: string
     regionRestriction?: {

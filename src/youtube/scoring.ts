@@ -65,14 +65,17 @@ export function normalize(value: string): string {
     .trim()
 }
 
+// ISO 8601 duration as YouTube sends it: "PT4M13S", "PT1H", "P1DT2H", and "P0D" for a live stream or a premiere that has no length yet.
+// Anything that is not a duration is Infinity (unknown, so out of any allowed range)
 export function isoDurationToSeconds(value = ''): number {
-  const match = value.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/)
+  const match = value.match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/)
 
-  if (!match) {
+  if (!match || value === 'P' || value.endsWith('T')) {
     return Infinity
   }
 
-  return Number(match[1] ?? 0) * 3600 + Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0)
+  const [, days, hours, minutes, seconds] = match
+  return Number(days ?? 0) * 86400 + Number(hours ?? 0) * 3600 + Number(minutes ?? 0) * 60 + Number(seconds ?? 0)
 }
 
 function unrequestedVersionWordCount(titleWords: string[], queryWordSet: Set<string>): number {
