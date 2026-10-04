@@ -5,7 +5,6 @@ import { createLogger } from '../../logger.js'
 
 const log = createLogger('TWITCH EVENTSUB')
 
-
 export type TwitchEventSubOptions = {
   client: TwitchClient
   onChannelPointsRedemption?: (event: TwitchChannelPointsRedemption) => Promise<void> | void

@@ -95,7 +95,10 @@ test('getErrorMessage', async (t) => {
 
 test('translateErrorCode', async (t) => {
   await t.test('no code returns the fallback', () => {
-    assert.equal(translateErrorCode(() => 'x', null, undefined, 'fallback text'), 'fallback text')
+    assert.equal(
+      translateErrorCode(() => 'x', null, undefined, 'fallback text'),
+      'fallback text'
+    )
   })
 
   await t.test('converts SCREAMING_SNAKE_CASE codes to a camelCase api.errors key', () => {

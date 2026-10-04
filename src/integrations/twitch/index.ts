@@ -50,10 +50,7 @@ function toCancellableRedemption(tracked: NonNullable<QueueItem['channelPointsRe
   } as TwitchChannelPointsRedemption
 }
 
-function handleChannelPointsPlaybackOutcome(
-  tracked: NonNullable<QueueItem['channelPointsRedemption']>,
-  outcome: RedemptionOutcome
-): void {
+function handleChannelPointsPlaybackOutcome(tracked: NonNullable<QueueItem['channelPointsRedemption']>, outcome: RedemptionOutcome): void {
   const redemption = toCancellableRedemption(tracked)
 
   if (outcome.status === 'failed') {
@@ -361,7 +358,9 @@ async function setRedemptionStatus(
       }
 
       const delay = REDEMPTION_RETRY_DELAY_MS * 2 ** (attempt - 1)
-      log.error(`Failed to set redemption ${redemption.id} to ${status} (attempt ${attempt}/${REDEMPTION_RETRY_ATTEMPTS}): ${reason}. Retrying in ${delay}ms`)
+      log.error(
+        `Failed to set redemption ${redemption.id} to ${status} (attempt ${attempt}/${REDEMPTION_RETRY_ATTEMPTS}): ${reason}. Retrying in ${delay}ms`
+      )
       await wait(delay)
     }
   }

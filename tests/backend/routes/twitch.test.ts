@@ -49,7 +49,7 @@ test('twitch routes localOnly protection', async (t) => {
     // The endpoint should be accessible from localhost (localOnly middleware passes through)
     // It may fail due to invalid test credentials, but should not return 403 LOCAL_ONLY
     assert.notEqual(response.status, 403)
-    
+
     const text = await response.text()
     if (response.headers.get('content-type')?.includes('application/json')) {
       const body = JSON.parse(text) as Record<string, any>
@@ -72,7 +72,7 @@ test('twitch routes localOnly protection', async (t) => {
     // The endpoint should be accessible from localhost (localOnly middleware passes through)
     // It may fail due to no connection, but should not return 403 LOCAL_ONLY
     assert.notEqual(response.status, 403)
-    
+
     const text = await response.text()
     if (response.headers.get('content-type')?.includes('application/json')) {
       const body = JSON.parse(text) as Record<string, any>
@@ -86,7 +86,7 @@ test('twitch routes localOnly protection', async (t) => {
     // The endpoint should be accessible from localhost (localOnly middleware passes through)
     // It may fail due to no connection, but should not return 403 LOCAL_ONLY
     assert.notEqual(response.status, 403)
-    
+
     const text = await response.text()
     if (response.headers.get('content-type')?.includes('application/json')) {
       const body = JSON.parse(text) as Record<string, any>

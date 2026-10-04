@@ -1,7 +1,7 @@
 # Service Tray
 
 Small WinForms tray launcher: starts `Service.exe` (the SEA-built server) as a
-hidden background process, shows a tray icon with Open panel / Open logs folder /
+hidden background process, shows a tray icon with Open panel / Open app folder /
 Restart server / Exit.
 
 ## Heads up: not compile-tested
@@ -44,14 +44,18 @@ runtime install needed on the machine you hand it to.
 
 ## Assembling the final folder
 
-The launcher expects `Service.exe` (built via `npm run build:sea` in the repo
+On Windows with the .NET SDK installed, `npm run build:release` in the repo root does all of this
+(Service.exe, the tray launcher, `public/`) and puts the result in `release/`. The manual way, if you need it:
+
+The launcher expects `Service.exe` (built via `npm run build:release` in the repo
 root) sitting right next to it, plus the `public/` folder next to that:
 
 ```
 Service/
   StreamQueue.exe   <- from dotnet publish above
-  Service.exe       <- from npm run build:sea (dist-sea/Service.exe)
-  public/               <- copy from the repo root
+  icon.ico          <- next to it, the tray reads it from disk
+  Service.exe       <- from npm run build:release (release/Service.exe)
+  public/           <- copy from the repo root
 ```
 
 `data/` and `cache/` are created **next to `Service.exe`** (see `src/persist.ts`),
@@ -62,11 +66,10 @@ if you zip and hand it to someone else.
 ## What to actually test on Windows
 
 - Double-click `StreamQueue.exe` - tray icon should appear, no console window,
-  no browser tab popping open on its own (that's intentional - suppressed via
-  `STREAMQUEUE_NO_AUTO_OPEN`, see `ServerManager.Start()`).
+  no browser tab popping open on its own (the server never opens one).
 - Tray menu "Open panel" - should open the control panel in your default browser.
-- "Open logs folder" - opens the `logs/` folder next to `StreamQueue.exe`, should
-  contain `tray.log` with the server's stdout/stderr, timestamped.
+- "Open app folder" - opens the folder next to `StreamQueue.exe`. `logs/tray.log` there has the server's
+  stdout/stderr (useful when the server dies before it can log by itself), `data/logs/app.log` is the server's own rotating log.
 - "Restart server" - stops and starts the child process; check the tray tooltip
   updates with the new port once it's back up.
 - "Exit" - tray icon disappears immediately, `Service.exe` process should be

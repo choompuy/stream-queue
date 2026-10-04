@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs'
 import { createConfigModule, rules } from './config-helper.js'
 import { dataPath } from './persist.js'
 import { notifyStateChange } from './state-events.js'

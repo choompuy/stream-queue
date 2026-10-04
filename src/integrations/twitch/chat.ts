@@ -89,7 +89,10 @@ export class TwitchChat extends ReconnectingSocket {
     }
 
     // a line break would end the IRC command and let the rest be read as a new one; Twitch drops anything over 500 characters
-    const clean = text.replace(/[\r\n]+/g, ' ').trim().slice(0, MAX_MESSAGE_LENGTH)
+    const clean = text
+      .replace(/[\r\n]+/g, ' ')
+      .trim()
+      .slice(0, MAX_MESSAGE_LENGTH)
     if (!clean) return
 
     this.socket.send(`PRIVMSG #${this.config.channelLogin} :${clean}`)

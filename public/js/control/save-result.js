@@ -23,9 +23,7 @@ export function reportSaveResult(entries, rejected, successKey, { successToast =
     setFieldState(input, isRefused ? 'error' : changed ? 'saved' : null)
   }
 
-  if (refused === 0) {
-    if (successToast) toastSuccess(t(successKey))
-  }
+  if (refused === 0 && successToast) toastSuccess(t(successKey))
   else toastError(t('toast.settingsPartiallySaved', { saved, rejected: refused }))
 }
 

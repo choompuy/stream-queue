@@ -78,7 +78,7 @@ The server uses port `4747`; if it is busy, the next free port is taken and reme
 npm run build:sea
 ```
 
-This produces `dist-sea/Service.exe`, a self-contained Node.js Single Executable Application. Copy the `public/` folder next to it.
+This produces `dist-sea/Service.exe`, a self-contained Node.js Single Executable Application. `npm run build:release` goes one step further and assembles the `release/` folder (exe with icon and version on Windows, `public/`, license) that is ready to run or to zip. Node.js 24 or newer is needed to build.
 
 For a no-terminal-window experience, build the optional WinForms tray launcher in `tray/`. It starts and stops the service in the background and provides shortcuts for opening the panel, logs, application folder, restart, and exit.
 

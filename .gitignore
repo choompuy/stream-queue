@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 dist-sea/
+release/
 
 # C# / .NET build artifacts
 tray/bin/

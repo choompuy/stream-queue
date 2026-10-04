@@ -104,5 +104,9 @@ export function buildRedemptionRejectionMessage(userName: string, reason: Failur
 
 // Sent instead of the "points refunded" message when Twitch did not accept the cancellation: it must not promise a refund
 export function buildRedemptionRefundFailedMessage(userName: string): string {
-  return translateWithFallback('chat.redemption.refundFailed', { user: userName }, `@${userName}, your request could not be completed and the points could not be refunded automatically, the streamer will sort it out`)
+  return translateWithFallback(
+    'chat.redemption.refundFailed',
+    { user: userName },
+    `@${userName}, your request could not be completed and the points could not be refunded automatically, the streamer will sort it out`
+  )
 }

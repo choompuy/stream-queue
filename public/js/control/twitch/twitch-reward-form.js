@@ -1,4 +1,4 @@
-import { setError, setFieldState, setValue, setChecked, setText, show } from '../../shared.js'
+import { setError, setFieldState, setValue, setChecked, setText } from '../../shared.js'
 import { t } from '../../i18n.js'
 import { state, dom } from '../state.js'
 import { trackChanges } from '../save-result.js'

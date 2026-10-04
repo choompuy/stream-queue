@@ -4,7 +4,8 @@ import { dom } from '../state.js'
 import { createListView, row, rowMenu } from './primitives.js'
 
 export const playlistsView = createListView(dom.playlistsListWrapper, {
-  getKey: (items) => items.map((playlist) => [playlist.id, playlist.title, playlist.thumbnail, playlist.itemCount, playlist.isActive].join(':')).join('|'),
+  getKey: (items) =>
+    items.map((playlist) => [playlist.id, playlist.title, playlist.thumbnail, playlist.itemCount, playlist.isActive].join(':')).join('|'),
   renderRow: (playlist) =>
     row({
       className: playlist.isActive ? 'row-active' : '',

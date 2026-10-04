@@ -34,10 +34,13 @@ export function renderFallback() {
     return
   }
 
-  setText(dom.fallbackInfo, t('fallback.info', {
-    count: tracks.length,
-    datetime: formatDateTime(data.lastRefreshedAt)
-  }))
+  setText(
+    dom.fallbackInfo,
+    t('fallback.info', {
+      count: tracks.length,
+      datetime: formatDateTime(data.lastRefreshedAt)
+    })
+  )
   views.fallback.render(selectors.markBlocked(tracks).map((track) => ({ ...track, isActive: track.videoId === activeVideoId })))
   scrollToActiveFallback()
   renderStats()

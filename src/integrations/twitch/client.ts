@@ -35,7 +35,7 @@ export class TwitchClient {
     const accessToken = await this.oauth.getValidAccessToken()
     if (!accessToken) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
 
-    const response = await this.request<T>(url, options, accessToken)
+    const response = await this.request(url, options, accessToken)
 
     // Only a 401 means the token is expired. A 403 is a refusal that a new token does not change (a reward made by
     // another app, a missing scope), so it is reported as it is, without a pointless refresh
@@ -51,10 +51,10 @@ export class TwitchClient {
     }
 
     // an error of the retried request itself is its own error, not a failed login
-    return this.handleResponse<T>(await this.request<T>(url, options, refreshedToken.accessToken))
+    return this.handleResponse<T>(await this.request(url, options, refreshedToken.accessToken))
   }
 
-  private async request<T>(url: string, options: RequestInit, accessToken: string): Promise<Response> {
+  private async request(url: string, options: RequestInit, accessToken: string): Promise<Response> {
     return fetch(url, {
       ...options,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

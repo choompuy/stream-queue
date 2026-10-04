@@ -16,7 +16,10 @@ test('closeQuietly()', async (t) => {
       process.off('uncaughtException', record)
     }
 
-    assert.deepEqual(uncaught.map((error) => error.message), [])
+    assert.deepEqual(
+      uncaught.map((error) => error.message),
+      []
+    )
   })
 
   await t.test('null and undefined are accepted', () => {

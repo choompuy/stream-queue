@@ -5,7 +5,7 @@ import { run } from './run.js'
 import { refreshFallbackState } from './fallback.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
-import { setText, setValue } from '../shared.js'
+import { setValue } from '../shared.js'
 
 export function loadPlaylists() {
   return run('loading playlists', async () => {

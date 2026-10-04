@@ -141,7 +141,7 @@ async function performSearch(query: string, bypassFilters: boolean): Promise<Son
 
     let search: { items: SearchItem[] }
     try {
-        search = await youtube<{ items: SearchItem[] }>('search', {
+      search = await youtube<{ items: SearchItem[] }>('search', {
         part: 'snippet',
         q: query,
         type: 'video',
