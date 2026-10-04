@@ -148,6 +148,23 @@ test('live streams', async (t) => {
   })
 })
 
+test('scheduled streams', async (t) => {
+  const open = { minViews: 0, minDurationSeconds: 60, maxDurationSeconds: 480, regionCode: '' }
+  const upcoming = baseVideo({ snippet: { categoryId: '10', liveBroadcastContent: 'upcoming' } })
+  const live = baseVideo({ snippet: { categoryId: '10', liveBroadcastContent: 'live' } })
+
+  await t.test('an upcoming stream or premiere is refused even when live streams are allowed: there is nothing to play yet', () => {
+    updateConfig({ ...open, allowLiveStreams: true })
+    assert.equal(getFilterFailureReason(baseSong({ duration: 0 }), upcoming), 'NOT_PLAYABLE')
+  })
+
+  await t.test('a stream that is on now is still accepted when live streams are allowed', () => {
+    updateConfig({ ...open, allowLiveStreams: true })
+    assert.equal(getFilterFailureReason(baseSong({ duration: 0 }), live), null)
+    updateConfig({ allowLiveStreams: false })
+  })
+})
+
 test('throwFilterError', async (t) => {
   await t.test('REGION_BLOCKED does not leak the configured region', () => {
     const config = { regionCode: 'RU' } as Parameters<typeof throwFilterError>[1]

@@ -96,6 +96,10 @@ export class TwitchEventSub extends ReconnectingSocket {
     this.startWatchdog(Math.max(timeoutSeconds * 1.5, 15) * 1000)
   }
 
+  protected canReconnect(): boolean {
+    return !this.config.client.needsReauthorization()
+  }
+
   private async handleNotification(message: EventSubMessage): Promise<void> {
     const subscription = message.payload.subscription
     if (!subscription) {

@@ -81,6 +81,10 @@ export class TwitchClient {
     throw new AppError('TWITCH_API_ERROR', `Twitch API error: ${message}`)
   }
 
+  needsReauthorization(): boolean {
+    return this.oauth.needsReauthorization()
+  }
+
   async getUserInfo(): Promise<TwitchUserInfo> {
     try {
       const response = await this.makeAuthenticatedRequest<TwitchUsersResponse>('https://api.twitch.tv/helix/users')

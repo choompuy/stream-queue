@@ -127,6 +127,11 @@ export function setVideoCache(videoId: string, song: Song | null, filtersVersion
   saveCache()
 }
 
+export function getSearchesToday(): number {
+  resetQuotaIfNeeded()
+  return getCache().quota.searches
+}
+
 export function canSearch(): boolean {
   resetQuotaIfNeeded()
   return getCache().quota.searches < CACHE_LIMITS.MAX_DAILY_SEARCHES

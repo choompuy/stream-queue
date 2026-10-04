@@ -197,8 +197,17 @@ export abstract class ReconnectingSocket {
     }
   }
 
+  protected canReconnect(): boolean {
+    return true
+  }
+
   protected scheduleReconnect(): void {
     if (this.stopped || this.reconnectTimer || this.connecting) return
+
+    if (!this.canReconnect()) {
+      this.log.warn('Not reconnecting: connect the account again, then the connection is restored')
+      return
+    }
 
     const delay = Math.min(this.timing.initialDelayMs * 2 ** this.attempts, this.timing.maxDelayMs)
     this.attempts++

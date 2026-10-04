@@ -16,6 +16,7 @@ class TestSocket extends ReconnectingSocket {
   }
   protected readonly url: string
   protected readonly readyName = 'the test welcome'
+  retryAllowed = true
   protected timing = { initialDelayMs: 5, maxDelayMs: 20, maxAttempts: 3, readyTimeoutMs: 150 }
 
   constructor(url: string) {
@@ -29,6 +30,10 @@ class TestSocket extends ReconnectingSocket {
 
   revoke(): void {
     this.restart()
+  }
+
+  protected canReconnect(): boolean {
+    return this.retryAllowed
   }
 }
 
@@ -130,6 +135,21 @@ test('ReconnectingSocket', async (t) => {
       false
     )
     await socket.disconnect() // stops the retries
+  })
+
+  await t.test('stops retrying while the subclass says the login is refused, and says so once', async () => {
+    const { server, socket } = await connected()
+    await socket.connect()
+    logged.length = 0
+
+    socket.retryAllowed = false
+    server.dropClients()
+    await until(() => logged.some((line) => line.includes('Not reconnecting')), 'the notice that retries stopped')
+    await new Promise((resolve) => setTimeout(resolve, 100)) // several retry delays pass
+
+    assert.equal(server.connections(), 1, 'no new connection was tried')
+    assert.equal(logged.filter((line) => line.includes('Not reconnecting')).length, 1)
+    assert.equal(logged.some((line) => line.startsWith('Reconnect failed')), false)
   })
 
   await t.test('does not reconnect after disconnect(), and can be connected again afterwards', async () => {

@@ -16,6 +16,7 @@ const REQUEST_TIMEOUT_MS = 15_000
 const log = createLogger('TWITCH OAUTH')
 
 const TOKEN_URL = 'https://id.twitch.tv/oauth2/token'
+const REVOKE_URL = 'https://id.twitch.tv/oauth2/revoke'
 
 function postForm(url: string, params: URLSearchParams): Promise<Response> {
   return fetch(url, {
@@ -125,6 +126,7 @@ export class TwitchOAuth {
 
   async refreshAccessToken(): Promise<TwitchTokenData> {
     if (this.refreshPromise) return this.refreshPromise
+    if (this.authFailed) throw new AppError('TWITCH_REFRESH_ERROR', 'Twitch no longer accepts the saved login, connect the account again')
     if (!this.config.clientId) throw new AppError('TWITCH_REFRESH_ERROR', 'Twitch client ID not configured')
     if (!this.tokenData?.refreshToken) throw new AppError('TWITCH_REFRESH_ERROR', 'No refresh token available')
 
@@ -175,7 +177,25 @@ export class TwitchOAuth {
     log.log('Token data cleared')
   }
 
-  /** True once Twitch has refused the refresh token: the account has to be connected again. */
+  // Tells Twitch to forget the tokens (best effort: the account is disconnected locally whatever the answer)
+  async revokeTokens(): Promise<void> {
+    const { clientId } = this.config
+    const tokens = [this.tokenData?.accessToken, this.tokenData?.refreshToken].filter((token): token is string => Boolean(token))
+    if (!clientId || tokens.length === 0) return
+
+    await Promise.all(
+      tokens.map(async (token) => {
+        try {
+          const response = await postForm(REVOKE_URL, new URLSearchParams({ client_id: clientId, token }))
+          if (!response.ok) log.warn(`Token revoke was refused with ${response.status}`)
+        } catch (error) {
+          log.warn(`Token revoke failed: ${error instanceof Error ? error.message : error}`)
+        }
+      })
+    )
+  }
+
+  // True once Twitch has refused the refresh token: the account has to be connected again
   needsReauthorization(): boolean {
     return this.authFailed
   }

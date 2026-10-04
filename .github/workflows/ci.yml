@@ -43,6 +43,9 @@ jobs:
 
       - name: Build the release folder
         run: npm run build:release
+        env:
+          # baked into the exe: without it the Twitch integration of the artifact stays off
+          TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
 
       - uses: actions/upload-artifact@v4
         with:

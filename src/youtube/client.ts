@@ -65,6 +65,7 @@ export function isMusicVideo(video: VideoItem): boolean {
 }
 
 // 'live' or 'upcoming'; its duration is not known yet, so the duration rules do not apply to it
+const isUpcoming = (video: VideoItem): boolean => video.snippet?.liveBroadcastContent === 'upcoming'
 const isLiveBroadcast = (video: VideoItem): boolean => Boolean(video.snippet?.liveBroadcastContent) && video.snippet!.liveBroadcastContent !== 'none'
 
 const FILTER_RULES: FilterRule[] = [
@@ -99,6 +100,12 @@ const FILTER_RULES: FilterRule[] = [
     message: 'this video is not playable'
   },
   {
+    // a scheduled stream or a premiere has nothing to play yet, whatever the setting for live streams says
+    reason: 'NOT_PLAYABLE',
+    check: (_s, v) => isUpcoming(v),
+    message: 'this video has not started yet'
+  },
+  {
     reason: 'IS_LIVE',
     check: (_s, v, c) => !c.allowLiveStreams && isLiveBroadcast(v),
     message: 'live streams are not allowed'
@@ -126,11 +133,16 @@ const RETRY_STATUSES = new Set([429, 500, 502, 503, 504])
 const MAX_ATTEMPTS = 3
 const RETRY_DELAY_MS = 500
 
-export async function youtube<T>(path: string, params: Record<string, string>): Promise<T> {
+// The request never reached YouTube (no key, no network), so YouTube cannot have charged quota for it
+export class RequestNotSentError extends AppError {}
+
+const isTimeout = (error: unknown): boolean => error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
+
+export async function youtube<T>(path: string, params: Record<string, string>, { attempts = MAX_ATTEMPTS }: { attempts?: number } = {}): Promise<T> {
   const { youtubeApiKey } = getSecrets()
 
   if (!youtubeApiKey) {
-    throw new AppError('NO_API_KEY', 'YouTube API key is not configured, add it in the control panel')
+    throw new RequestNotSentError('NO_API_KEY', 'YouTube API key is not configured, add it in the control panel')
   }
 
   const url = new URL(`https://www.googleapis.com/youtube/v3/${path}`)
@@ -139,20 +151,22 @@ export async function youtube<T>(path: string, params: Record<string, string>): 
     url.searchParams.set(key, value)
   }
 
-  // A read is safe to repeat: a timeout, a network error, a 429 and a 5xx are tried again (twice, with growing pauses)
+  // a timeout, a network error, a 429 and a 5xx are tried again (with growing pauses) while attempts are left
   for (let attempt = 1; ; attempt++) {
     let response: Response
     try {
       response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
     } catch (error) {
-      if (attempt >= MAX_ATTEMPTS) {
-        throw new AppError('YOUTUBE_ERROR', `YouTube API is unreachable: ${error instanceof Error ? error.message : error}`)
+      if (attempt >= attempts) {
+        const message = `YouTube API is unreachable: ${error instanceof Error ? error.message : error}`
+        // a timeout may have reached YouTube, anything else (DNS, no route, refused) did not
+        throw isTimeout(error) ? new AppError('YOUTUBE_ERROR', message) : new RequestNotSentError('YOUTUBE_ERROR', message)
       }
       await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt))
       continue
     }
 
-    if (RETRY_STATUSES.has(response.status) && attempt < MAX_ATTEMPTS) {
+    if (RETRY_STATUSES.has(response.status) && attempt < attempts) {
       await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt))
       continue
     }

@@ -9,6 +9,7 @@ import {
   PlaylistMeta,
   VIDEO_DETAILS_PART,
   MUSIC_CATEGORY_ID,
+  RequestNotSentError,
   PlaylistFetchResult
 } from './client.js'
 import { normalize, combinedScore, formatViews } from './scoring.js'
@@ -141,21 +142,26 @@ async function performSearch(query: string, bypassFilters: boolean): Promise<Son
 
     let search: { items: SearchItem[] }
     try {
-      search = await youtube<{ items: SearchItem[] }>('search', {
-        part: 'snippet',
-        q: query,
-        type: 'video',
-        // 'any' searches every category; clips filed outside Music are reachable by link only in 'music' mode
-        ...(getConfig().contentMode === 'music' ? { videoCategoryId: MUSIC_CATEGORY_ID } : {}),
-        videoEmbeddable: 'true',
-        videoSyndicated: 'true',
-        maxResults: '20',
-        order: 'relevance',
-        safeSearch: 'moderate'
-      })
+      search = await youtube<{ items: SearchItem[] }>(
+        'search',
+        {
+          part: 'snippet',
+          q: query,
+          type: 'video',
+          // 'any' searches every category; clips filed outside Music are reachable by link only in 'music' mode
+          ...(getConfig().contentMode === 'music' ? { videoCategoryId: MUSIC_CATEGORY_ID } : {}),
+          videoEmbeddable: 'true',
+          videoSyndicated: 'true',
+          maxResults: '20',
+          order: 'relevance',
+          safeSearch: 'moderate'
+        },
+        { attempts: 1 }
+      )
     } catch (error) {
-      // YouTube did not count a search that never got an answer: the reserved one is given back
-      releaseSearchQuota()
+      // only a search that never left is given back: a timeout or an error answer may well have been charged, and counting
+      // one search too many is harmless while counting one too few could run the real daily quota out
+      if (error instanceof RequestNotSentError) releaseSearchQuota()
       throw error
     }
 

@@ -17,6 +17,10 @@ const EXE_PATH = path.join(OUT_DIR, EXE_NAME)
 const SENTINEL_FUSE = 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2'
 const BAKED = Object.fromEntries(['TWITCH_CLIENT_ID'].map((key) => [key, process.env[key]?.trim() ?? '']))
 
+if (!BAKED.TWITCH_CLIENT_ID) {
+  console.warn('! TWITCH_CLIENT_ID is not set: this build starts with the Twitch integration off (put it in .env or the environment)')
+}
+
 rmSync(OUT_DIR, { recursive: true, force: true })
 mkdirSync(OUT_DIR, { recursive: true })
 

@@ -98,6 +98,10 @@ export class TwitchChat extends ReconnectingSocket {
     this.socket.send(`PRIVMSG #${this.config.channelLogin} :${clean}`)
   }
 
+  protected canReconnect(): boolean {
+    return !this.config.oauth.needsReauthorization()
+  }
+
   protected async beforeOpen(): Promise<void> {
     const accessToken = await this.config.oauth.getValidAccessToken()
     if (!accessToken) throw new Error('Twitch account is not connected, cannot open chat connection')

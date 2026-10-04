@@ -236,13 +236,16 @@ function retryTemporaryError(errorCode, videoId, generation) {
   temporaryErrorRetries.set(videoId, retries + 1)
   log(`Temporary player error, retry ${retries + 1}/${MAX_TEMPORARY_ERROR_RETRIES} for ${videoId}`)
 
+  // taken now, while the player still knows where it was: the retry continues from there instead of from the start
+  const startSeconds = Math.max(0, Math.floor(Number(player?.getCurrentTime?.()) || 0))
+
   setTimeout(
     () => {
       const stillCurrent = generation === playerGeneration && player && currentState?.current?.videoId === videoId
       if (!stillCurrent) return
 
-      if (currentState.isPaused) player.cueVideoById(videoId)
-      else player.loadVideoById(videoId)
+      if (currentState.isPaused) player.cueVideoById({ videoId, startSeconds })
+      else player.loadVideoById({ videoId, startSeconds })
     },
     2000 * (retries + 1)
   )

@@ -439,6 +439,9 @@ export async function disconnect(): Promise<void> {
     log.log('Device authorization cancelled due to disconnect')
   }
 
+  // asked before the tokens are forgotten locally; a failure does not stop the disconnect
+  await oauth.revokeTokens()
+
   oauth.clearTokenData()
   client.clearUserInfo()
   clearTwitchOAuthState()
