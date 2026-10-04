@@ -1,4 +1,4 @@
-import { test, beforeEach } from 'node:test'
+import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { TwitchOAuth } from '../../../../src/integrations/twitch/oauth.js'
 import { initializeTwitchIntegration, disconnect, _resetIntegration } from '../../../../src/integrations/twitch/index.js'

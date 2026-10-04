@@ -1,6 +1,6 @@
-import { test, beforeEach } from 'node:test'
+import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -160,7 +160,7 @@ test('scheduleSave() / flush()', async (t) => {
     assert.equal(existsSync(`${path}.tmp`), false)
   })
 
-  await t.test('an error from the write is reported through onError and does not throw out of flush()', async (t) => {
+  await t.test('an error from the write is reported through onError and does not throw out of flush()', async () => {
     const badDir = join(testDir, `not-writable-${++counter}`)
     mkdirSync(badDir)
     // a directory in place of the target file makes the rename fail; a simple, portable way to force a write error
@@ -278,6 +278,7 @@ test('flushAllStores()', async (t) => {
     const pathA = filePath()
     const pathB = filePath()
     const storeA = createFileStore<{ n: number }>(pathA)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const storeB = createFileStore<{ n: number }>(pathB)
 
     storeA.scheduleSave(

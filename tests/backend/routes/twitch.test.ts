@@ -13,15 +13,12 @@ process.env.TWITCH_CLIENT_ID = 'test_client_id'
 const express = (await import('express')).default
 const { router: twitchRouter } = await import('../../../src/routes/twitch.js')
 const { initializeTwitchIntegration } = await import('../../../src/integrations/twitch/index.js')
-const { getTwitchConfig, updateTwitchConfig } = await import('../../../src/integrations/twitch/config.js')
+const { getTwitchConfig } = await import('../../../src/integrations/twitch/config.js')
 
 // Initialize Twitch integration for tests
 initializeTwitchIntegration({
   clientId: 'test_client_id'
 })
-
-let server: any
-let port: number
 
 const app = express()
 app.use(express.json())
@@ -33,8 +30,8 @@ app.use((err: unknown, _req: unknown, _res: unknown, next: (e?: unknown) => void
   routeErrors.push(err)
   next(err)
 })
-server = app.listen(0)
-port = (server.address() as AddressInfo).port
+const server = app.listen(0)
+const port = (server.address() as AddressInfo).port
 
 after(() => {
   server.close()

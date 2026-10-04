@@ -3,7 +3,7 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist/', 'dist-sea/', 'node_modules/', 'data/', 'cache/', 'public/vendor/', 'tray/'] },
+  { ignores: ['dist/', 'dist-sea/', 'node_modules/', 'data/', 'cache/', 'public/vendor/', 'release/public/vendor/', 'tray/'] },
 
   js.configs.recommended,
 
@@ -13,6 +13,7 @@ export default tseslint.config(
     extends: [...tseslint.configs.recommended],
     languageOptions: { globals: globals.node },
     rules: {
+      'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' }],
       '@typescript-eslint/no-explicit-any': 'off'
     }
@@ -20,7 +21,7 @@ export default tseslint.config(
 
   // The panel and the overlay: plain browser modules
   {
-    files: ['public/js/**/*.js'],
+    files: ['public/js/**/*.js', 'release/public/js/**/*.js'],
     // YT is the YouTube player API, QRCode comes from vendor/qrcode.min.js
     languageOptions: { globals: { ...globals.browser, YT: 'readonly', QRCode: 'readonly' } },
     rules: { 'no-unused-vars': ['error', { argsIgnorePattern: '^_', caughtErrors: 'none' }] }
@@ -42,8 +43,11 @@ export default tseslint.config(
 
   // Tests: leftovers in test files are reported, they do not fail the build
   {
-    files: ['tests/**'],
-    plugins: { '@typescript-eslint': tseslint.plugin },
-    rules: { 'no-unused-vars': 'warn', '@typescript-eslint/no-unused-vars': 'warn', 'prefer-const': 'warn' }
+    files: ['tests/**/*.ts'],
+    rules: { 'no-unused-vars': 'off', '@typescript-eslint/no-unused-vars': 'warn', 'prefer-const': 'warn' }
+  },
+  {
+    files: ['tests/**/*.js'],
+    rules: { 'no-unused-vars': 'warn', 'prefer-const': 'warn' }
   }
 )

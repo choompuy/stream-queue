@@ -9,6 +9,7 @@ const { ApiError } = await import('../../../public/js/control/api.js')
 
 test('errorMessage', async (t) => {
   await t.test('uses the translated code when available', () => {
+    // eslint-disable-next-line no-unused-vars
     const fakeT = (key) => (key === 'api.errors.duplicate' ? 'This track is already in the queue' : key)
     const error = new ApiError('raw message', { code: 'DUPLICATE' })
     // errorMessage relies on the module-level t() from i18n.js, not an injectable one,
