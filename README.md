@@ -17,7 +17,7 @@ Viewers request songs in Twitch chat, StreamQueue searches YouTube, filters out 
 - 📈 **Activity log** - see accepted, rejected, blocked, and failed requests with structured failure reasons
 - 📱 **LAN access** - QR code and local network access for managing the queue from another device
 - 🌍 **RU/EN interface**
-- 🖥️ **Windows standalone build** - packaged `Service.exe` runs without Node.js installed; optional WinForms tray launcher provides a normal double-click workflow
+- 🖥️ **Windows standalone build** - packaged `Service.exe` runs without Node.js installed; optional .NET 10 WinForms tray launcher provides a normal double-click workflow
 - 💾 **Local storage** - queue, settings, playlists, blocklist, and cache stay on disk next to the application
 
 ## How it works
@@ -46,7 +46,7 @@ The easiest way to run StreamQueue on Windows is the standalone ZIP release.
 
 1. Download the latest release ZIP from GitHub Releases.
 2. Extract it to a folder.
-3. Run `Service.exe` or the optional `StreamQueueTray.exe`.
+3. Run `Service.exe` or the optional `StreamQueue.exe` tray launcher.
 4. Open the control panel shown by the application.
 5. Go to **Settings** and add your YouTube Data API key.
 6. Connect Twitch from the **Twitch** settings.
@@ -58,7 +58,8 @@ The application is portable: `data/`, `cache/`, and `logs/` are created next to 
 
 ### Requirements for development
 
-- [Node.js](https://nodejs.org/) 20+ (22 recommended)
+- [Node.js](https://nodejs.org/) 24+
+- A [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) on Windows if you want to build the optional tray launcher
 - A [YouTube Data API v3](https://console.cloud.google.com/apis/library/youtube.googleapis.com) key
 
 ### Run in development
@@ -80,7 +81,16 @@ npm run build:sea
 
 This produces `dist-sea/Service.exe`, a self-contained Node.js Single Executable Application. `npm run build:release` goes one step further and assembles the `release/` folder (exe with icon and version on Windows, `public/`, license) that is ready to run or to zip. Node.js 24 or newer is needed to build.
 
-For a no-terminal-window experience, build the optional WinForms tray launcher in `tray/`. It starts and stops the service in the background and provides shortcuts for opening the panel, logs, application folder, restart, and exit.
+For a no-terminal-window experience, build the optional .NET 10 WinForms tray launcher in `tray/`. It starts and stops the service in the background and provides shortcuts for opening the panel, logs, application folder, restart, and exit.
+
+To build the tray launcher:
+
+```bash
+cd tray
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+```
+
+The tray launcher is self-contained, so the published executable does not require a separate .NET runtime installation.
 
 ### Running the tests
 
@@ -192,7 +202,7 @@ Your YouTube API key and Twitch OAuth state are stored locally. The application 
 
 ## Tech stack
 
-Node.js · TypeScript · Express · vanilla JavaScript · YouTube Data API v3 · YouTube IFrame Player API · Twitch APIs · Twitch EventSub WebSocket · optional C#/WinForms tray launcher for Windows
+Node.js · TypeScript · Express · vanilla JavaScript · YouTube Data API v3 · YouTube IFrame Player API · Twitch APIs · Twitch EventSub WebSocket · optional C#/WinForms tray launcher for Windows (.NET 10)
 
 ## License
 

@@ -18,7 +18,7 @@ build it yourself before trusting it - see below.
 
 Requires the .NET 10 SDK on Windows.
 
-```
+```bash
 cd tray
 dotnet build
 ```
@@ -28,7 +28,7 @@ Produces a framework-dependent exe under `bin/Debug/net10.0-windows/` (needs the
 
 ## Publish (distributable single exe)
 
-```
+```bash
 cd tray
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 ```
@@ -50,7 +50,7 @@ On Windows with the .NET SDK installed, `npm run build:release` in the repo root
 The launcher expects `Service.exe` (built via `npm run build:release` in the repo
 root) sitting right next to it, plus the `public/` folder next to that:
 
-```
+```text
 Service/
   StreamQueue.exe   <- from dotnet publish above
   icon.ico          <- next to it, the tray reads it from disk

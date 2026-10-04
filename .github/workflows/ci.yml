@@ -51,7 +51,7 @@ jobs:
           # baked into the exe: without it the Twitch integration of the artifact stays off
           TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: stream-queue-windows
           path: release/
