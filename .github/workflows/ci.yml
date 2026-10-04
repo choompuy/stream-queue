@@ -9,9 +9,9 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -32,12 +32,16 @@ jobs:
     runs-on: windows-latest
     needs: check
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
 
       - run: npm ci
 
@@ -47,7 +51,7 @@ jobs:
           # baked into the exe: without it the Twitch integration of the artifact stays off
           TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: stream-queue-windows
           path: release/

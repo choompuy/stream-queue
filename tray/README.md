@@ -16,15 +16,15 @@ build it yourself before trusting it - see below.
 
 ## Build (dev/testing)
 
-Requires the .NET 8 SDK on Windows.
+Requires the .NET 10 SDK on Windows.
 
 ```
 cd tray
 dotnet build
 ```
 
-Produces a framework-dependent exe under `bin/Debug/net8.0-windows/` (needs the
-.NET 8 Desktop Runtime installed - if you have the SDK you already have it).
+Produces a framework-dependent exe under `bin/Debug/net10.0-windows/` (needs the
+.NET 10 Desktop Runtime installed - if you have the SDK you already have it).
 
 ## Publish (distributable single exe)
 
@@ -38,7 +38,7 @@ here and not baked into the .csproj - having them in the project file makes even
 a plain `dotnet build` try to resolve self-contained runtime packs it doesn't
 need, which is exactly what broke the first build attempt.
 
-Output: `bin/Release/net8.0-windows/win-x64/publish/StreamQueue.exe` - one
+Output: `bin/Release/net10.0-windows/win-x64/publish/StreamQueue.exe` - one
 file, self-contained (bundles its own .NET runtime, ~60-70MB), no separate
 runtime install needed on the machine you hand it to.
 
