@@ -10,11 +10,10 @@ import { show } from '../shared.js'
 
 const YOUTUBE_URL_HINT = /(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com|youtube-nocookie\.com|youtu\.be)\//
 
-let lastSearch = ''
+let searching = false
 
 export function clearSearchResults() {
   views.search.clear()
-  lastSearch = ''
   if (dom.searchInput) dom.searchInput.value = ''
   show(dom.searchListWrapper, false)
 }
@@ -23,7 +22,8 @@ export async function search() {
   const query = dom.searchInput?.value.trim()
   if (!query) return
 
-  if (lastSearch === query) return
+  if (searching) return
+  searching = true
 
   await run(
     'searching',
@@ -36,10 +36,11 @@ export async function search() {
       const data = await api.search(query)
       views.search.render(data.results)
       show(dom.searchListWrapper)
-      lastSearch = query
     },
     { button: dom.searchBtn }
-  )
+  ).finally(() => {
+    searching = false
+  })
 }
 
 export function addSong(query) {

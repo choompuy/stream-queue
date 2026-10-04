@@ -42,9 +42,3 @@ export function updateSettings(updates: Partial<Settings>): Settings {
   notifyStateChange()
   return config
 }
-
-export function resetSettings(): Settings {
-  settings.restoreConfig(defaultSettings)
-  notifyStateChange()
-  return getSettings()
-}

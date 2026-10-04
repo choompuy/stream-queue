@@ -8,11 +8,17 @@ import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 import { setText } from '../shared.js'
 
+// Every request gets a number: an answer that arrives after a newer request was sent describes an older state and is dropped
+let stateRequestId = 0
+
 export function refreshState(silent = false) {
   return run(
     'fetching state',
     async () => {
+      const requestId = ++stateRequestId
       const nextState = await api.getState()
+      if (requestId !== stateRequestId) return
+
       const trackChanged = state.current?.videoId !== nextState.current?.videoId
       state.current = nextState.current
       state.queue = nextState.queue ?? []

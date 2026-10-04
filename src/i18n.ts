@@ -4,7 +4,8 @@ import { getAppRoot } from './runtime.js'
 import { getSettings } from './settings.js'
 import { createLogger, describeError } from './logger.js'
 
-const LOCALES_DIR = path.join(getAppRoot(), 'public/locales')
+// resolved when used, not when the module is imported
+const localesDir = (): string => path.join(getAppRoot(), 'public/locales')
 const DEFAULT_LOCALE = 'en'
 
 const log = createLogger('I18N')
@@ -18,7 +19,7 @@ function loadLocale(locale: string): Dict {
   if (cached) return cached
 
   try {
-    const raw = fs.readFileSync(path.join(LOCALES_DIR, `${locale}.json`), 'utf-8')
+    const raw = fs.readFileSync(path.join(localesDir(), `${locale}.json`), 'utf-8')
     const dict = JSON.parse(raw) as Dict
     cache.set(locale, dict)
     return dict

@@ -12,7 +12,7 @@ import {
   PlaylistFetchResult
 } from './client.js'
 import { normalize, combinedScore, formatViews } from './scoring.js'
-import { getSearchCache, setSearchCache, getVideoCache, setVideoCache, canSearch, consumeSearchQuota, CACHE_LIMITS } from './cache.js'
+import { getSearchCache, setSearchCache, getVideoCache, setVideoCache, reserveSearchQuota, releaseSearchQuota, CACHE_LIMITS } from './cache.js'
 import { VideoItem, SearchItem, PlaylistItem } from './types.js'
 import { getConfig } from '../config.js'
 import { createLogger, describeError } from '../logger.js'
@@ -121,11 +121,6 @@ export async function searchSongs(query: string, bypassFilters = false): Promise
     return cached
   }
 
-  if (!canSearch()) {
-    log.warn(`Daily search limit reached: ${CACHE_LIMITS.MAX_DAILY_SEARCHES}`)
-    throw new AppError('YOUTUBE_QUOTA', 'daily YouTube search quota exceeded, use a direct link instead')
-  }
-
   return dedupInFlight(pendingSearches, cacheKey, () => performSearch(normalizedQuery, bypassFilters))
 }
 
@@ -138,19 +133,31 @@ function mapValidSongs(videos: VideoItem[], bypassFilters = false): Song[] {
 
 async function performSearch(query: string, bypassFilters: boolean): Promise<Song[]> {
   return withYouTubeErrorHandling('YouTube search', async () => {
-    const search = await youtube<{ items: SearchItem[] }>('search', {
-      part: 'snippet',
-      q: query,
-      type: 'video',
-      // 'any' searches every category; clips filed outside Music are reachable by link only in 'music' mode
-      ...(getConfig().contentMode === 'music' ? { videoCategoryId: MUSIC_CATEGORY_ID } : {}),
-      videoEmbeddable: 'true',
-      videoSyndicated: 'true',
-      maxResults: '20',
-      order: 'relevance',
-      safeSearch: 'moderate'
-    })
-    consumeSearchQuota()
+    // after the cache and the in-flight check, so only a search that really goes out costs quota
+    if (!reserveSearchQuota()) {
+      log.warn(`Daily search limit reached: ${CACHE_LIMITS.MAX_DAILY_SEARCHES}`)
+      throw new AppError('YOUTUBE_QUOTA', 'daily YouTube search quota exceeded, use a direct link instead')
+    }
+
+    let search: { items: SearchItem[] }
+    try {
+        search = await youtube<{ items: SearchItem[] }>('search', {
+        part: 'snippet',
+        q: query,
+        type: 'video',
+        // 'any' searches every category; clips filed outside Music are reachable by link only in 'music' mode
+        ...(getConfig().contentMode === 'music' ? { videoCategoryId: MUSIC_CATEGORY_ID } : {}),
+        videoEmbeddable: 'true',
+        videoSyndicated: 'true',
+        maxResults: '20',
+        order: 'relevance',
+        safeSearch: 'moderate'
+      })
+    } catch (error) {
+      // YouTube did not count a search that never got an answer: the reserved one is given back
+      releaseSearchQuota()
+      throw error
+    }
 
     const ids = (search.items ?? []).map((item) => item.id?.videoId).filter((id): id is string => Boolean(id))
     const relevanceRank = new Map(ids.map((id, i) => [id, i]))

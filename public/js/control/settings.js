@@ -11,7 +11,7 @@ import { reportSaveResult } from './save-result.js'
 
 export function changeLocale(locale) {
   return run('changing locale', async () => {
-    await api.updateLocale(locale)
+    await api.updateSettings({ locale })
     location.reload()
   })
 }
@@ -19,6 +19,7 @@ export function changeLocale(locale) {
 export function loadOverlaySettings() {
   return run('loading settings', async () => {
     state.settings = await api.getSettings()
+    renderOverlayUrl()
 
     setError(dom.showVideo, false)
     setChecked(dom.showVideo, state.settings.showVideo)
@@ -49,12 +50,18 @@ export function saveOverlaySettings() {
       return
     }
 
+    const wanted = {
+      showVideo: dom.showVideo?.checked ?? state.settings.showVideo,
+      hideOverlayInfo: dom.hideOverlayInfo?.checked ?? state.settings.hideOverlayInfo,
+      opacity: dom.overlayOpacity ? opacity : state.settings.opacity,
+      position: dom.badgePosition?.value ?? state.settings.position
+    }
+
+    const changes = Object.fromEntries(Object.entries(wanted).filter(([key, value]) => value !== state.settings[key]))
+    if (Object.keys(changes).length === 0) return
+
     try {
-      state.settings.showVideo = dom.showVideo?.checked ?? state.settings.showVideo
-      state.settings.hideOverlayInfo = dom.hideOverlayInfo?.checked ?? state.settings.hideOverlayInfo
-      state.settings.opacity = dom.overlayOpacity ? opacity : state.settings.opacity
-      state.settings.position = dom.badgePosition?.value ?? state.settings.position
-      await api.updateSettings(state.settings)
+      state.settings = await api.updateSettings(changes)
       syncPlayer()
     } catch (error) {
       if (error instanceof ApiError && error.code === 'INVALID_SETTINGS' && error.params?.fields) {
@@ -68,6 +75,16 @@ export function saveOverlaySettings() {
       throw error
     }
   })
+}
+
+// The overlay only plays music when it is opened as localhost, and OBS runs on this computer: the link must say localhost
+// even when the panel itself was opened by the computer's LAN address
+export function renderOverlayUrl() {
+  if (!dom.overlayUrl) return
+
+  const url = `http://localhost${location.port ? `:${location.port}` : ''}/overlay`
+  dom.overlayUrl.href = url
+  dom.overlayUrl.textContent = url
 }
 
 export function copyOverlayUrl() {

@@ -57,9 +57,6 @@ export const api = {
   getSettings: () => request('/api/settings'),
   updateSettings: (settings) => put('/api/settings', settings),
 
-  getLocale: () => request('/api/locale'),
-  updateLocale: (locale) => put('/api/locale', { locale }),
-
   getConfig: () => request('/api/config'),
   updateConfig: (config) => put('/api/config', config),
 
@@ -102,7 +99,7 @@ export const api = {
   connectTwitch: () => post('/api/integrations/twitch/connect'),
   getTwitchRewards: () => request('/api/integrations/twitch/rewards'),
   createTwitchReward: (data) => post('/api/integrations/twitch/rewards', data),
-  updateTwitchReward: (id, data) => patch(`/api/integrations/twitch/rewards/${id}`, data),
+  updateTwitchReward: (rewardId, data) => patch(`/api/integrations/twitch/rewards/${id(rewardId)}`, data),
   disconnectTwitch: () => post('/api/integrations/twitch/disconnect'),
   refreshTwitch: () => post('/api/integrations/twitch/refresh'),
   getTwitchConfig: () => request('/api/integrations/twitch/config'),

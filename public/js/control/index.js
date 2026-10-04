@@ -22,8 +22,8 @@ const POLLING = [
 ]
 
 async function init() {
-  const localeData = await run('fetching locale', () => api.getLocale(), { silent: true })
-  const locale = localeData?.locale
+  const settings = await run('fetching settings', () => api.getSettings(), { silent: true })
+  const locale = settings?.locale
 
   await initI18n(locale)
   if (dom.localeSelect) {

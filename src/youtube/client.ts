@@ -122,6 +122,10 @@ const FILTER_RULES: FilterRule[] = [
   }
 ]
 
+const RETRY_STATUSES = new Set([429, 500, 502, 503, 504])
+const MAX_ATTEMPTS = 3
+const RETRY_DELAY_MS = 500
+
 export async function youtube<T>(path: string, params: Record<string, string>): Promise<T> {
   const { youtubeApiKey } = getSecrets()
 
@@ -135,11 +139,26 @@ export async function youtube<T>(path: string, params: Record<string, string>): 
     url.searchParams.set(key, value)
   }
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 10_000)
-  try {
-    const response = await fetch(url, { signal: controller.signal })
-    const data = (await response.json()) as T & YouTubeErrorResponse
+  // A read is safe to repeat: a timeout, a network error, a 429 and a 5xx are tried again (twice, with growing pauses)
+  for (let attempt = 1; ; attempt++) {
+    let response: Response
+    try {
+      response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
+    } catch (error) {
+      if (attempt >= MAX_ATTEMPTS) {
+        throw new AppError('YOUTUBE_ERROR', `YouTube API is unreachable: ${error instanceof Error ? error.message : error}`)
+      }
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt))
+      continue
+    }
+
+    if (RETRY_STATUSES.has(response.status) && attempt < MAX_ATTEMPTS) {
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt))
+      continue
+    }
+
+    // an error page is not always JSON
+    const data = (await response.json().catch(() => ({}))) as T & YouTubeErrorResponse
 
     if (!response.ok) {
       const reason = data.error?.errors?.[0]?.reason
@@ -152,8 +171,6 @@ export async function youtube<T>(path: string, params: Record<string, string>): 
     }
 
     return data
-  } finally {
-    clearTimeout(timeout)
   }
 }
 

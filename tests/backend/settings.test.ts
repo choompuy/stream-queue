@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { getSettings, updateSettings, validateSettingsUpdates, resetSettings } from '../../src/settings.js'
+import { getSettings, updateSettings, validateSettingsUpdates } from '../../src/settings.js'
 
 test('validateSettingsUpdates()', async (t) => {
   await t.test('accepts every valid field', () => {
@@ -29,7 +29,7 @@ test('validateSettingsUpdates()', async (t) => {
 
 test('updateSettings()', async (t) => {
   await t.test('applies the valid part only', () => {
-    resetSettings()
+    updateSettings({ showVideo: false, hideOverlayInfo: false, opacity: 100, position: 'bottom-right', locale: 'en' })
     const result = updateSettings({ position: 'top-right', showVideo: 'yes' as never, locale: 'xx' as never })
 
     assert.deepEqual(result, { showVideo: false, hideOverlayInfo: false, opacity: 100, position: 'top-right', locale: 'en' })

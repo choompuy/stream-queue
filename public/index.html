@@ -3,12 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,200;0,300;0,400;0,500;0,600;0,700;1,200;1,300;1,400;1,500;1,600;1,700&display=swap"
-      rel="stylesheet"
-    />
+    <link rel="stylesheet" href="css/fonts.css" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="stylesheet" href="css/app.css" />
     <title>StreamQueue - Control Panel</title>
@@ -16,7 +11,7 @@
   <body>
     <header class="box-shadow">
       <nav class="header-nav container">
-        <button class="page-tab-btn btn btn-tab btn-sm active" data-page-tab-target="dashboard">
+        <button type="button" class="page-tab-btn btn btn-tab btn-sm active" data-page-tab-target="dashboard">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
             <path
               stroke="currentColor"
@@ -29,7 +24,7 @@
           </svg>
           <span data-i18n="nav.dashboard">Dashboard</span>
         </button>
-        <button class="page-tab-btn btn btn-tab btn-sm" data-page-tab-target="playlists">
+        <button type="button" class="page-tab-btn btn btn-tab btn-sm" data-page-tab-target="playlists">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
             <path
               stroke="currentColor"
@@ -41,7 +36,7 @@
           </svg>
           <span data-i18n="nav.playlists">Playlists</span>
         </button>
-        <button class="page-tab-btn btn btn-tab btn-sm" data-page-tab-target="settings">
+        <button type="button" class="page-tab-btn btn btn-tab btn-sm" data-page-tab-target="settings">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
             <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0" />
             <path
@@ -89,6 +84,7 @@
 
               <div class="now-playing-controls">
                 <button
+                  type="button"
                   id="playPauseBtn"
                   class="btn btn-lg btn-icon btn-primary"
                   data-action="resume-pause"
@@ -99,7 +95,14 @@
                     <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5v14m8-14v14" />
                   </svg>
                 </button>
-                <button id="skipBtn" class="btn btn-lg btn-icon btn-secondary" data-action="skip" title="Skip" data-i18n-title="nowPlaying.skip">
+                <button
+                  type="button"
+                  id="skipBtn"
+                  class="btn btn-lg btn-icon btn-secondary"
+                  data-action="skip"
+                  title="Skip"
+                  data-i18n-title="nowPlaying.skip"
+                >
                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
                     <path
                       stroke="currentColor"
@@ -125,9 +128,17 @@
 
         <div class="song-search-wrapper panel section-tab">
           <div class="row">
-            <input class="input" type="search" id="searchInput" placeholder="YouTube URL or search..." data-i18n-placeholder="search.placeholder" />
-            <button class="song-search-btn btn" id="searchBtn" data-action="search" data-i18n="search.searchBtn">Search</button>
-            <button class="song-search-btn btn btn-danger" id="searchClearBtn" data-action="search-clear">
+            <input
+              class="input"
+              type="search"
+              id="searchInput"
+              aria-label="YouTube URL or search"
+              data-i18n-aria-label="search.label"
+              placeholder="YouTube URL or search..."
+              data-i18n-placeholder="search.placeholder"
+            />
+            <button type="button" class="song-search-btn btn" id="searchBtn" data-action="search" data-i18n="search.searchBtn">Search</button>
+            <button type="button" class="song-search-btn btn btn-danger" id="searchClearBtn" data-action="search-clear">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                 <path
                   fill="currentColor"
@@ -144,19 +155,19 @@
 
         <div class="section-tabs-wrapper panel column">
           <div class="section-tabs" id="sectionTabs">
-            <button class="section-tab-btn btn btn-tab active" data-section-target="queue">
+            <button type="button" class="section-tab-btn btn btn-tab active" data-section-target="queue">
               <span data-i18n="queue.title">Queue</span>
               <span class="count-badge" id="tabQueueCount">0</span>
             </button>
-            <button class="section-tab-btn btn btn-tab" data-section-target="playlist">
+            <button type="button" class="section-tab-btn btn btn-tab" data-section-target="playlist">
               <span data-i18n="fallback.title">Playlist</span>
               <span class="count-badge" id="tabPlaylistCount">0</span>
             </button>
-            <button class="section-tab-btn btn btn-tab" data-section-target="activity">
+            <button type="button" class="section-tab-btn btn btn-tab" data-section-target="activity">
               <span data-i18n="activity.title">Activity</span>
               <span class="count-badge" id="tabActivityCount">0</span>
             </button>
-            <button class="section-tab-btn btn btn-tab" data-section-target="blocklist">
+            <button type="button" class="section-tab-btn btn btn-tab" data-section-target="blocklist">
               <span data-i18n="blocklist.title">Blocklist</span>
               <span class="count-badge" id="tabBlocklistCount">0</span>
             </button>
@@ -165,7 +176,7 @@
           <div class="section-tab section-tab-queue" data-section="queue">
             <div class="section-tab-header">
               <h2><span data-i18n="queue.title">Queue</span> <span class="text-sm text-secondary" id="queueCount">0/0</span></h2>
-              <button id="clearQueueBtn" class="btn btn-secondary btn-danger" data-action="clear-queue" data-i18n-title="queue.clear">
+              <button type="button" id="clearQueueBtn" class="btn btn-secondary btn-danger" data-action="clear-queue" data-i18n-title="queue.clear">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                   <path
                     stroke="currentColor"
@@ -193,6 +204,7 @@
               </div>
               <div class="section-tab-actions">
                 <button
+                  type="button"
                   id="fallbackRefreshBtn"
                   class="btn btn-icon btn-secondary"
                   data-action="fallback-refresh"
@@ -210,6 +222,7 @@
                   </svg>
                 </button>
                 <button
+                  type="button"
                   id="fallbackShuffleBtn"
                   class="btn btn-icon btn-secondary"
                   data-action="fallback-shuffle"
@@ -227,6 +240,7 @@
                   </svg>
                 </button>
                 <button
+                  type="button"
                   id="fallbackRepeatBtn"
                   class="btn btn-icon btn-secondary"
                   data-action="fallback-repeat"
@@ -244,6 +258,7 @@
                   </svg>
                 </button>
                 <button
+                  type="button"
                   id="fallbackEnabledBtn"
                   class="btn btn-secondary"
                   data-action="fallback-enabled"
@@ -273,7 +288,13 @@
             <div class="section-tab-header">
               <h2 data-i18n="activity.title">Activity</h2>
               <div class="section-tab-actions">
-                <button id="clearActivityBtn" class="btn btn-secondary btn-danger" data-action="clear-activity" data-i18n-title="activity.clear">
+                <button
+                  type="button"
+                  id="clearActivityBtn"
+                  class="btn btn-secondary btn-danger"
+                  data-action="clear-activity"
+                  data-i18n-title="activity.clear"
+                >
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                     <path
                       stroke="currentColor"
@@ -314,12 +335,16 @@
           <div class="row">
             <input
               id="playlistUrlInput"
+              aria-label="Playlist URL or ID"
+              data-i18n-aria-label="playlists.urlLabel"
               class="input"
               type="text"
               placeholder="Paste YouTube playlist URL or ID..."
               data-i18n-placeholder="playlists.addPlaceholder"
             />
-            <button id="playlistAddBtn" class="btn playlist-add-btn" data-action="add-playlist" data-i18n="playlists.addBtn">Add</button>
+            <button type="button" id="playlistAddBtn" class="btn playlist-add-btn" data-action="add-playlist" data-i18n="playlists.addBtn">
+              Add
+            </button>
           </div>
           <div class="row-list-wrapper" id="playlistsListWrapper" data-list="playlists">
             <div class="row-list"></div>
@@ -376,7 +401,13 @@
                 <span class="field-label" data-i18n="settings.overlay.obsUrl">OBS Browser Source URL</span>
                 <div class="field-row">
                   <a class="settings-input input text-blue" id="overlayUrl" href="/overlay" target="_blank" rel="noopener noreferrer">/overlay</a>
-                  <button class="btn btn-secondary btn-icon" data-action="copy-overlay-url" title="Copy" data-i18n-title="settings.overlay.copy">
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-icon"
+                    data-action="copy-overlay-url"
+                    title="Copy"
+                    data-i18n-title="settings.overlay.copy"
+                  >
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                       <path
                         stroke="currentColor"
@@ -395,7 +426,13 @@
                 <span class="field-label" data-i18n="settings.overlay.ipSelector">IP selector</span>
                 <div class="field-row">
                   <select class="settings-input input hidden" id="selectIp"></select>
-                  <button class="btn btn-secondary btn-icon" data-action="toggle-qr" title="QR code" data-i18n-title="settings.overlay.qrCode">
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-icon"
+                    data-action="toggle-qr"
+                    title="QR code"
+                    data-i18n-title="settings.overlay.qrCode"
+                  >
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                       <path
                         fill="currentColor"
@@ -504,8 +541,8 @@
             </div>
 
             <div class="settings-section-actions">
-              <button class="btn btn-secondary" data-action="cancel-config" data-i18n="common.cancel">Cancel</button>
-              <button class="btn btn-primary" id="cfgSaveBtn" data-action="save-config" data-i18n="common.save">Save</button>
+              <button type="button" class="btn btn-secondary" data-action="cancel-config" data-i18n="common.cancel">Cancel</button>
+              <button type="button" class="btn btn-primary" id="cfgSaveBtn" data-action="save-config" data-i18n="common.save">Save</button>
             </div>
           </div>
 
@@ -528,11 +565,18 @@
                   </div>
 
                   <div id="twitchConnectionControls">
-                    <button id="twitchConnectBtn" class="btn btn-primary" data-action="connect-twitch" data-i18n="settings.twitch.connect">
+                    <button
+                      type="button"
+                      id="twitchConnectBtn"
+                      class="btn btn-primary"
+                      data-action="connect-twitch"
+                      data-i18n="settings.twitch.connect"
+                    >
                       Connect Twitch
                     </button>
 
                     <button
+                      type="button"
                       id="twitchDisconnectBtn"
                       class="btn btn-secondary btn-danger hidden"
                       data-action="disconnect-twitch"
@@ -562,7 +606,9 @@
                   <select class="settings-input input" id="twitchRewardSelect">
                     <option value="" data-i18n="settings.twitch.rewardNone">Select reward</option>
                   </select>
-                  <button class="btn btn-secondary" id="twitchCreateNewRewardBtn" data-i18n="settings.twitch.createReward">Create reward</button>
+                  <button type="button" class="btn btn-secondary" id="twitchCreateNewRewardBtn" data-i18n="settings.twitch.createReward">
+                    Create reward
+                  </button>
                 </div>
                 <div class="text-muted text-xs" data-i18n="settings.twitch.rewardNote">Redemptions of this reward will be used as song requests</div>
               </label>
@@ -631,8 +677,10 @@
               </div>
 
               <div class="settings-section-actions">
-                <button class="btn btn-secondary" data-action="cancel-twitch-reward" data-i18n="common.cancel">Cancel</button>
-                <button id="twitchSaveRewardBtn" data-action="save-twitch-reward" class="btn btn-primary" data-i18n="common.save">Save</button>
+                <button type="button" class="btn btn-secondary" data-action="cancel-twitch-reward" data-i18n="common.cancel">Cancel</button>
+                <button type="button" id="twitchSaveRewardBtn" data-action="save-twitch-reward" class="btn btn-primary" data-i18n="common.save">
+                  Save
+                </button>
               </div>
             </div>
           </div>
@@ -678,7 +726,7 @@
               </label>
             </div>
 
-            <div class="settings-section" id="twitchChatCommandRows">
+            <div class="settings-section">
               <label class="field" for="chatCmdSkipCommand" data-chat-command="skip">
                 <span class="field-label" data-i18n="settings.twitchChat.commands.skip">Skip track</span>
                 <div class="field-row">
@@ -728,8 +776,14 @@
             </div>
 
             <div class="settings-section-actions">
-              <button class="btn btn-secondary" data-action="cancel-twitch-chat-commands" data-i18n="common.cancel">Cancel</button>
-              <button id="twitchChatCommandsSaveBtn" class="btn btn-primary" data-action="save-twitch-chat-commands" data-i18n="common.save">
+              <button type="button" class="btn btn-secondary" data-action="cancel-twitch-chat-commands" data-i18n="common.cancel">Cancel</button>
+              <button
+                type="button"
+                id="twitchChatCommandsSaveBtn"
+                class="btn btn-primary"
+                data-action="save-twitch-chat-commands"
+                data-i18n="common.save"
+              >
                 Save
               </button>
             </div>
@@ -765,7 +819,7 @@
 
     <div id="toastContainer" class="toast-container"></div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="vendor/qrcode.min.js"></script>
     <script type="module" src="js/control/index.js"></script>
   </body>
 </html>

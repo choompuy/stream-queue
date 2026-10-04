@@ -10,6 +10,7 @@ let renderedVideoId = null
 let settings = {}
 let localeLoaded = false
 let playerGeneration = 0
+let resetCounter = 0
 
 const log = createLogger('PREVIEW')
 
@@ -163,7 +164,7 @@ function configurePlayer() {
 }
 
 function updateProgress() {
-  if (!isPlaybackSource || !player || !currentState?.current) {
+  if (!isPlaybackSource || !player || !isPlayerReady || typeof player.getCurrentTime !== 'function' || !currentState?.current) {
     dom.progressBar.style.width = '0%'
     setText(dom.elapsedTime, '0:00 / 0:00')
     return
@@ -289,9 +290,8 @@ function onPlayerError(event) {
   if (retryTemporaryError(event.data, videoId, playerGeneration)) return
 
   reportedFailureVideoId = videoId
-  const generation = playerGeneration
-  resetPlayer().then(() => {
-    if (generation !== playerGeneration - 1) return
+  resetPlayer().then((token) => {
+    if (token !== resetCounter) return
 
     reportFailure(event.data, videoId)
   })
@@ -339,6 +339,7 @@ function createPlayer() {
 }
 
 async function resetPlayer() {
+  const token = ++resetCounter
   const oldPlayer = player
 
   player = null
@@ -364,9 +365,10 @@ async function resetPlayer() {
 
   await new Promise((resolve) => requestAnimationFrame(resolve))
 
-  if (!isPlaybackSource || typeof YT === 'undefined' || !YT.Player) return
+  if (!isPlaybackSource || typeof YT === 'undefined' || !YT.Player) return token
 
   createPlayer()
+  return token
 }
 
 // OBS often starts before the network is up: a failed load of the API script is retried, with growing pauses, until it works

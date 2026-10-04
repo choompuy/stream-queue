@@ -21,7 +21,7 @@ export function renderCurrent() {
   setText(dom.currentTitle, current.title)
   setText(dom.currentChannel, current.channelTitle)
   setText(dom.currentDuration, formatDuration(current.duration))
-  setText(dom.currentViews, `${formatViews(current.views)} views`)
+  setText(dom.currentViews, t('player.views', { count: formatViews(current.views) }))
   setText(dom.currentRequester, `@${current.requestedBy}`)
 }
 

@@ -22,6 +22,8 @@ function closeToast(toast) {
   }
 
   toast.addEventListener('animationend', handleAnimationEnd)
+  // animationend does not come when animations are off (reduced motion, a hidden tab): the toast is removed anyway
+  setTimeout(() => toast.remove(), 1000)
 }
 
 function enforceMaxToasts(root) {

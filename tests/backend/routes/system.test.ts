@@ -75,7 +75,6 @@ test('the /api route table', async (t) => {
       '/overlay-state',
       '/network-info',
       '/settings',
-      '/locale',
       '/config',
       '/secrets',
       '/playlists',

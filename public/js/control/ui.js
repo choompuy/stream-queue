@@ -1,3 +1,5 @@
+import { getCurrentLocale } from '../i18n.js'
+
 export function withLoading(button, action) {
   if (!button) return action()
 
@@ -12,13 +14,12 @@ export function withLoading(button, action) {
 export function formatDateTime(timestamp, joiner = ', ') {
   if (!timestamp) return '-'
 
-  const date = new Date(timestamp)
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
+  // the order of day and month (and the digits) follow the language of the panel
+  const locale = getCurrentLocale()
+  const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hour12: false }).format(timestamp)
+  const day = new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit' }).format(timestamp)
 
-  return [`${hours}:${minutes}`, `${day}/${month}`].join(joiner)
+  return [time, day].join(joiner)
 }
 
 export function toggleActive(element, isActive) {

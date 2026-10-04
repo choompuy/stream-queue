@@ -3,7 +3,7 @@ import { ConfigResponse, SettingsResponse } from '../types.js'
 import { ok, fail, failFromError, asyncHandler, sendConfigUpdate } from '../http.js'
 import { localOnly } from '../local-only.js'
 import { getConfig, updateConfig, restoreConfig } from '../config.js'
-import { LOCALES, getSettings, updateSettings, validateSettingsUpdates } from '../settings.js'
+import { getSettings, updateSettings, validateSettingsUpdates } from '../settings.js'
 import { getPublicSecretsView, SecretsResponse, updateSecrets } from '../secrets.js'
 import { parsePlaylistId } from '../youtube/url.js'
 import { refreshFallback, reorderFallback } from '../fallback.js'
@@ -26,22 +26,6 @@ router.put('/settings', (req, res) => {
   }
 
   ok<SettingsResponse>(res, updateSettings(updates))
-})
-
-router.get('/locale', (_req, res) => {
-  const settings = getSettings()
-  ok(res, { locale: settings.locale })
-})
-
-router.put('/locale', (req, res) => {
-  const { locale } = req.body ?? {}
-
-  if (!LOCALES.includes(locale)) {
-    return fail(res, 'Invalid locale', 'INVALID_LOCALE', 400)
-  }
-
-  const updated = updateSettings({ locale })
-  ok<SettingsResponse>(res, updated)
 })
 
 router.get('/config', (_req, res) => {

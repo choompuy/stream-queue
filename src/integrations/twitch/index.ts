@@ -417,10 +417,6 @@ export function getTwitchHealth(): TwitchHealth {
   }
 }
 
-export function isDeviceAuthorizationPending(): boolean {
-  return deviceAuthorizationPromise !== null
-}
-
 export async function disconnect(): Promise<void> {
   if (!oauth || !client) {
     log.log('Twitch integration not initialized, nothing to disconnect')

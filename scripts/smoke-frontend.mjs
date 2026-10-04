@@ -19,7 +19,16 @@ window.HTMLElement.prototype.scrollBy = () => {}
 
 const calls = []
 const V = (c) => c.repeat(11)
-const track = (c, extra = {}) => ({ videoId: V(c), title: `Track ${c}`, channelTitle: 'Chan', thumbnail: `https://i.ytimg.com/vi/${V(c)}/mqdefault.jpg`, duration: 100, views: 5, requestedBy: 'bob', ...extra })
+const track = (c, extra = {}) => ({
+  videoId: V(c),
+  title: `Track ${c}`,
+  channelTitle: 'Chan',
+  thumbnail: `https://i.ytimg.com/vi/${V(c)}/mqdefault.jpg`,
+  duration: 100,
+  views: 5,
+  requestedBy: 'bob',
+  ...extra
+})
 let stateOverride = null
 let failStateWith500 = false
 let blocklist = [{ videoId: V('c'), title: 'Blocked one', blockedAt: Date.now() }]
@@ -33,16 +42,37 @@ const routes = {
   'GET /api/activity': () => ({
     entries: [
       { at: Date.now(), videoId: V('a'), title: 'A $$ "quoted" & <b>', query: 'q', status: 'accepted', requestedBy: 'bob', reasonCode: null },
-      { at: Date.now() - 1000, videoId: V('d'), title: 'Broken', query: 'q', status: 'failed', requestedBy: 'amy', reasonCode: 'PLAYBACK_EMBED_DISALLOWED' }
+      {
+        at: Date.now() - 1000,
+        videoId: V('d'),
+        title: 'Broken',
+        query: 'q',
+        status: 'failed',
+        requestedBy: 'amy',
+        reasonCode: 'PLAYBACK_EMBED_DISALLOWED'
+      }
     ]
   }),
   'GET /api/blocklist': () => ({ entries: blocklist }),
-  'GET /api/playlists': () => ({ playlists: [{ id: 'PL1', title: 'One', thumbnail: '', itemCount: 3, isActive: true }, { id: 'PL2', title: 'Two', thumbnail: '', itemCount: 1, isActive: false }] }),
+  'GET /api/playlists': () => ({
+    playlists: [
+      { id: 'PL1', title: 'One', thumbnail: '', itemCount: 3, isActive: true },
+      { id: 'PL2', title: 'Two', thumbnail: '', itemCount: 1, isActive: false }
+    ]
+  }),
   'GET /api/state': () => {
     if (failStateWith500) return [500, { error: 'boom', code: 'SERVER_ERROR' }]
     return stateOverride ?? { current: track('a'), queue: [track('b'), track('c')], isPaused: false, nextTrack: null }
   },
-  'GET /api/fallback': () => ({ upNext: [track('e'), track('f')], activeVideoId: V('f'), lastRefreshedAt: Date.now(), sourceCount: 2, shuffle: false, repeat: true, enabled: true }),
+  'GET /api/fallback': () => ({
+    upNext: [track('e'), track('f')],
+    activeVideoId: V('f'),
+    lastRefreshedAt: Date.now(),
+    sourceCount: 2,
+    shuffle: false,
+    repeat: true,
+    enabled: true
+  }),
   [`DELETE /api/blocklist/${V('c')}`]: () => {
     blocklist = blocklist.filter((entry) => entry.videoId !== V('c'))
     return {}
@@ -69,7 +99,10 @@ globalThis.fetch = async (url, options = {}) => {
 
 const errors = []
 const origError = console.error
-console.error = (...a) => { errors.push(a); origError(...a) }
+console.error = (...a) => {
+  errors.push(a)
+  origError(...a)
+}
 const logs = []
 console.log = (...a) => logs.push(a.join(' '))
 
@@ -81,7 +114,11 @@ const $$ = (sel) => [...document.querySelectorAll(sel)]
 const toasts = () => $$('#toastContainer .toast-message').map((n) => n.textContent)
 const tick = () => new Promise((r) => setTimeout(r, 50))
 let passed = 0
-const check = (name, fn) => { fn(); passed++; process.stdout.write(`  ok - ${name}\n`) }
+const check = (name, fn) => {
+  fn()
+  passed++
+  process.stdout.write(`  ok - ${name}\n`)
+}
 
 // --- initial render
 check('queue rows rendered with blocked pill on the blocked one', () => {
@@ -92,7 +129,10 @@ check('queue rows rendered with blocked pill on the blocked one', () => {
 })
 check('queue rows: a normal row has a menu (block, remove), a blocked row a dedicated unblock button', () => {
   const rows = $$('#queueListWrapper .row-item')
-  assert.deepEqual([...rows[0].querySelectorAll('.row-menu-item')].map((b) => b.dataset.action), ['block-track', 'queue-remove'])
+  assert.deepEqual(
+    [...rows[0].querySelectorAll('.row-menu-item')].map((b) => b.dataset.action),
+    ['block-track', 'queue-remove']
+  )
   assert.equal(rows[1].querySelector('.row-menu'), null)
   assert.equal(rows[1].querySelector('[data-action="unblock-track"]')?.dataset.videoId, V('c'))
 })
@@ -148,7 +188,8 @@ check('click outside closes the menu', () => {
 // --- block flow (data attributes round-trip through the DOM)
 calls.length = 0
 $('#activityListWrapper [data-action="block-track"]').click()
-await tick(); await tick()
+await tick()
+await tick()
 check('block-track posts videoId + title exactly, then reloads blocklist and state', () => {
   assert.ok(calls.includes('POST /api/blocklist'))
   assert.ok(calls.includes('GET /api/blocklist'))
@@ -161,7 +202,8 @@ check('block-track posts videoId + title exactly, then reloads blocklist and sta
 // --- unblock from the dedicated button on a blocked queue row
 calls.length = 0
 $('#queueListWrapper [data-action="unblock-track"]').click()
-await tick(); await tick()
+await tick()
+await tick()
 check('unblock-track deletes the entry, reloads the lists and the row becomes a normal one', () => {
   assert.ok(calls.includes(`DELETE /api/blocklist/${V('c')}`))
   assert.ok(calls.includes('GET /api/blocklist'))
@@ -173,7 +215,8 @@ check('unblock-track deletes the entry, reloads the lists and the row becomes a 
 
 // --- errors: API error -> toast (translated), silent polling -> no toast
 $(`#fallbackListWrapper [data-video-id="${V('e')}"] [data-action="fallback-play"]`).click()
-await tick(); await tick()
+await tick()
+await tick()
 check('API error from an action shows a translated toast', () => {
   assert.ok(toasts().includes('This track has been blocked by the streamer'), JSON.stringify(toasts()))
 })
@@ -203,15 +246,24 @@ check('several simultaneous network failures show a single toast', () => {
 globalThis.fetch = realFetch
 
 // --- unknown action is logged, not thrown
-const stray = document.createElement('button'); stray.dataset.action = 'does-not-exist'; document.body.append(stray)
+const stray = document.createElement('button')
+stray.dataset.action = 'does-not-exist'
+document.body.append(stray)
 stray.click()
-check('unknown data-action is logged instead of silently ignored', () => assert.ok(logs.some((l) => l.includes('No handler registered for action "does-not-exist"'))))
+check('unknown data-action is logged instead of silently ignored', () =>
+  assert.ok(logs.some((l) => l.includes('No handler registered for action "does-not-exist"')))
+)
 
 // --- programmer errors are logged but not toasted
 const { run } = await import(pathToFileURL(`${ROOT}/js/control/run.js`).href)
 const n = toasts().length
-await run('boom', () => { throw new TypeError('x is undefined') })
-check('non-API errors are logged but not shown as toasts', () => assert.equal(toasts().length, n))
+await run('boom', () => {
+  throw new TypeError('x is undefined')
+})
+check('non-API errors are logged and shown as a generic error toast', () => {
+  assert.equal(toasts().length, n + 1)
+  assert.ok(logs.some((l) => l.includes('Error boom:')))
+})
 
 check('no console.error during the whole run', () => assert.deepEqual(errors, []))
 console.log = () => {}

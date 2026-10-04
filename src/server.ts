@@ -12,6 +12,8 @@ import { apiRouter } from './routes/index.js'
 import { initializeTwitchIntegration } from './integrations/twitch/index.js'
 import { getTwitchClientId } from './secrets.js'
 import { createLogger, describeError, enableFileLogging, flushLogs } from './logger.js'
+import { hostCheck } from './host-check.js'
+import { installShutdownHandlers } from './shutdown.js'
 
 const app = express()
 let PORT: number
@@ -19,6 +21,7 @@ let PORT: number
 const LAN_HOSTNAME_PATTERN = /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[0-1])\.|fd[0-9a-f]{2}:|fe80:)/i
 const PUBLIC_DIR = path.join(getAppRoot(), 'public')
 
+app.use(hostCheck)
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -56,6 +59,7 @@ app.use(errorHandler)
 async function main() {
   loadEnvFile()
   enableFileLogging()
+  installShutdownHandlers()
 
   // a stray rejected promise must not stop the music mid-stream: log it and carry on
   process.on('unhandledRejection', (reason) => {

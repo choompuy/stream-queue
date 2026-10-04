@@ -86,6 +86,7 @@
   },
   "search": {
     "placeholder": "YouTube URL or search...",
+    "label": "YouTube URL or search",
     "searchBtn": "Search",
     "noResults": "No results found",
     "addToQueue": "Add to queue",
@@ -131,6 +132,7 @@
   "playlists": {
     "title": "Playlists",
     "addPlaceholder": "Paste YouTube playlist URL or ID...",
+    "urlLabel": "Playlist URL or ID",
     "addBtn": "Add",
     "errorAdding": "Error adding playlist",
     "empty": {
@@ -243,6 +245,7 @@
     }
   },
   "player": {
+    "views": "{{count}} views",
     "error": {
       "invalidParameter": "Invalid parameter",
       "html5Error": "HTML5 player error",
@@ -262,7 +265,6 @@
       "forbiddenOrigin": "This origin is not allowed",
       "localOnly": "This action is only available from the computer the app is running on",
       "rateLimited": "Too many requests, please wait a moment",
-      "invalidLocale": "Invalid locale",
       "invalidPlaylistId": "Invalid playlist ID or URL",
       "playlistNotFound": "Playlist not found",
       "playlistLoadFailed": "Failed to load playlist, check the ID",

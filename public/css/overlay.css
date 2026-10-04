@@ -16,12 +16,11 @@ body {
 
 .badge {
   position: absolute;
-  bottom: 0;
-  right: 0;
   display: flex;
   flex-direction: row;
   width: 100%;
   max-width: 20rem;
+  height: fit-content;
   background-color: var(--bg);
   border: 1px solid var(--text-muted);
   z-index: 0;
@@ -37,7 +36,6 @@ body {
   inset: 0;
   width: 100%;
   max-width: 100%;
-  margin-right: auto;
   background: var(--text-muted);
   transition: 0.4s ease-in-out;
   transition-property: max-width, clip-path;
@@ -67,14 +65,18 @@ body {
 
 .badge[data-position='top-left']::after {
   margin-left: auto;
+  margin-right: 0;
 }
-.badge[data-position='top-right'] ::after {
+.badge[data-position='top-right']::after {
+  margin-left: 0;
   margin-right: auto;
 }
-.badge[data-position='bottom-left'] ::after {
+.badge[data-position='bottom-left']::after {
   margin-left: auto;
+  margin-right: 0;
 }
-.badge[data-position='bottom-right'] ::after {
+.badge[data-position='bottom-right']::after {
+  margin-left: 0;
   margin-right: auto;
 }
 

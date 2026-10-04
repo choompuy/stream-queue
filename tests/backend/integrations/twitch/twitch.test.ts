@@ -4,7 +4,6 @@ import { TwitchOAuth } from '../../../../src/integrations/twitch/oauth.js'
 import {
   initializeTwitchIntegration,
   disconnect,
-  isDeviceAuthorizationPending,
   _resetIntegration
 } from '../../../../src/integrations/twitch/index.js'
 import { clearTwitchOAuthState, getPublicSecretsView } from '../../../../src/secrets.js'
@@ -153,13 +152,5 @@ test('TwitchIntegration', async (t) => {
     // Should not throw any errors
     const status = getPublicSecretsView().twitch
     assert.equal(status.connected, false)
-  })
-
-  await t.test('isDeviceAuthorizationPending returns false when no authorization in progress', () => {
-    initializeTwitchIntegration({
-      clientId: 'test_client_id'
-    })
-
-    assert.equal(isDeviceAuthorizationPending(), false)
   })
 })

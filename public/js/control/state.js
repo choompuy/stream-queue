@@ -99,8 +99,6 @@ export const dom = {
   fallbackEnabledText: $('fallbackEnabledText'),
 
   tabActivityCount: $('tabActivityCount'),
-  statAcceptedToday: $('statAcceptedToday'),
-  statRejectedToday: $('statRejectedToday'),
   activityListWrapper: $('activityListWrapper'),
   clearActivityBtn: $('clearActivityBtn'),
 
@@ -110,14 +108,12 @@ export const dom = {
   playlistsListWrapper: $('playlistsListWrapper'),
   playlistUrlInput: $('playlistUrlInput'),
   playlistAddBtn: $('playlistAddBtn'),
-  playlistsCount: $('playlistsCount'),
 
   twitchNotConfigured: $('twitchNotConfigured'),
   twitchConnectionControls: $('twitchConnectionControls'),
   twitchHealthWarning: $('twitchHealthWarning'),
   twitchAuthorization: $('twitchAuthorization'),
   twitchAuthorizationCode: $('twitchAuthorizationCode'),
-  twitchChanel: $('twitchChanel'),
   twitchChanelImg: $('twitchChanelImg'),
   twitchChanelName: $('twitchChanelName'),
   twitchConnectBtn: $('twitchConnectBtn'),

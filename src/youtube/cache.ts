@@ -85,7 +85,7 @@ function resetQuotaIfNeeded(): void {
 }
 
 export function getSearchCache(query: string, filtersVersion: string): Song[] | null {
-  const entry = getCache().searches[query]
+  const entry = Object.hasOwn(getCache().searches, query) ? getCache().searches[query] : undefined
 
   if (!entry || entry.expiresAt <= Date.now() || entry.filtersVersion !== filtersVersion) {
     return null
@@ -107,7 +107,7 @@ export function setSearchCache(query: string, results: Song[], filtersVersion: s
 export type VideoCacheResult = { song: Song | null; reason: FilterFailureReason | null }
 
 export function getVideoCache(videoId: string, filtersVersion: string): VideoCacheResult | undefined {
-  const entry = getCache().videos[videoId]
+  const entry = Object.hasOwn(getCache().videos, videoId) ? getCache().videos[videoId] : undefined
 
   if (!entry || entry.expiresAt <= Date.now() || entry.filtersVersion !== filtersVersion) {
     return undefined
@@ -130,6 +130,24 @@ export function setVideoCache(videoId: string, song: Song | null, filtersVersion
 export function canSearch(): boolean {
   resetQuotaIfNeeded()
   return getCache().quota.searches < CACHE_LIMITS.MAX_DAILY_SEARCHES
+}
+
+/**
+ * Takes one search from today's quota *before* the request is made. Checking first and counting after the answer let a
+ * burst of different searches all pass the check while none of them was counted yet.
+ */
+export function reserveSearchQuota(): boolean {
+  if (!canSearch()) return false
+
+  consumeSearchQuota()
+  return true
+}
+
+/** Gives a reserved search back: the request failed before YouTube counted it (network error, an error answer). */
+export function releaseSearchQuota(): void {
+  const { quota } = getCache()
+  if (quota.searches > 0) quota.searches -= 1
+  saveCache()
 }
 
 export function consumeSearchQuota(): void {

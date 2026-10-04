@@ -38,7 +38,9 @@ export function parseYouTubeUrl(input: string): { isYouTube: boolean; videoId: s
   return { isYouTube: true, videoId: isValidVideoId(id) ? id : null }
 }
 
-const PLAYLIST_ID_PATTERN = /^(PL|RD|UU|LL|FL|OL)[A-Za-z0-9_-]+$/
+// Only the kinds the playlistItems API can read: user playlists (PL), channel uploads (UU), auto-generated albums (OL).
+// Mixes (RD), liked videos (LL) and favourites (FL) answer with an error there
+const PLAYLIST_ID_PATTERN = /^(PL|UU|OL)[A-Za-z0-9_-]+$/
 
 export function isValidPlaylistId(value: unknown): value is string {
   return typeof value === 'string' && PLAYLIST_ID_PATTERN.test(value)

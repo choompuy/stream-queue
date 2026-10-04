@@ -4,11 +4,8 @@ import { StateResponse, OverlayStateResponse } from '../types.js'
 import { ok } from '../http.js'
 import { getState } from '../player.js'
 import { getSettings } from '../settings.js'
-import { flushAllStores } from '../persist.js'
 import { localOnly } from '../local-only.js'
-import { createLogger, describeError, flushLogs } from '../logger.js'
-
-const log = createLogger('SHUTDOWN')
+import { shutdown } from '../shutdown.js'
 
 export function lanAddresses(): string[] {
   return Object.values(os.networkInterfaces())
@@ -17,7 +14,7 @@ export function lanAddresses(): string[] {
     .map((iface) => iface.address)
 }
 
-export function createSystemRouter({ exit = () => process.exit(0) }: { exit?: () => void } = {}): express.Router {
+export function createSystemRouter({ exit = (code: number) => process.exit(code) }: { exit?: (code: number) => void } = {}): express.Router {
   const router = express.Router()
 
   router.get('/state', (_req, res) => {
@@ -33,12 +30,7 @@ export function createSystemRouter({ exit = () => process.exit(0) }: { exit?: ()
   })
 
   router.post('/shutdown', localOnly, (_req, res) => {
-    res.on('finish', () => {
-      flushAllStores()
-        .catch((error) => log.error(`Flush failed: ${describeError(error)}`))
-        .then(flushLogs)
-        .finally(exit)
-    })
+    res.on('finish', () => void shutdown(0, exit))
     ok(res, {})
   })
 

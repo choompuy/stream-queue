@@ -17,7 +17,6 @@ export function loadPlaylists() {
 
 export function renderPlaylists() {
   if (!dom.playlistsListWrapper) return
-  setText(dom.playlistsCount, state.playlists.length)
 
   const activeId = state.config?.fallbackPlaylist?.playlistId ?? ''
   views.playlists.render(state.playlists.map((playlist) => ({ ...playlist, isActive: playlist.id === activeId })))
