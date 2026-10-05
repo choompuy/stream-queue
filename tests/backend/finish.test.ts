@@ -134,3 +134,41 @@ test('a damaged redemption is dropped, the track is kept', () => {
   assert.equal(restored?.videoId, A)
   assert.equal(restored?.channelPointsRedemption, undefined)
 })
+
+test('detachChannelPointsRedemptions()', async (t) => {
+  t.beforeEach(reset)
+
+  await t.test('forgets the redemptions of the current and the queued tracks, and reports how many', () => {
+    queue.hydrateQueue({
+      current: { ...song(A), requestedBy: 'u1', channelPointsRedemption: redemption('d1') },
+      queue: [
+        { ...song(B), requestedBy: 'u2', channelPointsRedemption: redemption('d2') },
+        { ...song(C), requestedBy: 'u3' }
+      ]
+    })
+
+    assert.equal(queue.detachChannelPointsRedemptions(), 2)
+    assert.equal(queue.getCurrent()?.channelPointsRedemption, undefined)
+    assert.deepEqual(
+      queue.getQueue().map((item) => item.channelPointsRedemption),
+      [undefined, undefined]
+    )
+  })
+
+  await t.test('a detached track no longer touches Twitch when it ends or is removed', () => {
+    const calls: string[] = []
+    registerRedemptionHandler((tracked) => void calls.push(tracked.id))
+    queue.hydrateQueue({ queue: [{ ...song(B), requestedBy: 'u2', channelPointsRedemption: redemption('d3') }] })
+
+    queue.detachChannelPointsRedemptions()
+    queue.removeAt(0)
+
+    assert.deepEqual(calls, [])
+    registerRedemptionHandler(null)
+  })
+
+  await t.test('returns 0 and changes nothing when there is nothing to forget', () => {
+    queue.hydrateQueue({ queue: [{ ...song(B), requestedBy: 'u2' }] })
+    assert.equal(queue.detachChannelPointsRedemptions(), 0)
+  })
+})

@@ -11,7 +11,7 @@ import type {
   TwitchChatPermission
 } from './types.js'
 import { clearTwitchOAuthState, getPublicSecretsView, getSecrets, updateTwitchOAuthState } from '../../secrets.js'
-import { requestSong, setPaused } from '../../queue.js'
+import { detachChannelPointsRedemptions, requestSong, setPaused } from '../../queue.js'
 import {
   buildNowPlayingMessage,
   buildQueueMessage,
@@ -194,7 +194,10 @@ function matchesCommand(text: string, command: string): boolean {
   return normalized === command || normalized.startsWith(`${command} `)
 }
 
+const CHAT_START_WAIT_MS = 5000
+
 async function replyInChat(message: string): Promise<void> {
+  if (!chat?.isConnected() && chatStart) await Promise.race([chatStart, wait(CHAT_START_WAIT_MS)])
   if (!chat) return
   await chat.sendMessage(message).catch((error) => {
     chatLog.error(`Failed to send chat reply: ${error instanceof Error ? error.message : error}`)
@@ -254,7 +257,16 @@ async function handleChatMessage(message: TwitchChatMessage): Promise<void> {
   }
 }
 
-async function startChat(): Promise<void> {
+let chatStart: Promise<void> | null = null
+
+function startChat(): Promise<void> {
+  chatStart ??= connectChat().finally(() => {
+    chatStart = null
+  })
+  return chatStart
+}
+
+async function connectChat(): Promise<void> {
   if (!oauth || !client) return
 
   if (chat) {
@@ -339,6 +351,13 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+// A 4xx other than 429 is Twitch's final answer (the redemption was already closed by hand, the reward is gone): trying again
+// three times changes nothing. A network error, a timeout, 429 and 5xx are worth another try
+function isRetryable(error: unknown): boolean {
+  const status = error instanceof AppError && typeof error.params?.status === 'number' ? error.params.status : null
+  return status === null || status === 429 || status >= 500
+}
+
 // Sets the status with retries and backoff. Returns whether Twitch accepted it
 async function setRedemptionStatus(
   redemption: TwitchChannelPointsRedemption,
@@ -352,8 +371,8 @@ async function setRedemptionStatus(
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
 
-      if (attempt === REDEMPTION_RETRY_ATTEMPTS) {
-        log.error(`Failed to set redemption ${redemption.id} to ${status} after ${attempt} attempts: ${reason}`)
+      if (attempt === REDEMPTION_RETRY_ATTEMPTS || !isRetryable(error)) {
+        log.error(`Failed to set redemption ${redemption.id} to ${status} after ${attempt} attempt(s): ${reason}`)
         return false
       }
 
@@ -438,6 +457,9 @@ export async function disconnect(): Promise<void> {
     deviceAuthorizationPromise = null
     log.log('Device authorization cancelled due to disconnect')
   }
+
+  const detached = detachChannelPointsRedemptions()
+  if (detached > 0) log.warn(`${detached} queued redemption(s) stay UNFULFILLED on Twitch: fulfill or refund them in the rewards queue`)
 
   // asked before the tokens are forgotten locally; a failure does not stop the disconnect
   await oauth.revokeTokens()

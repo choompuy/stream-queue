@@ -201,7 +201,7 @@
       "disconnect": "Отключить",
       "disconnectConfirm": "Отключить Twitch? Команды чата и интеграция с наградами за баллы канала перестанут работать",
       "save": "Сохранить настройки Twitch",
-      "clientCredentialsNote": "Создайте приложение в Twitch Developer Console, чтобы получить Client ID и Client Secret",
+      "clientCredentialsNote": "Client ID для Twitch не найден. Создайте приложение типа Public в Twitch Developer Console, впишите его Client ID в файл .env рядом с программой как TWITCH_CLIENT_ID=... и перезапустите программу. Секрет не нужен.",
       "reward": "Награда Channel Points",
       "rewardNone": "Выберите награду",
       "rewardNote": "Погашения этой награды будут использоваться как запросы песен",

@@ -11,7 +11,7 @@ import { loadActivity } from './activity.js'
 import { loadBlocklist } from './blocklist.js'
 import { loadPlaylists } from './playlists.js'
 import { loadSecrets, loadConfig, loadOverlaySettings, loadNetworkInfo } from './settings.js'
-import { loadTwitchSettings, loadTwitchConfig, loadTwitchSecrets } from './twitch/index.js'
+import { loadTwitchSettings, loadTwitchConfig, loadTwitchSecrets, refreshTwitchHealth } from './twitch/index.js'
 import { isDashboardActive } from './tabs.js'
 import { setError } from '../shared.js'
 
@@ -52,7 +52,14 @@ async function init() {
 
   const poller = createPoller(POLLING, { shouldRun: isDashboardActive })
   poller.start()
-  window.addEventListener('pagehide', poller.stop)
+
+  const twitchPoller = createPoller([{ run: refreshTwitchHealth, every: 4000 }], { shouldRun: () => document.visibilityState === 'visible' })
+  twitchPoller.start()
+
+  window.addEventListener('pagehide', () => {
+    poller.stop()
+    twitchPoller.stop()
+  })
 
   log('Control panel initialized')
 }

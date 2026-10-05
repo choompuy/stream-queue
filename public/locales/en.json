@@ -201,7 +201,7 @@
       "disconnect": "Disconnect",
       "disconnectConfirm": "Disconnect Twitch? Chat commands and Channel Points integrations will stop working",
       "save": "Save Twitch settings",
-      "clientCredentialsNote": "Create an application in the Twitch Developer Console to get your Client ID and Client Secret",
+      "clientCredentialsNote": "No Twitch Client ID found. Create an application of type Public in the Twitch Developer Console, put its Client ID into the .env file next to the app as TWITCH_CLIENT_ID=..., and restart the app. A secret is not needed.",
       "reward": "Channel Points reward",
       "rewardNone": "Select reward",
       "rewardNote": "Redemptions of this reward will be used as song requests",

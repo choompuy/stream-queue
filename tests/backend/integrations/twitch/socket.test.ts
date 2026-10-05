@@ -17,7 +17,12 @@ class TestSocket extends ReconnectingSocket {
   protected readonly url: string
   protected readonly readyName = 'the test welcome'
   retryAllowed = true
-  protected timing = { initialDelayMs: 5, maxDelayMs: 20, maxAttempts: 3, readyTimeoutMs: 150 }
+  // stableAfterMs is short, so that an ordinary test connection counts as stable almost at once
+  protected timing = { initialDelayMs: 5, maxDelayMs: 20, maxAttempts: 3, readyTimeoutMs: 150, stableAfterMs: 10 }
+
+  slowDown(stableAfterMs: number, initialDelayMs: number, maxDelayMs: number): void {
+    this.timing = { ...this.timing, stableAfterMs, initialDelayMs, maxDelayMs }
+  }
 
   constructor(url: string) {
     super()
@@ -120,6 +125,24 @@ test('ReconnectingSocket', async (t) => {
       server.dropClients()
       await until(() => server.connections() === drop + 1 && socket.isConnected(), `reconnect after drop ${drop}`)
     }
+  })
+
+  await t.test('a connection that is dropped at once does not reset the reconnect pause', async () => {
+    const { server, socket } = await connected()
+    socket.slowDown(60_000, 20, 1000) // a connection counts as stable only after a minute
+    const times: number[] = []
+    await socket.connect()
+    times.push(Date.now())
+
+    for (let drop = 1; drop <= 4; drop++) {
+      server.dropClients()
+      await until(() => server.connections() === drop + 1 && socket.isConnected(), `reconnect after drop ${drop}`, 5000)
+      times.push(Date.now())
+    }
+
+    const gaps = times.slice(1).map((time, index) => time - times[index])
+    // 20, 40, 80, 160 ms in theory: each wait is longer than the one before, not the shortest every time
+    assert.ok(gaps[3] >= gaps[0] * 3, `the pause grew: ${gaps.join(', ')} ms`)
   })
 
   await t.test('never gives up: keeps retrying long after the old attempt limit', async () => {

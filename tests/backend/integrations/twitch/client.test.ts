@@ -54,6 +54,12 @@ test('TwitchClient authenticated requests', async (t) => {
     assert.equal(helix.length, 1)
   })
 
+  await t.test('the HTTP status travels with the error, so a final answer can be told from a passing failure', async () => {
+    stub([json(404, { message: 'redemption not found' })], refreshed)
+
+    await assert.rejects(connectedClient().getUserInfo(), (error: { params?: { status?: number } }) => error.params?.status === 404)
+  })
+
   await t.test('a 401 refreshes the token once and repeats the request with the new one', async () => {
     stub([json(401), json(200, USER)], refreshed)
 

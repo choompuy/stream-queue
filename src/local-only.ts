@@ -9,12 +9,18 @@ export function isLoopbackAddress(address: string | undefined): boolean {
 
 const withoutMappedPrefix = (address: string): string => address.replace(/^::ffff:/i, '').toLowerCase()
 
+const ADDRESSES_TTL_MS = 5000
+let cachedAddresses: { at: number; set: Set<string> } | null = null
+
 export function ownAddresses(): Set<string> {
+  if (cachedAddresses && Date.now() - cachedAddresses.at < ADDRESSES_TTL_MS) return cachedAddresses.set
+
   const addresses = Object.values(os.networkInterfaces())
     .flatMap((interfaces) => interfaces ?? [])
     .map((iface) => withoutMappedPrefix(iface.address.split('%')[0]))
 
-  return new Set(addresses)
+  cachedAddresses = { at: Date.now(), set: new Set(addresses) }
+  return cachedAddresses.set
 }
 
 export function isLocalAddress(address: string | undefined): boolean {

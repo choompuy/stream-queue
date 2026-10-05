@@ -46,6 +46,21 @@ export function hydrateQueue(data: { current?: QueueItem | null; queue?: QueueIt
   }
 }
 
+// Forgets the Channel Points redemption of every queued and current track (they stay as plain tracks). Returns how many there were
+export function detachChannelPointsRedemptions(): number {
+  let detached = 0
+
+  for (const item of [currentSong, ...queue]) {
+    if (item?.channelPointsRedemption) {
+      delete item.channelPointsRedemption
+      detached++
+    }
+  }
+
+  if (detached > 0) notifyStateChange()
+  return detached
+}
+
 export function getQueue(): QueueItem[] {
   return [...queue]
 }
@@ -208,7 +223,10 @@ export async function requestSong(
       song = await getVideoById(videoId, bypassFilters)
     } else {
       const songs = await searchSongs(query, bypassFilters)
-      song = selectBestSong(songs)
+      song = selectBestSong(
+        songs,
+        (candidate) => !isBlocked(candidate.videoId) && !isQueued(candidate.videoId) && !isActiveNonFallback(candidate.videoId)
+      )
     }
 
     if (!song) {

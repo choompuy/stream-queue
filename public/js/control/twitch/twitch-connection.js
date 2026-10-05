@@ -7,6 +7,8 @@ import { loadTwitchRewards, renderTwitchRewards } from './twitch-rewards.js'
 
 const POLL_INTERVAL_MS = 2000
 
+const UNHEALTHY_POLLS_BEFORE_WARNING = 2
+
 let pollController = null
 
 export function stopTwitchPolling() {
@@ -59,12 +61,39 @@ function navigateAuthorizationWindow(authWindow, url) {
   }
 }
 
+function isUnhealthy(health) {
+  return Boolean(health) && (health.auth === 'reauthorize' || !health.eventSub || !health.chat)
+}
+
 // no status -> disconnected
 function applyStatus(status) {
   state.twitch.connected = Boolean(status?.connected)
   state.twitch.user = status?.user ?? null
   state.twitch.connectedAt = status?.connectedAt ?? null
   state.twitch.health = status?.health ?? null
+  state.twitch.unhealthyPolls = isUnhealthy(state.twitch.health) ? 1 : 0
+}
+
+export function refreshTwitchHealth() {
+  return run(
+    'refreshing Twitch status',
+    async () => {
+      if (!state.twitch.configured || !state.twitch.connected) return
+
+      const status = await api.getTwitchStatus()
+
+      if (!status.connected) {
+        applyStatus(null)
+        renderTwitchConnection()
+        return
+      }
+
+      state.twitch.health = status.health ?? null
+      state.twitch.unhealthyPolls = isUnhealthy(state.twitch.health) ? state.twitch.unhealthyPolls + 1 : 0
+      renderTwitchHealth(true)
+    },
+    { silent: true }
+  )
 }
 
 export function connectTwitch() {
@@ -167,7 +196,7 @@ function renderTwitchHealth(isConnected) {
 
   if (isConnected && health) {
     if (health.auth === 'reauthorize') key = 'settings.twitch.healthReauthorize'
-    else if (!health.eventSub || !health.chat) key = 'settings.twitch.healthOffline'
+    else if (isUnhealthy(health) && state.twitch.unhealthyPolls >= UNHEALTHY_POLLS_BEFORE_WARNING) key = 'settings.twitch.healthOffline'
   }
 
   setText(dom.twitchHealthWarning, key ? t(key) : '')
@@ -178,10 +207,13 @@ export function renderTwitchConnection() {
   const { configured, connected, user } = state.twitch
 
   show(dom.twitchNotConfigured, !configured)
+  show(dom.twitchChannelField, configured)
   show(dom.twitchConnectionControls, configured)
 
   if (!configured) {
-    for (const element of [dom.twitchAuthorization, dom.twitchRewardSection, dom.twitchRewardForm]) show(element, false)
+    for (const element of [dom.twitchAuthorization, dom.twitchRewardSection, dom.twitchRewardForm, dom.twitchHealthWarning, dom.twitchChatCommandsPanel]) {
+      show(element, false)
+    }
     return
   }
 
@@ -192,8 +224,10 @@ export function renderTwitchConnection() {
   setClass(dom.twitchChanelName, 'text-green', isConnected)
   setClass(dom.twitchChanelName, 'text-red', !isConnected)
   if (dom.twitchChanelImg) {
-    show(dom.twitchChanelImg, isConnected)
-    dom.twitchChanelImg.src = isConnected ? user.profileImageUrl : ''
+    const avatar = isConnected ? user.profileImageUrl : ''
+    if (avatar) dom.twitchChanelImg.src = avatar
+    else dom.twitchChanelImg.removeAttribute('src')
+    show(dom.twitchChanelImg, Boolean(avatar))
   }
 
   show(dom.twitchConnectBtn, !isConnected)

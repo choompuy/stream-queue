@@ -162,7 +162,10 @@ function persistState(): void {
   const version = getFallbackSourceVersion()
   if (version !== savedTracksVersion) {
     savedTracksVersion = version
-    tracksStore.scheduleSave(() => ({ sourceTracks: getFallbackSourceTracks() }), onError)
+    tracksStore.scheduleSave(() => ({ sourceTracks: getFallbackSourceTracks() }), (error) => {
+      savedTracksVersion = -1 // not on disk: written again with the next save
+      onError(error)
+    })
   }
 }
 

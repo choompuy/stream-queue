@@ -5,10 +5,18 @@ const log = createLogger('SHUTDOWN')
 
 let shuttingDown = false
 
+// If saving never finishes (a stuck disk, a hung write) the process must still end: a crashed Node stays alive otherwise
+const FORCE_EXIT_AFTER_MS = 5000
+
 /** Saves everything that is still waiting to be written (settings, queue, logs) and then exits. Safe to call more than once. */
 export async function shutdown(code = 0, exit: (code: number) => void = (c) => process.exit(c)): Promise<void> {
   if (shuttingDown) return
   shuttingDown = true
+
+  setTimeout(() => {
+    log.error(`Saving did not finish in ${FORCE_EXIT_AFTER_MS / 1000}s, exiting anyway`)
+    exit(code)
+  }, FORCE_EXIT_AFTER_MS).unref()
 
   try {
     await flushAllStores()

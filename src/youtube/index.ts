@@ -198,8 +198,8 @@ async function performSearch(query: string, bypassFilters: boolean): Promise<Son
  * counts YouTube's own relevance rank, which is only known during the search: scoring the songs again here, without
  * it, could pick a different track than the one the list shows first.
  */
-export function selectBestSong(songs: Song[]): Song | null {
-  const selected = songs[0]
+export function selectBestSong(songs: Song[], isAvailable: (song: Song) => boolean = () => true): Song | null {
+  const selected = songs.find(isAvailable) ?? songs[0]
   if (!selected) return null
 
   debugLog(`[SELECT] "${selected.title}" - ${formatViews(selected.views)} views`)

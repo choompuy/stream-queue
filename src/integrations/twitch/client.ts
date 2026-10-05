@@ -78,7 +78,7 @@ export class TwitchClient {
       // Ignore invalid/non-JSON responses.
     }
 
-    throw new AppError('TWITCH_API_ERROR', `Twitch API error: ${message}`)
+    throw new AppError('TWITCH_API_ERROR', `Twitch API error: ${message}`, { status: response.status })
   }
 
   needsReauthorization(): boolean {
