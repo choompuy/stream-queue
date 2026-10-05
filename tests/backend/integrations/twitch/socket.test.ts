@@ -172,7 +172,10 @@ test('ReconnectingSocket', async (t) => {
 
     assert.equal(server.connections(), 1, 'no new connection was tried')
     assert.equal(logged.filter((line) => line.includes('Not reconnecting')).length, 1)
-    assert.equal(logged.some((line) => line.startsWith('Reconnect failed')), false)
+    assert.equal(
+      logged.some((line) => line.startsWith('Reconnect failed')),
+      false
+    )
   })
 
   await t.test('does not reconnect after disconnect(), and can be connected again afterwards', async () => {

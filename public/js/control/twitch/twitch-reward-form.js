@@ -5,8 +5,12 @@ import { trackChanges } from '../save-result.js'
 
 const TITLE_MAX_LENGTH = 45
 const PROMPT_MAX_LENGTH = 140
-const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/
 const DEFAULT_COLOR = '#000000'
+
+function normalizeColor(value) {
+  const hex = value.trim().replace(/^#/, '')
+  return /^[0-9A-Fa-f]{6}$/.test(hex) ? `#${hex.toUpperCase()}` : null
+}
 
 // `key` names Twitch's `<key>_setting` object and the `is_<key>_enabled` flag, `value` names the number inside them
 const LIMITS = [
@@ -98,21 +102,22 @@ export function readRewardForm() {
   const title = dom.twitchRewardTitle?.value.trim()
   const cost = Number(dom.twitchRewardCost?.value)
   const prompt = dom.twitchRewardPrompt?.value.trim()
-  const color = dom.twitchRewardBackgroundColor?.value.trim()
+  const typedColor = dom.twitchRewardBackgroundColor?.value.trim() ?? ''
+  const color = typedColor ? normalizeColor(typedColor) : null
   const data = {
     title,
     cost,
     // an empty prompt has to be sent to clear it on an existing reward
     prompt: state.twitch.editingReward ? prompt : prompt || undefined,
     is_enabled: Boolean(dom.twitchRewardEnabled?.checked),
-    background_color: color || undefined
+    background_color: color ?? undefined
   }
 
   const results = [
     check(dom.twitchRewardTitle, Boolean(title) && title.length <= TITLE_MAX_LENGTH),
     check(dom.twitchRewardCost, Number.isInteger(cost) && cost >= 1),
     check(dom.twitchRewardPrompt, !prompt || prompt.length <= PROMPT_MAX_LENGTH),
-    check(dom.twitchRewardBackgroundColor, !color || HEX_COLOR.test(color))
+    check(dom.twitchRewardBackgroundColor, !typedColor || color !== null)
   ]
 
   for (const { toggle, input, key, value } of LIMITS) {
@@ -155,8 +160,8 @@ export function bindRewardForm() {
     })
 
     colorText.addEventListener('input', () => {
-      const hex = colorText.value.trim()
-      if (HEX_COLOR.test(hex)) colorPicker.value = hex
+      const normalized = normalizeColor(colorText.value)
+      if (normalized) colorPicker.value = normalized.toLowerCase()
     })
   }
 
