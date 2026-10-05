@@ -7,6 +7,7 @@ import { blockTrackItem, createListView, row, rowMenu, statusPill } from './prim
 const STATUS_LABEL_KEYS = {
   accepted: 'activity.accepted',
   failed: 'activity.failed',
+  skipped: 'activity.skipped',
   rejected: 'activity.rejected'
 }
 

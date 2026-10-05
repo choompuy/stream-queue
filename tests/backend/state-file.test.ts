@@ -10,6 +10,7 @@ mkdirSync(join(dir, 'cache'), { recursive: true })
 const { sanitizeState, sanitizeQueueItem, initState } = await import('../../src/state-file.js')
 const queue = await import('../../src/queue.js')
 const { flushAllStores } = await import('../../src/persist.js')
+const { finishItem } = await import('../../src/finish.js')
 
 const A = 'aaaaaaaaaaa'
 const B = 'bbbbbbbbbbb'
@@ -185,5 +186,30 @@ test('initState()', async (t) => {
       queue.getQueue().map((entry) => entry.videoId),
       [C]
     )
+  })
+})
+
+test('closed redemptions are saved', async (t) => {
+  await t.test('sanitizeState() keeps the ids that are strings and defaults to none', () => {
+    assert.deepEqual(sanitizeState({ ...goodState(), closedRedemptions: ['a', '', 5, null, 'b'] }).closedRedemptions, ['a', 'b'])
+    assert.deepEqual(sanitizeState(goodState()).closedRedemptions, [])
+    assert.deepEqual(sanitizeState({ ...goodState(), closedRedemptions: 'nope' }).closedRedemptions, [])
+  })
+
+  await t.test('closing a redemption writes the state file at once, not after the usual delay', async () => {
+    const stateFile = join(dir, 'cache', 'queue-state.json')
+    initState()
+
+    finishItem({ ...song(A), requestedBy: 'viewer', channelPointsRedemption: { id: 'saved-now', rewardId: 'r', userName: 'viewer' } }, 'played')
+
+    // the normal save waits 250 ms: the file has to have it long before that
+    const deadline = Date.now() + 120
+    let saved: { closedRedemptions?: string[] } = {}
+    while (Date.now() < deadline && !saved.closedRedemptions?.includes('saved-now')) {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      saved = JSON.parse(readFileSync(stateFile, 'utf8'))
+    }
+
+    assert.ok(saved.closedRedemptions?.includes('saved-now'), 'the closed id is in the file')
   })
 })

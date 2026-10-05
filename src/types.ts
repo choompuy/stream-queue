@@ -8,8 +8,9 @@ export type ActivityReasonCode =
   | 'PLAYBACK_FAILED'
   | 'TRACK_REMOVED'
   | 'QUEUE_CLEARED'
+  | 'REWARD_NOT_REFUNDED'
 
-export type ActivityStatus = 'accepted' | 'rejected' | 'failed'
+export type ActivityStatus = 'accepted' | 'rejected' | 'failed' | 'skipped'
 export type ActivityEntry = {
   requestedBy: string
   query: string

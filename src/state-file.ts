@@ -4,12 +4,14 @@ import { isValidPlaylistId, isValidVideoId } from './youtube/url.js'
 import { getQueue, getCurrent, hydrateQueue } from './queue.js'
 import { getFallbackProgress, getFallbackSourceTracks, getFallbackSourceVersion, hydrateFallback, FallbackSnapshot } from './fallback.js'
 import { onStateChange } from './state-events.js'
+import { getClosedRedemptionIds, registerClosedChangeListener, restoreClosedRedemptions } from './finish.js'
 import { createLogger, describeError } from './logger.js'
 
 export type StateFile = {
   current: QueueItem | null
   queue: QueueItem[]
   fallback: Omit<FallbackSnapshot, 'sourceTracks'>
+  closedRedemptions: string[]
 }
 
 type TracksFile = { sourceTracks: Song[] }
@@ -18,6 +20,7 @@ export type SanitizedState = {
   current: QueueItem | null
   queue: QueueItem[]
   fallback: FallbackSnapshot | undefined
+  closedRedemptions: string[]
   problems: string[]
 }
 
@@ -135,7 +138,11 @@ export function sanitizeState(raw: unknown): SanitizedState {
   if (invalid) problems.push(`queue: dropped ${invalid} invalid item(s)`)
   if (duplicates) problems.push(`queue: dropped ${duplicates} duplicate item(s)`)
 
-  return { current, queue, fallback: sanitizeFallback(data.fallback, problems), problems }
+  const closedRedemptions = Array.isArray(data.closedRedemptions)
+    ? data.closedRedemptions.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(-500)
+    : []
+
+  return { current, queue, fallback: sanitizeFallback(data.fallback, problems), closedRedemptions, problems }
 }
 
 const store = createFileStore<Partial<StateFile>>(() => cachePath('queue-state.json'))
@@ -147,7 +154,8 @@ function stateSnapshot(): StateFile {
   return {
     current: getCurrent(),
     queue: getQueue(),
-    fallback: getFallbackProgress()
+    fallback: getFallbackProgress(),
+    closedRedemptions: getClosedRedemptionIds()
   }
 }
 
@@ -183,10 +191,11 @@ export function loadState(): void {
 
   // an older state file still carries the tracks inside `fallback`: they are used until the track file exists
   const raw = tracks.length > 0 && isObject(saved.fallback) ? { ...saved, fallback: { ...saved.fallback, sourceTracks: tracks } } : saved
-  const { current, queue, fallback, problems } = sanitizeState(raw)
+  const { current, queue, fallback, closedRedemptions, problems } = sanitizeState(raw)
 
   for (const problem of problems) log.warn(problem)
 
+  restoreClosedRedemptions(closedRedemptions)
   attempt('queue', () => hydrateQueue({ current, queue }))
   attempt('fallback', () => hydrateFallback(fallback))
   savedTracksVersion = tracks.length > 0 ? getFallbackSourceVersion() : -1
@@ -203,4 +212,9 @@ export function initState(): void {
 
   loadState()
   onStateChange(persistState)
+
+  registerClosedChangeListener(() => {
+    persistState()
+    void store.flush()
+  })
 }

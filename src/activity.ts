@@ -61,6 +61,21 @@ export function logAcceptance(requestedBy: string, query: string, title: string,
   logActivity({ requestedBy, query, title, videoId, status: 'accepted', reasonCode: null })
 }
 
+/**
+ * A track bought with Channel Points was skipped. Skipping does not touch the reward (the streamer or a moderator decides):
+ * it stays UNFULFILLED on Twitch with the points held, and this entry is where that can be seen.
+ */
+export function logSkippedWithOpenReward(item: QueueItem): void {
+  logActivity({
+    requestedBy: item.requestedBy,
+    query: item.url,
+    title: item.title,
+    videoId: item.videoId,
+    status: 'skipped',
+    reasonCode: 'REWARD_NOT_REFUNDED'
+  })
+}
+
 export function logFailure(item: QueueItem, reasonCode: ActivityReasonCode, reasonParams?: ReasonParams): void {
   logActivity({
     requestedBy: item.requestedBy,

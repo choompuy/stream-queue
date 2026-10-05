@@ -7,7 +7,8 @@ import { join } from 'node:path'
 // data/ and cache/ are read relative to the working directory: keep the test away from the real ones
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
-const { registerRedemptionHandler } = await import('../../src/finish.js')
+const { registerRedemptionHandler, registerClosedChangeListener, restoreClosedRedemptions, getClosedRedemptionIds } = await import('../../src/finish.js')
+const { getActivity, clearActivity } = await import('../../src/activity.js')
 const queue = await import('../../src/queue.js')
 const player = await import('../../src/player.js')
 const { blockTrack, unblockTrack } = await import('../../src/blocklist.js')
@@ -32,14 +33,15 @@ const C = 'ccccccccccc'
 const D = 'ddddddddddd'
 
 let outcomes: string[] = []
-registerRedemptionHandler((tracked, outcome) =>
-  outcomes.push(`${tracked.id}:${outcome.status === 'succeeded' ? 'FULFILLED' : `CANCELED/${outcome.reason.code}`}`)
-)
+const recordOutcome: Parameters<typeof registerRedemptionHandler>[0] = (tracked, outcome) =>
+  void outcomes.push(`${tracked.id}:${outcome.status === 'succeeded' ? 'FULFILLED' : `CANCELED/${outcome.reason.code}`}`)
+registerRedemptionHandler(recordOutcome)
 
 function reset(): void {
   queue.clearQueue()
   queue.setCurrent(null)
   outcomes = []
+  clearActivity()
   unblockTrack(A)
   run++
 }
@@ -82,6 +84,24 @@ test('a Channel Points redemption is closed by the way its track leaves', async 
     queue.setCurrent({ ...song(A), requestedBy: 'user', channelPointsRedemption: redemption('r1') })
     player.skipCurrent()
     assert.deepEqual(outcomes, [])
+  })
+
+  await t.test('a skip that leaves a reward open is written to the activity journal, so it can be seen', () => {
+    queue.setCurrent({ ...song(A), requestedBy: 'viewer', channelPointsRedemption: redemption('r1') })
+    player.skipCurrent()
+
+    const [entry, ...others] = getActivity()
+    assert.equal(others.length, 0)
+    assert.equal(entry.status, 'skipped')
+    assert.equal(entry.reasonCode, 'REWARD_NOT_REFUNDED')
+    assert.equal(entry.requestedBy, 'viewer')
+    assert.equal(entry.videoId, A)
+  })
+
+  await t.test('skipping a track that was not bought with points writes nothing (it would only be noise)', () => {
+    queue.setCurrent({ ...song(A), requestedBy: 'chatter' })
+    player.skipCurrent()
+    assert.deepEqual(getActivity(), [])
   })
 
   await t.test('a redemption is closed only once', () => {
@@ -164,11 +184,48 @@ test('detachChannelPointsRedemptions()', async (t) => {
     queue.removeAt(0)
 
     assert.deepEqual(calls, [])
-    registerRedemptionHandler(null)
+    registerRedemptionHandler(recordOutcome)
   })
 
   await t.test('returns 0 and changes nothing when there is nothing to forget', () => {
     queue.hydrateQueue({ queue: [{ ...song(B), requestedBy: 'u2' }] })
     assert.equal(queue.detachChannelPointsRedemptions(), 0)
+  })
+})
+
+test('closed redemptions across a restart', async (t) => {
+  t.beforeEach(reset)
+
+  await t.test('a restored track whose redemption was already closed does not close it again', () => {
+    restoreClosedRedemptions([tag('old1')])
+    queue.setCurrent({ ...song(A), requestedBy: 'viewer', channelPointsRedemption: redemption('old1') })
+
+    player.endCurrent(A)
+
+    assert.deepEqual(outcomes, [])
+  })
+
+  await t.test('the closed ids are available to be saved, and the listener hears every closing', () => {
+    let heard = 0
+    registerClosedChangeListener(() => void heard++)
+
+    queue.setCurrent({ ...song(A), requestedBy: 'viewer', channelPointsRedemption: redemption('r9') })
+    player.endCurrent(A)
+
+    assert.equal(heard, 1)
+    assert.ok(getClosedRedemptionIds().includes(tag('r9')))
+    registerClosedChangeListener(null)
+  })
+
+  await t.test('a failing listener does not stop the redemption from being closed', () => {
+    registerClosedChangeListener(() => {
+      throw new Error('disk full')
+    })
+
+    queue.setCurrent({ ...song(A), requestedBy: 'viewer', channelPointsRedemption: redemption('r10') })
+    player.endCurrent(A)
+
+    assert.deepEqual(outcomes, [`${tag('r10')}:FULFILLED`])
+    registerClosedChangeListener(null)
   })
 })

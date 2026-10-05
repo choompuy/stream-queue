@@ -21,6 +21,22 @@ export function registerRedemptionHandler(next: typeof handler): void {
 const CLOSED_LIMIT = 500
 const closed = new Set<string>()
 
+let onClosedChange: (() => void) | null = null
+
+/** Called every time a redemption is closed, so that whoever saves the state can write it at once. */
+export function registerClosedChangeListener(listener: (() => void) | null): void {
+  onClosedChange = listener
+}
+
+export function getClosedRedemptionIds(): string[] {
+  return [...closed]
+}
+
+export function restoreClosedRedemptions(ids: string[]): void {
+  for (const id of ids) closed.add(id)
+  while (closed.size > CLOSED_LIMIT) closed.delete(closed.values().next().value as string)
+}
+
 function markClosed(id: string): boolean {
   if (closed.has(id)) return false
 
@@ -41,6 +57,12 @@ export function finishItem(item: QueueItem | null | undefined, outcome: ItemOutc
   if (!markClosed(tracked.id)) {
     log.warn(`redemption ${tracked.id} was already closed, ignored`)
     return
+  }
+
+  try {
+    onClosedChange?.()
+  } catch (error) {
+    log.error(`could not save the closed redemption ${tracked.id}: ${describeError(error)}`)
   }
 
   const result: RedemptionOutcome =

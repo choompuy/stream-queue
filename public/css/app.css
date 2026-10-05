@@ -606,6 +606,11 @@ button:disabled {
 }
 
 .status-pill.failed {
+  background-color: var(--accent-red-bg);
+  color: var(--accent-red);
+}
+
+.status-pill.skipped {
   background-color: var(--accent-blue-bg);
   color: var(--accent-blue);
 }
