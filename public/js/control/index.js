@@ -1,5 +1,6 @@
 import { api } from './api.js'
-import { dom, log } from './state.js'
+import { log } from './state.js'
+import { dom } from './dom.js'
 import { initI18n } from '../i18n.js'
 import './player.js'
 import { run } from './run.js'

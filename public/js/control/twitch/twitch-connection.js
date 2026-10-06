@@ -2,7 +2,8 @@ import { show, setText, setClass } from '../../shared.js'
 import { t } from '../../i18n.js'
 import { api, ApiError } from '../api.js'
 import { run } from '../run.js'
-import { state, dom, log } from '../state.js'
+import { state, log } from '../state.js'
+import { dom } from '../dom.js'
 import { loadTwitchRewards, renderTwitchRewards } from './twitch-rewards.js'
 
 const POLL_INTERVAL_MS = 2000

@@ -1,7 +1,9 @@
 import { setChecked, setFieldState, setValue } from '../../shared.js'
 import { api } from '../api.js'
 import { run } from '../run.js'
-import { state, dom, CHAT_COMMAND_FIELDS } from '../state.js'
+import { state } from '../state.js'
+import { dom } from '../dom.js'
+import { CHAT_COMMAND_FIELDS } from '../fields.js'
 import { reportSaveResult, trackChanges } from '../save-result.js'
 
 const DEFAULT_COOLDOWN_SECONDS = 5

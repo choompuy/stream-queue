@@ -1,5 +1,6 @@
 import { api } from './api.js'
-import { state, dom, log } from './state.js'
+import { state, log } from './state.js'
+import { dom } from './dom.js'
 import { views } from './views/index.js'
 import { run } from './run.js'
 import { refreshFallbackState } from './fallback.js'

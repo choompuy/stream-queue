@@ -12,7 +12,7 @@ const workDir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
 cpSync(locales, join(workDir, 'public/locales'), { recursive: true })
 process.chdir(workDir)
 
-const { buildRedemptionAcceptedMessage, buildRedemptionRejectionMessage } = await import('../../src/chat-replies.js')
+const { buildRedemptionAcceptedMessage, buildRedemptionRejectionMessage } = await import('../../src/integrations/twitch/chat-replies.js')
 
 test('buildRedemptionAcceptedMessage', async (t) => {
   await t.test('names the track and its place in the queue', () => {

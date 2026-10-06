@@ -1,5 +1,6 @@
 import { api } from './api.js'
-import { dom, state } from './state.js'
+import { state } from './state.js'
+import { dom } from './dom.js'
 import { run } from './run.js'
 import { refreshState } from './queue.js'
 

@@ -1,6 +1,6 @@
 import { PAUSE_ICON, PLAY_ICON, DELETE_ICON } from '../../icons.js'
 import { t } from '../../i18n.js'
-import { dom } from '../state.js'
+import { dom } from '../dom.js'
 import { createListView, row, rowMenu } from './primitives.js'
 
 export const playlistsView = createListView(dom.playlistsListWrapper, {
