@@ -1,5 +1,5 @@
 import WebSocket from 'ws'
-import type { createLogger } from '../../logger.js'
+import type { createLogger } from '../../infra/logger.js'
 
 /**
  * Closes a socket that may still be connecting. ws emits 'error' when a CONNECTING socket is closed; with the listeners

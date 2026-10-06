@@ -1,7 +1,7 @@
-import { translateWithFallback, t } from '../../i18n.js'
-import { getSettings } from '../../settings.js'
-import { getState } from '../../player.js'
-import type { PlayerState, FailureReason } from '../../types.js'
+import { translateWithFallback, t } from '../../core/i18n.js'
+import { getSettings } from '../../core/settings.js'
+import { getState } from '../../core/player.js'
+import type { PlayerState, FailureReason } from '../../core/types.js'
 
 const truncate = (s: string, max = 40) => {
   const chars = Array.from(s)

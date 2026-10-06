@@ -1,6 +1,6 @@
-import { createLogger } from '../../logger.js'
-import { AppError } from '../../types.js'
-import type { TwitchDeviceCodeResponse, TwitchUserInfo } from './types.js'
+import { createLogger } from '../../infra/logger.js'
+import { AppError } from '../../core/types.js'
+import type { TwitchDeviceCodeResponse, TwitchUserInfo } from '../../core/types.js'
 import type { TwitchOAuth } from './oauth.js'
 
 const log = createLogger('TWITCH DEVICE AUTH')

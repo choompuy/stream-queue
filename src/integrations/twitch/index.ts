@@ -1,11 +1,11 @@
-import type { TwitchAuthConfig, TwitchUserInfo, TwitchDeviceCodeResponse } from './types.js'
+import type { TwitchAuthConfig, TwitchUserInfo, TwitchDeviceCodeResponse } from '../../core/types.js'
 import type { TwitchHealth } from './integration.js'
 import type { TwitchClient } from './client.js'
 import type { TwitchIntegration } from './integration.js'
 import type { TwitchDeps } from './integration.js'
 import { createTwitchIntegration as createTwitchIntegrationImpl } from './integration.js'
 import { hasPermission, matchesCommand } from './chat-commands.js'
-import type { TwitchChatMessage } from './types.js'
+import type { TwitchChatMessage } from '../../core/types.js'
 
 let current: TwitchIntegration | null = null
 

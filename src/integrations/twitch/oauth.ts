@@ -1,5 +1,5 @@
-import { createLogger } from '../../logger.js'
-import { AppError } from '../../types.js'
+import { createLogger } from '../../infra/logger.js'
+import { AppError } from '../../core/types.js'
 import type {
   TwitchAuthConfig,
   TwitchDeviceCodeResponse,
@@ -7,7 +7,7 @@ import type {
   TwitchOAuthOptions,
   TwitchTokenData,
   TwitchTokenResponse
-} from './types.js'
+} from '../../core/types.js'
 
 const DEFAULT_SCOPES = ['chat:read', 'chat:edit', 'channel:manage:redemptions']
 const REFRESH_BUFFER_MS = 5 * 60 * 1000

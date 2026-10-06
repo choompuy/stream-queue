@@ -1,5 +1,5 @@
-import type { TwitchChatMessage, TwitchChatPermission } from './types.js'
-import type { TwitchChatCommandsConfig } from './types.js'
+import type { TwitchChatMessage, TwitchChatPermission } from '../../core/types.js'
+import type { TwitchChatCommandsConfig } from '../../core/types.js'
 
 export function hasPermission(message: TwitchChatMessage, permission: TwitchChatPermission): boolean {
   switch (permission) {

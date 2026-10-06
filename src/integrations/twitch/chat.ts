@@ -1,8 +1,8 @@
 import type WebSocket from 'ws'
 import { TwitchOAuth } from './oauth.js'
 import { ReconnectingSocket } from './socket.js'
-import type { TwitchChatMessage } from './types.js'
-import { createLogger } from '../../logger.js'
+import type { TwitchChatMessage } from '../../core/types.js'
+import { createLogger } from '../../infra/logger.js'
 
 const log = createLogger('TWITCH CHAT')
 

@@ -1,7 +1,7 @@
-import type { TwitchTokenData } from '../../types.js'
+import type { TwitchTokenData } from '../../core/types.js'
 
 // these three are stored in secrets.json, so they live in the shared types and are only re-exported here
-export type { TwitchTokenData, TwitchUserInfo } from '../../types.js'
+export type { TwitchTokenData, TwitchUserInfo } from '../../core/types.js'
 
 export type TwitchAuthConfig = {
   clientId: string

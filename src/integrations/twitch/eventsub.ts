@@ -1,7 +1,7 @@
 import { CHANNEL_POINTS_REDEMPTION, type TwitchClient } from './client.js'
 import { ReconnectingSocket, closeQuietly } from './socket.js'
-import type { EventSubMessage, TwitchChannelPointsRedemption } from './types.js'
-import { createLogger } from '../../logger.js'
+import type { EventSubMessage, TwitchChannelPointsRedemption } from '../../core/types.js'
+import { createLogger } from '../../infra/logger.js'
 
 const log = createLogger('TWITCH EVENTSUB')
 

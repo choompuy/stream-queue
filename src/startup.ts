@@ -1,6 +1,6 @@
-import { getState, moveToNext } from './player.js'
-import { refreshFallback } from './fallback.js'
-import { createLogger, describeError } from './logger.js'
+import { getState, moveToNext } from './core/player.js'
+import { refreshFallback } from './core/fallback.js'
+import { createLogger, describeError } from './infra/logger.js'
 
 const log = createLogger('SERVER')
 

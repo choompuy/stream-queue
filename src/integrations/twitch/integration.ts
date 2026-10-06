@@ -1,10 +1,10 @@
-import { createLogger } from '../../logger.js'
-import { AppError } from '../../types.js'
-import { updateTwitchOAuthState, clearTwitchOAuthState, getSecrets, getPublicSecretsView } from '../../secrets.js'
-import { detachChannelPointsRedemptions } from '../../queue.js'
-import { registerRedemptionHandler, type RedemptionOutcome } from '../../finish.js'
-import { emit } from '../../state-events.js'
-import type { QueueItem } from '../../types.js'
+import { createLogger } from '../../infra/logger.js'
+import { AppError } from '../../core/types.js'
+import { updateTwitchOAuthState, clearTwitchOAuthState, getSecrets, getPublicSecretsView } from '../../infra/secrets.js'
+import { detachChannelPointsRedemptions } from '../../core/queue.js'
+import { registerRedemptionHandler, type RedemptionOutcome } from '../../core/finish.js'
+import { emit } from '../../infra/state-events.js'
+import type { QueueItem } from '../../core/types.js'
 import { TwitchOAuth } from './oauth.js'
 import { TwitchClient } from './client.js'
 import { TwitchEventSub } from './eventsub.js'
@@ -13,13 +13,13 @@ import { DeviceAuthorization } from './device-auth.js'
 import { RedemptionHandler } from './redemptions.js'
 import { ChatCommands } from './chat-commands.js'
 import { ChatReplier, buildRedemptionAcceptedMessage } from './chat-replies.js'
-import { getTwitchConfig } from './config.js'
+import { getTwitchConfig } from '../../core/config.js'
 import type {
   TwitchAuthConfig,
   TwitchDeviceCodeResponse,
   TwitchUserInfo,
   TwitchChatMessage
-} from './types.js'
+} from '../../core/types.js'
 
 export type TwitchHealth = {
   auth: 'ok' | 'reauthorize'

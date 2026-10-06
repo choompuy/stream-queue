@@ -1,0 +1,63 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import { getAppRoot } from '../infra/runtime.js'
+import { getSettings } from './settings.js'
+import { createLogger, describeError } from '../infra/logger.js'
+
+// resolved when used, not when the module is imported
+const localesDir = (): string => path.join(getAppRoot(), 'public/locales')
+const DEFAULT_LOCALE = 'en'
+
+const log = createLogger('I18N')
+
+type Dict = { [key: string]: Dict | string }
+
+const cache = new Map<string, Dict>()
+
+function loadLocale(locale: string): Dict {
+  const cached = cache.get(locale)
+  if (cached) return cached
+
+  try {
+    const raw = fs.readFileSync(path.join(localesDir(), `${locale}.json`), 'utf-8')
+    const dict = JSON.parse(raw) as Dict
+    cache.set(locale, dict)
+    return dict
+  } catch (error) {
+    log.error(`Failed to load locale "${locale}": ${describeError(error)}`)
+    return {} // Return empty object without caching - allows retry on subsequent calls
+  }
+}
+
+export function t(locale: string, key: string, params: Record<string, string | number> = {}): string | null {
+  let value: unknown = loadLocale(locale)
+
+  for (const part of key.split('.')) {
+    if (value && typeof value === 'object' && part in (value as Dict)) {
+      value = (value as Dict)[part]
+    } else {
+      value = undefined
+      break
+    }
+  }
+
+  if (typeof value !== 'string') {
+    if (locale !== DEFAULT_LOCALE) return t(DEFAULT_LOCALE, key, params)
+    return null
+  }
+
+  return Object.entries(params).reduce((acc, [param, replacement]) => acc.replaceAll(`{{${param}}}`, () => String(replacement)), value)
+}
+
+export function translateWithFallback(key: string, params: Record<string, string | number> | undefined, fallback: string): string {
+  return t(getSettings().locale, key, params) ?? fallback
+}
+
+function codeToI18nKey(code: string): string {
+  const camel = code.toLowerCase().replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase())
+  return `api.errors.${camel}`
+}
+
+export function translateErrorCode(locale: string, code: string, params?: Record<string, string | number>): string | null {
+  return t(locale, codeToI18nKey(code), params)
+}

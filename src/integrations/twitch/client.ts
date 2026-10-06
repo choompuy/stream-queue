@@ -10,10 +10,10 @@ import type {
   TwitchCreateCustomReward,
   TwitchCreateCustomRewardResponse,
   TwitchUpdateCustomReward
-} from './types.js'
+} from '../../core/types.js'
 import { TwitchOAuth } from './oauth.js'
-import { AppError } from '../../types.js'
-import { createLogger } from '../../logger.js'
+import { AppError } from '../../core/types.js'
+import { createLogger } from '../../infra/logger.js'
 
 const log = createLogger('TWITCH CLIENT')
 

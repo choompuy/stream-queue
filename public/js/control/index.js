@@ -15,12 +15,16 @@ import { loadSecrets, loadConfig, loadOverlaySettings, loadNetworkInfo } from '.
 import { loadTwitchSettings, loadTwitchConfig, loadTwitchSecrets, refreshTwitchHealth } from './twitch/index.js'
 import { isDashboardActive } from './tabs.js'
 import { setError } from '../shared.js'
+import { connectEvents } from '../sse.js'
 
-const POLLING = [
-  { run: () => refreshState(true), every: 2000 },
-  { run: () => refreshFallbackState(true), every: 30000 },
-  { run: () => loadActivity(true), every: 5000 }
+const FALLBACK_POLLING = [
+  { run: () => refreshState(true), every: 10000 },
+  { run: () => refreshFallbackState(true), every: 10000 },
+  { run: () => loadActivity(true), every: 10000 },
+  { run: refreshTwitchHealth, every: 10000 }
 ]
+
+const dirtyTopics = new Set()
 
 async function init() {
   const settings = await run('fetching settings', () => api.getSettings(), { silent: true })
@@ -51,15 +55,67 @@ async function init() {
     refreshFallbackState()
   ])
 
-  const poller = createPoller(POLLING, { shouldRun: isDashboardActive })
-  poller.start()
+  // SSE connection
+  let sseConnection = null
+  let fallbackPoller = null
 
-  const twitchPoller = createPoller([{ run: refreshTwitchHealth, every: 4000 }], { shouldRun: () => document.visibilityState === 'visible' })
-  twitchPoller.start()
+  function handleSSEChange(topic) {
+    if (!isDashboardActive()) {
+      dirtyTopics.add(topic)
+      return
+    }
+
+    switch (topic) {
+      case 'state':
+        refreshState(true)
+        break
+      case 'activity':
+        loadActivity(true)
+        break
+      case 'fallback':
+        refreshFallbackState(true)
+        break
+      case 'twitch':
+        refreshTwitchHealth()
+        break
+    }
+  }
+
+  function handleSSEStatus(status) {
+    if (status === 'open') {
+      log('SSE connected')
+      if (fallbackPoller) {
+        fallbackPoller.stop()
+        fallbackPoller = null
+      }
+    } else {
+      log('SSE down, enabling fallback polling')
+      if (!fallbackPoller) {
+        fallbackPoller = createPoller(FALLBACK_POLLING, { shouldRun: isDashboardActive })
+        fallbackPoller.start()
+      }
+    }
+  }
+
+  sseConnection = connectEvents({
+    topics: ['state', 'activity', 'fallback', 'twitch'],
+    onChange: handleSSEChange,
+    onStatus: handleSSEStatus
+  })
+
+  // Re-sync dirty topics when tab becomes active
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && dirtyTopics.size > 0) {
+      for (const topic of dirtyTopics) {
+        handleSSEChange(topic)
+      }
+      dirtyTopics.clear()
+    }
+  })
 
   window.addEventListener('pagehide', () => {
-    poller.stop()
-    twitchPoller.stop()
+    if (sseConnection) sseConnection.close()
+    if (fallbackPoller) fallbackPoller.stop()
   })
 
   log('Control panel initialized')

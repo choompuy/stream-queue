@@ -1,6 +1,6 @@
-import { createConfigModule, field, rules, type Schema } from '../../config-helper.js'
-import { dataPath, deepMerge } from '../../persist.js'
-import type { TwitchChatCommandConfig, TwitchChatPermission, TwitchConfig } from './types.js'
+import { createConfigModule, field, rules, type Schema } from '../../infra/config-helper.js'
+import { dataPath, deepMerge } from '../../infra/persist.js'
+import type { TwitchChatCommandConfig, TwitchChatPermission, TwitchConfig } from '../../core/types.js'
 
 const COMMAND_PATTERN = /^![\p{L}\p{N}]+(?: [\p{L}\p{N}]+)*$/u
 const PERMISSIONS: TwitchChatPermission[] = ['everyone', 'moderator', 'broadcaster']

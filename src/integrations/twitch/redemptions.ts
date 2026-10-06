@@ -1,7 +1,7 @@
-import { createLogger } from '../../logger.js'
-import { AppError } from '../../types.js'
-import type { FailureReason } from '../../types.js'
-import type { TwitchChannelPointsRedemption } from './types.js'
+import { createLogger } from '../../infra/logger.js'
+import { AppError } from '../../core/types.js'
+import type { FailureReason } from '../../core/types.js'
+import type { TwitchChannelPointsRedemption } from '../../core/types.js'
 import { TwitchClient } from './client.js'
 
 const log = createLogger('TWITCH REDEMPTIONS')
