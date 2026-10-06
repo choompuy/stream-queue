@@ -1,22 +1,24 @@
 import { Song, AppError } from '../types.js'
-import {
-  youtube,
-  videoToSong,
-  isValidSong,
-  getFilterFailureReason,
-  throwFilterError,
-  fetchPlaylistMeta,
-  PlaylistMeta,
-  VIDEO_DETAILS_PART,
-  MUSIC_CATEGORY_ID,
-  RequestNotSentError,
-  PlaylistFetchResult
-} from './client.js'
+import { youtube, fetchPlaylistMeta, VIDEO_DETAILS_PART, RequestNotSentError } from './client.js'
+import { videoToSong } from './mapper.js'
+import { isValidSong, getFilterFailureReason, throwFilterError, MUSIC_CATEGORY_ID } from './filters.js'
 import { normalize, combinedScore, formatViews } from './scoring.js'
 import { getSearchCache, setSearchCache, getVideoCache, setVideoCache, reserveSearchQuota, releaseSearchQuota, CACHE_LIMITS } from './cache.js'
 import { VideoItem, SearchItem, PlaylistItem } from './types.js'
 import { getConfig } from '../config.js'
 import { createLogger, describeError } from '../logger.js'
+
+export type PlaylistMeta = {
+  id: string
+  title: string
+  thumbnail: string
+  itemCount: number
+}
+
+export type PlaylistFetchResult = { songs: Song[]; truncated: boolean }
+
+export { fetchPlaylistMeta, VIDEO_DETAILS_PART, RequestNotSentError } from './client.js'
+export { MUSIC_CATEGORY_ID, isLiveBroadcast } from './filters.js'
 
 const pendingSearches = new Map<string, Promise<Song[]>>()
 const pendingVideos = new Map<string, Promise<Song | null>>()
@@ -90,7 +92,7 @@ async function fetchVideoById(videoId: string, bypassFilters: boolean): Promise<
     const song = videoToSong(video)
 
     if (!bypassFilters) {
-      const reason = getFilterFailureReason(song, video)
+      const reason = getFilterFailureReason(song, video, getConfig())
       if (reason) {
         debugLog(`[VIDEO] Video rejected (${reason}): "${song.title}"`)
         setVideoCache(videoId, null, filtersVersion(), reason)
@@ -126,9 +128,10 @@ export async function searchSongs(query: string, bypassFilters = false): Promise
 }
 
 function mapValidSongs(videos: VideoItem[], bypassFilters = false): Song[] {
+  const config = getConfig()
   return videos
     .map((video) => ({ video, song: videoToSong(video) }))
-    .filter(({ video, song }) => bypassFilters || isValidSong(song, video))
+    .filter(({ video, song }) => bypassFilters || isValidSong(song, video, config))
     .map(({ song }) => song)
 }
 
@@ -205,9 +208,6 @@ export function selectBestSong(songs: Song[], isAvailable: (song: Song) => boole
   debugLog(`[SELECT] "${selected.title}" - ${formatViews(selected.views)} views`)
   return selected
 }
-
-export { fetchPlaylistMeta }
-export type { PlaylistMeta, PlaylistFetchResult }
 
 export async function fetchPlaylistSongs(playlistId: string): Promise<PlaylistFetchResult> {
   if (!playlistId) {
