@@ -1,5 +1,6 @@
 import { $, formatDuration, createLogger, getErrorMessage, show, setClass, setText } from './shared.js'
 import { initI18n, t, getCurrentLocale } from './i18n.js'
+import { loadYouTubeApi, createYouTubePlayer, PLAYER_ERROR, playerErrorKey } from './youtube-player.js'
 
 let player = null
 let currentState = null
@@ -14,7 +15,8 @@ let resetCounter = 0
 
 const log = createLogger('PREVIEW')
 
-const isPlaybackSource = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+let isPlaybackSource = false
 
 const REQUEST_TIMEOUT_MS = 8000
 const STALE_POLL_MS = 15000
@@ -300,45 +302,45 @@ function onPlayerError(event) {
   })
 }
 
-function createPlayer() {
-  if (!isPlaybackSource || typeof YT === 'undefined' || !YT.Player) return
+async function createPlayer() {
+  if (!isPlaybackSource) return
 
   playerGeneration += 1
   const generation = playerGeneration
-  player = new YT.Player('player', {
-    width: '100%',
-    height: '100%',
 
-    playerVars: {
-      autoplay: 0,
-      controls: 0,
-      rel: 0,
-      fs: 0,
-      cc_load_policy: 0,
-      iv_load_policy: 3,
-      disablekb: 1,
-      playsinline: 1
-    },
-
-    events: {
-      onReady: (event) => {
-        if (generation !== playerGeneration) return
-        onPlayerReady(event)
+  try {
+    player = await createYouTubePlayer('player', {
+      playerVars: {
+        autoplay: 0,
+        controls: 0,
+        rel: 0,
+        fs: 0,
+        cc_load_policy: 0,
+        iv_load_policy: 3,
+        disablekb: 1,
+        playsinline: 1
       },
+      events: {
+        onReady: (event) => {
+          if (generation !== playerGeneration) return
+          onPlayerReady(event)
+        },
+        onStateChange: (event) => {
+          if (generation !== playerGeneration) return
+          onPlayerStateChange(event)
+        },
 
-      onStateChange: (event) => {
-        if (generation !== playerGeneration) return
-        onPlayerStateChange(event)
-      },
-
-      onError: (event) => {
-        if (generation !== playerGeneration) return
-        onPlayerError(event)
+        onError: (event) => {
+          if (generation !== playerGeneration) return
+          onPlayerError(event)
+        }
       }
-    }
-  })
+    })
 
-  log(`YouTube player created: generation ${generation}`)
+    log(`YouTube player created: generation ${generation}`)
+  } catch (error) {
+    log('Failed to create player:', error)
+  }
 }
 
 async function resetPlayer() {
@@ -374,32 +376,40 @@ async function resetPlayer() {
   return token
 }
 
-// OBS often starts before the network is up: a failed load of the API script is retried, with growing pauses, until it works
-function loadYouTubeApi(attempt = 0) {
-  const tag = document.createElement('script')
-  tag.src = 'https://www.youtube.com/iframe_api'
-
-  tag.onerror = () => {
-    tag.remove()
-    const delay = Math.min(2000 * 2 ** Math.min(attempt, 5), 30000)
-    log(`YouTube API failed to load, retrying in ${delay / 1000}s`)
-    setTimeout(() => loadYouTubeApi(attempt + 1), delay)
+// Web Locks: on localhost, only one overlay instance should play music
+if (isLocalhost) {
+  if (navigator.locks) {
+    navigator.locks.request('stream-queue-playback', { ifAvailable: true }, async (lock) => {
+      if (!lock) {
+        log('Another overlay is already playing - this one is read-only')
+        isPlaybackSource = false
+        dom.nowPlayingVideo.classList.add('hidden')
+        return
+      }
+      isPlaybackSource = true
+      log('Acquired playback lock - this overlay is the active player')
+      enablePlayback()
+      // Keep the lock held while the page is open
+      await new Promise(() => {})
+    })
+  } else {
+    // CEF without Web Locks: fallback to old behavior
+    isPlaybackSource = true
+    enablePlayback()
   }
-
-  const firstScriptTag = document.getElementsByTagName('script')[0]
-  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag)
-}
-
-if (isPlaybackSource) {
-  window.onYouTubeIframeAPIReady = () => {
-    log('YouTube API ready')
-    createPlayer()
-  }
-
-  loadYouTubeApi()
 } else {
   log('Non-localhost origin: read-only widget, no embedded player')
   dom.nowPlayingVideo.classList.add('hidden')
+}
+
+function enablePlayback() {
+  if (isPlaybackSource) {
+    window.onYouTubeIframeAPIReady = () => {
+      log('YouTube API ready')
+      createPlayer()
+    }
+    loadYouTubeApi()
+  }
 }
 
 async function init() {

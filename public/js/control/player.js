@@ -3,6 +3,7 @@ import { PLAY_ICON, PAUSE_ICON } from '../icons.js'
 import { state, log } from './state.js'
 import { dom } from './dom.js'
 import { t } from '../i18n.js'
+import { loadYouTubeApi, createYouTubePlayer } from '../youtube-player.js'
 
 let player = null
 let playerReady = false
@@ -55,34 +56,28 @@ export function syncPlayer() {
   player.cueVideoById(state.current.videoId)
 }
 
-function onPlayerReady() {
-  log('Player ready')
-  playerReady = true
-  syncPlayer()
+async function initPlayer() {
+  try {
+    player = await createYouTubePlayer('player', {
+      playerVars: {
+        autoplay: 0,
+        controls: 1,
+        rel: 0
+      },
+      events: {
+        onReady: () => {
+          log('Player ready')
+          playerReady = true
+          syncPlayer()
+        },
+        onError: (event) => {
+          log(`Player error: ${getErrorMessage(event.data, t)}`)
+        }
+      }
+    })
+  } catch (error) {
+    log('Failed to create player:', error)
+  }
 }
 
-function onPlayerError(event) {
-  log(`Player error: ${getErrorMessage(event.data, t)}`)
-}
-
-window.onYouTubeIframeAPIReady = () => {
-  log('YouTube API ready')
-
-  player = new YT.Player('player', {
-    width: '100%',
-    height: '100%',
-    playerVars: {
-      autoplay: 0,
-      controls: 1,
-      rel: 0
-    },
-    events: {
-      onReady: onPlayerReady,
-      onError: onPlayerError
-    }
-  })
-}
-
-const iframeApiTag = document.createElement('script')
-iframeApiTag.src = 'https://www.youtube.com/iframe_api'
-document.head.appendChild(iframeApiTag)
+initPlayer()
