@@ -32,6 +32,7 @@ export abstract class ReconnectingSocket {
   protected beforeOpen(): void | Promise<void> {}
   protected onOpen(_socket: WebSocket): void {}
   protected onClosed(): void {}
+  protected onStatusChange?(_status: 'connected' | 'disconnected'): void {}
 
   private connecting = false
   private attempts = 0
@@ -88,6 +89,7 @@ export abstract class ReconnectingSocket {
     this.ready = true
     this.pending?.resolve()
     this.pending = null
+    this.onStatusChange?.('connected')
   }
 
   protected abort(error: Error): void {
@@ -117,6 +119,7 @@ export abstract class ReconnectingSocket {
     this.stableTimer = null
     this.stopWatchdog()
     this.onClosed()
+    this.onStatusChange?.('disconnected')
   }
 
   /**

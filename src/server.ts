@@ -14,6 +14,10 @@ import { getTwitchClientId } from './secrets.js'
 import { createLogger, describeError, enableFileLogging, flushLogs } from './logger.js'
 import { hostCheck } from './host-check.js'
 import { installShutdownHandlers } from './shutdown.js'
+import { requestSong, setPaused, detachChannelPointsRedemptions } from './queue.js'
+import { getState, skipCurrent } from './player.js'
+import { registerRedemptionHandler } from './finish.js'
+import { translateWithFallback } from './i18n.js'
 
 const app = express()
 let PORT: number
@@ -72,6 +76,18 @@ async function main() {
   if (twitchClientId) {
     initializeTwitchIntegration({
       clientId: twitchClientId
+    }, {
+      queue: {
+        requestSong,
+        setPaused,
+        detachChannelPointsRedemptions
+      },
+      player: {
+        getState,
+        skipCurrent
+      },
+      registerRedemptionHandler,
+      translate: (key, params, fallback) => translateWithFallback(key, params as Record<string, string | number> | undefined, fallback ?? '')
     })
   } else {
     log.warn('Twitch integration disabled: TWITCH_CLIENT_ID is not set')

@@ -1,7 +1,7 @@
-import { translateWithFallback, t } from './i18n.js'
-import { getSettings } from './settings.js'
-import { getState } from './player.js'
-import type { PlayerState, FailureReason } from './types.js'
+import { translateWithFallback, t } from '../../i18n.js'
+import { getSettings } from '../../settings.js'
+import { getState } from '../../player.js'
+import type { PlayerState, FailureReason } from '../../types.js'
 
 const truncate = (s: string, max = 40) => {
   const chars = Array.from(s)
@@ -109,4 +109,37 @@ export function buildRedemptionRefundFailedMessage(userName: string): string {
     { user: userName },
     `@${userName}, your request could not be completed and the points could not be refunded automatically, the streamer will sort it out`
   )
+}
+
+export class ChatReplier {
+  private sendMessage: (message: string) => Promise<void>
+  private isChatReady: () => boolean
+  private chatStart: Promise<void> | null = null
+  private chatStartWaitMs = 5000
+
+  constructor(sendMessage: (message: string) => Promise<void>, isChatReady: () => boolean) {
+    this.sendMessage = sendMessage
+    this.isChatReady = isChatReady
+  }
+
+  async reply(message: string): Promise<void> {
+    if (!this.isChatReady() && this.chatStart) {
+      await Promise.race([this.chatStart, this.wait(this.chatStartWaitMs)])
+    }
+    await this.sendMessage(message).catch((error) => {
+      console.error(`Failed to send chat reply: ${error instanceof Error ? error.message : error}`)
+    })
+  }
+
+  setChatStart(promise: Promise<void>): void {
+    this.chatStart = promise
+  }
+
+  clearChatStart(): void {
+    this.chatStart = null
+  }
+
+  private wait(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+  }
 }

@@ -10,9 +10,9 @@ const { getConfig, updateConfig } = await import('../../../../src/config.js')
 const { updateTwitchConfig } = await import('../../../../src/integrations/twitch/config.js')
 const { hydrateQueue, setPaused, getIsPaused } = await import('../../../../src/queue.js')
 const { getState } = await import('../../../../src/player.js')
-const { _test, _resetIntegration } = await import('../../../../src/integrations/twitch/index.js')
+const { getTwitchIntegration } = await import('../../../../src/integrations/twitch/index.js')
 const { clearTwitchOAuthState } = await import('../../../../src/secrets.js')
-
+import { hasPermission, matchesCommand } from '../../../../src/integrations/twitch/chat-commands.js'
 import type { TwitchChatMessage } from '../../../../src/integrations/twitch/types.js'
 
 function message(overrides: Partial<TwitchChatMessage> = {}): TwitchChatMessage {
@@ -27,12 +27,27 @@ function message(overrides: Partial<TwitchChatMessage> = {}): TwitchChatMessage 
   }
 }
 
+async function createMockCommands() {
+  const { ChatCommands } = await import('../../../../src/integrations/twitch/chat-commands.js')
+  return new ChatCommands(
+    {
+      buildNowPlayingMessage: () => 'Now playing: Test Song',
+      buildQueueMessage: () => 'Queue: []',
+      skipCurrent: () => {},
+      getState: () => ({ current: null, queue: [], isPaused: false }),
+      setPaused: () => {},
+      translate: (k, p, f) => f ?? k
+    } as any,
+    () => Promise.resolve()
+  )
+}
+
 const DEFAULTS = getConfig()
 
 beforeEach(async () => {
-  await _resetIntegration()
+  const integration = getTwitchIntegration()
+  if (integration) await integration.stop()
   clearTwitchOAuthState()
-  _test.resetCooldown()
   hydrateQueue({ current: null, queue: [] })
   setPaused(false)
   updateConfig({
@@ -58,49 +73,49 @@ beforeEach(async () => {
 
 test('hasPermission()', async (t) => {
   await t.test('"everyone" allows anyone', () => {
-    assert.equal(_test.hasPermission(message({ isModerator: false, isBroadcaster: false }), 'everyone'), true)
+    assert.equal(hasPermission(message({ isModerator: false, isBroadcaster: false }), 'everyone'), true)
   })
 
   await t.test('"moderator" allows a moderator', () => {
-    assert.equal(_test.hasPermission(message({ isModerator: true }), 'moderator'), true)
+    assert.equal(hasPermission(message({ isModerator: true }), 'moderator'), true)
   })
 
   await t.test('"moderator" allows the broadcaster too', () => {
-    assert.equal(_test.hasPermission(message({ isModerator: false, isBroadcaster: true }), 'moderator'), true)
+    assert.equal(hasPermission(message({ isModerator: false, isBroadcaster: true }), 'moderator'), true)
   })
 
   await t.test('"moderator" denies a regular viewer', () => {
-    assert.equal(_test.hasPermission(message({ isModerator: false, isBroadcaster: false }), 'moderator'), false)
+    assert.equal(hasPermission(message({ isModerator: false, isBroadcaster: false }), 'moderator'), false)
   })
 
   await t.test('"broadcaster" denies a moderator who is not the broadcaster', () => {
-    assert.equal(_test.hasPermission(message({ isModerator: true, isBroadcaster: false }), 'broadcaster'), false)
+    assert.equal(hasPermission(message({ isModerator: true, isBroadcaster: false }), 'broadcaster'), false)
   })
 
   await t.test('"broadcaster" allows the broadcaster', () => {
-    assert.equal(_test.hasPermission(message({ isBroadcaster: true }), 'broadcaster'), true)
+    assert.equal(hasPermission(message({ isBroadcaster: true }), 'broadcaster'), true)
   })
 })
 
 test('matchesCommand()', async (t) => {
   await t.test('matches an exact, case-insensitive command', () => {
-    assert.equal(_test.matchesCommand('!SG Skip', '!sg skip'), true)
+    assert.equal(matchesCommand('!SG Skip', '!sg skip'), true)
   })
 
   await t.test('matches when the command is followed by extra text', () => {
-    assert.equal(_test.matchesCommand('!sg skip please', '!sg skip'), true)
+    assert.equal(matchesCommand('!sg skip please', '!sg skip'), true)
   })
 
   await t.test('does not match a longer word that merely starts with the command', () => {
-    assert.equal(_test.matchesCommand('!sg skipping', '!sg skip'), false)
+    assert.equal(matchesCommand('!sg skipping', '!sg skip'), false)
   })
 
   await t.test('does not match an unrelated message', () => {
-    assert.equal(_test.matchesCommand('hello chat', '!sg skip'), false)
+    assert.equal(matchesCommand('hello chat', '!sg skip'), false)
   })
 
   await t.test('collapses repeated whitespace before comparing', () => {
-    assert.equal(_test.matchesCommand('!sg   skip', '!sg skip'), true)
+    assert.equal(matchesCommand('!sg   skip', '!sg skip'), true)
   })
 })
 
@@ -110,8 +125,11 @@ test('handleChatMessage() - read-only commands (now/queue)', async (t) => {
       current: { videoId: 'abc', title: 'Test Song', channelTitle: 'x', thumbnail: '', duration: 100, views: 1, url: '', requestedBy: 'someone' }
     })
 
+    const commands = await createMockCommands()
+    const config = (await import('../../../../src/integrations/twitch/config.js')).getTwitchConfig()
+
     // The command should be processed without errors
-    await _test.handleChatMessage(message({ text: '!sg now' }))
+    await commands.handle(message({ text: '!sg now' }), config.chatCommands)
   })
 
   await t.test('"queue" command is processed for anyone', async () => {
@@ -119,20 +137,29 @@ test('handleChatMessage() - read-only commands (now/queue)', async (t) => {
       queue: [{ videoId: 'abc', title: 'Queued Song', channelTitle: 'x', thumbnail: '', duration: 100, views: 1, url: '', requestedBy: 'someone' }]
     })
 
+    const commands = await createMockCommands()
+    const config = (await import('../../../../src/integrations/twitch/config.js')).getTwitchConfig()
+
     // The command should be processed without errors
-    await _test.handleChatMessage(message({ text: '!sg queue' }))
+    await commands.handle(message({ text: '!sg queue' }), config.chatCommands)
   })
 
   await t.test('a disabled command does not trigger', async () => {
     updateTwitchConfig({ chatCommands: { now: { enabled: false } } })
 
+    const commands = await createMockCommands()
+    const config = (await import('../../../../src/integrations/twitch/config.js')).getTwitchConfig()
+
     // The command should be processed but not trigger due to being disabled
-    await _test.handleChatMessage(message({ text: '!sg now' }))
+    await commands.handle(message({ text: '!sg now' }), config.chatCommands)
   })
 
   await t.test('an unrecognized message does not trigger any command', async () => {
+    const commands = await createMockCommands()
+    const config = (await import('../../../../src/integrations/twitch/config.js')).getTwitchConfig()
+
     // The message should be processed without errors
-    await _test.handleChatMessage(message({ text: 'just chatting' }))
+    await commands.handle(message({ text: 'just chatting' }), config.chatCommands)
   })
 
   await t.test('the global cooldown blocks a second plain command from a different user', async () => {
@@ -140,8 +167,11 @@ test('handleChatMessage() - read-only commands (now/queue)', async (t) => {
       current: { videoId: 'abc', title: 'Test Song', channelTitle: 'x', thumbnail: '', duration: 100, views: 1, url: '', requestedBy: 'someone' }
     })
 
-    await _test.handleChatMessage(message({ text: '!sg now', displayName: 'UserOne' }))
-    await _test.handleChatMessage(message({ text: '!sg now', displayName: 'UserTwo' }))
+    const commands = await createMockCommands()
+    const config = (await import('../../../../src/integrations/twitch/config.js')).getTwitchConfig()
+
+    await commands.handle(message({ text: '!sg now', displayName: 'UserOne' }), config.chatCommands)
+    await commands.handle(message({ text: '!sg now', displayName: 'UserTwo' }), config.chatCommands)
 
     // The second call should be blocked by cooldown (no error thrown, but message logged)
   })
@@ -153,7 +183,10 @@ test('handleChatMessage() - control commands (skip/pause/resume)', async (t) => 
       current: { videoId: 'abc', title: 'Song A', channelTitle: 'x', thumbnail: '', duration: 100, views: 1, url: '', requestedBy: 'someone' }
     })
 
-    await _test.handleChatMessage(message({ text: '!sg skip', isModerator: false, isBroadcaster: false }))
+    const commands = await createMockCommands()
+    const config = (await import('../../../../src/integrations/twitch/config.js')).getTwitchConfig()
+
+    await commands.handle(message({ text: '!sg skip', isModerator: false, isBroadcaster: false }), config.chatCommands)
 
     assert.equal(getState().current?.videoId, 'abc')
   })
@@ -164,7 +197,10 @@ test('handleChatMessage() - control commands (skip/pause/resume)', async (t) => 
       queue: [{ videoId: 'def', title: 'Song B', channelTitle: 'x', thumbnail: '', duration: 100, views: 1, url: '', requestedBy: 'someone' }]
     })
 
-    await _test.handleChatMessage(message({ text: '!sg skip', isModerator: true }))
+    const commands = await createMockCommands()
+    const config = (await import('../../../../src/integrations/twitch/config.js')).getTwitchConfig()
+
+    await commands.handle(message({ text: '!sg skip', isModerator: true }), config.chatCommands)
 
     assert.equal(getState().current?.videoId, 'def')
   })
@@ -175,13 +211,19 @@ test('handleChatMessage() - control commands (skip/pause/resume)', async (t) => 
       queue: [{ videoId: 'def', title: 'Song B', channelTitle: 'x', thumbnail: '', duration: 100, views: 1, url: '', requestedBy: 'someone' }]
     })
 
-    await _test.handleChatMessage(message({ text: '!sg skip', isModerator: false, isBroadcaster: true }))
+    const commands = await createMockCommands()
+    const config = (await import('../../../../src/integrations/twitch/config.js')).getTwitchConfig()
+
+    await commands.handle(message({ text: '!sg skip', isModerator: false, isBroadcaster: true }), config.chatCommands)
 
     assert.equal(getState().current?.videoId, 'def')
   })
 
   await t.test('pause sets the player to paused', async () => {
-    await _test.handleChatMessage(message({ text: '!sg pause', isModerator: true }))
+    const commands = await createMockCommands()
+    const config = (await import('../../../../src/integrations/twitch/config.js')).getTwitchConfig()
+
+    await commands.handle(message({ text: '!sg pause', isModerator: true }), config.chatCommands)
 
     assert.equal(getIsPaused(), true)
   })
@@ -189,25 +231,34 @@ test('handleChatMessage() - control commands (skip/pause/resume)', async (t) => 
   await t.test('resume clears paused', async () => {
     setPaused(true)
 
-    await _test.handleChatMessage(message({ text: '!sg resume', isModerator: true }))
+    const commands = await createMockCommands()
+    const config = (await import('../../../../src/integrations/twitch/config.js')).getTwitchConfig()
+
+    await commands.handle(message({ text: '!sg resume', isModerator: true }), config.chatCommands)
 
     assert.equal(getIsPaused(), false)
   })
 
   await t.test('the global cooldown blocks a second control command from a different moderator', async () => {
-    await _test.handleChatMessage(message({ text: '!sg pause', displayName: 'ModOne', isModerator: true }))
+    const commands = await createMockCommands()
+    const config = (await import('../../../../src/integrations/twitch/config.js')).getTwitchConfig()
+
+    await commands.handle(message({ text: '!sg pause', displayName: 'ModOne', isModerator: true }), config.chatCommands)
 
     setPaused(false)
-    await _test.handleChatMessage(message({ text: '!sg pause', displayName: 'ModTwo', isModerator: true }))
+    await commands.handle(message({ text: '!sg pause', displayName: 'ModTwo', isModerator: true }), config.chatCommands)
 
     // The second call should be blocked by cooldown
     assert.equal(getIsPaused(), false)
   })
 
   await t.test('a permission check happens before the cooldown - a denied viewer never consumes it', async () => {
-    await _test.handleChatMessage(message({ text: '!sg pause', isModerator: false, isBroadcaster: false }))
+    const commands = await createMockCommands()
+    const config = (await import('../../../../src/integrations/twitch/config.js')).getTwitchConfig()
 
-    await _test.handleChatMessage(message({ text: '!sg pause', isModerator: true }))
+    await commands.handle(message({ text: '!sg pause', isModerator: false, isBroadcaster: false }), config.chatCommands)
+
+    await commands.handle(message({ text: '!sg pause', isModerator: true }), config.chatCommands)
 
     // The second call should succeed since the first didn't consume cooldown
     assert.equal(getIsPaused(), true)
@@ -222,10 +273,13 @@ test('handleChatMessage() - custom configured commands', async (t) => {
       queue: [{ videoId: 'def', title: 'Song B', channelTitle: 'x', thumbnail: '', duration: 100, views: 1, url: '', requestedBy: 'someone' }]
     })
 
-    await _test.handleChatMessage(message({ text: '!sg skip', isModerator: true }))
+    const commands = await createMockCommands()
+    const config = (await import('../../../../src/integrations/twitch/config.js')).getTwitchConfig()
+
+    await commands.handle(message({ text: '!sg skip', isModerator: true }), config.chatCommands)
     assert.equal(getState().current?.videoId, 'abc') // old command text no longer works
 
-    await _test.handleChatMessage(message({ text: '!qskip', isModerator: true }))
+    await commands.handle(message({ text: '!qskip', isModerator: true }), config.chatCommands)
     assert.equal(getState().current?.videoId, 'def')
   })
 
@@ -236,7 +290,10 @@ test('handleChatMessage() - custom configured commands', async (t) => {
       queue: [{ videoId: 'def', title: 'Song B', channelTitle: 'x', thumbnail: '', duration: 100, views: 1, url: '', requestedBy: 'someone' }]
     })
 
-    await _test.handleChatMessage(message({ text: '!sg skip', isModerator: false, isBroadcaster: false }))
+    const commands = await createMockCommands()
+    const config = (await import('../../../../src/integrations/twitch/config.js')).getTwitchConfig()
+
+    await commands.handle(message({ text: '!sg skip', isModerator: false, isBroadcaster: false }), config.chatCommands)
     assert.equal(getState().current?.videoId, 'def')
   })
 })

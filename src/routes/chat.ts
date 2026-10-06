@@ -1,6 +1,6 @@
 import express from 'express'
 import { ok } from '../http.js'
-import { buildNowPlayingMessage, buildQueueMessage } from '../chat-replies.js'
+import { buildNowPlayingMessage, buildQueueMessage } from '../integrations/twitch/chat-replies.js'
 
 export const router = express.Router()
 
