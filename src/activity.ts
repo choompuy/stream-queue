@@ -1,6 +1,7 @@
 import { ActivityEntry, ActivityReasonCode, QueueItem } from './types.js'
 import { dataPath, createFileStore } from './persist.js'
 import { createLogger, describeError } from './logger.js'
+import { emit } from './state-events.js'
 
 const ACTIVITY_LIMIT = 100
 
@@ -26,6 +27,7 @@ export function logActivity(entry: Omit<ActivityEntry, 'at'>): void {
     list.length = ACTIVITY_LIMIT
   }
   save()
+  emit('activity')
 }
 
 export function getActivity(): ActivityEntry[] {
@@ -36,6 +38,7 @@ export function clearActivity(): void {
   entries().length = 0
   save()
   log.log('cleared')
+  emit('activity')
 }
 
 type ReasonParams = Record<string, string | number>

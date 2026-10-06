@@ -2,7 +2,7 @@ import { getConfig, updateConfig } from './config.js'
 import { fetchPlaylistSongs } from './youtube/index.js'
 import { Song, QueueItem, Config, FallbackPlaylist, FallbackStateResponse, AppError } from './types.js'
 import { addSong, getCurrent, setCurrent } from './queue.js'
-import { notifyStateChange } from './state-events.js'
+import { emit } from './state-events.js'
 import { isBlocked } from './blocklist.js'
 import { createLogger } from './logger.js'
 
@@ -133,7 +133,8 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
 
   if (!playlistId) {
     resetRotation()
-    notifyStateChange()
+    emit('state')
+    emit('fallback')
     return getFallbackState()
   }
 
@@ -183,7 +184,8 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
   lastFallbackRefreshAt = Date.now()
 
   log.log(`Loaded ${fallbackTracksById.size} tracks from playlist ${playlistId}`)
-  notifyStateChange()
+  emit('state')
+  emit('fallback')
   return getFallbackState()
 }
 
@@ -193,7 +195,8 @@ export function reorderFallback(shuffleOn: boolean): void {
   const activeId = current?.isFallback ? current.videoId : activeFallbackVideoId()
   fallbackOrder = buildOrder([...fallbackTracksById.values()], shuffleOn, activeId)
   fallbackCursor = activeId ? fallbackOrder.indexOf(activeId) : -1
-  notifyStateChange()
+  emit('state')
+  emit('fallback')
 }
 
 type FallbackFlag = 'shuffle' | 'repeat' | 'enabled'
@@ -217,7 +220,8 @@ export function clearFallback(): FallbackStateResponse {
   resetRotation()
 
   updateConfig({ fallbackPlaylist: { playlistId: null } })
-  notifyStateChange()
+  emit('state')
+  emit('fallback')
   log.log('cleared')
   return getFallbackState()
 }

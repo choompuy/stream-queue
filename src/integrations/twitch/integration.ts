@@ -3,6 +3,7 @@ import { AppError } from '../../types.js'
 import { updateTwitchOAuthState, clearTwitchOAuthState, getSecrets, getPublicSecretsView } from '../../secrets.js'
 import { detachChannelPointsRedemptions } from '../../queue.js'
 import { registerRedemptionHandler, type RedemptionOutcome } from '../../finish.js'
+import { emit } from '../../state-events.js'
 import type { QueueItem } from '../../types.js'
 import { TwitchOAuth } from './oauth.js'
 import { TwitchClient } from './client.js'
@@ -217,6 +218,11 @@ class TwitchIntegrationImpl implements TwitchIntegration {
       onChannelPointsRedemption: (event) => this.handleChannelPointsRedemption(event)
     })
 
+    // Add status change callback
+    this.eventSub.onStatusChange = (status) => {
+      emit('twitch')
+    }
+
     try {
       await this.eventSub.connect()
       log.log('Twitch EventSub connected')
@@ -245,6 +251,11 @@ class TwitchIntegrationImpl implements TwitchIntegration {
       botLogin: userInfo.login,
       onMessage: (message) => this.handleChatMessage(message)
     })
+
+    // Add status change callback
+    this.chat.onStatusChange = (status) => {
+      emit('twitch')
+    }
 
     this.chatReplier = new ChatReplier(
       (message) => this.chat!.sendMessage(message),

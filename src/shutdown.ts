@@ -1,5 +1,6 @@
 import { flushAllStores } from './persist.js'
 import { createLogger, describeError, flushLogs } from './logger.js'
+import { closeAllStreams } from './sse.js'
 
 const log = createLogger('SHUTDOWN')
 
@@ -17,6 +18,8 @@ export async function shutdown(code = 0, exit: (code: number) => void = (c) => p
     log.error(`Saving did not finish in ${FORCE_EXIT_AFTER_MS / 1000}s, exiting anyway`)
     exit(code)
   }, FORCE_EXIT_AFTER_MS).unref()
+
+  closeAllStreams()
 
   try {
     await flushAllStores()
