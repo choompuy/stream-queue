@@ -36,19 +36,10 @@ async function init() {
   const secretsLoaded = loadSecrets()
   const twitchSecretsLoaded = loadTwitchSecrets()
 
-  await Promise.allSettled([
-    secretsLoaded,
-    twitchSecretsLoaded,
-    secretsLoaded.then(() => loadConfig()),
-    twitchSecretsLoaded.then(() => loadTwitchSettings()).then(() => loadTwitchConfig()),
-    loadOverlaySettings(),
-    loadNetworkInfo(),
-    loadActivity(),
-    loadBlocklist(),
-    loadPlaylists(),
-    refreshState(),
-    refreshFallbackState()
-  ])
+  await Promise.allSettled([secretsLoaded, twitchSecretsLoaded, loadOverlaySettings(), loadNetworkInfo()])
+  await Promise.allSettled([secretsLoaded.then(() => loadConfig()), twitchSecretsLoaded.then(() => loadTwitchSettings())])
+  await loadTwitchConfig()
+  await Promise.allSettled([loadActivity(), loadBlocklist(), loadPlaylists(), refreshState(), refreshFallbackState()])
 
   const poller = createPoller(POLLING, { shouldRun: isDashboardActive })
   poller.start()

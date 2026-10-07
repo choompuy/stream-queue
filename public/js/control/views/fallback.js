@@ -16,7 +16,7 @@ export const fallbackView = createListView(dom.fallbackListWrapper, {
       subtitle: track.channelTitle,
       meta: formatDuration(track.duration),
       extra: track.isActive
-        ? statusPill(t('fallback.playing'), 'failed')
+        ? statusPill(t('fallback.playing'), 'info')
         : track.isBlocked
           ? statusPill(t('blocklist.blockedLabel'), 'rejected')
           : '',

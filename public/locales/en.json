@@ -91,7 +91,8 @@
     "noResults": "No results found",
     "addToQueue": "Add to queue",
     "errorSearching": "Error searching",
-    "errorAdding": "Error adding video"
+    "errorAdding": "Error adding video",
+    "clear": "Clear search"
   },
   "queue": {
     "title": "Queue",

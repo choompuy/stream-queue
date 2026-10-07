@@ -2,7 +2,14 @@ import { cachePath, createFileStore } from './persist.js'
 import { QueueItem, Song } from './types.js'
 import { isValidPlaylistId, isValidVideoId } from './youtube/url.js'
 import { getQueue, getCurrent, hydrateQueue } from './queue.js'
-import { getFallbackProgress, getFallbackSourceTracks, getFallbackSourceVersion, hydrateFallback, FallbackSnapshot } from './fallback.js'
+import {
+  getFallbackProgress,
+  getFallbackSourceTracks,
+  getFallbackSourceVersion,
+  hydrateFallback,
+  FallbackSnapshot,
+  alignFallbackCursor
+} from './fallback.js'
 import { onStateChange } from './state-events.js'
 import { getClosedRedemptionIds, registerClosedChangeListener, restoreClosedRedemptions } from './finish.js'
 import { createLogger, describeError } from './logger.js'
@@ -86,19 +93,34 @@ function sanitizeFallback(raw: unknown, problems: string[]): FallbackSnapshot | 
   if (tracks.size !== rawTracks.length) problems.push(`fallback: dropped ${rawTracks.length - tracks.size} invalid or duplicate track(s)`)
 
   const rawOrder = Array.isArray(raw.order) ? raw.order : []
-  const order = [...new Set(rawOrder.filter((id): id is string => typeof id === 'string' && tracks.has(id)))]
+  const order = [...new Set(rawOrder.filter((id): id is string => typeof id === 'string'))]
   const orderChanged = order.length !== rawOrder.length
 
-  const cursor = raw.cursor
-  const cursorValid = Number.isInteger(cursor) && (cursor as number) >= -1 && (cursor as number) <= order.length
-  if (orderChanged || !cursorValid) problems.push('fallback: rotation repaired, position reset')
+  if (tracks.size === 0 && order.length > 0) {
+    problems.push('fallback: track list not found, position kept, the list loads with the next playlist refresh')
+  }
+
+  const rawCursor = raw.cursor
+  const cursorValid = Number.isInteger(rawCursor) && (rawCursor as number) >= -1 && (rawCursor as number) <= rawOrder.length
+  if (!cursorValid) problems.push('fallback: invalid position, reset')
+  if (orderChanged) problems.push('fallback: rotation repaired (junk or repeated ids removed)')
+
+  // when the order was repaired the position follows the track it pointed at, not the number
+  let cursor = -1
+  if (cursorValid) {
+    const at = rawOrder[rawCursor as number]
+
+    if (!orderChanged) cursor = rawCursor as number
+    else if (typeof at === 'string') cursor = order.indexOf(at)
+    else if (rawCursor === rawOrder.length) cursor = order.length
+  }
 
   const lastRefreshedAt = raw.lastRefreshedAt
 
   return {
     sourceTracks: [...tracks.values()],
     order,
-    cursor: !orderChanged && cursorValid ? (cursor as number) : -1,
+    cursor,
     playlistId: isValidPlaylistId(raw.playlistId) ? raw.playlistId : null,
     lastRefreshedAt: typeof lastRefreshedAt === 'number' && Number.isFinite(lastRefreshedAt) ? lastRefreshedAt : null
   }
@@ -170,10 +192,13 @@ function persistState(): void {
   const version = getFallbackSourceVersion()
   if (version !== savedTracksVersion) {
     savedTracksVersion = version
-    tracksStore.scheduleSave(() => ({ sourceTracks: getFallbackSourceTracks() }), (error) => {
-      savedTracksVersion = -1 // not on disk: written again with the next save
-      onError(error)
-    })
+    tracksStore.scheduleSave(
+      () => ({ sourceTracks: getFallbackSourceTracks() }),
+      (error) => {
+        savedTracksVersion = -1 // not on disk: written again with the next save
+        onError(error)
+      }
+    )
   }
 }
 
@@ -198,6 +223,8 @@ export function loadState(): void {
   restoreClosedRedemptions(closedRedemptions)
   attempt('queue', () => hydrateQueue({ current, queue }))
   attempt('fallback', () => hydrateFallback(fallback))
+
+  if (current?.isFallback) attempt('fallback position', () => alignFallbackCursor(current.videoId))
   savedTracksVersion = tracks.length > 0 ? getFallbackSourceVersion() : -1
 
   log.log('State loaded from disk')

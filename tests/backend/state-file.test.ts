@@ -86,13 +86,50 @@ test('sanitizeState()', async (t) => {
     assert.equal(sanitizeState({ ...goodState(), current: null }).current, null)
   })
 
-  await t.test('fallback: unknown order ids are dropped and the position reset', () => {
+  await t.test('fallback: an id without a saved track stays in the rotation and the position is kept (the refresh cleans it up)', () => {
     const state = goodState()
     state.fallback.order = [F1, 'ghost000000', F2]
+    state.fallback.cursor = 2
+    const result = sanitizeState(state)
+
+    assert.deepEqual(result.fallback?.order, [F1, 'ghost000000', F2])
+    assert.equal(result.fallback?.cursor, 2)
+    assert.deepEqual(result.problems, [])
+  })
+
+  await t.test('fallback: a missing track list keeps the order and the position and says so', () => {
+    const state = goodState()
+    state.fallback.sourceTracks = []
+    state.fallback.cursor = 1
     const result = sanitizeState(state)
 
     assert.deepEqual(result.fallback?.order, [F1, F2])
-    assert.equal(result.fallback?.cursor, -1)
+    assert.equal(result.fallback?.cursor, 1)
+    assert.equal(result.problems.some((problem) => problem.includes('track list not found')), true)
+  })
+
+  await t.test('fallback: a repaired order keeps the position on the same track, not on the same number', () => {
+    const state = goodState()
+    state.fallback.order = [5 as never, F1, F1, F2]
+    state.fallback.cursor = 3 // F2
+    const result = sanitizeState(state)
+
+    assert.deepEqual(result.fallback?.order, [F1, F2])
+    assert.equal(result.fallback?.cursor, 1)
+  })
+
+  await t.test('fallback: a position at the end of the list stays at the end after a repair', () => {
+    const state = goodState()
+    state.fallback.order = [F1, F1, F2]
+    state.fallback.cursor = 3
+    assert.equal(sanitizeState(state).fallback?.cursor, 2)
+  })
+
+  await t.test('fallback: a position that points at junk is reset', () => {
+    const state = goodState()
+    state.fallback.order = [F1, 5 as never, F2]
+    state.fallback.cursor = 1
+    assert.equal(sanitizeState(state).fallback?.cursor, -1)
   })
 
   await t.test('fallback: out-of-range cursor, bad playlist id and junk tracks are repaired', () => {

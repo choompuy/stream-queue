@@ -89,7 +89,13 @@ function computeNextIndex(config: Config, cursor: number): number | null {
   return config.fallbackPlaylist.repeat ? 0 : null
 }
 
+function hasPlayableTracks(): boolean {
+  return fallbackOrder.some((videoId) => fallbackTracksById.has(videoId))
+}
+
 export function peekNextFallbackTrack(): QueueItem | null {
+  if (!hasPlayableTracks()) return null
+
   const config = getConfig()
   const attempts = fallbackOrder.length || 1
   let cursor = fallbackCursor
@@ -107,6 +113,8 @@ export function peekNextFallbackTrack(): QueueItem | null {
 }
 
 export function advanceFallback(): QueueItem | null {
+  if (!hasPlayableTracks()) return null
+
   const config = getConfig()
   const attempts = fallbackOrder.length || 1
 
@@ -138,9 +146,8 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
   }
 
   const { songs: newTracks, truncated } = await fetchPlaylistSongs(playlistId)
-  if (truncated) {
-    log.log(`Playlist was truncated due to page limit (${newTracks.length} tracks loaded)`)
-  }
+  if (truncated) log.log(`Playlist was truncated due to page limit (${newTracks.length} tracks loaded)`)
+
   const config = getConfig()
 
   if (config.fallbackPlaylist.playlistId !== playlistId) {
@@ -157,14 +164,14 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
     fallbackCursor = -1
   } else {
     const newIds = new Set(newTracks.map((track) => track.videoId))
-    const oldIds = new Set(fallbackTracksById.keys())
+    const orderBefore = fallbackOrder
+    const inRotation = new Set(orderBefore)
 
-    const addedIds = newTracks.map((track) => track.videoId).filter((id) => !oldIds.has(id))
-    const removedCount = [...oldIds].filter((id) => !newIds.has(id)).length
+    const addedIds = newTracks.map((track) => track.videoId).filter((id) => !inRotation.has(id))
+    const removedCount = orderBefore.filter((id) => !newIds.has(id)).length
 
     setSourceTracks(newTracks)
 
-    const orderBefore = fallbackOrder
     const activeIndexBefore = activeId ? orderBefore.indexOf(activeId) : -1
     fallbackOrder = orderBefore.filter((id) => newIds.has(id))
     fallbackOrder.push(...(config.fallbackPlaylist.shuffle ? shuffle(addedIds) : addedIds))
@@ -282,6 +289,12 @@ export function getFallbackProgress(): Omit<FallbackSnapshot, 'sourceTracks'> {
 
 export function getFallbackSnapshot(): FallbackSnapshot {
   return { sourceTracks: getFallbackSourceTracks(), ...getFallbackProgress() }
+}
+
+// Puts the rotation position on `videoId` (the fallback track that is playing), if it is in the rotation
+export function alignFallbackCursor(videoId: string): void {
+  const index = fallbackOrder.indexOf(videoId)
+  if (index >= 0) fallbackCursor = index
 }
 
 export function hydrateFallback(data: Partial<FallbackSnapshot> | undefined): void {
