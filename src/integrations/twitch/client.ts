@@ -33,7 +33,9 @@ export class TwitchClient {
     if (!this.oauth.getConfig().clientId) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID not configured')
 
     const accessToken = await this.oauth.getValidAccessToken()
-    if (!accessToken) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
+    if (!accessToken) {
+      throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected', this.refreshMayWorkLater() ? { transient: 1 } : undefined)
+    }
 
     const response = await this.request(url, options, accessToken)
 
@@ -47,7 +49,11 @@ export class TwitchClient {
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
       log.error(`Token refresh failed: ${reason}`)
-      throw new AppError('TWITCH_REFRESH_ERROR', `Authentication failed - please reconnect your Twitch account (${reason})`)
+      throw new AppError(
+        'TWITCH_REFRESH_ERROR',
+        `Authentication failed - please reconnect your Twitch account (${reason})`,
+        this.refreshMayWorkLater() ? { transient: 1 } : undefined
+      )
     }
 
     // an error of the retried request itself is its own error, not a failed login
@@ -81,6 +87,11 @@ export class TwitchClient {
     throw new AppError('TWITCH_API_ERROR', `Twitch API error: ${message}`, { status: response.status })
   }
 
+  // a login exists and Twitch has not refused it: a failed refresh was a passing problem
+  private refreshMayWorkLater(): boolean {
+    return Boolean(this.oauth.getTokenData()?.refreshToken) && !this.oauth.needsReauthorization()
+  }
+
   needsReauthorization(): boolean {
     return this.oauth.needsReauthorization()
   }
@@ -106,16 +117,13 @@ export class TwitchClient {
     }
   }
 
-  async updateRedemptionStatus(
-    redemption: TwitchChannelPointsRedemption,
-    status: TwitchRedemptionUpdateStatus
-  ): Promise<TwitchChannelPointsRedemption> {
+  async updateRedemptionStatus(redemption: { id: string; rewardId: string }, status: TwitchRedemptionUpdateStatus): Promise<TwitchChannelPointsRedemption> {
     const userInfo = this.userInfo
     if (!userInfo) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
 
     const params = new URLSearchParams({
       broadcaster_id: userInfo.id,
-      reward_id: redemption.reward.id,
+      reward_id: redemption.rewardId,
       id: redemption.id
     })
 

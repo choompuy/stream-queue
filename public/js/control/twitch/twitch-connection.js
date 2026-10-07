@@ -2,6 +2,7 @@ import { show, setText, setClass } from '../../shared.js'
 import { t } from '../../i18n.js'
 import { api, ApiError } from '../api.js'
 import { run } from '../run.js'
+import { toastInfo } from '../toast.js'
 import { state, dom, log } from '../state.js'
 import { loadTwitchRewards, renderTwitchRewards } from './twitch-rewards.js'
 
@@ -157,13 +158,17 @@ export function disconnectTwitch() {
 
   return run('disconnecting Twitch', async () => {
     stopTwitchPolling()
-    await api.disconnectTwitch()
+    const result = await api.disconnectTwitch()
     applyStatus(null)
     state.twitch.rewards = []
     show(dom.twitchAuthorization, false)
     show(dom.twitchRewardForm, false)
     renderTwitchConnection()
     renderTwitchRewards()
+
+    // queued tracks paid with points stay UNFULFILLED on Twitch: nobody else will close them
+    const open = Number(result?.openRedemptions) || 0
+    if (open > 0) toastInfo(t('toast.twitchDisconnectedWithOpenRewards', { count: open }))
   })
 }
 

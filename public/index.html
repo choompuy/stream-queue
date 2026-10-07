@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="css/fonts.css" />
+    <link rel="stylesheet" href="css/fonts.css" media="print" onload="this.media = 'all'" />
+    <link rel="stylesheet" href="css/app.css" media="print" onload="this.media = 'all'" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    <link rel="stylesheet" href="css/app.css" />
     <title>StreamQueue - Control Panel</title>
   </head>
   <body>
@@ -69,7 +69,11 @@
       <section class="container page-tab active" data-page-tab="dashboard">
         <div class="now-playing-wrapper panel">
           <div class="player-wrapper">
-            <div id="player"></div>
+            <div id="player">
+              <div class="player-placeholder text-muted text-sm">
+                <span data-i18n="nowPlaying.playerPlaceholder">Video player will load when a track is queued</span>
+              </div>
+            </div>
           </div>
 
           <div class="now-playing-main">
@@ -826,7 +830,6 @@
 
     <div id="toastContainer" class="toast-container"></div>
 
-    <script src="vendor/qrcode.min.js"></script>
     <script type="module" src="js/control/index.js"></script>
   </body>
 </html>

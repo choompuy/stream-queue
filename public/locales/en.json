@@ -82,7 +82,8 @@
     "pause": "Pause",
     "resume": "Resume",
     "skip": "Skip",
-    "next": "NEXT"
+    "next": "NEXT",
+    "playerPlaceholder": "Video player will load when a track is queued"
   },
   "search": {
     "placeholder": "YouTube URL or search...",
@@ -344,6 +345,7 @@
     "twitchSettingsSaved": "Twitch settings saved",
     "twitchChatCommandsSaved": "Chat commands saved",
     "twitchRewardCreated": "Reward created successfully",
-    "twitchRewardUpdated": "Reward updated successfully"
+    "twitchRewardUpdated": "Reward updated successfully",
+    "twitchDisconnectedWithOpenRewards": "Disconnected. Rewards still waiting in the Twitch rewards queue (fulfill or refund them there): {{count}}"
   }
 }

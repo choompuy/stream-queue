@@ -12,7 +12,7 @@ import {
   RequestNotSentError,
   PlaylistFetchResult
 } from './client.js'
-import { normalize, combinedScore, formatViews } from './scoring.js'
+import { normalize, formatViews } from './utils.js'
 import { getSearchCache, setSearchCache, getVideoCache, setVideoCache, reserveSearchQuota, releaseSearchQuota, CACHE_LIMITS } from './cache.js'
 import { VideoItem, SearchItem, PlaylistItem } from './types.js'
 import { getConfig } from '../config.js'
@@ -166,7 +166,6 @@ async function performSearch(query: string, bypassFilters: boolean): Promise<Son
     }
 
     const ids = (search.items ?? []).map((item) => item.id?.videoId).filter((id): id is string => Boolean(id))
-    const relevanceRank = new Map(ids.map((id, i) => [id, i]))
     debugLog(`[SEARCH] Found ${ids.length} candidates`)
 
     if (!ids.length) {
@@ -180,11 +179,7 @@ async function performSearch(query: string, bypassFilters: boolean): Promise<Son
     })
 
     const songs = mapValidSongs(details.items ?? [], bypassFilters)
-
     debugLog(`[FILTER] ${songs.length} suitable results`)
-    songs.sort(
-      (a, b) => combinedScore(b, query, relevanceRank.get(b.videoId), ids.length) - combinedScore(a, query, relevanceRank.get(a.videoId), ids.length)
-    )
     if (!bypassFilters) {
       setSearchCache(query, songs, filtersVersion())
       debugLog(`[CACHE] Saved "${query}" - ${songs.length} results`)

@@ -33,6 +33,7 @@ const chatLog = createLogger('TWITCH CHAT')
 
 const REDEMPTION_RETRY_ATTEMPTS = 3
 const REDEMPTION_RETRY_DELAY_MS = 1000
+let retryDelayMs = REDEMPTION_RETRY_DELAY_MS
 
 let oauth: TwitchOAuth | null = null
 let client: TwitchClient | null = null
@@ -42,19 +43,18 @@ let deviceAuthorizationPromise: Promise<unknown> | null = null
 let deviceAuthorizationGeneration = 0
 const lastRun = { plainCooldownSeconds: 0, controlCooldownSeconds: 0 }
 
-function toCancellableRedemption(tracked: NonNullable<QueueItem['channelPointsRedemption']>): TwitchChannelPointsRedemption {
-  return {
-    id: tracked.id,
-    user_name: tracked.userName,
-    reward: { id: tracked.rewardId }
-  } as TwitchChannelPointsRedemption
-}
+// what is kept with a queued track about the redemption that paid for it
+type TrackedRedemption = NonNullable<QueueItem['channelPointsRedemption']>
 
-function handleChannelPointsPlaybackOutcome(tracked: NonNullable<QueueItem['channelPointsRedemption']>, outcome: RedemptionOutcome): void {
-  const redemption = toCancellableRedemption(tracked)
+const trackRedemption = (event: TwitchChannelPointsRedemption): TrackedRedemption => ({
+  id: event.id,
+  rewardId: event.reward.id,
+  userName: event.user_name
+})
 
+function handleChannelPointsPlaybackOutcome(tracked: TrackedRedemption, outcome: RedemptionOutcome): void {
   if (outcome.status === 'failed') {
-    void cancelRedemption(redemption, client, outcome.reason)
+    void cancelRedemption(tracked, client, outcome.reason)
     return
   }
 
@@ -63,7 +63,7 @@ function handleChannelPointsPlaybackOutcome(tracked: NonNullable<QueueItem['chan
     return
   }
 
-  void fulfillRedemption(redemption, client)
+  void fulfillRedemption(tracked, client)
 }
 
 export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = {}): void {
@@ -110,10 +110,12 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
     return
   }
 
+  const tracked = trackRedemption(event)
+
   const query = event.user_input.trim()
   if (!query) {
     log.error(`Empty song request in redemption: ${event.id}`)
-    await cancelRedemption(event, client, { code: 'SONG_NOT_FOUND' })
+    await cancelRedemption(tracked, client, { code: 'SONG_NOT_FOUND' })
     return
   }
 
@@ -122,18 +124,22 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
     return
   }
 
-  const result = await requestSong(query, event.user_name, false, {
-    id: event.id,
-    rewardId: event.reward.id,
-    userName: event.user_name
-  })
+  const result = await requestSong(query, event.user_name, false, tracked)
 
   if (result.outcome !== 'added') {
     const reason: FailureReason =
       result.outcome === 'invalid-url' ? { code: 'INVALID_YOUTUBE_URL' } : result.outcome === 'not-found' ? { code: 'SONG_NOT_FOUND' } : result.reason
 
     log.error(`Song request failed for redemption ${event.id}: ${result.outcome}`)
-    await cancelRedemption(event, client, reason)
+    await cancelRedemption(tracked, client, reason)
+    return
+  }
+
+  // The account can be disconnected while the song is being looked up. The track is queued by now, but there is
+  // no login left to close the redemption with, so it is left for the streamer like the others
+  if (!oauth?.isAuthenticated()) {
+    const detached = detachChannelPointsRedemptions()
+    log.warn(`Twitch was disconnected while redemption ${event.id} was being handled: ${detached} queued redemption(s) stay UNFULFILLED on Twitch`)
     return
   }
 
@@ -351,32 +357,49 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-// A 4xx other than 429 is Twitch's final answer (the redemption was already closed by hand, the reward is gone): trying again
-// three times changes nothing. A network error, a timeout, 429 and 5xx are worth another try
-function isRetryable(error: unknown): boolean {
-  const status = error instanceof AppError && typeof error.params?.status === 'number' ? error.params.status : null
-  return status === null || status === 429 || status >= 500
+// A repeat helps only when the failure can pass by itself: a lost connection or a timeout (they arrive as plain errors),
+// a 429, a 5xx, or a login that could not be refreshed right now (flagged `transient`). A refusal (4xx), a missing
+// login or a token Twitch no longer accepts gives the same answer every time
+export function isRetryable(error: unknown): boolean {
+  if (!(error instanceof AppError)) return true
+  if (error.params?.transient === 1) return true
+
+  const status = error.params?.status
+  return typeof status === 'number' && (status === 429 || status >= 500)
 }
+
+// Twitch answers 404 when there is no UNFULFILLED redemption with that id: the streamer already closed it in the rewards
+// queue, or the reward was deleted. (A 400 means the request itself is wrong, so it stays a failure)
+const isNoLongerOpen = (error: unknown): boolean => error instanceof AppError && error.params?.status === 404
+
+type RedemptionUpdate = 'done' | 'no-longer-open' | 'failed'
 
 // Sets the status with retries and backoff. Returns whether Twitch accepted it
 async function setRedemptionStatus(
-  redemption: TwitchChannelPointsRedemption,
+  redemption: TrackedRedemption,
   twitchClient: TwitchClient,
   status: 'FULFILLED' | 'CANCELED'
-): Promise<boolean> {
+): Promise<RedemptionUpdate> {
   for (let attempt = 1; attempt <= REDEMPTION_RETRY_ATTEMPTS; attempt++) {
     try {
       await twitchClient.updateRedemptionStatus(redemption, status)
-      return true
+      return 'done'
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
 
-      if (attempt === REDEMPTION_RETRY_ATTEMPTS || !isRetryable(error)) {
-        log.error(`Failed to set redemption ${redemption.id} to ${status} after ${attempt} attempt(s): ${reason}`)
-        return false
+      if (isNoLongerOpen(error)) {
+        log.log(
+          `Redemption ${redemption.id} is not open any more (closed in the Twitch rewards queue, or its reward was deleted): ${status} not needed`
+        )
+        return 'no-longer-open'
       }
 
-      const delay = REDEMPTION_RETRY_DELAY_MS * 2 ** (attempt - 1)
+      if (attempt === REDEMPTION_RETRY_ATTEMPTS || !isRetryable(error)) {
+        log.error(`Failed to set redemption ${redemption.id} to ${status} after ${attempt} attempt(s): ${reason}`)
+        return 'failed'
+      }
+
+      const delay = retryDelayMs * 2 ** (attempt - 1)
       log.error(
         `Failed to set redemption ${redemption.id} to ${status} (attempt ${attempt}/${REDEMPTION_RETRY_ATTEMPTS}): ${reason}. Retrying in ${delay}ms`
       )
@@ -384,40 +407,51 @@ async function setRedemptionStatus(
     }
   }
 
-  return false
+  return 'failed'
 }
 
-async function fulfillRedemption(redemption: TwitchChannelPointsRedemption, twitchClient: TwitchClient | null): Promise<void> {
+async function fulfillRedemption(redemption: TrackedRedemption, twitchClient: TwitchClient | null): Promise<void> {
   if (!twitchClient) {
     log.error(`Cannot fulfill redemption ${redemption.id}: Twitch client not initialized`)
     return
   }
 
-  if (await setRedemptionStatus(redemption, twitchClient, 'FULFILLED')) {
+  const result = await setRedemptionStatus(redemption, twitchClient, 'FULFILLED')
+
+  if (result === 'done') {
     log.log(`Channel Points redemption fulfilled: ${redemption.id}`)
     return
   }
+
+  // already closed by the streamer: nothing is left to do or to worry about
+  if (result === 'no-longer-open') return
 
   // The track was played: refunding the points now would give the viewer the song for free.
   // The redemption stays UNFULFILLED for the streamer or a moderator to close in the Twitch rewards queue
   log.error(`Redemption ${redemption.id} was played but could not be fulfilled, it is left for a manual decision`)
 }
 
-async function cancelRedemption(redemption: TwitchChannelPointsRedemption, twitchClient: TwitchClient | null, reason: FailureReason): Promise<void> {
+async function cancelRedemption(redemption: TrackedRedemption, twitchClient: TwitchClient | null, reason: FailureReason): Promise<void> {
   if (!twitchClient) {
     log.error(`Cannot cancel redemption ${redemption.id}: Twitch client not initialized`)
-    await replyInChat(buildRedemptionRefundFailedMessage(redemption.user_name))
+    await replyInChat(buildRedemptionRefundFailedMessage(redemption.userName))
     return
   }
+
+  const result = await setRedemptionStatus(redemption, twitchClient, 'CANCELED')
 
   // "points refunded" goes to chat only when Twitch confirmed it: the points stay held otherwise
-  if (await setRedemptionStatus(redemption, twitchClient, 'CANCELED')) {
+  if (result === 'done') {
     log.log(`Channel Points redemption canceled (points refunded): ${redemption.id}`)
-    await replyInChat(buildRedemptionRejectionMessage(redemption.user_name, reason))
+    await replyInChat(buildRedemptionRejectionMessage(redemption.userName, reason))
     return
   }
 
-  await replyInChat(buildRedemptionRefundFailedMessage(redemption.user_name))
+  // Closed by the streamer in the meantime: whatever they chose (refund or accept) is already done, and either
+  // message here ("refunded" or "could not be refunded") could be wrong. Nothing is said in chat
+  if (result === 'no-longer-open') return
+
+  await replyInChat(buildRedemptionRefundFailedMessage(redemption.userName))
 }
 
 export type TwitchHealth = {
@@ -435,10 +469,11 @@ export function getTwitchHealth(): TwitchHealth {
   }
 }
 
-export async function disconnect(): Promise<void> {
+/** Disconnects the account. Returns how many queued redemptions were left UNFULFILLED on Twitch for the streamer to close by hand. */
+export async function disconnect(): Promise<number> {
   if (!oauth || !client) {
     log.log('Twitch integration not initialized, nothing to disconnect')
-    return
+    return 0
   }
 
   if (eventSub) {
@@ -469,6 +504,7 @@ export async function disconnect(): Promise<void> {
   clearTwitchOAuthState()
 
   log.log('Twitch account disconnected')
+  return detached
 }
 
 export async function refreshConnection(): Promise<TwitchUserInfo> {
@@ -506,6 +542,11 @@ export const _test = {
   },
   setChat: (mock: TwitchChat | null) => {
     chat = mock
+  },
+  cancelRedemption,
+  fulfillRedemption,
+  setRetryDelay: (ms: number) => {
+    retryDelayMs = ms
   }
 }
 

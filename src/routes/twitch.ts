@@ -133,8 +133,8 @@ router.post(
   '/disconnect',
   localOnly,
   asyncHandler(async (_req, res) => {
-    await disconnect()
-    ok(res, {})
+    const openRedemptions = await disconnect()
+    ok(res, { openRedemptions })
   })
 )
 

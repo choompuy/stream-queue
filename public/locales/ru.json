@@ -82,7 +82,8 @@
     "pause": "Пауза",
     "resume": "Продолжить",
     "skip": "Пропустить",
-    "next": "СЛЕД."
+    "next": "СЛЕД.",
+    "playerPlaceholder": "Видеоплеер загрузится, когда трек будет добавлен в очередь"
   },
   "search": {
     "label": "Ссылка YouTube или поисковый запрос",
@@ -344,6 +345,7 @@
     "twitchSettingsSaved": "Настройки Twitch сохранены",
     "twitchChatCommandsSaved": "Команды чата сохранены",
     "twitchRewardCreated": "Награда успешно создана",
-    "twitchRewardUpdated": "Награда успешно обновлена"
+    "twitchRewardUpdated": "Награда успешно обновлена",
+    "twitchDisconnectedWithOpenRewards": "Отключено. Наград, ожидающих в очереди наград Twitch (примите или верните их там): {{count}}"
   }
 }

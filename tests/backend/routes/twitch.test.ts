@@ -61,6 +61,7 @@ test('twitch routes localOnly protection', async (t) => {
     assert.equal(response.status, 200)
     const body = (await response.json()) as Record<string, any>
     assert.equal(body.success, true)
+    assert.equal(body.data.openRedemptions, 0, 'the panel is told how many queued redemptions stay open on Twitch')
   })
 
   await t.test('POST /refresh is accessible from localhost (localOnly does not block)', async () => {

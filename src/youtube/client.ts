@@ -2,7 +2,7 @@ import { getSecrets } from '../secrets.js'
 import { getConfig } from '../config.js'
 import { Song, AppError, Config, FilterFailureReason } from '../types.js'
 import { VideoItem } from './types.js'
-import { isoDurationToSeconds } from './scoring.js'
+import { isoDurationToSeconds } from './utils.js'
 
 export type PlaylistMeta = {
   id: string

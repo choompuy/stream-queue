@@ -83,6 +83,58 @@ test('TwitchClient authenticated requests', async (t) => {
     assert.equal(helix.length, 1, 'the request is not repeated without a new token')
   })
 
+  await t.test('a refresh that fails on the network is marked as passing, so a repeat is worth trying', async () => {
+    stub([json(401)], () => {
+      throw new TypeError('fetch failed')
+    })
+
+    await assert.rejects(connectedClient().getUserInfo(), (error: { code?: string; params?: { transient?: number } }) => {
+      return error.code === 'TWITCH_REFRESH_ERROR' && error.params?.transient === 1
+    })
+  })
+
+  await t.test('a refresh Twitch refuses is not marked as passing', async () => {
+    stub([json(401)], () => json(400, { message: 'Invalid refresh token' }))
+
+    await assert.rejects(connectedClient().getUserInfo(), (error: { code?: string; params?: { transient?: number } }) => {
+      return error.code === 'TWITCH_REFRESH_ERROR' && error.params?.transient === undefined
+    })
+  })
+
+  await t.test('an expired token that cannot be refreshed just now is a passing problem, no login at all is not', async () => {
+    const expired = new TwitchOAuth({ clientId: 'client-1' })
+    expired.setTokenData({ accessToken: 'old', refreshToken: 'old-refresh', expiresAt: Date.now() - 1000, scope: [] })
+    stub([json(200, USER)], () => {
+      throw new TypeError('fetch failed')
+    })
+    await assert.rejects(new TwitchClient(expired).getUserInfo(), (error: { code?: string; params?: { transient?: number } }) => {
+      return error.code === 'TWITCH_NOT_CONNECTED' && error.params?.transient === 1
+    })
+
+    await assert.rejects(new TwitchClient(new TwitchOAuth({ clientId: 'client-1' })).getUserInfo(), (error: { code?: string; params?: { transient?: number } }) => {
+      return error.code === 'TWITCH_NOT_CONNECTED' && error.params?.transient === undefined
+    })
+  })
+
+  await t.test('updateRedemptionStatus() needs only the ids and sends them to Twitch', async () => {
+    const urls: string[] = []
+    const seen = globalThis.fetch
+    globalThis.fetch = async (input) => {
+      urls.push(String(input instanceof Request ? input.url : input))
+      return json(200, { data: [{ id: 'red-1', status: 'CANCELED' }] })
+    }
+    connectedClient().setCachedUserInfo({ id: '1', login: 'streamer', displayName: 'Streamer', profileImageUrl: '' })
+
+    const client = connectedClient()
+    client.setCachedUserInfo({ id: '1', login: 'streamer', displayName: 'Streamer', profileImageUrl: '' })
+    await client.updateRedemptionStatus({ id: 'red-1', rewardId: 'reward-1' }, 'CANCELED')
+    globalThis.fetch = seen
+
+    const query = new URL(urls.at(-1) ?? '').searchParams
+    assert.equal(query.get('id'), 'red-1')
+    assert.equal(query.get('reward_id'), 'reward-1')
+  })
+
   await t.test('needsReauthorization() follows the login', async () => {
     stub([json(401)], () => json(400))
     const client = connectedClient()

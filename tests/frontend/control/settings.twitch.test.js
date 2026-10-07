@@ -861,3 +861,32 @@ test('cancelConfigChanges()', async (t) => {
     assert.equal(dom.secYoutubeKey.value, 'typed')
   })
 })
+
+test('disconnectTwitch(): redemptions left open', async (t) => {
+  const { disconnectTwitch } = await import('../../../public/js/control/twitch/twitch-connection.js')
+  const originalConfirm = globalThis.confirm
+  globalThis.confirm = () => true
+  t.after(() => {
+    globalThis.confirm = originalConfirm
+  })
+
+  const toasts = () => [...document.querySelectorAll('#toastContainer .toast')].map((toast) => toast.textContent)
+
+  await t.test('a number above zero is shown to the streamer', async () => {
+    document.getElementById('toastContainer').innerHTML = ''
+    handlers = { 'POST /api/integrations/twitch/disconnect': () => ({ openRedemptions: 3 }) }
+
+    await disconnectTwitch()
+
+    assert.ok(toasts().some((text) => text.includes('3')), JSON.stringify(toasts()))
+  })
+
+  await t.test('nothing is shown when nothing was left open', async () => {
+    document.getElementById('toastContainer').innerHTML = ''
+    handlers = { 'POST /api/integrations/twitch/disconnect': () => ({ openRedemptions: 0 }) }
+
+    await disconnectTwitch()
+
+    assert.deepEqual(toasts(), [])
+  })
+})
