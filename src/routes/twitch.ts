@@ -1,5 +1,5 @@
 import express from 'express'
-import { ok, asyncHandler, sendConfigUpdate } from '../http.js'
+import { ok, sendConfigUpdate } from '../http.js'
 import type { TwitchConnectionResponse, TwitchCreateCustomReward, TwitchUpdateCustomReward } from '../integrations/twitch/types.js'
 import { AppError } from '../types.js'
 import { startDeviceAuthorization, disconnect, refreshConnection, getClient, getTwitchHealth } from '../integrations/twitch/index.js'
@@ -105,84 +105,53 @@ router.get('/config', (_req, res) => {
   ok(res, getTwitchConfig())
 })
 
-router.put(
-  '/config',
-  localOnly,
-  asyncHandler(async (req, res) => {
-    const { config, rejected } = updateTwitchConfig(req.body)
+router.put('/config', localOnly, async (req, res) => {
+  const { config, rejected } = updateTwitchConfig(req.body)
+  sendConfigUpdate(res, config, rejected)
+})
 
-    sendConfigUpdate(res, config, rejected)
+router.post('/connect', localOnly, async (_req, res) => {
+  const device = await startDeviceAuthorization()
+
+  ok(res, {
+    userCode: device.user_code,
+    verificationUri: device.verification_uri,
+    expiresIn: device.expires_in
   })
-)
+})
 
-router.post(
-  '/connect',
-  localOnly,
-  asyncHandler(async (_req, res) => {
-    const device = await startDeviceAuthorization()
+router.post('/disconnect', localOnly, async (_req, res) => {
+  const openRedemptions = await disconnect()
+  ok(res, { openRedemptions })
+})
 
-    ok(res, {
-      userCode: device.user_code,
-      verificationUri: device.verification_uri,
-      expiresIn: device.expires_in
-    })
+router.post('/refresh', localOnly, async (_req, res) => {
+  const userInfo = await refreshConnection()
+  ok(res, { user: toUserResponse(userInfo) })
+})
+
+router.get('/rewards', localOnly, async (_req, res) => {
+  const client = requireClient()
+  const rewards = await client.getCustomRewards()
+
+  ok(res, {
+    rewards: rewards.filter((reward) => reward.is_user_input_required)
   })
-)
+})
 
-router.post(
-  '/disconnect',
-  localOnly,
-  asyncHandler(async (_req, res) => {
-    const openRedemptions = await disconnect()
-    ok(res, { openRedemptions })
-  })
-)
+router.post('/rewards', localOnly, async (req, res) => {
+  const client = requireClient()
+  const payload = validateRewardPayload(req.body, { requireTitleAndCost: true })
+  const reward = await client.createCustomReward(payload as TwitchCreateCustomReward)
 
-router.post(
-  '/refresh',
-  localOnly,
-  asyncHandler(async (_req, res) => {
-    const userInfo = await refreshConnection()
+  ok(res, { reward })
+})
 
-    ok(res, {
-      user: toUserResponse(userInfo)
-    })
-  })
-)
+router.patch('/rewards/:id', localOnly, async (req, res) => {
+  const client = requireClient()
+  const payload = validateRewardPayload(req.body, { requireTitleAndCost: false })
+  const rewardId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id
+  const reward = await client.updateCustomReward(rewardId, payload as TwitchUpdateCustomReward)
 
-router.get(
-  '/rewards',
-  localOnly,
-  asyncHandler(async (_req, res) => {
-    const client = requireClient()
-    const rewards = await client.getCustomRewards()
-
-    ok(res, {
-      rewards: rewards.filter((reward) => reward.is_user_input_required)
-    })
-  })
-)
-
-router.post(
-  '/rewards',
-  localOnly,
-  asyncHandler(async (req, res) => {
-    const client = requireClient()
-    const payload = validateRewardPayload(req.body, { requireTitleAndCost: true })
-    const reward = await client.createCustomReward(payload as TwitchCreateCustomReward)
-
-    ok(res, { reward })
-  })
-)
-
-router.patch(
-  '/rewards/:id',
-  localOnly,
-  asyncHandler<{ id: string }>(async (req, res) => {
-    const client = requireClient()
-    const payload = validateRewardPayload(req.body, { requireTitleAndCost: false })
-    const reward = await client.updateCustomReward(req.params.id, payload as TwitchUpdateCustomReward)
-
-    ok(res, { reward })
-  })
-)
+  ok(res, { reward })
+})

@@ -1,4 +1,4 @@
-import { Response, Request, NextFunction, RequestHandler, ParamsDictionary } from 'express-serve-static-core'
+import { Response } from 'express-serve-static-core'
 import { AppError, AppErrorCode, ApiOk, ApiError, ApiErrorCode, ConfigUpdateResponse } from './types.js'
 import { getSettings } from './settings.js'
 import { translateErrorCode } from './i18n.js'
@@ -85,12 +85,4 @@ export function failFromError(res: Response, error: unknown): void {
 export function failFromReason(res: Response, reason: { code: string; params?: Record<string, string | number> }): void {
   const status = STATUS_BY_CODE[reason.code as AppErrorCode] ?? 500
   fail(res, reason.code, reason.code as ApiErrorCode, status, reason.params)
-}
-
-export function asyncHandler<P = ParamsDictionary>(
-  handler: (req: Request<P>, res: Response, next: NextFunction) => Promise<void>
-): RequestHandler<P> {
-  return (req, res, next) => {
-    handler(req, res, next).catch(next)
-  }
 }

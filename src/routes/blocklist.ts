@@ -17,7 +17,7 @@ router.post('/', (req, res) => {
     return fail(res, 'a valid videoId is required', 'INVALID_VIDEO_ID', 400)
   }
 
-  const entry = blockTrack(videoId, typeof title === 'string' ? title : videoId)
+  const entry = blockTrack(videoId, typeof title === 'string' ? title.slice(0, 200) : videoId)
   const skipped = skipIfCurrent(videoId)
   ok(res, { entry, skipped }, 201)
 })

@@ -22,14 +22,12 @@
     "build:release": "node scripts/build-release.mjs"
   },
   "dependencies": {
-    "cors": "^2.8.5",
     "dotenv": "^18.0.3",
     "express": "^5.1.0",
     "ws": "^8.21.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
-    "@types/cors": "^2.8.17",
     "@types/express": "^5.0.3",
     "@types/node": "^22.18.0",
     "@types/ws": "^8.18.1",

@@ -34,6 +34,11 @@ export async function shutdown(code = 0, exit: (code: number) => void = (c) => p
 
 /** SIGINT (Ctrl+C), SIGTERM (a service stop), SIGHUP (Windows sends it when the console window is closed), SIGBREAK and a crash all end the same way: saved first. */
 export function installShutdownHandlers(): void {
+  // a stray rejected promise must not stop the music mid-stream: log it and carry on
+  process.on('unhandledRejection', (reason) => {
+    log.error(`Unhandled rejection: ${describeError(reason, true)}`)
+  })
+
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK'] as const) {
     process.on(signal, () => {
       log.log(`${signal} received, saving and exiting`)

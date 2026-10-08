@@ -140,6 +140,16 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
   return getFallbackState()
 }
 
+// The playlist id is already stored; if it cannot be loaded, only that id goes back to what it was
+export async function refreshFallbackOrRollback(previousPlaylistId: string | null): Promise<void> {
+  try {
+    await refreshFallback()
+  } catch (error) {
+    updateConfig({ fallbackPlaylist: { playlistId: previousPlaylistId } })
+    throw error
+  }
+}
+
 /** Re-orders the rotation for the given shuffle mode, keeping the playing track in place. Does not touch the config. */
 export function reorderFallback(shuffleOn: boolean): void {
   const current = getCurrent()

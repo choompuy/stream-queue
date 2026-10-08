@@ -2,7 +2,7 @@ import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
 import type { AddressInfo } from 'node:net'
 import express from 'express'
-import { errorHandler, ForbiddenOriginError } from '../../src/error-handler.js'
+import { errorHandler } from '../../src/error-handler.js'
 
 const app = express()
 app.use(express.json({ limit: '1kb' }))
@@ -10,7 +10,6 @@ app.post('/echo', (req, res) => res.json({ got: req.body }))
 app.get('/boom', () => {
   throw new Error('secret internal detail')
 })
-app.get('/origin', (_req, _res, next) => next(new ForbiddenOriginError()))
 app.get('/teapot', (_req, _res, next) => next(Object.assign(new Error('teapot'), { status: 418 })))
 app.get('/late', (_req, res, next) => {
   res.write('partial')
@@ -46,13 +45,6 @@ test('errorHandler', async (t) => {
 
     assert.equal(response.status, 200)
     assert.deepEqual(await response.json(), { got: { a: 1 } })
-  })
-
-  await t.test('a disallowed CORS origin is a 403 FORBIDDEN_ORIGIN', async () => {
-    const response = await fetch(`${base}/origin`)
-
-    assert.equal(response.status, 403)
-    assert.equal(((await response.json()) as Record<string, any>).code, 'FORBIDDEN_ORIGIN')
   })
 
   await t.test('other client errors keep their 4xx status', async () => {

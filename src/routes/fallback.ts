@@ -1,6 +1,6 @@
 import express from 'express'
 import { StateResponse, QueueItem, FallbackEnqueueResponse } from '../types.js'
-import { ok, fail, asyncHandler } from '../http.js'
+import { ok, fail } from '../http.js'
 import {
   refreshFallback,
   getFallbackState,
@@ -26,12 +26,9 @@ router.get('/', (_req, res) => {
   ok(res, getFallbackState())
 })
 
-router.post(
-  '/refresh',
-  asyncHandler(async (_req, res) => {
-    ok(res, await refreshFallback())
-  })
-)
+router.post('/refresh', async (_req, res) => {
+  ok(res, await refreshFallback())
+})
 
 router.post('/shuffle', (_req, res) => {
   ok(res, toggleFallbackShuffle())
