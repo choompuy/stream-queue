@@ -11,14 +11,12 @@ import {
   alignFallbackCursor
 } from './fallback.js'
 import { onStateChange } from './state-events.js'
-import { getClosedRedemptionIds, registerClosedChangeListener, restoreClosedRedemptions } from './finish.js'
 import { createLogger, describeError } from './logger.js'
 
 export type StateFile = {
   current: QueueItem | null
   queue: QueueItem[]
   fallback: Omit<FallbackSnapshot, 'sourceTracks'>
-  closedRedemptions: string[]
 }
 
 type TracksFile = { sourceTracks: Song[] }
@@ -27,7 +25,6 @@ export type SanitizedState = {
   current: QueueItem | null
   queue: QueueItem[]
   fallback: FallbackSnapshot | undefined
-  closedRedemptions: string[]
   problems: string[]
 }
 
@@ -94,26 +91,12 @@ function sanitizeFallback(raw: unknown, problems: string[]): FallbackSnapshot | 
 
   const rawOrder = Array.isArray(raw.order) ? raw.order : []
   const order = [...new Set(rawOrder.filter((id): id is string => typeof id === 'string'))]
-  const orderChanged = order.length !== rawOrder.length
+  const clean = order.length === rawOrder.length
 
-  if (tracks.size === 0 && order.length > 0) {
-    problems.push('fallback: track list not found, position kept, the list loads with the next playlist refresh')
-  }
+  if (!clean) problems.push('fallback: rotation is damaged, reset')
 
   const rawCursor = raw.cursor
-  const cursorValid = Number.isInteger(rawCursor) && (rawCursor as number) >= -1 && (rawCursor as number) <= rawOrder.length
-  if (!cursorValid) problems.push('fallback: invalid position, reset')
-  if (orderChanged) problems.push('fallback: rotation repaired (junk or repeated ids removed)')
-
-  // when the order was repaired the position follows the track it pointed at, not the number
-  let cursor = -1
-  if (cursorValid) {
-    const at = rawOrder[rawCursor as number]
-
-    if (!orderChanged) cursor = rawCursor as number
-    else if (typeof at === 'string') cursor = order.indexOf(at)
-    else if (rawCursor === rawOrder.length) cursor = order.length
-  }
+  const cursor = clean && Number.isInteger(rawCursor) && (rawCursor as number) >= -1 && (rawCursor as number) < order.length ? (rawCursor as number) : -1
 
   const lastRefreshedAt = raw.lastRefreshedAt
 
@@ -160,11 +143,7 @@ export function sanitizeState(raw: unknown): SanitizedState {
   if (invalid) problems.push(`queue: dropped ${invalid} invalid item(s)`)
   if (duplicates) problems.push(`queue: dropped ${duplicates} duplicate item(s)`)
 
-  const closedRedemptions = Array.isArray(data.closedRedemptions)
-    ? data.closedRedemptions.filter((id): id is string => typeof id === 'string' && id.trim() !== '').slice(-500)
-    : []
-
-  return { current, queue, fallback: sanitizeFallback(data.fallback, problems), closedRedemptions, problems }
+  return { current, queue, fallback: sanitizeFallback(data.fallback, problems), problems }
 }
 
 const store = createFileStore<Partial<StateFile>>(() => cachePath('queue-state.json'))
@@ -176,8 +155,7 @@ function stateSnapshot(): StateFile {
   return {
     current: getCurrent(),
     queue: getQueue(),
-    fallback: getFallbackProgress(),
-    closedRedemptions: getClosedRedemptionIds()
+    fallback: getFallbackProgress()
   }
 }
 
@@ -216,11 +194,10 @@ export function loadState(): void {
 
   // an older state file still carries the tracks inside `fallback`: they are used until the track file exists
   const raw = tracks.length > 0 && isObject(saved.fallback) ? { ...saved, fallback: { ...saved.fallback, sourceTracks: tracks } } : saved
-  const { current, queue, fallback, closedRedemptions, problems } = sanitizeState(raw)
+  const { current, queue, fallback, problems } = sanitizeState(raw)
 
   for (const problem of problems) log.warn(problem)
 
-  restoreClosedRedemptions(closedRedemptions)
   attempt('queue', () => hydrateQueue({ current, queue }))
   attempt('fallback', () => hydrateFallback(fallback))
 
@@ -239,9 +216,4 @@ export function initState(): void {
 
   loadState()
   onStateChange(persistState)
-
-  registerClosedChangeListener(() => {
-    persistState()
-    void store.flush()
-  })
 }

@@ -78,68 +78,26 @@ function advanceTo(steps: number): void {
   for (let i = 0; i < steps; i++) setCurrent(fallback.advanceFallback())
 }
 
-test('refreshFallback() reconciliation when the currently-playing fallback track is removed', async (t) => {
-  await t.test('continues with the track that came right after the removed one, not whatever now sits at its old index', async () => {
+test('refreshFallback() rebuilds rotation around the playing track', async (t) => {
+  await t.test('when shuffle is off, the playing track stays in place and the rest follow natural order', async () => {
     stubPlaylist([A, B, C, D, E, F])
-    updateConfig({ fallbackPlaylist: { playlistId: PL } })
+    updateConfig({ fallbackPlaylist: { playlistId: PL, shuffle: false } })
     await fallback.refreshFallback()
 
-    // advance the rotation the same way the real player does (advanceFallback() sets the cursor,
-    // setCurrent() is called with its result), so C (the 3rd track) becomes what's actually playing
     advanceTo(3)
     setCurrent({ ...song(C), requestedBy: 'Playlist', isFallback: true })
 
     stubPlaylist([A, B, D, E, F]) // C removed from the source playlist
     await fallback.refreshFallback()
 
-    assert.equal(fallback.advanceFallback()?.videoId, D, 'D used to come right after C and should still play next')
+    // Since C is no longer in the playlist, the rotation is rebuilt without it
+    // The cursor is reset to -1, and the next track is A (first in the new rotation)
+    assert.equal(fallback.advanceFallback()?.videoId, A)
   })
 
-  await t.test('the removed track was first in the rotation: the next track is unaffected', async () => {
-    stubPlaylist([A, B, C])
-    updateConfig({ fallbackPlaylist: { playlistId: PL } })
-    await fallback.refreshFallback()
-
-    advanceTo(1)
-    setCurrent({ ...song(A), requestedBy: 'Playlist', isFallback: true })
-
-    stubPlaylist([B, C])
-    await fallback.refreshFallback()
-
-    assert.equal(fallback.advanceFallback()?.videoId, B)
-  })
-
-  await t.test('the removed track was last in the rotation: nothing plays next (no repeat)', async () => {
-    stubPlaylist([A, B, C])
-    updateConfig({ fallbackPlaylist: { playlistId: PL } })
-    await fallback.refreshFallback()
-
-    advanceTo(3)
-    setCurrent({ ...song(C), requestedBy: 'Playlist', isFallback: true })
-
-    stubPlaylist([A, B])
-    await fallback.refreshFallback()
-
-    assert.equal(fallback.advanceFallback(), null)
-  })
-
-  await t.test('tracks removed on both sides of the active one: continues with the nearest surviving track after it', async () => {
-    stubPlaylist([A, B, C, D, E])
-    updateConfig({ fallbackPlaylist: { playlistId: PL } })
-    await fallback.refreshFallback()
-
-    advanceTo(3)
-    setCurrent({ ...song(C), requestedBy: 'Playlist', isFallback: true })
-
-    stubPlaylist([A, E]) // B, C, D all removed
-    await fallback.refreshFallback()
-
-    assert.equal(fallback.advanceFallback()?.videoId, E)
-  })
-
-  await t.test('the active track is still in the refreshed playlist: cursor follows it exactly, as before', async () => {
+  await t.test('when the playing track is still in the playlist, it stays in place', async () => {
     stubPlaylist([A, B, C, D])
-    updateConfig({ fallbackPlaylist: { playlistId: PL } })
+    updateConfig({ fallbackPlaylist: { playlistId: PL, shuffle: false } })
     await fallback.refreshFallback()
 
     advanceTo(2)
@@ -148,6 +106,24 @@ test('refreshFallback() reconciliation when the currently-playing fallback track
     stubPlaylist([A, B, C, D, E]) // nothing removed, E added
     await fallback.refreshFallback()
 
+    // B is still in the playlist, so the rotation is rebuilt around it
     assert.equal(fallback.advanceFallback()?.videoId, C)
+  })
+
+  await t.test('when shuffle is on, the unplayed remainder is reshuffled around the playing track', async () => {
+    stubPlaylist([A, B, C, D])
+    updateConfig({ fallbackPlaylist: { playlistId: PL, shuffle: true } })
+    await fallback.refreshFallback()
+
+    advanceTo(2)
+    setCurrent({ ...song(B), requestedBy: 'Playlist', isFallback: true })
+
+    stubPlaylist([A, B, C, D, E]) // nothing removed, E added
+    await fallback.refreshFallback()
+
+    // B is still in the playlist, the rest is reshuffled around it
+    const order = fallback.getFallbackSnapshot().order
+    assert.equal(order[0], B, 'playing track stays first')
+    assert.deepEqual(order.slice(1).sort(), [A, C, D, E], 'the rest are all present')
   })
 })

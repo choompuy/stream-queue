@@ -26,6 +26,7 @@ beforeEach(() => {
 
 test('per-user request limit is case-insensitive', async (t) => {
   await t.test('the same user under a different letter case is still counted as one user', () => {
+    queue.setCurrent({ ...song('zzzzzzzzzzz'), requestedBy: 'someone' })
     queue.addSong(song('aaaaaaaaaaa'), 'Bob', { bypassLimits: false })
 
     assert.throws(() => queue.assertCanAddSong(song('bbbbbbbbbbb'), 'bob', { bypassLimits: false }), { code: 'USER_LIMIT' })
@@ -33,13 +34,15 @@ test('per-user request limit is case-insensitive', async (t) => {
   })
 
   await t.test('a different user is not affected by another user being at their limit', () => {
+    queue.setCurrent({ ...song('zzzzzzzzzzz'), requestedBy: 'someone' })
     queue.addSong(song('aaaaaaaaaaa'), 'Bob', { bypassLimits: false })
 
     assert.doesNotThrow(() => queue.assertCanAddSong(song('bbbbbbbbbbb'), 'Amy', { bypassLimits: false }))
   })
 
   await t.test('removing the one request frees up the slot for any case of the same name', () => {
-    const added = queue.addSong(song('aaaaaaaaaaa'), 'Bob', { bypassLimits: false })
+    queue.setCurrent({ ...song('zzzzzzzzzzz'), requestedBy: 'someone' })
+    const added = queue.addSong(song('aaaaaaaaaaa'), 'Bob', { bypassLimits: false }).item
     queue.removeAt(queue.getQueue().indexOf(added))
 
     assert.doesNotThrow(() => queue.assertCanAddSong(song('bbbbbbbbbbb'), 'BOB', { bypassLimits: false }))

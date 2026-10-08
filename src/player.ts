@@ -1,6 +1,6 @@
 import { StateResponse, QueueItem, ActivityReasonCode } from './types.js'
 import { isBlocked } from './blocklist.js'
-import { logRejection, logFailure, logSkippedWithOpenReward } from './activity.js'
+import { logRejection, logFailure } from './activity.js'
 import { getQueue, getCurrent, getIsPaused, setCurrent, shiftQueue } from './queue.js'
 import { peekNextFallbackTrack, advanceFallback } from './fallback.js'
 import { finishItem } from './finish.js'
@@ -47,10 +47,6 @@ export function skipCurrent(): QueueItem | null {
   const skipped = getCurrent()
   if (skipped) {
     log.log(`skipped "${skipped.title}"`)
-    if (skipped.channelPointsRedemption) {
-      log.warn(`"${skipped.title}" was bought with Channel Points: the reward stays UNFULFILLED on Twitch until it is fulfilled or refunded there`)
-      logSkippedWithOpenReward(skipped)
-    }
   }
   return moveToNext()
 }
