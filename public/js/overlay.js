@@ -1,5 +1,6 @@
 import { $, formatDuration, createLogger, getErrorMessage, show, setClass, setText } from './shared.js'
 import { initI18n, t, getCurrentLocale } from './i18n.js'
+import { loadYouTubeApi } from './youtube-api.js'
 
 let player = null
 let currentState = null
@@ -276,7 +277,7 @@ function onPlayerStateChange(event) {
 }
 
 function onPlayerError(event) {
-  const message = getErrorMessage(event.data, t || ((key) => key))
+  const message = getErrorMessage(event.data, t)
   log(`Player error: ${message}`)
   const videoId = currentState?.current?.videoId
 
@@ -374,29 +375,8 @@ async function resetPlayer() {
   return token
 }
 
-// OBS often starts before the network is up: a failed load of the API script is retried, with growing pauses, until it works
-function loadYouTubeApi(attempt = 0) {
-  const tag = document.createElement('script')
-  tag.src = 'https://www.youtube.com/iframe_api'
-
-  tag.onerror = () => {
-    tag.remove()
-    const delay = Math.min(2000 * 2 ** Math.min(attempt, 5), 30000)
-    log(`YouTube API failed to load, retrying in ${delay / 1000}s`)
-    setTimeout(() => loadYouTubeApi(attempt + 1), delay)
-  }
-
-  const firstScriptTag = document.getElementsByTagName('script')[0]
-  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag)
-}
-
 if (isPlaybackSource) {
-  window.onYouTubeIframeAPIReady = () => {
-    log('YouTube API ready')
-    createPlayer()
-  }
-
-  loadYouTubeApi()
+  loadYouTubeApi().then(createPlayer)
 } else {
   log('Non-localhost origin: read-only widget, no embedded player')
   dom.nowPlayingVideo.classList.add('hidden')
