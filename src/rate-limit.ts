@@ -52,5 +52,5 @@ export function createRateLimiter({
     next()
   }
 
-  return { middleware, _hitsForTest: hits }
+  return { middleware }
 }

@@ -18,6 +18,7 @@ const commandSchema: Schema = {
   permission: rules.oneOf(PERMISSIONS)
 }
 
+// `validateTwitchConfigUpdates` and `restoreTwitchConfig` are exported for tests
 export const {
   getConfig: getTwitchConfig,
   updateConfig: updateTwitchConfig,

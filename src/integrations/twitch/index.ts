@@ -551,6 +551,7 @@ export const _test = {
 }
 
 // Export for testing purposes only
+/** @internal exported for tests */
 export async function _resetIntegration(): Promise<void> {
   if (eventSub) await eventSub.disconnect()
   if (chat) await chat.disconnect()

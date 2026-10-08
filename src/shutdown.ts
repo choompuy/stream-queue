@@ -13,10 +13,11 @@ export async function shutdown(code = 0, exit: (code: number) => void = (c) => p
   if (shuttingDown) return
   shuttingDown = true
 
-  setTimeout(() => {
+  const forceExit = setTimeout(() => {
     log.error(`Saving did not finish in ${FORCE_EXIT_AFTER_MS / 1000}s, exiting anyway`)
     exit(code)
-  }, FORCE_EXIT_AFTER_MS).unref()
+  }, FORCE_EXIT_AFTER_MS)
+  forceExit.unref()
 
   try {
     await flushAllStores()
@@ -25,6 +26,9 @@ export async function shutdown(code = 0, exit: (code: number) => void = (c) => p
   }
 
   await flushLogs()
+
+  // saved in time: the safety net must not fire a second exit later
+  clearTimeout(forceExit)
   exit(code)
 }
 

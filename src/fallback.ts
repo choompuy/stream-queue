@@ -287,6 +287,7 @@ export function getFallbackProgress(): Omit<FallbackSnapshot, 'sourceTracks'> {
   }
 }
 
+/** @internal exported for tests (the state file saves the progress and the track list separately) */
 export function getFallbackSnapshot(): FallbackSnapshot {
   return { sourceTracks: getFallbackSourceTracks(), ...getFallbackProgress() }
 }
