@@ -42,33 +42,9 @@
   "common": {
     "save": "Save",
     "cancel": "Cancel",
-    "delete": "Delete",
-    "remove": "Remove",
-    "clear": "Clear",
     "close": "Close",
-    "back": "Back",
-    "add": "Add",
-    "search": "Search",
-    "settings": "Settings",
-    "loading": "Loading...",
-    "error": "Error",
-    "success": "Success",
-    "confirm": "Confirm",
-    "yes": "Yes",
-    "no": "No",
-    "copy": "Copy",
-    "refresh": "Refresh",
-    "enabled": "On",
-    "disabled": "Off",
     "on": "On",
     "off": "Off",
-    "pause": "Pause",
-    "resume": "Resume",
-    "skip": "Skip",
-    "shuffle": "Shuffle",
-    "repeat": "Repeat",
-    "next": "Next",
-    "previous": "Previous",
     "more": "More actions"
   },
   "nav": {
@@ -91,8 +67,6 @@
     "searchBtn": "Search",
     "noResults": "No results found",
     "addToQueue": "Add to queue",
-    "errorSearching": "Error searching",
-    "errorAdding": "Error adding video",
     "clear": "Clear search"
   },
   "queue": {
@@ -100,8 +74,7 @@
     "empty": "Queue is empty",
     "remove": "Remove from queue",
     "clear": "Clear",
-    "clearConfirm": "Clear entire queue?",
-    "count": "{{current}}/{{max}}"
+    "clearConfirm": "Clear entire queue?"
   },
   "fallback": {
     "title": "Playlist",
@@ -137,7 +110,6 @@
     "addPlaceholder": "Paste YouTube playlist URL or ID...",
     "urlLabel": "Playlist URL or ID",
     "addBtn": "Add",
-    "errorAdding": "Error adding playlist",
     "empty": {
       "title": "No saved playlists yet",
       "description": "Add a YouTube playlist above, then activate it to use as your fallback rotation"
@@ -186,8 +158,7 @@
         "contentModeAny": "Any video"
       },
       "contentModeNote": "Music only: category Music, or a music topic. Search looks in Music only; other clips can be added by link",
-      "regionCodeNote": "Two-letter country code (ISO 3166-1, e.g. US, RU, DE). Tracks not licensed for this region are skipped instead of being queued. Leave empty to disable",
-      "save": "Save settings"
+      "regionCodeNote": "Two-letter country code (ISO 3166-1, e.g. US, RU, DE). Tracks not licensed for this region are skipped instead of being queued. Leave empty to disable"
     },
     "about": {
       "title": "About",
@@ -203,7 +174,6 @@
       "connect": "Connect Twitch",
       "disconnect": "Disconnect",
       "disconnectConfirm": "Disconnect Twitch? Chat commands and Channel Points integrations will stop working",
-      "save": "Save Twitch settings",
       "clientCredentialsNote": "No Twitch Client ID found. Create an application of type Public in the Twitch Developer Console, put its Client ID into the .env file next to the app as TWITCH_CLIENT_ID=..., and restart the app. A secret is not needed.",
       "reward": "Channel Points reward",
       "rewardNone": "Select reward",
@@ -219,16 +189,12 @@
       "createRewardPrompt": "Description (optional)",
       "createRewardBackgroundColor": "Background color (hex, optional)",
       "createRewardEnabled": "Enable reward",
-      "limitsSection": "Purchase limits",
       "maxPerStream": "Max per stream",
       "maxPerUserPerStream": "Max per user per stream",
-      "globalCooldown": "Global cooldown (seconds)",
-      "rewardCreated": "Reward created successfully",
-      "rewardCreateError": "Failed to create reward"
+      "globalCooldown": "Global cooldown (seconds)"
     },
     "twitchChat": {
       "title": "Twitch chat commands",
-      "save": "Save chat commands",
       "cooldown": "Control command cooldown (seconds)",
       "cooldownNote": "Applies only to skip/pause/resume - a shared cooldown so two moderators can't trigger the same action back to back.",
       "plainCooldown": "Queue command cooldown (seconds)",
@@ -309,22 +275,6 @@
       "twitchNotConnected": "Twitch account is not connected",
       "twitchRefreshError": "Failed to refresh Twitch connection"
     }
-  },
-  "time": {
-    "secondsAgo": "{{count}}s ago",
-    "minutesAgo": "{{count}}m ago",
-    "hoursAgo": "{{count}}h ago",
-    "daysAgo": "{{count}}d ago"
-  },
-  "requests": {
-    "one": "request",
-    "few": "requests",
-    "many": "requests"
-  },
-  "tracks": {
-    "one": "track",
-    "few": "tracks",
-    "many": "tracks"
   },
   "toast": {
     "removedFromQueue": "Removed from queue",

@@ -5,20 +5,6 @@ let translations = {}
 // the default language, loaded next to another one: a key missing there shows English text instead of the key itself
 let fallbackTranslations = {}
 
-const pluralRules = {
-  en: (n) => {
-    return n === 1 ? 'one' : 'many'
-  },
-  ru: (n) => {
-    const lastTwo = n % 100
-    const lastOne = n % 10
-    if (lastTwo >= 11 && lastTwo <= 19) return 'many'
-    if (lastOne === 1) return 'one'
-    if (lastOne >= 2 && lastOne <= 4) return 'few'
-    return 'many'
-  }
-}
-
 export async function loadTranslations(locale) {
   try {
     const response = await fetch(`/locales/${locale}.json`)
@@ -70,19 +56,8 @@ export function t(key, params = {}) {
   return result
 }
 
-export function tPlural(key, count, params = {}) {
-  const rule = pluralRules[currentLocale] || pluralRules.en
-  const form = rule(Number(count))
-  const pluralKey = `${key}.${form}`
-  return t(pluralKey, { ...params, count })
-}
-
 export function getCurrentLocale() {
   return currentLocale
-}
-
-export function setLocale(locale) {
-  return loadTranslations(locale)
 }
 
 export async function initI18n(locale = DEFAULT_LOCALE) {
