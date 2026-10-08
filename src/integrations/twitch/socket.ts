@@ -1,5 +1,5 @@
 import WebSocket from 'ws'
-import type { createLogger } from '../../logger.js'
+import { describeError, type createLogger } from '../../logger.js'
 
 /**
  * Closes a socket that may still be connecting. ws emits 'error' when a CONNECTING socket is closed; with the listeners
@@ -33,7 +33,7 @@ export abstract class ReconnectingSocket {
   protected onOpen(_socket: WebSocket): void {}
   protected onClosed(): void {}
 
-  private connecting = false
+  private starting: Promise<void> | null = null
   private attempts = 0
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private watchdogTimer: ReturnType<typeof setTimeout> | null = null
@@ -41,29 +41,36 @@ export abstract class ReconnectingSocket {
   private watchdogMs = 0
   private pending: { promise: Promise<void>; resolve: () => void; reject: (error: Error) => void } | null = null
 
-  async connect(): Promise<void> {
+  connect(): Promise<void> {
     if (this.stopped) this.attempts = 0
     this.stopped = false
-    if (this.isConnected() || this.connecting) return
+    if (this.isConnected()) return Promise.resolve()
 
-    this.clearReconnectTimer()
-    this.connecting = true
-
-    try {
-      await this.beforeOpen()
-      await this.open(this.url)
-      await this.waitReady()
-      this.markStable()
-    } finally {
-      this.connecting = false
+    // a second caller joins the attempt in progress instead of starting another one (or being told "connected" too early)
+    if (!this.starting) {
+      const attempt: Promise<void> = this.start().finally(() => {
+        if (this.starting === attempt) this.starting = null
+      })
+      this.starting = attempt
     }
+
+    return this.starting
+  }
+
+  private async start(): Promise<void> {
+    this.clearReconnectTimer()
+    await this.beforeOpen()
+    // disconnect() may have been called while the token was being fetched: no socket must be opened after it
+    if (this.stopped) throw new Error('Disconnected')
+    await this.open(this.url)
+    await this.waitReady()
+    this.markStable()
   }
 
   async disconnect(): Promise<void> {
     this.stopped = true
-    this.connecting = false
     this.clearReconnectTimer()
-    this.pending = null
+    this.failPending(new Error('Disconnected'))
 
     const socket = this.socket
     this.socket = null
@@ -75,8 +82,8 @@ export abstract class ReconnectingSocket {
     this.log.log('Disconnected')
   }
 
+  // does not undo a disconnect(): the caller of a failed first connect() must not bring back a socket that was closed on purpose
   retryInBackground(): void {
-    this.stopped = false
     this.scheduleReconnect()
   }
 
@@ -91,8 +98,15 @@ export abstract class ReconnectingSocket {
   }
 
   protected abort(error: Error): void {
-    this.pending?.reject(error)
+    this.failPending(error)
     this.dropSocket()
+  }
+
+  // Whoever waits for the socket to become ready must always be answered: a connect() left waiting would never end,
+  // and with it no reconnect would ever start. The rejected wait stays in place, so a waitReady() that starts only
+  // afterwards still ends with the real reason (the next open() replaces it)
+  private failPending(error: Error): void {
+    this.pending?.reject(error)
   }
 
   protected dropSocket(): void {
@@ -147,7 +161,7 @@ export abstract class ReconnectingSocket {
 
   protected restart(): void {
     this.clearReconnectTimer()
-    this.pending = null
+    this.failPending(new Error('Restarted'))
     this.dropSocket()
     this.scheduleReconnect()
   }
@@ -165,11 +179,11 @@ export abstract class ReconnectingSocket {
     const socket = new WebSocket(url)
     this.socket = socket
 
-    return new Promise((resolveOpen, rejectOpen) => {
-      let opened = false
+    const opened = new Promise<void>((resolveOpen, rejectOpen) => {
+      let isOpen = false
 
       socket.once('open', () => {
-        opened = true
+        isOpen = true
         this.onOpen(socket)
         resolveOpen()
       })
@@ -179,21 +193,24 @@ export abstract class ReconnectingSocket {
 
         Promise.resolve()
           .then(() => this.onMessage(data.toString()))
-          .catch((error) => this.log.error(`Failed to handle message: ${error instanceof Error ? error.message : error}`))
+          .catch((error) => this.log.error(`Failed to handle message: ${describeError(error)}`))
       })
 
       socket.on('close', () => this.handleClose(socket))
 
       socket.on('error', (error) => {
-        if (opened) {
+        if (isOpen) {
           this.log.error(`WebSocket error: ${error.message}`)
           return
         }
         if (this.socket === socket) this.socket = null
-        this.pending?.reject(error)
+        this.failPending(error)
         rejectOpen(error)
       })
     })
+
+    // a close or a restart while the socket is still connecting settles the pending wait too, so this cannot hang
+    return Promise.race([opened, promise])
   }
 
   protected async waitReady(): Promise<void> {
@@ -214,7 +231,7 @@ export abstract class ReconnectingSocket {
   }
 
   protected scheduleReconnect(): void {
-    if (this.stopped || this.reconnectTimer || this.connecting) return
+    if (this.stopped || this.reconnectTimer || this.starting) return
 
     if (!this.canReconnect()) {
       this.log.warn('Not reconnecting: connect the account again, then the connection is restored')
@@ -228,7 +245,7 @@ export abstract class ReconnectingSocket {
       this.reconnectTimer = null
 
       this.connect().catch((error) => {
-        this.log.error(`Reconnect failed (attempt ${this.attempts}): ${error instanceof Error ? error.message : error}`)
+        this.log.error(`Reconnect failed (attempt ${this.attempts}): ${describeError(error)}`)
         this.scheduleReconnect()
       })
     }, delay)
@@ -238,7 +255,7 @@ export abstract class ReconnectingSocket {
     if (this.socket !== socket) return
 
     this.socket = null
-    this.pending = null
+    this.failPending(new Error('Connection closed before it was ready'))
     this.teardown()
 
     if (this.stopped) return

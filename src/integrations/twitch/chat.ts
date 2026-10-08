@@ -2,7 +2,7 @@ import type WebSocket from 'ws'
 import { TwitchOAuth } from './oauth.js'
 import { ReconnectingSocket } from './socket.js'
 import type { TwitchChatMessage } from './types.js'
-import { createLogger } from '../../logger.js'
+import { createLogger, describeError } from '../../logger.js'
 
 const log = createLogger('TWITCH CHAT')
 
@@ -186,7 +186,7 @@ export class TwitchChat extends ReconnectingSocket {
     log.debug(`${message.displayName}: ${message.text}`)
 
     void Promise.resolve(this.config.onMessage?.(message)).catch((error) => {
-      log.error(`Chat message handler failed: ${error instanceof Error ? error.message : error}`)
+      log.error(`Chat message handler failed: ${describeError(error)}`)
     })
   }
 }

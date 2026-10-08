@@ -50,8 +50,9 @@ async function until(condition: () => boolean, what: string, timeoutMs = 2000): 
   }
 }
 
-// A local server that says "welcome" to every client, unless `silent` is set
-async function startServer(silent = false) {
+// A local server that says "welcome" to every client, unless `silent` is set.
+// The first `closeFirst` connections are closed before any welcome (a drop in the middle of the handshake)
+async function startServer(silent = false, closeFirst = 0) {
   const server = new WebSocketServer({ port: 0 })
   const clients = new Set<ServerSocket>()
   let connections = 0
@@ -60,6 +61,10 @@ async function startServer(silent = false) {
     connections++
     clients.add(client)
     client.on('close', () => clients.delete(client))
+    if (connections <= closeFirst) {
+      setTimeout(() => client.close(), 20)
+      return
+    }
     if (!silent) client.send('welcome')
   })
   await new Promise((resolve) => server.once('listening', resolve))
@@ -80,8 +85,8 @@ after(async () => {
   for (const stop of running) await stop()
 })
 
-async function connected(silent = false) {
-  const server = await startServer(silent)
+async function connected(silent = false, closeFirst = 0) {
+  const server = await startServer(silent, closeFirst)
   const socket = new TestSocket(server.url)
   running.push(async () => {
     await socket.disconnect()
@@ -188,6 +193,45 @@ test('ReconnectingSocket', async (t) => {
     assert.equal(socket.isConnected(), false)
 
     await socket.connect()
+    assert.equal(socket.isConnected(), true)
+  })
+
+  await t.test('a drop before the service says ready ends connect() with an error instead of hanging, and retrying brings the socket back', async () => {
+    const { server, socket } = await connected(false, 1)
+
+    const outcome = await Promise.race([
+      socket.connect().then(
+        () => 'connected',
+        (error: Error) => error.message
+      ),
+      new Promise<string>((resolve) => setTimeout(() => resolve('hung'), 1000))
+    ])
+    assert.match(outcome, /closed before it was ready/)
+
+    socket.retryInBackground()
+    await until(() => server.connections() === 2 && socket.isConnected(), 'the retry after the failed first attempt')
+  })
+
+  await t.test('disconnect() while connecting ends connect() and nothing is opened or brought back afterwards', async () => {
+    const { server, socket } = await connected()
+
+    const attempt = socket.connect().catch((error: Error) => error)
+    await socket.disconnect()
+    assert.match(String(await attempt), /Disconnected/)
+
+    socket.retryInBackground() // what a caller of the failed connect() does
+    await new Promise((resolve) => setTimeout(resolve, 60))
+
+    assert.equal(server.connections(), 0)
+    assert.equal(socket.isConnected(), false)
+  })
+
+  await t.test('two connect() calls during one attempt share it', async () => {
+    const { server, socket } = await connected()
+
+    await Promise.all([socket.connect(), socket.connect()])
+
+    assert.equal(server.connections(), 1)
     assert.equal(socket.isConnected(), true)
   })
 

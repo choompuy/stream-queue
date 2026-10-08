@@ -1,7 +1,7 @@
 import { CHANNEL_POINTS_REDEMPTION, type TwitchClient } from './client.js'
 import { ReconnectingSocket, closeQuietly } from './socket.js'
 import type { EventSubMessage, TwitchChannelPointsRedemption } from './types.js'
-import { createLogger } from '../../logger.js'
+import { createLogger, describeError } from '../../logger.js'
 
 const log = createLogger('TWITCH EVENTSUB')
 
@@ -35,7 +35,7 @@ export class TwitchEventSub extends ReconnectingSocket {
     try {
       message = JSON.parse(rawMessage) as EventSubMessage
     } catch (error) {
-      log.error(`Failed to parse message: ${error instanceof Error ? error.message : error}`)
+      log.error(`Failed to parse message: ${describeError(error)}`)
       return
     }
 
@@ -124,13 +124,13 @@ export class TwitchEventSub extends ReconnectingSocket {
   }
 
   private async handleChannelPointsRedemption(event: unknown): Promise<void> {
-    if (!event || typeof event !== 'object') {
+    const redemption = event as TwitchChannelPointsRedemption | null
+    if (!redemption || typeof redemption !== 'object' || !redemption.id || !redemption.reward?.id) {
       log.warn('Invalid Channel Points event')
       return
     }
 
-    const redemption = event as TwitchChannelPointsRedemption
-    log.log(`Channel Points redemption: ${redemption.reward.title} by ${redemption.user_name}`)
+    // the viewer and the reward are logged by the handler once the reward is known to be the configured one
     await this.config.onChannelPointsRedemption?.(redemption)
   }
 
@@ -150,7 +150,7 @@ export class TwitchEventSub extends ReconnectingSocket {
       await this.waitReady()
       log.log('Reconnected')
     } catch (error) {
-      log.error(`Reconnect failed: ${error instanceof Error ? error.message : error}`)
+      log.error(`Reconnect failed: ${describeError(error)}`)
       this.isReconnect = false
       this.scheduleReconnect()
     } finally {
