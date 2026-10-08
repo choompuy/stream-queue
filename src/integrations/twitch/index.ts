@@ -26,7 +26,7 @@ import { getState, skipCurrent } from '../../player.js'
 import { registerRedemptionHandler, type RedemptionOutcome } from '../../finish.js'
 import { AppError } from '../../types.js'
 import type { FailureReason, QueueItem } from '../../types.js'
-import { createLogger } from '../../logger.js'
+import { createLogger, describeError } from '../../logger.js'
 
 const log = createLogger('TWITCH')
 const chatLog = createLogger('TWITCH CHAT')
@@ -102,13 +102,13 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
 }
 
 async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemption): Promise<void> {
-  log.log(`Channel Points redemption: ${event.reward.title} by ${event.user_name}`)
-
   const configuredRewardId = getTwitchConfig().channelPointsRewardId
   if (!configuredRewardId || event.reward.id !== configuredRewardId) {
     log.log(`Ignoring redemption with non-matching reward ID: ${event.reward.id} (configured: ${configuredRewardId || 'none'})`)
     return
   }
+
+  log.log(`Channel Points redemption: ${event.reward.title} by ${event.user_name}`)
 
   const tracked = trackRedemption(event)
 
@@ -116,11 +116,6 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
   if (!query) {
     log.error(`Empty song request in redemption: ${event.id}`)
     await cancelRedemption(tracked, client, { code: 'SONG_NOT_FOUND' })
-    return
-  }
-
-  if (!client) {
-    log.error(`Twitch client is not initialized for redemption: ${event.id}`)
     return
   }
 
@@ -147,37 +142,47 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
   await replyInChat(buildRedemptionAcceptedMessage(event.user_name, result.added))
 }
 
-async function startEventSub(): Promise<void> {
+let eventSubStart: Promise<void> | null = null
+
+// One run at a time: device authorization finishing together with "refresh connection" must not connect the same socket twice
+function startEventSub(): Promise<void> {
+  eventSubStart ??= connectEventSub().finally(() => {
+    eventSubStart = null
+  })
+  return eventSubStart
+}
+
+async function connectEventSub(): Promise<void> {
   if (!oauth || !client) return
 
-  // already created: if it is down (it gave up earlier, or the first connect failed) it is woken up, not replaced
-  if (eventSub) {
-    if (!eventSub.isConnected()) await eventSub.connect().catch(() => eventSub?.retryInBackground())
-    return
+  if (!eventSub) {
+    if (!client.getCachedUserInfo()) {
+      log.log('Twitch account not connected, EventSub will not start')
+      return
+    }
+
+    if (!oauth.getConfig().clientId) {
+      log.log('Twitch client ID not configured, EventSub will not start')
+      return
+    }
+
+    eventSub = new TwitchEventSub({
+      client,
+      onChannelPointsRedemption: handleChannelPointsRedemption
+    })
   }
 
-  if (!client.getCachedUserInfo()) {
-    log.log('Twitch account not connected, EventSub will not start')
-    return
-  }
+  if (!eventSub.isConnected()) await connectOrRetry(eventSub, 'Twitch EventSub', log)
+}
 
-  if (!oauth.getConfig().clientId) {
-    log.log('Twitch client ID not configured, EventSub will not start')
-    return
-  }
-
-  eventSub = new TwitchEventSub({
-    client,
-    onChannelPointsRedemption: handleChannelPointsRedemption
-  })
-
+// Without a network at startup the integration must not stay dead: the same instance keeps retrying by itself
+async function connectOrRetry(socket: TwitchEventSub | TwitchChat, name: string, logger: ReturnType<typeof createLogger>): Promise<void> {
   try {
-    await eventSub.connect()
-    log.log('Twitch EventSub connected')
+    await socket.connect()
+    logger.log(`${name} connected`)
   } catch (error) {
-    // without a network at startup the integration must not stay dead: the same instance keeps retrying by itself
-    log.error(`Failed to start EventSub, will keep retrying: ${error instanceof Error ? error.message : error}`)
-    eventSub.retryInBackground()
+    logger.error(`Failed to start ${name}, will keep retrying: ${describeError(error)}`)
+    socket.retryInBackground()
   }
 }
 
@@ -275,33 +280,24 @@ function startChat(): Promise<void> {
 async function connectChat(): Promise<void> {
   if (!oauth || !client) return
 
-  if (chat) {
-    if (!chat.isConnected()) await chat.connect().catch(() => chat?.retryInBackground())
-    return
+  if (!chat) {
+    const userInfo = client.getCachedUserInfo()
+    if (!userInfo) {
+      chatLog.log('Twitch account not connected, chat will not start')
+      return
+    }
+
+    // Started whenever the account is connected, with or without enabled commands: the replies to redemptions
+    // (accepted, refunded) go through the chat too, and which commands react is decided per message
+    chat = new TwitchChat({
+      oauth,
+      channelLogin: userInfo.login,
+      botLogin: userInfo.login,
+      onMessage: handleChatMessage
+    })
   }
 
-  const userInfo = client.getCachedUserInfo()
-  if (!userInfo) {
-    chatLog.log('Twitch account not connected, chat will not start')
-    return
-  }
-
-  // Started whenever the account is connected, with or without enabled commands: the replies to redemptions
-  // (accepted, refunded) go through the chat too, and which commands react is decided per message
-  chat = new TwitchChat({
-    oauth,
-    channelLogin: userInfo.login,
-    botLogin: userInfo.login,
-    onMessage: handleChatMessage
-  })
-
-  try {
-    await chat.connect()
-    chatLog.log('Twitch chat connected')
-  } catch (error) {
-    chatLog.error(`Failed to start chat, will keep retrying: ${error instanceof Error ? error.message : error}`)
-    chat.retryInBackground()
-  }
+  if (!chat.isConnected()) await connectOrRetry(chat, 'Twitch chat', chatLog)
 }
 
 export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeResponse> {
