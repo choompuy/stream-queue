@@ -1,5 +1,6 @@
 import { CLOSE_ICON } from '../icons.js'
 import { setClass } from '../shared.js'
+import { t } from '../i18n.js'
 
 const DEFAULT_DURATION = 4000
 const MAX_TOASTS = 3
@@ -57,13 +58,15 @@ export function showToast(message, options = {}) {
     <div class="toast-bg"></div>
     <div class="toast">
       <span class="toast-message"></span>
-      <button type="button" class="toast-close btn btn-sm btn-icon" aria-label="Close">
+      <button type="button" class="toast-close btn btn-sm btn-icon" >
         ${CLOSE_ICON(20)}
       </button>
     </div>
   `
   toast.querySelector('.toast-message').textContent = message
-  toast.querySelector('.toast-close').addEventListener('click', () => closeToast(toast))
+  const closeButton = toast.querySelector('.toast-close')
+  closeButton.setAttribute('aria-label', t('common.close'))
+  closeButton.addEventListener('click', () => closeToast(toast))
   root.appendChild(toast)
 
   if (duration > 0) setTimeout(() => closeToast(toast), duration)

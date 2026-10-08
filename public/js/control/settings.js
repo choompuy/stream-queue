@@ -9,6 +9,22 @@ import { t } from '../i18n.js'
 import { toastError } from './toast.js'
 import { reportSaveResult } from './save-result.js'
 
+let qrCodePromise
+
+function loadQRCode() {
+  if (qrCodePromise) return qrCodePromise
+
+  qrCodePromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = 'vendor/qrcode.min.js'
+    script.onload = () => resolve(window.QRCode)
+    script.onerror = reject
+    document.head.appendChild(script)
+  })
+
+  return qrCodePromise
+}
+
 export function changeLocale(locale) {
   return run('changing locale', async () => {
     await api.updateSettings({ locale })
@@ -103,43 +119,37 @@ export function loadNetworkInfo() {
     if (!ips.length) state.selectedIp = 'localhost'
     else if (!state.selectedIp || !ips.includes(state.selectedIp)) state.selectedIp = ips[0]
 
+    renderIpSelect()
     renderQrUrl()
   })
 }
 
-export function renderQrUrl() {
-  const host = state.selectedIp === 'localhost' ? 'localhost' : state.selectedIp
+function renderIpSelect() {
+  if (!dom.selectIp) return
+
+  const ips = state.network?.ips ?? []
+  show(dom.selectIp, ips.length > 1)
+  if (ips.length <= 1) return
+
+  dom.selectIp.innerHTML = ips
+    .map((ip) => `<option value="${escapeHtml(ip)}" ${ip === state.selectedIp ? 'selected' : ''}>${escapeHtml(ip)}</option>`)
+    .join('')
+}
+
+export async function renderQrUrl() {
+  if (!dom.controlPanelQr || dom.controlPanelQr.classList.contains('hidden') || !state.selectedIp) return
+
+  const QRCode = await loadQRCode()
+  if (typeof QRCode === 'undefined') return
+
   const port = state.network?.port ?? location.port
-  const url = `http://${host}${port ? `:${port}` : ''}`
 
-  if (dom.selectIp) {
-    const ips = state.network?.ips ?? []
-    if (ips.length > 1) {
-      show(dom.selectIp)
-      dom.selectIp.innerHTML = ips
-        .map(
-          (ip) => `
-            <option value="${escapeHtml(ip)}" ${ip === state.selectedIp ? 'selected' : ''}>
-              ${escapeHtml(ip)}
-            </option>
-          `
-        )
-        .join('')
-    } else {
-      show(dom.selectIp, false)
-    }
-  }
-
-  if (dom.controlPanelQr && !dom.controlPanelQr.classList.contains('hidden')) {
-    if (typeof QRCode === 'undefined') return
-
-    dom.controlPanelQr.innerHTML = ''
-    new QRCode(dom.controlPanelQr, {
-      text: url,
-      width: 128,
-      height: 128
-    })
-  }
+  dom.controlPanelQr.innerHTML = ''
+  new QRCode(dom.controlPanelQr, {
+    text: `http://${state.selectedIp}${port ? `:${port}` : ''}`,
+    width: 128,
+    height: 128
+  })
 }
 
 export function onIpChange() {
@@ -218,7 +228,7 @@ export async function saveConfigSetting() {
     if (!input) continue
 
     const value = readFieldValue(field, input)
-    entries.push({ input, path: field.path ? `${field.path}.${field.key}` : field.key, changed: value !== storedFieldValue(field) })
+    entries.push({ input, field, path: field.path ? `${field.path}.${field.key}` : field.key, changed: value !== storedFieldValue(field) })
 
     if (field.path) {
       config[field.path] ??= {}
@@ -237,11 +247,8 @@ export async function saveConfigSetting() {
       const { config: saved, rejected } = await api.updateConfig(config)
       state.config = saved
 
-      for (const { input, path } of entries) {
+      for (const { input, field, path } of entries) {
         if (rejected.includes(path)) continue
-
-        const field = CONFIG_FIELDS.find((f) => (f.path ? `${f.path}.${f.key}` === path : f.key === path))
-        if (!field) continue
 
         const serverValue = storedFieldValue(field)
         if (field.type === 'checkbox') setChecked(input, serverValue)
