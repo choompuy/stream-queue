@@ -75,9 +75,16 @@ export function createConfigModule<T extends object>(options: {
   const store = createFileStore<T>(filePath)
   const log = createLogger('CONFIG')
 
-  // read from disk on first use, not when the module is imported
+  // Read from disk on first use, not when the module is imported. A file edited by hand (or left by an older version)
+  // may hold what the schema would refuse: those values are ignored and the defaults stay in their place
+  function loadChecked(): T {
+    const { clean, rejected } = validateConfigUpdates(store.load(defaults), defaults)
+    if (rejected.length) log.warn(`Ignored invalid values in ${store.path()}: ${rejected.join(', ')}`)
+    return deepMerge(defaults, clean)
+  }
+
   let config: T | null = null
-  const current = (): T => (config ??= store.load(defaults))
+  const current = (): T => (config ??= loadChecked())
 
   const save = () =>
     store.scheduleSave(

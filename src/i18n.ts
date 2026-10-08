@@ -13,6 +13,7 @@ const log = createLogger('I18N')
 type Dict = { [key: string]: Dict | string }
 
 const cache = new Map<string, Dict>()
+const reported = new Set<string>()
 
 function loadLocale(locale: string): Dict {
   const cached = cache.get(locale)
@@ -24,8 +25,12 @@ function loadLocale(locale: string): Dict {
     cache.set(locale, dict)
     return dict
   } catch (error) {
-    log.error(`Failed to load locale "${locale}": ${describeError(error)}`)
-    return {} // Return empty object without caching - allows retry on subsequent calls
+    // not cached, so a later call retries; reported once, otherwise every chat reply and API error would repeat it
+    if (!reported.has(locale)) {
+      reported.add(locale)
+      log.error(`Failed to load locale "${locale}": ${describeError(error)}`)
+    }
+    return {}
   }
 }
 

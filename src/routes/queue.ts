@@ -9,8 +9,6 @@ import { getState } from '../player.js'
 
 export const router = express.Router()
 
-// generous enough for a real viewer clicking around, tight enough to stop a flood from one address
-
 router.post('/request', async (req, res) => {
   const { query, requestedBy, admin } = req.body ?? {}
   const bypassFilters = admin === true && isLocalAddress(req.socket.remoteAddress)

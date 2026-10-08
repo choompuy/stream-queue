@@ -1,6 +1,5 @@
-import { dataPath, createFileStore } from './persist.js'
-import { field, validateUpdates, type FieldRule, type Schema } from './config-helper.js'
-import { createLogger, describeError } from './logger.js'
+import { dataPath, type DeepPartial } from './persist.js'
+import { createConfigModule, field, type FieldRule, type Schema } from './config-helper.js'
 import { AppError, type TwitchSecrets, type TwitchTokenData, type TwitchUserInfo } from './types.js'
 
 export type Secrets = {
@@ -10,23 +9,6 @@ export type Secrets = {
 
 export type SecretsUpdates = {
   youtubeApiKey?: string
-}
-
-const log = createLogger('SECRETS')
-const store = createFileStore<Secrets>(() => dataPath('secrets.json'))
-
-// read from disk on first use, not when the module is imported
-let secrets: Secrets | null = null
-
-function current(): Secrets {
-  return (secrets ??= store.load({
-    youtubeApiKey: '',
-    twitch: {
-      tokenData: null,
-      userInfo: null,
-      connectedAt: null
-    }
-  }))
 }
 
 function isValidTokenData(value: unknown): value is TwitchTokenData {
@@ -51,35 +33,34 @@ function isValidUserInfo(value: unknown): value is TwitchUserInfo {
 
 const nullable = (isValid: (value: unknown) => boolean): FieldRule => field({ validate: (v) => v === null || isValid(v) })
 
-// An empty string is allowed: it clears the key
-const API_SCHEMA: Schema = {
-  youtubeApiKey: field({ normalize: (v) => (typeof v === 'string' ? v.trim() : v), validate: (v) => typeof v === 'string' })
-}
-
 const TWITCH_SCHEMA: Schema = {
   tokenData: nullable(isValidTokenData),
   userInfo: nullable(isValidUserInfo),
   connectedAt: nullable((v) => typeof v === 'number' && Number.isFinite(v))
 }
 
-function checked(schema: Schema, updates: unknown): Record<string, unknown> {
-  const { clean, rejected } = validateUpdates(schema, updates)
+const secrets = createConfigModule<Secrets>({
+  filePath: () => dataPath('secrets.json'),
+  defaults: { youtubeApiKey: '', twitch: { tokenData: null, userInfo: null, connectedAt: null } },
+  schema: {
+    // An empty string is allowed: it clears the key
+    youtubeApiKey: field({ normalize: (v) => (typeof v === 'string' ? v.trim() : v), validate: (v) => typeof v === 'string' }),
+    twitch: TWITCH_SCHEMA
+  }
+})
+
+// Secrets are refused as a whole: either everything in an update is valid, or nothing is applied
+function apply(updates: DeepPartial<Secrets>): void {
+  const { clean, rejected } = secrets.validateConfigUpdates(updates)
   if (rejected.length) throw new AppError('INVALID_INPUT', `invalid secrets: ${rejected.join(', ')}`, { fields: rejected.join(', ') })
-  return clean
+
+  secrets.updateConfig(clean)
 }
 
-export function getSecrets(): Secrets {
-  return structuredClone(current())
-}
+export const getSecrets = (): Secrets => secrets.getConfig()
 
 export function updateSecrets(updates: SecretsUpdates): Secrets {
-  const input = updates.youtubeApiKey === undefined ? {} : { youtubeApiKey: updates.youtubeApiKey }
-  const { youtubeApiKey } = checked(API_SCHEMA, input) as SecretsUpdates
-
-  if (youtubeApiKey !== undefined && youtubeApiKey !== current().youtubeApiKey) {
-    secrets = { ...current(), youtubeApiKey }
-    scheduleSave()
-  }
+  if (updates.youtubeApiKey !== undefined) apply({ youtubeApiKey: updates.youtubeApiKey })
 
   return getSecrets()
 }
@@ -87,21 +68,11 @@ export function updateSecrets(updates: SecretsUpdates): Secrets {
 export function updateTwitchOAuthState(updates: Partial<TwitchSecrets>): void {
   if (Object.keys(updates).length === 0) return
 
-  const clean = checked(TWITCH_SCHEMA, updates) as Partial<TwitchSecrets>
-
-  secrets = {
-    ...current(),
-    twitch: {
-      ...current().twitch,
-      ...clean
-    }
-  }
-
-  scheduleSave()
+  apply({ twitch: updates })
 }
 
 export function clearTwitchOAuthState(): void {
-  const { tokenData, userInfo, connectedAt } = current().twitch
+  const { tokenData, userInfo, connectedAt } = getSecrets().twitch
   if (tokenData === null && userInfo === null && connectedAt === null) return
 
   updateTwitchOAuthState({
@@ -124,7 +95,7 @@ const baked = (key: string) => (typeof __BAKED_ENV__ !== 'undefined' ? __BAKED_E
 export const getTwitchClientId = (): string => process.env.TWITCH_CLIENT_ID?.trim() || baked('TWITCH_CLIENT_ID') || ''
 
 export function getPublicSecretsView() {
-  const { youtubeApiKey, twitch } = current()
+  const { youtubeApiKey, twitch } = getSecrets()
 
   return {
     youtubeApiKey: maskSecret(youtubeApiKey),
@@ -143,13 +114,6 @@ export function getPublicSecretsView() {
       connectedAt: twitch.connectedAt
     }
   }
-}
-
-function scheduleSave(): void {
-  store.scheduleSave(
-    () => current(),
-    (error) => log.error(`Failed to save: ${describeError(error)}`)
-  )
 }
 
 export type SecretsResponse = ReturnType<typeof getPublicSecretsView>
