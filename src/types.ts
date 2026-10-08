@@ -74,28 +74,6 @@ export type PlayerState = {
   isPaused: boolean
 }
 
-type SearchCacheEntry = {
-  results: Song[]
-  expiresAt: number
-  filtersVersion: string
-}
-
-type VideoCacheEntry = {
-  song: Song | null
-  reason: FilterFailureReason | null
-  expiresAt: number
-  filtersVersion: string
-}
-
-export type CacheFile = {
-  searches: Record<string, SearchCacheEntry>
-  videos: Record<string, VideoCacheEntry>
-  quota: {
-    date: string
-    searches: number
-  }
-}
-
 export type ApiError = { success: false; error: string; code: string; params?: Record<string, string | number> }
 export type ApiOk<T> = { success: true; data: T }
 

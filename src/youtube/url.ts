@@ -1,5 +1,5 @@
-export function isValidVideoId(value: string | null | undefined): value is string {
-  return Boolean(value && /^[a-zA-Z0-9_-]{11}$/.test(value))
+export function isValidVideoId(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(value)
 }
 
 const VIDEO_PATH_KINDS = new Set(['shorts', 'embed', 'v', 'live'])

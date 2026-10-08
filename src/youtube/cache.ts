@@ -1,9 +1,8 @@
-import { cachePath, createFileStore } from '../persist.js'
+import { dataPath, createFileStore } from '../persist.js'
 import { createLogger, describeError } from '../logger.js'
-import { CacheFile, Song, FilterFailureReason } from '../types.js'
+import { Song, FilterFailureReason } from '../types.js'
 
 const log = createLogger('CACHE')
-const store = createFileStore<CacheFile>(() => cachePath('youtube-cache.json'))
 
 export const CACHE_LIMITS = {
   VIDEO_CACHE_TTL: 10 * 60 * 1000,
@@ -13,7 +12,51 @@ export const CACHE_LIMITS = {
   MAX_DAILY_SEARCHES: 90
 }
 
-const SWEEP_INTERVAL = 60 * 60 * 1000
+const MAX_ENTRIES = 200
+
+type Entry<T> = { value: T; expiresAt: number }
+
+const searches = new Map<string, Entry<Song[]>>()
+const videos = new Map<string, Entry<VideoCacheResult>>()
+
+function read<T>(map: Map<string, Entry<T>>, key: string): T | undefined {
+  const entry = map.get(key)
+  if (!entry) return undefined
+  if (entry.expiresAt <= Date.now()) {
+    map.delete(key)
+    return undefined
+  }
+  return entry.value
+}
+
+function write<T>(map: Map<string, Entry<T>>, key: string, value: T, ttl: number): void {
+  map.delete(key) // re-inserted, so the oldest entry is always the first one
+  map.set(key, { value, expiresAt: Date.now() + ttl })
+  if (map.size > MAX_ENTRIES) map.delete(map.keys().next().value as string)
+}
+
+export function getSearchCache(key: string): Song[] | undefined {
+  return read(searches, key)
+}
+
+export function setSearchCache(key: string, songs: Song[]): void {
+  write(searches, key, songs, CACHE_LIMITS.SEARCH_CACHE_TTL)
+}
+
+export type VideoCacheResult = { song: Song | null; reason: FilterFailureReason | null }
+
+export function getVideoCache(key: string): VideoCacheResult | undefined {
+  return read(videos, key)
+}
+
+export function setVideoCache(key: string, result: VideoCacheResult): void {
+  write(videos, key, result, CACHE_LIMITS.VIDEO_CACHE_TTL)
+}
+
+// quota: the only thing that must survive a restart (and a cache cleanup)
+type Quota = { date: string; searches: number }
+const quotaStore = createFileStore<Quota>(() => dataPath('youtube-quota.json'))
+let quota: Quota | null = null
 
 // YouTube resets daily API quota at midnight Pacific Time — do not change this timezone
 function getQuotaDate(): string {
@@ -25,141 +68,27 @@ function getQuotaDate(): string {
   }).format(new Date())
 }
 
-// Loaded from disk, and the hourly sweep started, on first use - not when the module is imported
-let loadedCache: CacheFile | null = null
-
-function getCache(): CacheFile {
-  if (!loadedCache) {
-    loadedCache = store.load({
-      searches: {},
-      videos: {},
-      quota: { date: getQuotaDate(), searches: 0 }
-    })
-    setInterval(sweepExpired, SWEEP_INTERVAL).unref()
-  }
-
-  return loadedCache
-}
-
-function saveCache(): void {
-  store.scheduleSave(
-    () => getCache(),
-    (error) => log.error(`Failed to save cache: ${describeError(error)}`)
-  )
-}
-
-function sweepExpired(): void {
-  const cache = getCache()
-  const now = Date.now()
-  let hasChanges = false
-
-  for (const key in cache.searches) {
-    if (cache.searches[key].expiresAt <= now) {
-      delete cache.searches[key]
-      hasChanges = true
-    }
-  }
-
-  for (const key in cache.videos) {
-    if (cache.videos[key].expiresAt <= now) {
-      delete cache.videos[key]
-      hasChanges = true
-    }
-  }
-
-  if (hasChanges) {
-    saveCache()
-  }
-}
-
-function resetQuotaIfNeeded(): void {
-  const cache = getCache()
+function currentQuota(): Quota {
   const today = getQuotaDate()
-
-  if (cache.quota.date === today) {
-    return
-  }
-
-  cache.quota = { date: today, searches: 0 }
-  saveCache()
+  quota ??= quotaStore.load({ date: today, searches: 0 })
+  if (quota.date !== today) quota = { date: today, searches: 0 }
+  return quota
 }
 
-export function getSearchCache(query: string, filtersVersion: string): Song[] | null {
-  const entry = Object.hasOwn(getCache().searches, query) ? getCache().searches[query] : undefined
+const saveQuota = () => quotaStore.scheduleSave(() => currentQuota(), (error) => log.error(`Failed to save quota: ${describeError(error)}`))
 
-  if (!entry || entry.expiresAt <= Date.now() || entry.filtersVersion !== filtersVersion) {
-    return null
-  }
-
-  return entry.results
-}
-
-export function setSearchCache(query: string, results: Song[], filtersVersion: string): void {
-  getCache().searches[query] = {
-    results,
-    expiresAt: Date.now() + CACHE_LIMITS.SEARCH_CACHE_TTL,
-    filtersVersion
-  }
-
-  saveCache()
-}
-
-export type VideoCacheResult = { song: Song | null; reason: FilterFailureReason | null }
-
-export function getVideoCache(videoId: string, filtersVersion: string): VideoCacheResult | undefined {
-  const entry = Object.hasOwn(getCache().videos, videoId) ? getCache().videos[videoId] : undefined
-
-  if (!entry || entry.expiresAt <= Date.now() || entry.filtersVersion !== filtersVersion) {
-    return undefined
-  }
-
-  return { song: entry.song, reason: entry.reason ?? null }
-}
-
-export function setVideoCache(videoId: string, song: Song | null, filtersVersion: string, reason: FilterFailureReason | null = null): void {
-  getCache().videos[videoId] = {
-    song,
-    reason,
-    expiresAt: Date.now() + CACHE_LIMITS.VIDEO_CACHE_TTL,
-    filtersVersion
-  }
-
-  saveCache()
-}
-
-/** @internal exported for tests */
-export function getSearchesToday(): number {
-  resetQuotaIfNeeded()
-  return getCache().quota.searches
-}
-
-export function canSearch(): boolean {
-  resetQuotaIfNeeded()
-  return getCache().quota.searches < CACHE_LIMITS.MAX_DAILY_SEARCHES
-}
-
-/**
- * Takes one search from today's quota *before* the request is made. Checking first and counting after the answer let a
- * burst of different searches all pass the check while none of them was counted yet.
- */
 export function reserveSearchQuota(): boolean {
-  if (!canSearch()) return false
-
-  consumeSearchQuota()
+  const current = currentQuota()
+  if (current.searches >= CACHE_LIMITS.MAX_DAILY_SEARCHES) return false
+  current.searches++
+  saveQuota()
   return true
 }
 
-/** Gives a reserved search back: the request failed before YouTube counted it (network error, an error answer). */
 export function releaseSearchQuota(): void {
-  const { quota } = getCache()
-  if (quota.searches > 0) quota.searches -= 1
-  saveCache()
+  const current = currentQuota()
+  if (current.searches > 0) current.searches--
+  saveQuota()
 }
 
-export function consumeSearchQuota(): void {
-  resetQuotaIfNeeded()
-  const { quota } = getCache()
-  quota.searches += 1
-  saveCache()
-  log.info(`Search quota usage: ${quota.searches}/${CACHE_LIMITS.MAX_DAILY_SEARCHES}`)
-}
+export const getSearchesToday = (): number => currentQuota().searches

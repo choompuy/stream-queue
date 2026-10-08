@@ -16,7 +16,7 @@ const reportFailureLimiter = createRateLimiter({ windowMs: 60_000, max: 20, keyP
 function readVideoId(body: unknown): { videoId?: string; valid: boolean } {
   const videoId = (body as { videoId?: unknown } | undefined)?.videoId
   if (videoId === undefined) return { valid: true }
-  return isValidVideoId(videoId as string) ? { videoId: videoId as string, valid: true } : { valid: false }
+  return isValidVideoId(videoId) ? { videoId, valid: true } : { valid: false }
 }
 
 router.post('/ended', (req, res) => {

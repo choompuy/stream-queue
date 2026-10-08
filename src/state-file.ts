@@ -33,9 +33,9 @@ const text = (value: unknown): string => (typeof value === 'string' ? value : ''
 const amount = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0)
 
 export function sanitizeSong(raw: unknown): Song | null {
-  if (!isObject(raw) || !isValidVideoId(raw.videoId as string) || !text(raw.title)) return null
+  if (!isObject(raw) || !isValidVideoId(raw.videoId) || !text(raw.title)) return null
 
-  const videoId = raw.videoId as string
+  const videoId = raw.videoId
 
   return {
     videoId,
