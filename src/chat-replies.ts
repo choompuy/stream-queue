@@ -54,30 +54,6 @@ export function buildQueueMessage(): string {
   return base + more
 }
 
-const REDEMPTION_REASON_FALLBACKS: Partial<Record<FailureReason['code'], string>> = {
-  DUPLICATE: 'that track is already in the queue',
-  BLOCKED: 'that track is blocked',
-  TRACK_REMOVED: 'your track was removed from the queue',
-  QUEUE_CLEARED: 'the queue was cleared',
-  QUEUE_FULL: 'the queue is full',
-  USER_LIMIT: 'you already have a track queued',
-  INVALID_YOUTUBE_URL: 'that is not a valid YouTube link',
-  SONG_NOT_FOUND: 'no matching track was found',
-  NOT_MUSIC: 'that video is not categorized as music',
-  NOT_PUBLIC: 'that video is not public',
-  NOT_EMBEDDABLE: 'that video cannot be embedded',
-  AGE_RESTRICTED: 'that video is age-restricted',
-  REGION_BLOCKED: 'that video is not available in this region',
-  NOT_PLAYABLE: 'that video cannot be played',
-  IS_LIVE: 'live streams cannot be queued',
-  IS_SHORT: 'shorts cannot be queued',
-  DURATION_OUT_OF_RANGE: 'that track does not meet the length requirement',
-  VIEWS_TOO_LOW: 'that track does not meet the view count requirement',
-  PLAYBACK_VIDEO_UNAVAILABLE: 'that video became unavailable during playback',
-  PLAYBACK_EMBED_DISALLOWED: 'that video stopped allowing embedded playback',
-  PLAYBACK_FAILED: 'playback failed'
-}
-
 // "@user, <title> added to the queue [#N]" / "@user, <title> added, playing now" - confirmation of an accepted Channel Points request
 export function buildRedemptionAcceptedMessage(userName: string, added: { song: { title: string }; started: boolean; position: number }): string {
   const params = { user: userName, title: truncate(added.song.title), position: added.position }
@@ -90,16 +66,14 @@ export function buildRedemptionAcceptedMessage(userName: string, added: { song: 
 // "@user, <reason>, points refunded" - one message per FailureReason, shared by the Channel Points
 // redemption flow (request rejected, or a later playback failure) wherever it needs to notify chat
 export function buildRedemptionRejectionMessage(userName: string, reason: FailureReason): string {
-  const fallbackReason = REDEMPTION_REASON_FALLBACKS[reason.code] ?? 'your request could not be completed'
   // only a playback failure names the track (the one that could not be played); a request that was never queued has none
   const title = typeof reason.params?.title === 'string' ? truncate(reason.params.title) : undefined
   const params = { user: userName, ...reason.params, ...(title && { title }) }
-  const locale = getSettings().locale
 
-  const specific = t(locale, `chat.redemption.${reason.code}`, params)
-  if (specific) return specific
-
-  return translateWithFallback('chat.redemption.generic', params, `@${userName}, ${fallbackReason}, points refunded`)
+  return (
+    t(getSettings().locale, `chat.redemption.${reason.code}`, params) ??
+    translateWithFallback('chat.redemption.generic', params, `@${userName}, your request could not be completed, points refunded`)
+  )
 }
 
 // Sent instead of the "points refunded" message when Twitch did not accept the cancellation: it must not promise a refund
