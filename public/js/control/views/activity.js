@@ -1,6 +1,6 @@
 import { escapeHtml, translateErrorCode, youtubeThumbnail } from '../../shared.js'
 import { t } from '../../i18n.js'
-import { dom } from '../state.js'
+import { dom } from '../dom.js'
 import { formatDateTime } from '../ui.js'
 import { blockTrackItem, createListView, row, rowMenu, statusPill } from './primitives.js'
 

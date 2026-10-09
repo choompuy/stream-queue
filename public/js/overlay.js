@@ -1,6 +1,7 @@
 import { $, formatDuration, createLogger, getErrorMessage, show, setClass, setText } from './shared.js'
 import { initI18n, t, getCurrentLocale } from './i18n.js'
 import { loadYouTubeApi } from './youtube-api.js'
+import { claimPlayback } from './playback-lock.js'
 
 let player = null
 let currentState = null
@@ -15,7 +16,10 @@ let resetCounter = 0
 
 const log = createLogger('PREVIEW')
 
-const isPlaybackSource = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+
+// only one overlay on this computer plays the music: the others (and any overlay opened by another address) just show the badge
+let isPlaybackSource = false
 
 const REQUEST_TIMEOUT_MS = 8000
 const STALE_POLL_MS = 15000
@@ -375,12 +379,18 @@ async function resetPlayer() {
   return token
 }
 
-if (isPlaybackSource) {
+function enablePlayback() {
+  log('This overlay plays the music')
+  isPlaybackSource = true
+  dom.nowPlayingVideo.classList.remove('hidden')
   loadYouTubeApi().then(createPlayer)
-} else {
-  log('Non-localhost origin: read-only widget, no embedded player')
-  dom.nowPlayingVideo.classList.add('hidden')
 }
+
+// hidden until the lock is granted: a waiting overlay must not show an empty video frame
+dom.nowPlayingVideo.classList.add('hidden')
+
+if (isLocalhost) claimPlayback(enablePlayback)
+else log('Non-localhost origin: read-only widget, no embedded player')
 
 async function init() {
   await fetchOverlayState()

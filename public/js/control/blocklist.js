@@ -1,5 +1,6 @@
 import { api } from './api.js'
-import { state, renderStats } from './state.js'
+import { state } from './state.js'
+import { renderStats } from './stats.js'
 import { views } from './views/index.js'
 import { run } from './run.js'
 import { t } from '../i18n.js'

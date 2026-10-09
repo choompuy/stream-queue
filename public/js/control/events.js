@@ -1,4 +1,5 @@
-import { CONFIG_FIELDS, dom } from './state.js'
+import { dom } from './dom.js'
+import { CONFIG_FIELDS } from './fields.js'
 import { switchPageTab, switchSection } from './tabs.js'
 import { dispatchAction } from './actions.js'
 import { bindMenus } from './menu.js'

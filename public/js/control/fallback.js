@@ -1,5 +1,7 @@
 import { api } from './api.js'
-import { state, dom, selectors, renderStats } from './state.js'
+import { state, selectors } from './state.js'
+import { dom } from './dom.js'
+import { renderStats } from './stats.js'
 import { views } from './views/index.js'
 import { run } from './run.js'
 import { toggleActive, formatDateTime } from './ui.js'

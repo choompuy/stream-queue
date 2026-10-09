@@ -1,7 +1,7 @@
 import { t } from '../i18n.js'
 import { translateErrorCode } from '../shared.js'
 import { ApiError } from './api.js'
-import { log } from './state.js'
+import { log } from './log.js'
 import { toastError } from './toast.js'
 import { withLoading } from './ui.js'
 

@@ -1,6 +1,7 @@
 import { setError, setFieldState, setValue, setChecked, setText } from '../../shared.js'
 import { t } from '../../i18n.js'
-import { state, dom } from '../state.js'
+import { state } from '../state.js'
+import { dom } from '../dom.js'
 import { trackChanges } from '../save-result.js'
 
 const TITLE_MAX_LENGTH = 45

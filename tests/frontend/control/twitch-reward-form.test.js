@@ -46,7 +46,8 @@ globalThis.fetch = async (url, options = {}) => {
   return { ok: true, json: async () => ({ data: await handler() }) }
 }
 
-const { state, dom } = await import('../../../public/js/control/state.js')
+const { state } = await import('../../../public/js/control/state.js')
+const { dom } = await import('../../../public/js/control/dom.js')
 const { showRewardForm, markRewardSaved, readRewardForm, bindRewardForm } = await import('../../../public/js/control/twitch/twitch-reward-form.js')
 const { saveReward, cancelRewardChanges } = await import('../../../public/js/control/twitch/twitch-rewards.js')
 

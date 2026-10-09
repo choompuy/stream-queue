@@ -1,7 +1,7 @@
 import { escapeHtml, formatDuration } from '../../shared.js'
 import { DELETE_ICON } from '../../icons.js'
 import { t } from '../../i18n.js'
-import { dom } from '../state.js'
+import { dom } from '../dom.js'
 import { blockTrackItem, createListView, row, rowMenu, statusPill, unblockTrackItem } from './primitives.js'
 
 export const queueView = createListView(dom.queueListWrapper, {

@@ -1,6 +1,8 @@
 import { formatDuration, formatViews, getErrorMessage, show, setText } from '../shared.js'
 import { PLAY_ICON, PAUSE_ICON } from '../icons.js'
-import { state, dom, log } from './state.js'
+import { state } from './state.js'
+import { dom } from './dom.js'
+import { log } from './log.js'
 import { t } from '../i18n.js'
 import { loadYouTubeApi } from '../youtube-api.js'
 
