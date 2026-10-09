@@ -2,6 +2,7 @@ import { $, formatDuration, createLogger, getErrorMessage, show, setClass, setTe
 import { initI18n, t, getCurrentLocale } from './i18n.js'
 import { loadYouTubeApi } from './youtube-api.js'
 import { claimPlayback } from './playback-lock.js'
+import { connectEvents } from './sse.js'
 
 let player = null
 let currentState = null
@@ -45,6 +46,14 @@ const dom = {
   nextElapsedTime: $('nextElapsedTime')
 }
 
+// a change that is announced while a read is running may not be in that read: it is read once more when this one is done
+let refetchRequested = false
+
+function requestRefresh() {
+  if (fetchStartedAt) refetchRequested = true
+  else fetchOverlayState()
+}
+
 async function fetchOverlayState() {
   if (fetchStartedAt && Date.now() - fetchStartedAt < STALE_POLL_MS) return
   const startedAt = Date.now()
@@ -68,6 +77,11 @@ async function fetchOverlayState() {
     log('Error fetching settings:', error)
   } finally {
     if (fetchStartedAt === startedAt) fetchStartedAt = 0
+
+    if (refetchRequested) {
+      refetchRequested = false
+      fetchOverlayState()
+    }
   }
 }
 
@@ -398,7 +412,25 @@ async function init() {
 
 init()
 
+// The events say when to read the state. What the viewer sees is this page, so a read every 15 s stays under them as a net,
+// and while the events are down the page reads every second, as it always did
+const SAFETY_POLL_TICKS = 15
+let eventsOpen = false
+let quietTicks = 0
+
+connectEvents({
+  topics: ['state'],
+  onChange: requestRefresh,
+  onStatus: (status) => {
+    eventsOpen = status === 'open'
+  }
+})
+
 setInterval(() => {
-  fetchOverlayState()
   updateProgress()
+
+  if (!eventsOpen || ++quietTicks >= SAFETY_POLL_TICKS) {
+    quietTicks = 0
+    fetchOverlayState()
+  }
 }, 1000)

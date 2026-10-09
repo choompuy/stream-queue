@@ -38,6 +38,7 @@ export class TwitchOAuth {
   private refreshPromise: Promise<TwitchTokenData> | null = null
   private authFailed = false
   private onTokenUpdated?: (tokenData: TwitchTokenData) => void
+  private onAuthStateChange?: () => void
 
   constructor(config: TwitchOAuthOptions) {
     this.config = {
@@ -46,6 +47,7 @@ export class TwitchOAuth {
     }
 
     this.onTokenUpdated = config.onTokenUpdated
+    this.onAuthStateChange = config.onAuthStateChange
 
     if (!this.config.clientId) log.log('Twitch client ID not configured')
   }
@@ -175,7 +177,7 @@ export class TwitchOAuth {
   clearTokenData(): void {
     this.tokenData = null
     this.refreshPromise = null
-    this.authFailed = false
+    this.setAuthFailed(false)
     log.log('Token data cleared')
   }
 
@@ -198,6 +200,13 @@ export class TwitchOAuth {
   }
 
   // True once Twitch has refused the refresh token: the account has to be connected again
+  private setAuthFailed(failed: boolean): void {
+    if (this.authFailed === failed) return
+
+    this.authFailed = failed
+    this.onAuthStateChange?.()
+  }
+
   needsReauthorization(): boolean {
     return this.authFailed
   }
@@ -230,7 +239,7 @@ export class TwitchOAuth {
       if (!response.ok) {
         // Twitch refused the refresh token itself (expired after 30 days of a public client, revoked, password changed):
         // retrying is pointless, the account has to be connected again. A network error or a 5xx is not that
-        if (response.status === 400 || response.status === 401) this.authFailed = true
+        if (response.status === 400 || response.status === 401) this.setAuthFailed(true)
         throw await oauthError(response, 'Token refresh failed')
       }
 
@@ -250,7 +259,7 @@ export class TwitchOAuth {
       expiresAt: Date.now() + data.expires_in * 1000,
       scope: data.scope
     }
-    this.authFailed = false
+    this.setAuthFailed(false)
     this.onTokenUpdated?.(this.tokenData)
 
     return this.tokenData

@@ -10,7 +10,10 @@ import { loadTwitchRewards, renderTwitchRewards } from './twitch-rewards.js'
 
 const POLL_INTERVAL_MS = 2000
 
-const UNHEALTHY_POLLS_BEFORE_WARNING = 2
+// A connection that is down for a moment (a reconnect takes seconds) is not worth a red warning: it is shown only if it stays down
+const OFFLINE_WARNING_DELAY_MS = 6000
+
+let offlineTimer = null
 
 let pollController = null
 
@@ -68,13 +71,33 @@ function isUnhealthy(health) {
   return Boolean(health) && (health.auth === 'reauthorize' || !health.eventSub || !health.chat)
 }
 
+// A refused login ('reauthorize') is shown at once, a connection that is down only after it stayed down for a while
+function trackHealth(health) {
+  state.twitch.health = health ?? null
+
+  const down = isUnhealthy(state.twitch.health) && state.twitch.health.auth !== 'reauthorize'
+  if (!down) {
+    clearTimeout(offlineTimer)
+    offlineTimer = null
+    state.twitch.offlineWarning = false
+    return
+  }
+
+  if (state.twitch.offlineWarning || offlineTimer) return
+
+  offlineTimer = setTimeout(() => {
+    offlineTimer = null
+    state.twitch.offlineWarning = true
+    renderTwitchHealth(Boolean(state.twitch.connected && state.twitch.user))
+  }, OFFLINE_WARNING_DELAY_MS)
+}
+
 // no status -> disconnected
 function applyStatus(status) {
   state.twitch.connected = Boolean(status?.connected)
   state.twitch.user = status?.user ?? null
   state.twitch.connectedAt = status?.connectedAt ?? null
-  state.twitch.health = status?.health ?? null
-  state.twitch.unhealthyPolls = isUnhealthy(state.twitch.health) ? 1 : 0
+  trackHealth(status?.health)
 }
 
 export function refreshTwitchHealth() {
@@ -91,8 +114,7 @@ export function refreshTwitchHealth() {
         return
       }
 
-      state.twitch.health = status.health ?? null
-      state.twitch.unhealthyPolls = isUnhealthy(state.twitch.health) ? state.twitch.unhealthyPolls + 1 : 0
+      trackHealth(status.health)
       renderTwitchHealth(true)
     },
     { silent: true }
@@ -203,7 +225,7 @@ function renderTwitchHealth(isConnected) {
 
   if (isConnected && health) {
     if (health.auth === 'reauthorize') key = 'settings.twitch.healthReauthorize'
-    else if (isUnhealthy(health) && state.twitch.unhealthyPolls >= UNHEALTHY_POLLS_BEFORE_WARNING) key = 'settings.twitch.healthOffline'
+    else if (state.twitch.offlineWarning) key = 'settings.twitch.healthOffline'
   }
 
   setText(dom.twitchHealthWarning, key ? t(key) : '')

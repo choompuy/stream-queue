@@ -12,6 +12,8 @@ export type TwitchOAuthOptions = {
   clientId: string
   scopes?: string[]
   onTokenUpdated?: (tokenData: TwitchTokenData) => void
+  // the saved login was refused by Twitch, or works again
+  onAuthStateChange?: () => void
 }
 
 export type TwitchDeviceCodeResponse = {

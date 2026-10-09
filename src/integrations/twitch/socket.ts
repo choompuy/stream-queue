@@ -33,6 +33,10 @@ export abstract class ReconnectingSocket {
   protected onOpen(_socket: WebSocket): void {}
   protected onClosed(): void {}
 
+  // Called when the connection goes up or down (the panel shows it); it does not carry the state, the listener reads it
+  onStatusChange: (() => void) | null = null
+
+  private reportedConnected = false
   private starting: Promise<void> | null = null
   private attempts = 0
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -75,6 +79,7 @@ export abstract class ReconnectingSocket {
     const socket = this.socket
     this.socket = null
     this.teardown()
+    this.reportStatus()
 
     if (!socket) return
 
@@ -95,6 +100,19 @@ export abstract class ReconnectingSocket {
     this.ready = true
     this.pending?.resolve()
     this.pending = null
+    this.reportStatus()
+  }
+
+  private reportStatus(): void {
+    const connected = this.isConnected()
+    if (connected === this.reportedConnected) return
+
+    this.reportedConnected = connected
+    try {
+      this.onStatusChange?.()
+    } catch (error) {
+      this.log.error(`Status listener failed: ${describeError(error)}`)
+    }
   }
 
   protected abort(error: Error): void {
@@ -113,6 +131,7 @@ export abstract class ReconnectingSocket {
     const socket = this.socket
     this.socket = null
     this.teardown()
+    this.reportStatus()
     closeQuietly(socket)
   }
 
@@ -257,6 +276,7 @@ export abstract class ReconnectingSocket {
     this.socket = null
     this.failPending(new Error('Connection closed before it was ready'))
     this.teardown()
+    this.reportStatus()
 
     if (this.stopped) return
 

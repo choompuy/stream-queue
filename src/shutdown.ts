@@ -1,5 +1,6 @@
 import { flushAllStores } from './persist.js'
 import { createLogger, describeError, flushLogs } from './logger.js'
+import { closeAllStreams } from './sse.js'
 
 const log = createLogger('SHUTDOWN')
 
@@ -12,6 +13,9 @@ const FORCE_EXIT_AFTER_MS = 5000
 export async function shutdown(code = 0, exit: (code: number) => void = (c) => process.exit(c)): Promise<void> {
   if (shuttingDown) return
   shuttingDown = true
+
+  // first: an open stream holds the connection of the page, and nothing below depends on it
+  closeAllStreams()
 
   const forceExit = setTimeout(() => {
     log.error(`Saving did not finish in ${FORCE_EXIT_AFTER_MS / 1000}s, exiting anyway`)

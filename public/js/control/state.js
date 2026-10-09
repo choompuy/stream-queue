@@ -26,7 +26,7 @@ export const state = {
     user: null,
     connectedAt: null,
     health: null,
-    unhealthyPolls: 0,
+    offlineWarning: false,
     rewards: [],
     selectedRewardId: '',
     savedRewardId: '',

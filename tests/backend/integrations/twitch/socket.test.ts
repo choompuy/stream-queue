@@ -235,6 +235,23 @@ test('ReconnectingSocket', async (t) => {
     assert.equal(socket.isConnected(), true)
   })
 
+  await t.test('onStatusChange is called once when the connection goes up and once when it goes down', async () => {
+    const { server, socket } = await connected()
+    const states: boolean[] = []
+    socket.onStatusChange = () => states.push(socket.isConnected())
+    socket.retryAllowed = false
+
+    await socket.connect()
+    assert.deepEqual(states, [true])
+
+    server.dropClients()
+    await until(() => states.length === 2, 'the drop to be reported')
+    assert.deepEqual(states, [true, false])
+
+    await socket.disconnect()
+    assert.deepEqual(states, [true, false], 'a socket that is already down does not report again')
+  })
+
   await t.test('restart() closes the socket and opens a fresh one', async () => {
     const { server, socket } = await connected()
     await socket.connect()

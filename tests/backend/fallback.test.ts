@@ -9,7 +9,7 @@ process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 const fallback = await import('../../src/fallback.js')
 const { getConfig, updateConfig } = await import('../../src/config.js')
 const { setCurrent } = await import('../../src/queue.js')
-const { onStateChange } = await import('../../src/state-events.js')
+const { on } = await import('../../src/state-events.js')
 
 const IDS = Array.from({ length: 12 }, (_, i) => `track${String(i).padStart(2, '0')}`)
 const song = (videoId: string) => ({
@@ -62,7 +62,7 @@ test('toggleFallbackShuffle()', async (t) => {
 test('state persistence hooks', async (t) => {
   function countNotifications(action: () => void): number {
     let count = 0
-    const off = onStateChange(() => count++)
+    const off = on('state', () => count++)
     action()
     off()
     return count

@@ -1,5 +1,6 @@
 import { dataPath, type DeepPartial } from './persist.js'
 import { createConfigModule, field, type FieldRule, type Schema } from './config-helper.js'
+import { emit } from './state-events.js'
 import { AppError, type TwitchSecrets, type TwitchTokenData, type TwitchUserInfo } from './types.js'
 
 export type Secrets = {
@@ -69,6 +70,8 @@ export function updateTwitchOAuthState(updates: Partial<TwitchSecrets>): void {
   if (Object.keys(updates).length === 0) return
 
   apply({ twitch: updates })
+  // the account (or its token) changed: the panel reads the connection again
+  emit('twitch')
 }
 
 export function clearTwitchOAuthState(): void {

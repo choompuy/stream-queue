@@ -10,7 +10,7 @@ import {
   FallbackSnapshot,
   alignFallbackCursor
 } from './fallback.js'
-import { onStateChange } from './state-events.js'
+import { on } from './state-events.js'
 import { createLogger, describeError } from './logger.js'
 
 export type StateFile = {
@@ -215,5 +215,5 @@ export function initState(): void {
   initialized = true
 
   loadState()
-  onStateChange(persistState)
+  on('state', persistState)
 }

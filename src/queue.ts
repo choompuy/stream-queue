@@ -4,7 +4,7 @@ import { parseYouTubeUrl } from './youtube/url.js'
 import { logRejection, logAcceptance, logSkippedWithOpenReward } from './activity.js'
 import { QueueItem, Song, AppError, AddedSong, FailureReason } from './types.js'
 import { isBlocked } from './blocklist.js'
-import { notifyStateChange } from './state-events.js'
+import { emit } from './state-events.js'
 import { finishItem } from './finish.js'
 import { createLogger, describeError } from './logger.js'
 
@@ -57,7 +57,7 @@ export function detachChannelPointsRedemptions(): number {
     }
   }
 
-  if (detached > 0) notifyStateChange()
+  if (detached > 0) emit('state')
   return detached
 }
 
@@ -71,7 +71,7 @@ export function getCurrent(): QueueItem | null {
 
 export function setPaused(value: boolean): void {
   isPaused = value
-  notifyStateChange()
+  emit('state')
 }
 
 export function getIsPaused(): boolean {
@@ -137,7 +137,7 @@ export function addSong(song: Song, requestedBy: string, options: AddOptions = {
   } else {
     queue.push(item)
     log.log(`added "${song.title}" at position ${queue.length}`)
-    notifyStateChange()
+    emit('state')
   }
 
   return { item, started }
@@ -157,7 +157,7 @@ export function setCurrent(item: QueueItem | null): void {
     log.log(item ? `now playing "${item.title}"` : 'nothing is playing')
   }
 
-  notifyStateChange()
+  emit('state')
 }
 
 export function removeByVideoId(videoId: string): QueueItem | null {
@@ -176,7 +176,7 @@ export function removeAt(index: number): QueueItem | null {
     finishItem(item, { code: 'TRACK_REMOVED' })
   }
 
-  notifyStateChange()
+  emit('state')
 
   return item ?? null
 }
@@ -189,7 +189,7 @@ export function clearQueue(): QueueItem[] {
 
   for (const item of cleared) finishItem(item, { code: 'QUEUE_CLEARED' })
 
-  notifyStateChange()
+  emit('state')
 
   return cleared
 }
