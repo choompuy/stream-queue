@@ -136,6 +136,24 @@ export function createFileStore<T>(location: string | (() => string)) {
   }
 }
 
+/**
+ * Reads a file that holds a list. Valid JSON is not always what the code expects (a file edited by hand, one left by an
+ * older version): what is not a list becomes an empty one, and an item that fails `isItem` is dropped
+ */
+export function loadList<T>(store: { load: (defaults: T[]) => T[]; path: () => string }, isItem: (value: unknown) => value is T): T[] {
+  const stored: unknown = store.load([])
+
+  if (!Array.isArray(stored)) {
+    log.warn(`${store.path()} does not hold a list, it is ignored`)
+    return []
+  }
+
+  const items = stored.filter(isItem)
+  if (items.length !== stored.length) log.warn(`Ignored ${stored.length - items.length} invalid entries in ${store.path()}`)
+
+  return items
+}
+
 export async function flushAllStores(): Promise<void> {
   await Promise.allSettled(activeStoreFlushers.map((flush) => flush()))
 }
