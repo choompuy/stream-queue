@@ -66,6 +66,24 @@ test('formatViews', async (t) => {
   await t.test('below one thousand', () => {
     assert.equal(formatViews(999), '999')
   })
+
+  await t.test('round numbers have no ".0"', () => {
+    assert.equal(formatViews(1000), '1K')
+    assert.equal(formatViews(3_000_000), '3M')
+  })
+
+  await t.test('no count at all is zero', () => {
+    assert.equal(formatViews(null), '0')
+    assert.equal(formatViews(undefined), '0')
+  })
+
+  await t.test('follows the language of the panel: the units and the decimal mark', () => {
+    const russian = (views) => formatViews(views, 'ru').replace(/\s/g, ' ')
+
+    assert.equal(russian(2_500_000), '2,5 млн')
+    assert.equal(russian(15_400), '15,4 тыс.')
+    assert.equal(russian(999), '999')
+  })
 })
 
 test('getErrorMessage', async (t) => {

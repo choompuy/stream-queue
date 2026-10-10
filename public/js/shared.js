@@ -24,11 +24,11 @@ export function youtubeThumbnail(videoId, quality = 'mqdefault') {
   return `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/${quality}.jpg`
 }
 
-export function formatViews(views) {
+// 1.2K / 2.5M in English, "1,2 тыс." / "2,5 млн" in Russian: the units and the decimal mark come from the language of the panel
+export function formatViews(views, locale = 'en') {
   if (views == null) return '0'
-  if (views >= 1000000) return `${(views / 1000000).toFixed(1)}M`
-  if (views >= 1000) return `${(views / 1000).toFixed(1)}K`
-  return views.toString()
+
+  return new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(views)
 }
 
 export function createLogger(prefix) {
