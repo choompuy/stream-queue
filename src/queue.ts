@@ -200,12 +200,14 @@ export type RequestSongResult =
   | { outcome: 'added'; added: AddedSong }
   | { outcome: 'error'; reason: FailureReason }
 
-export async function requestSong(
-  query: string,
-  requestedBy: string,
-  bypassFilters: boolean,
+type RequestOptions = {
+  // an admin request (from this computer): the filters and the limits do not apply
+  bypassFilters?: boolean
+  // set when a Channel Points redemption paid for the request: the track carries it until the redemption is closed
   channelPointsRedemption?: QueueItem['channelPointsRedemption']
-): Promise<RequestSongResult> {
+}
+
+export async function requestSong(query: string, requestedBy: string, { bypassFilters = false, channelPointsRedemption }: RequestOptions = {}): Promise<RequestSongResult> {
   let song: Song | null = null
 
   try {

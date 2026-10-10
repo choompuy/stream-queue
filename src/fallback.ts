@@ -249,11 +249,6 @@ export function getFallbackProgress(): Omit<FallbackSnapshot, 'sourceTracks'> {
   }
 }
 
-/** @internal exported for tests (the state file saves the progress and the track list separately) */
-export function getFallbackSnapshot(): FallbackSnapshot {
-  return { sourceTracks: getFallbackSourceTracks(), ...getFallbackProgress() }
-}
-
 // Puts the rotation position on `videoId` (the fallback track that is playing), if it is in the rotation
 export function alignFallbackCursor(videoId: string): void {
   const index = fallbackOrder.indexOf(videoId)

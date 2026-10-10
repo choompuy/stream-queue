@@ -1,6 +1,7 @@
 import { dataPath, type DeepPartial } from './persist.js'
 import { createConfigModule, field, type FieldRule, type Schema } from './config-helper.js'
 import { emit } from './state-events.js'
+import { getTwitchClientId } from './env.js'
 import { AppError, type TwitchSecrets, type TwitchTokenData, type TwitchUserInfo } from './types.js'
 
 export type Secrets = {
@@ -91,11 +92,6 @@ function maskSecret(value: string): string {
   if (value.length <= 4) return '•'.repeat(value.length)
   return `${'•'.repeat(value.length - 4)}${value.slice(-4)}`
 }
-
-declare const __BAKED_ENV__: Record<string, string> | undefined
-const baked = (key: string) => (typeof __BAKED_ENV__ !== 'undefined' ? __BAKED_ENV__[key] : '')
-
-export const getTwitchClientId = (): string => process.env.TWITCH_CLIENT_ID?.trim() || baked('TWITCH_CLIENT_ID') || ''
 
 export function getPublicSecretsView() {
   const { youtubeApiKey, twitch } = getSecrets()

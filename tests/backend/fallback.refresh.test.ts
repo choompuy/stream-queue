@@ -122,7 +122,7 @@ test('refreshFallback() rebuilds rotation around the playing track', async (t) =
     await fallback.refreshFallback()
 
     // B is still in the playlist, the rest is reshuffled around it
-    const order = fallback.getFallbackSnapshot().order
+    const order = fallback.getFallbackProgress().order
     assert.equal(order[0], B, 'playing track stays first')
     assert.deepEqual(order.slice(1).sort(), [A, C, D, E], 'the rest are all present')
   })

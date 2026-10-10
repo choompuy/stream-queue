@@ -21,7 +21,7 @@ router.post('/request', async (req, res) => {
     return fail(res, 'username is required', 'USERNAME_REQUIRED', 400)
   }
 
-  const result = await requestSong(query.trim(), requestedBy.trim().slice(0, 50), bypassFilters)
+  const result = await requestSong(query.trim(), requestedBy.trim().slice(0, 50), { bypassFilters })
 
   switch (result.outcome) {
     case 'invalid-url':

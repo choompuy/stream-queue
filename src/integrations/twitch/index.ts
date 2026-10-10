@@ -53,9 +53,9 @@ const trackRedemption = (event: TwitchChannelPointsRedemption): TrackedRedemptio
   userName: event.user_name
 })
 
-function handleChannelPointsPlaybackOutcome(tracked: TrackedRedemption, outcome: RedemptionOutcome): void {
+function handleChannelPointsPlaybackOutcome(tracked: TrackedRedemption, outcome: RedemptionOutcome, twitchClient: TwitchClient): void {
   if (outcome.status === 'failed') {
-    void cancelRedemption(tracked, client, outcome.reason)
+    void cancelRedemption(tracked, twitchClient, outcome.reason)
     return
   }
 
@@ -64,7 +64,7 @@ function handleChannelPointsPlaybackOutcome(tracked: TrackedRedemption, outcome:
     return
   }
 
-  void fulfillRedemption(tracked, client)
+  void fulfillRedemption(tracked, twitchClient)
 }
 
 export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = {}): void {
@@ -81,7 +81,8 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
     },
     onAuthStateChange: () => emit('twitch')
   })
-  client = new TwitchClient(oauth)
+  const twitchClient = new TwitchClient(oauth)
+  client = twitchClient
 
   const secrets = getSecrets()
 
@@ -91,11 +92,11 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
   }
 
   if (secrets.twitch.userInfo) {
-    client.setCachedUserInfo(secrets.twitch.userInfo)
+    twitchClient.setCachedUserInfo(secrets.twitch.userInfo)
     log.log('Restored Twitch user info from storage')
   }
 
-  registerRedemptionHandler(handleChannelPointsPlaybackOutcome)
+  registerRedemptionHandler((tracked, outcome) => handleChannelPointsPlaybackOutcome(tracked, outcome, twitchClient))
 
   log.log('Twitch integration initialized')
 
@@ -103,7 +104,7 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
   void startChat()
 }
 
-async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemption): Promise<void> {
+async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemption, twitchClient: TwitchClient): Promise<void> {
   const configuredRewardId = getTwitchConfig().channelPointsRewardId
   if (!configuredRewardId || event.reward.id !== configuredRewardId) {
     log.log(`Ignoring redemption with non-matching reward ID: ${event.reward.id} (configured: ${configuredRewardId || 'none'})`)
@@ -117,18 +118,18 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
   const query = event.user_input.trim()
   if (!query) {
     log.error(`Empty song request in redemption: ${event.id}`)
-    await cancelRedemption(tracked, client, { code: 'SONG_NOT_FOUND' })
+    await cancelRedemption(tracked, twitchClient, { code: 'SONG_NOT_FOUND' })
     return
   }
 
-  const result = await requestSong(query, event.user_name, false, tracked)
+  const result = await requestSong(query, event.user_name, { channelPointsRedemption: tracked })
 
   if (result.outcome !== 'added') {
     const reason: FailureReason =
       result.outcome === 'invalid-url' ? { code: 'INVALID_YOUTUBE_URL' } : result.outcome === 'not-found' ? { code: 'SONG_NOT_FOUND' } : result.reason
 
     log.error(`Song request failed for redemption ${event.id}: ${result.outcome}`)
-    await cancelRedemption(tracked, client, reason)
+    await cancelRedemption(tracked, twitchClient, reason)
     return
   }
 
@@ -168,9 +169,10 @@ async function connectEventSub(): Promise<void> {
       return
     }
 
+    const twitchClient = client
     eventSub = new TwitchEventSub({
-      client,
-      onChannelPointsRedemption: handleChannelPointsRedemption
+      client: twitchClient,
+      onChannelPointsRedemption: (event) => handleChannelPointsRedemption(event, twitchClient)
     })
     eventSub.onStatusChange = () => emit('twitch')
   }
@@ -410,12 +412,7 @@ async function setRedemptionStatus(
   return 'failed'
 }
 
-async function fulfillRedemption(redemption: TrackedRedemption, twitchClient: TwitchClient | null): Promise<void> {
-  if (!twitchClient) {
-    log.error(`Cannot fulfill redemption ${redemption.id}: Twitch client not initialized`)
-    return
-  }
-
+async function fulfillRedemption(redemption: TrackedRedemption, twitchClient: TwitchClient): Promise<void> {
   const result = await setRedemptionStatus(redemption, twitchClient, 'FULFILLED')
 
   if (result === 'done') {
@@ -431,13 +428,7 @@ async function fulfillRedemption(redemption: TrackedRedemption, twitchClient: Tw
   log.error(`Redemption ${redemption.id} was played but could not be fulfilled, it is left for a manual decision`)
 }
 
-async function cancelRedemption(redemption: TrackedRedemption, twitchClient: TwitchClient | null, reason: FailureReason): Promise<void> {
-  if (!twitchClient) {
-    log.error(`Cannot cancel redemption ${redemption.id}: Twitch client not initialized`)
-    await replyInChat(buildRedemptionRefundFailedMessage(redemption.userName))
-    return
-  }
-
+async function cancelRedemption(redemption: TrackedRedemption, twitchClient: TwitchClient, reason: FailureReason): Promise<void> {
   const result = await setRedemptionStatus(redemption, twitchClient, 'CANCELED')
 
   // "points refunded" goes to chat only when Twitch confirmed it: the points stay held otherwise

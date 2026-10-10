@@ -28,7 +28,7 @@ beforeEach(() => {
   updateConfig({ fallbackPlaylist: { shuffle: false } })
 })
 
-const order = () => fallback.getFallbackSnapshot().order
+const order = () => fallback.getFallbackProgress().order
 
 test('reorderFallback()', async (t) => {
   await t.test('re-orders the rotation without touching the stored shuffle flag', () => {
@@ -87,7 +87,7 @@ test('state persistence hooks', async (t) => {
       countNotifications(() => fallback.clearFallback()),
       1
     )
-    assert.deepEqual(fallback.getFallbackSnapshot().order, [])
-    assert.equal(fallback.getFallbackSnapshot().playlistId, null)
+    assert.deepEqual(fallback.getFallbackProgress().order, [])
+    assert.equal(fallback.getFallbackProgress().playlistId, null)
   })
 })

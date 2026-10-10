@@ -40,7 +40,7 @@ beforeEach(() => {
   setFallback([])
 })
 
-const cursor = () => fallback.getFallbackSnapshot().cursor
+const cursor = () => fallback.getFallbackProgress().cursor
 const playing = (id: string) => queue.setCurrent({ ...song(id), requestedBy: 'viewer' })
 
 test('moveToNext()', async (t) => {
