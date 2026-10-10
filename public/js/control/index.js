@@ -33,7 +33,11 @@ const refreshTopic = (name) => (TOPICS[name].isShown() ? TOPICS[name].read() : u
 // the net under the events: while they are down the panel polls, slowly, as it used to
 const SAFETY_POLL_MS = 10000
 
-async function init() {
+/**
+ * Starts the control panel on the page that is open. Nothing runs on import, so the panel can be started by a test.
+ * Returns `stop`, which closes the events and the safety net.
+ */
+export async function startControlPanel() {
   const settings = await run('fetching settings', () => api.getSettings(), { silent: true })
   const locale = settings?.locale
 
@@ -67,16 +71,20 @@ async function init() {
   })
 
   // a tab hidden for a while heard nothing (the browser may even have paused it): read the status again when it is back
-  document.addEventListener('visibilitychange', () => {
+  const onVisibilityChange = () => {
     if (document.visibilityState === 'visible') refreshTopic('twitch')
-  })
+  }
+  document.addEventListener('visibilitychange', onVisibilityChange)
 
-  window.addEventListener('pagehide', () => {
+  const stop = () => {
     events.close()
     safetyNet.stop()
-  })
+    document.removeEventListener('visibilitychange', onVisibilityChange)
+    window.removeEventListener('pagehide', stop)
+  }
+  window.addEventListener('pagehide', stop)
 
   log('Control panel initialized')
-}
 
-init()
+  return { stop }
+}

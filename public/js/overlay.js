@@ -17,8 +17,6 @@ let resetCounter = 0
 
 const log = createLogger('PREVIEW')
 
-const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
-
 // only one overlay on this computer plays the music: the others (and any overlay opened by another address) just show the badge
 let isPlaybackSource = false
 
@@ -33,18 +31,8 @@ const temporaryErrorRetries = new Map()
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-const dom = {
-  nowPlayingVideo: $('nowPlayingVideo'),
-  badge: $('badge'),
-  currentThumbnail: $('currentThumbnail'),
-  currentTitle: $('currentTitle'),
-  currentRequester: $('currentRequester'),
-  progressBar: $('progressBar'),
-  elapsedTime: $('elapsedTime'),
-  nextPlaying: $('nextPlaying'),
-  nextTitle: $('nextTitle'),
-  nextElapsedTime: $('nextElapsedTime')
-}
+// the elements of overlay.html, found when the overlay starts
+let dom = null
 
 // a change that is announced while a read is running may not be in that read: it is read once more when this one is done
 let refetchRequested = false
@@ -385,7 +373,9 @@ async function resetPlayer() {
     oldElement.replaceWith(newElement)
   }
 
-  await new Promise((resolve) => requestAnimationFrame(resolve))
+  // one frame for the page to drop the old player. A page that is not shown (an OBS source that is hidden) never draws one,
+  // and the failure must not wait for it: the queue stands until the failure is reported
+  await Promise.race([new Promise((resolve) => requestAnimationFrame(resolve)), sleep(100)])
 
   if (!isPlaybackSource || typeof YT === 'undefined' || !YT.Player) return token
 
@@ -400,37 +390,65 @@ function enablePlayback() {
   loadYouTubeApi().then(createPlayer)
 }
 
-// hidden until the lock is granted: a waiting overlay must not show an empty video frame
-dom.nowPlayingVideo.classList.add('hidden')
-
-if (isLocalhost) claimPlayback(enablePlayback)
-else log('Non-localhost origin: read-only widget, no embedded player')
-
-async function init() {
-  await fetchOverlayState()
-}
-
-init()
-
 // The events say when to read the state. What the viewer sees is this page, so a read every 15 s stays under them as a net,
 // and while the events are down the page reads every second, as it always did
 const SAFETY_POLL_TICKS = 15
-let eventsOpen = false
-let quietTicks = 0
 
-connectEvents({
-  topics: ['state'],
-  onChange: requestRefresh,
-  onStatus: (status) => {
-    eventsOpen = status === 'open'
+/**
+ * Starts the overlay on the page that is open. Nothing runs on import, so the overlay can be started (and stopped) by a test.
+ *
+ * `locks` is the Web Locks API that decides which overlay plays the music; by default the one of the browser.
+ * Returns `refresh` (read the state now) and `stop` (stop reading it).
+ */
+export function startOverlay({ locks } = {}) {
+  dom = {
+    nowPlayingVideo: $('nowPlayingVideo'),
+    badge: $('badge'),
+    currentThumbnail: $('currentThumbnail'),
+    currentTitle: $('currentTitle'),
+    currentRequester: $('currentRequester'),
+    progressBar: $('progressBar'),
+    elapsedTime: $('elapsedTime'),
+    nextPlaying: $('nextPlaying'),
+    nextTitle: $('nextTitle'),
+    nextElapsedTime: $('nextElapsedTime')
   }
-})
 
-setInterval(() => {
-  updateProgress()
+  const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
 
-  if (!eventsOpen || ++quietTicks >= SAFETY_POLL_TICKS) {
-    quietTicks = 0
-    fetchOverlayState()
+  // hidden until the lock is granted: a waiting overlay must not show an empty video frame
+  dom.nowPlayingVideo.classList.add('hidden')
+
+  if (isLocalhost) claimPlayback(enablePlayback, locks)
+  else log('Non-localhost origin: read-only widget, no embedded player')
+
+  fetchOverlayState()
+
+  let eventsOpen = false
+  let quietTicks = 0
+
+  const events = connectEvents({
+    topics: ['state'],
+    onChange: requestRefresh,
+    onStatus: (status) => {
+      eventsOpen = status === 'open'
+    }
+  })
+
+  const timer = setInterval(() => {
+    updateProgress()
+
+    if (!eventsOpen || ++quietTicks >= SAFETY_POLL_TICKS) {
+      quietTicks = 0
+      fetchOverlayState()
+    }
+  }, 1000)
+
+  return {
+    refresh: fetchOverlayState,
+    stop() {
+      clearInterval(timer)
+      events.close()
+    }
   }
-}, 1000)
+}
