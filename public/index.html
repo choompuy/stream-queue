@@ -295,7 +295,7 @@
             </div>
             <div class="row-list-wrapper" id="fallbackListWrapper" data-list="fallback">
               <div class="row-list"></div>
-              <div class="empty" data-i18n="fallback.empty">Fallback is empty</div>
+              <div class="empty" data-i18n="fallback.empty">Playlist is empty</div>
             </div>
           </div>
 
@@ -366,7 +366,7 @@
             <div class="empty">
               <div data-i18n="playlists.empty.title">No saved playlists yet</div>
               <div class="text-sm text-muted" data-i18n="playlists.empty.description">
-                Add a YouTube playlist above, then activate it to use as your fallback rotation.
+                Add a YouTube playlist above, then activate it to use as your fallback rotation
               </div>
             </div>
           </div>
@@ -523,7 +523,7 @@
               </label>
 
               <label class="field-row">
-                <span class="field-label" data-i18n="settings.bot.limits.allowLiveStreams">Live Streams</span>
+                <span class="field-label" data-i18n="settings.bot.limits.allowLiveStreams">Live streams</span>
                 <input class="settings-input checkbox" type="checkbox" id="cfgAllowLiveStreams" />
               </label>
 
@@ -550,7 +550,7 @@
                 />
                 <span class="text-muted text-xs" data-i18n="settings.bot.regionCodeNote">
                   Two-letter country code (ISO 3166-1, e.g. US, RU, DE). Tracks not licensed for this region are skipped instead of being queued.
-                  Leave empty to disable.
+                  Leave empty to disable
                 </span>
               </label>
             </div>
@@ -568,11 +568,12 @@
 
             <div class="settings-section">
               <span id="twitchNotConfigured" class="text-muted text-xs hidden" data-i18n="settings.twitch.clientCredentialsNote">
-                Create an application in the Twitch Developer Console to get your Client ID and Client Secret
+                No Twitch Client ID found. Create an application of type Public in the Twitch Developer Console, put its Client ID into the .env file
+                next to the app as TWITCH_CLIENT_ID=..., and restart the app. A secret is not needed
               </span>
 
               <div id="twitchChannelField" class="field">
-                <span class="field-label" data-i18n="settings.twitch.chanel">Not connected</span>
+                <span class="field-label" data-i18n="settings.twitch.chanel">Twitch channel</span>
                 <div class="field-row">
                   <div class="start">
                     <img id="twitchChanelImg" class="thumbnail hidden" alt="User avatar" />
@@ -832,7 +833,7 @@
       </section>
     </main>
 
-    <div id="toastContainer" class="toast-container"></div>
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
     <script type="module" src="js/control/main.js"></script>
   </body>

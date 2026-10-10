@@ -25,6 +25,16 @@ test('toasts', async (t) => {
     assert.equal(container.querySelector('.toast-close').getAttribute('aria-label'), 'Закрыть')
   })
 
+  await t.test('an error is an alert for a screen reader, other toasts are not', () => {
+    toastError('alert me', { duration: 0 })
+    toastSuccess('calm', { duration: 0 })
+
+    const roleOf = (message) => [...container.querySelectorAll('.toast-wrapper')].find((node) => node.textContent.includes(message)).getAttribute('role')
+
+    assert.equal(roleOf('alert me'), 'alert')
+    assert.equal(roleOf('calm'), null)
+  })
+
   await t.test('the same error is not shown twice while it is still on screen', () => {
     toastError('boom', { duration: 0 })
     toastError('boom', { duration: 0 })

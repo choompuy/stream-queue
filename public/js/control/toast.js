@@ -53,6 +53,8 @@ export function showToast(message, options = {}) {
 
   const toast = document.createElement('div')
   toast.className = `toast-wrapper toast-${type} toast-entering${duration > 0 ? '' : ' toast-persistent'}`
+  // an error interrupts what the screen reader is saying, the rest waits for its turn (the container is a polite live region)
+  if (type === 'error') toast.setAttribute('role', 'alert')
   toast.style.setProperty('--toast-duration', `${duration > 0 ? duration : DEFAULT_DURATION}ms`)
   toast.innerHTML = `
     <div class="toast-bg"></div>
