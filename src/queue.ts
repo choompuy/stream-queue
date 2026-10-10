@@ -20,7 +20,10 @@ const isQueued = (videoId: string): boolean => queue.some((item) => item.videoId
 
 function getUserActiveCount(username: string): number {
   const key = username.toLowerCase()
-  return queue.filter((item) => item.requestedBy.toLowerCase() === key).length
+  const isTheirs = (item: QueueItem): boolean => item.requestedBy.toLowerCase() === key
+  const playing = currentSong !== null && !currentSong.isFallback && isTheirs(currentSong)
+
+  return queue.filter(isTheirs).length + (playing ? 1 : 0)
 }
 
 function isActiveNonFallback(videoId: string): boolean {
