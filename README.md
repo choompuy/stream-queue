@@ -19,6 +19,9 @@ Viewers request songs in Twitch chat, StreamQueue searches YouTube, filters out 
 - 🌍 **RU/EN interface**
 - 🖥️ **Windows standalone build** - packaged `Service.exe` runs without Node.js installed; optional .NET 10 WinForms tray launcher provides a normal double-click workflow
 - 💾 **Local storage** - queue, settings, playlists, blocklist, and cache stay on disk next to the application
+- ⚡ **Real-time updates** - Server-Sent Events (SSE) push live queue and playback changes to the control panel without polling
+- 🧠 **In-memory caching** - YouTube API responses cached in memory for faster searches and reduced quota usage
+- 🔒 **Hardened reliability** - robust error handling, startup recovery, and state persistence for critical components
 
 ## How it works
 
@@ -202,7 +205,7 @@ Your YouTube API key and Twitch OAuth state are stored locally. The application 
 
 ## Tech stack
 
-Node.js · TypeScript · Express · vanilla JavaScript · YouTube Data API v3 · YouTube IFrame Player API · Twitch APIs · Twitch EventSub WebSocket · optional C#/WinForms tray launcher for Windows (.NET 10)
+Node.js · TypeScript · Express · vanilla JavaScript · Server-Sent Events (SSE) · YouTube Data API v3 · YouTube IFrame Player API · Twitch APIs · Twitch EventSub WebSocket · optional C#/WinForms tray launcher for Windows (.NET 10)
 
 ## License
 
