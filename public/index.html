@@ -140,6 +140,7 @@
               class="input"
               type="search"
               id="searchInput"
+              data-submit="searchBtn"
               aria-label="YouTube URL or search"
               data-i18n-aria-label="search.label"
               placeholder="YouTube URL or search..."
@@ -191,7 +192,7 @@
           <div class="section-tab section-tab-queue" data-section="queue">
             <div class="section-tab-header">
               <h2><span data-i18n="queue.title">Queue</span> <span class="text-sm text-secondary" id="queueCount">0/0</span></h2>
-              <button type="button" id="clearQueueBtn" class="btn btn-secondary btn-danger" data-action="clear-queue" data-i18n-title="queue.clear">
+              <button type="button" id="clearQueueBtn" class="btn btn-secondary btn-danger" data-action="clear-queue" data-confirm="queue.clearConfirm" data-i18n-title="queue.clear">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                   <path
                     stroke="currentColor"
@@ -308,6 +309,7 @@
                   id="clearActivityBtn"
                   class="btn btn-secondary btn-danger"
                   data-action="clear-activity"
+                  data-confirm="activity.clearConfirm"
                   data-i18n-title="activity.clear"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
@@ -350,6 +352,7 @@
           <div class="row">
             <input
               id="playlistUrlInput"
+              data-submit="playlistAddBtn"
               aria-label="Playlist URL or ID"
               data-i18n-aria-label="playlists.urlLabel"
               class="input"
@@ -596,6 +599,7 @@
                       id="twitchDisconnectBtn"
                       class="btn btn-secondary btn-danger hidden"
                       data-action="disconnect-twitch"
+                      data-confirm="settings.twitch.disconnectConfirm"
                       data-i18n="settings.twitch.disconnect"
                     >
                       Disconnect

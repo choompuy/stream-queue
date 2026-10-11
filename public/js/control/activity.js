@@ -1,6 +1,5 @@
 import { api } from './api.js'
 import { state } from './state.js'
-import { dom } from './dom.js'
 import { renderStats } from './stats.js'
 import { views } from './views/index.js'
 import { run } from './run.js'
@@ -54,8 +53,6 @@ export function loadActivity(silent = false) {
 }
 
 export async function clearActivity() {
-  if (!confirm(t('activity.clearConfirm'))) return
-
   await run(
     'clearing activity',
     async () => {
@@ -64,8 +61,7 @@ export async function clearActivity() {
       views.activity.invalidate()
       renderActivity()
       renderStats()
-    },
-    { button: dom.clearActivityBtn }
+    }
   )
 }
 

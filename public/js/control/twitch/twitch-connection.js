@@ -172,14 +172,11 @@ export function connectTwitch() {
         if (!navigated) authWindow?.close()
         if (pollController === controller) pollController = null
       }
-    },
-    { button: dom.twitchConnectBtn }
+    }
   )
 }
 
 export function disconnectTwitch() {
-  if (!confirm(t('settings.twitch.disconnectConfirm'))) return
-
   return run('disconnecting Twitch', async () => {
     stopTwitchPolling()
     const result = await api.disconnectTwitch()

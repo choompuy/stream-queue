@@ -280,8 +280,7 @@ export async function saveConfigSetting() {
       renderQueue()
       renderPlaylists()
       reportSaveResult(entries, rejected, 'toast.settingsSaved', { successToast: !apiKeyFailed })
-    },
-    { button: dom.cfgSaveBtn }
+    }
   )
 }
 

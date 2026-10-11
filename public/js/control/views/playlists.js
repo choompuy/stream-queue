@@ -19,7 +19,7 @@ export const playlistsView = createListView(dom.playlistsListWrapper, {
           icon: playlist.isActive ? PAUSE_ICON : PLAY_ICON,
           label: playlist.isActive ? t('playlists.pause') : t('playlists.activate')
         },
-        { action: 'playlist-delete', data: { id: playlist.id }, icon: DELETE_ICON, label: t('playlists.delete'), danger: true }
+        { action: 'playlist-delete', data: { id: playlist.id, confirm: 'playlists.deleteConfirm' }, icon: DELETE_ICON, label: t('playlists.delete'), danger: true }
       ])
     })
 })

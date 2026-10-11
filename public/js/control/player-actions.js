@@ -1,6 +1,5 @@
 import { api } from './api.js'
 import { state } from './state.js'
-import { dom } from './dom.js'
 import { run } from './run.js'
 import { refreshState } from './queue.js'
 
@@ -12,8 +11,7 @@ export function playPauseCurrent() {
       else await api.pause()
 
       await refreshState()
-    },
-    { button: dom.playPauseBtn }
+    }
   )
 }
 
@@ -23,8 +21,7 @@ export function skipCurrent() {
     async () => {
       await api.skip()
       await refreshState()
-    },
-    { button: dom.skipBtn }
+    }
   )
 }
 

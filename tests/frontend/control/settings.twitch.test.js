@@ -48,9 +48,6 @@ const jsdom = new JSDOM(
 globalThis.window = jsdom.window
 globalThis.document = jsdom.window.document
 
-// disconnectTwitch() asks for confirmation; a test flips this to simulate the user cancelling
-let confirmAnswer = true
-globalThis.confirm = () => confirmAnswer
 
 // requests the control panel makes, keyed by "METHOD path"
 let handlers = {}
@@ -157,7 +154,6 @@ function reset() {
   requests = []
   openedWindows = []
   lastBody = null
-  confirmAnswer = true
   settings.stopTwitchPolling()
 
   state.twitch.configured = true
@@ -281,24 +277,6 @@ test('connectTwitch', async (t) => {
     await drain(settings.connectTwitch())
 
     assert.equal(openedWindows[0].closed, true, 'a failed connect must not leave a blank tab behind')
-    assert.equal(dom.twitchConnectBtn.disabled, false)
-  })
-
-  await t.test('disables the connect button for the whole polling window', async () => {
-    let disabledWhilePolling = null
-
-    handlers = {
-      'POST /api/integrations/twitch/connect': () => deviceCode(),
-      'GET /api/integrations/twitch': () => {
-        disabledWhilePolling = dom.twitchConnectBtn.disabled
-        return { connected: true, user: { displayName: 'streamer' } }
-      },
-      'GET /api/integrations/twitch/rewards': () => ({ rewards: [] })
-    }
-
-    await drain(settings.connectTwitch())
-
-    assert.equal(disabledWhilePolling, true, 'a second click must not start a second poll loop')
     assert.equal(dom.twitchConnectBtn.disabled, false)
   })
 
@@ -463,21 +441,6 @@ test('loadTwitchSettings', async (t) => {
     await settings.loadTwitchSettings()
 
     assert.equal(state.twitch.selectedRewardId, 'reward-gone')
-  })
-})
-
-test('disconnectTwitch asks for confirmation first', async (t) => {
-  t.beforeEach(reset)
-
-  await t.test('cancelling the confirmation changes nothing and sends no request', async () => {
-    state.twitch.connected = true
-    state.twitch.user = { displayName: 'streamer' }
-    confirmAnswer = false
-
-    await settings.disconnectTwitch()
-
-    assert.equal(state.twitch.connected, true)
-    assert.deepEqual(requests, [])
   })
 })
 
@@ -866,11 +829,6 @@ test('cancelConfigChanges()', async (t) => {
 
 test('disconnectTwitch(): redemptions left open', async (t) => {
   const { disconnectTwitch } = await import('../../../public/js/control/twitch/twitch-connection.js')
-  const originalConfirm = globalThis.confirm
-  globalThis.confirm = () => true
-  t.after(() => {
-    globalThis.confirm = originalConfirm
-  })
 
   const toasts = () => [...document.querySelectorAll('#toastContainer .toast')].map((toast) => toast.textContent)
 

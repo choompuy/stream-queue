@@ -60,15 +60,12 @@ export function removeFromQueue(videoId) {
 }
 
 export async function clearQueue() {
-  if (!confirm(t('queue.clearConfirm'))) return
-
   await run(
     'clearing queue',
     async () => {
       await api.clearQueue()
       await refreshState()
-    },
-    { button: dom.clearQueueBtn }
+    }
   )
 }
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { setupPanel, deferred, makeTrack as track, V } from './panel-env.js'
+import { setupPanel, makeTrack as track, V } from './panel-env.js'
 
 const panel = setupPanel()
 
@@ -34,20 +34,6 @@ test('search', async (t) => {
 
     assert.equal(results().length, 2)
     assert.equal(wrapperHidden(), false)
-  })
-
-  await t.test('a second search while the first is still running is ignored', async () => {
-    const answer = deferred()
-    panel.route('GET /api/search?q=slow&admin=1', () => answer.promise)
-    panel.calls.length = 0
-    input.value = 'slow'
-
-    const first = search()
-    const second = search()
-    answer.resolve({ results: [] })
-    await Promise.all([first, second])
-
-    assert.equal(panel.count('GET /api/search?q=slow&admin=1'), 1)
   })
 
   await t.test('after a failed search the next one is sent', async () => {

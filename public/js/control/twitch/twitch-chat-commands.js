@@ -100,9 +100,6 @@ export async function saveTwitchChatCommands() {
       }
 
       reportSaveResult(entries, rejected, 'toast.twitchChatCommandsSaved')
-    },
-    {
-      button: dom.twitchChatCommandsSaveBtn
     }
   )
 }

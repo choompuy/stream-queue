@@ -1,6 +1,6 @@
 import { test, mock } from 'node:test'
 import assert from 'node:assert/strict'
-import { setupPanel, makeTrack as track } from './panel-env.js'
+import { setupPanel, deferred, makeTrack as track } from './panel-env.js'
 
 const panel = setupPanel()
 mock.method(console, 'log', () => {})
@@ -102,6 +102,25 @@ test('the Enter key', async (t) => {
     press(panel.$('#searchInput'), 'Enter')
     await flush()
     assert.deepEqual(panel.calls, ['GET /api/search?q=hello&admin=1'])
+  })
+
+  await t.test('while a search is running, neither a second click nor Enter sends another one', async () => {
+    const answer = deferred()
+    panel.route('GET /api/search?q=slow&admin=1', () => answer.promise)
+    panel.$('#searchInput').value = 'slow'
+    panel.calls.length = 0
+
+    panel.$('#searchBtn').click()
+    panel.$('#searchBtn').click()
+    press(panel.$('#searchInput'), 'Enter')
+    assert.equal(panel.count('GET /api/search?q=slow&admin=1'), 1)
+
+    answer.resolve({ results: [] })
+    await flush()
+    await flush()
+    press(panel.$('#searchInput'), 'Enter')
+    await flush()
+    assert.equal(panel.count('GET /api/search?q=slow&admin=1'), 2, 'the button is back')
   })
 
   await t.test('in the playlist box it adds the playlist', async () => {

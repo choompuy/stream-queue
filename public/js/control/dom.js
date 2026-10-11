@@ -19,7 +19,6 @@ export const dom = {
   cfgRegionCode: $('cfgRegionCode'),
   cfgAllowShorts: $('cfgAllowShorts'),
   cfgAllowLiveStreams: $('cfgAllowLiveStreams'),
-  cfgSaveBtn: $('cfgSaveBtn'),
 
   secYoutubeKey: $('secYoutubeKey'),
   secretsStatus: $('secretsStatus'),
@@ -37,14 +36,10 @@ export const dom = {
   nextDuration: $('nextDuration'),
 
   playPauseBtn: $('playPauseBtn'),
-  skipBtn: $('skipBtn'),
-  clearQueueBtn: $('clearQueueBtn'),
 
   searchInput: $('searchInput'),
   searchListWrapper: $('searchListWrapper'),
-  searchBtn: $('searchBtn'),
 
-  sectionTabs: $('sectionTabs'),
 
   tabQueueCount: $('tabQueueCount'),
   queueListWrapper: $('queueListWrapper'),
@@ -53,7 +48,6 @@ export const dom = {
   tabPlaylistCount: $('tabPlaylistCount'),
   fallbackListWrapper: $('fallbackListWrapper'),
   fallbackInfo: $('fallbackInfo'),
-  fallbackRefreshBtn: $('fallbackRefreshBtn'),
   fallbackRepeatBtn: $('fallbackRepeatBtn'),
   fallbackShuffleBtn: $('fallbackShuffleBtn'),
   fallbackEnabledBtn: $('fallbackEnabledBtn'),
@@ -61,14 +55,12 @@ export const dom = {
 
   tabActivityCount: $('tabActivityCount'),
   activityListWrapper: $('activityListWrapper'),
-  clearActivityBtn: $('clearActivityBtn'),
 
   tabBlocklistCount: $('tabBlocklistCount'),
   blocklistListWrapper: $('blocklistListWrapper'),
 
   playlistsListWrapper: $('playlistsListWrapper'),
   playlistUrlInput: $('playlistUrlInput'),
-  playlistAddBtn: $('playlistAddBtn'),
 
   twitchNotConfigured: $('twitchNotConfigured'),
   twitchConnectionControls: $('twitchConnectionControls'),
@@ -97,7 +89,6 @@ export const dom = {
   twitchMaxPerUserPerStream: $('twitchMaxPerUserPerStream'),
   twitchGlobalCooldownEnabled: $('twitchGlobalCooldownEnabled'),
   twitchGlobalCooldownSeconds: $('twitchGlobalCooldownSeconds'),
-  twitchSaveRewardBtn: $('twitchSaveRewardBtn'),
 
   twitchChatCommandsPanel: $('twitchChatCommandsPanel'),
   chatCmdCooldown: $('chatCmdCooldown'),
@@ -117,5 +108,4 @@ export const dom = {
   chatCmdResumeEnabled: $('chatCmdResumeEnabled'),
   chatCmdResumeCommand: $('chatCmdResumeCommand'),
   chatCmdResumePermission: $('chatCmdResumePermission'),
-  twitchChatCommandsSaveBtn: $('twitchChatCommandsSaveBtn')
 }

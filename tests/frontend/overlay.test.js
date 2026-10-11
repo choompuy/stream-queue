@@ -8,8 +8,10 @@ const SETTINGS = { locale: 'en', showVideo: true, hideOverlayInfo: false, opacit
 
 let instance = 0
 
+const GRANTED = { request: (name, callback) => callback() }
+
 // A fresh overlay on a fresh page. `server` is what the overlay reads: change it, then call overlay.refresh().
-async function boot(t, { current = null, isPaused = false, settings = {}, locks, events = true } = {}) {
+async function boot(t, { current = null, isPaused = false, settings = {}, locks = GRANTED, events = true } = {}) {
   mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
   const env = setupPanel({ page: 'overlay.html', url: 'http://localhost:4747/overlay' })

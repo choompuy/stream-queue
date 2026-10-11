@@ -1,6 +1,5 @@
 import { api } from './api.js'
 import { state } from './state.js'
-import { dom } from './dom.js'
 import { views } from './views/index.js'
 import { run } from './run.js'
 import { refreshState } from './queue.js'
@@ -15,8 +14,7 @@ export function refreshFallback() {
       await api.refreshFallback()
       await refreshFallbackState()
       toastSuccess(t('toast.fallbackRefreshed'))
-    },
-    { button: dom.fallbackRefreshBtn }
+    }
   )
 }
 

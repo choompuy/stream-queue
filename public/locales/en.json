@@ -174,7 +174,7 @@
       "connect": "Connect Twitch",
       "disconnect": "Disconnect",
       "disconnectConfirm": "Disconnect Twitch? Chat commands and Channel Points integrations will stop working",
-      "clientCredentialsNote": "No Twitch Client ID found. Create an application of type Public in the Twitch Developer Console, put its Client ID into the .env file next to the app as TWITCH_CLIENT_ID=..., and restart the app. A secret is not needed.",
+      "clientCredentialsNote": "No Twitch Client ID found. Create an application of type Public in the Twitch Developer Console, put its Client ID into the .env file next to the app as TWITCH_CLIENT_ID=..., and restart the app. A secret is not needed",
       "reward": "Channel Points reward",
       "rewardNone": "Select reward",
       "rewardNote": "Redemptions of this reward will be used as song requests",

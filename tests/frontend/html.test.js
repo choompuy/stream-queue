@@ -53,6 +53,24 @@ for (const [name, document] of Object.entries(pages)) {
       assert.deepEqual(missing, [])
     })
 
+    await t.test('asks its data-confirm questions in words that both languages have', () => {
+      const keys = [...document.querySelectorAll('[data-confirm]')].map((element) => element.dataset.confirm)
+
+      assert.deepEqual(
+        keys.filter((key) => typeof get(en, key) !== 'string' || typeof get(ru, key) !== 'string'),
+        []
+      )
+    })
+
+    await t.test('lets Enter in a data-submit field press a button that exists and has an action', () => {
+      const targets = [...document.querySelectorAll('[data-submit]')].map((element) => document.getElementById(element.dataset.submit))
+
+      assert.deepEqual(
+        targets.filter((target) => target?.tagName !== 'BUTTON' || !target.dataset.action),
+        []
+      )
+    })
+
     await t.test('shows, before the translation arrives, the English text that the translation has', () => {
       const stale = translated(document)
         .map(([element, key, attribute]) => ({ key, attribute, shown: attribute ? element.getAttribute(attribute) : element.textContent }))
@@ -60,7 +78,7 @@ for (const [name, document] of Object.entries(pages)) {
         .filter(({ key, shown }) => normalize(shown) !== normalize(get(en, key)))
 
       assert.deepEqual(
-        stale.map(({ key, shown }) => `${key}: ${normalize(shown)}`),
+        stale.map(({ key, shown }) => `${key}\n  html: ${normalize(shown)}\n  en:   ${normalize(get(en, key))}`),
         []
       )
     })

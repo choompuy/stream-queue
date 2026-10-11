@@ -108,17 +108,7 @@ test('clearQueue', async (t) => {
   panel.route('GET /api/state', { current: track('d'), queue: [], isPaused: false })
   panel.route('POST /api/queue/clear', {})
 
-  await t.test('does nothing when the question is answered with no', async () => {
-    globalThis.confirm = () => false
-    panel.calls.length = 0
-
-    await queue.clearQueue()
-
-    assert.deepEqual(panel.calls, [])
-  })
-
-  await t.test('clears and reloads when it is answered with yes', async () => {
-    globalThis.confirm = () => true
+  await t.test('clears and reloads', async () => {
     panel.calls.length = 0
 
     await queue.clearQueue()

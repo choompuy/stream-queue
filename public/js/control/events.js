@@ -3,8 +3,6 @@ import { CONFIG_FIELDS } from './fields.js'
 import { switchPageTab, switchSection } from './tabs.js'
 import { dispatchAction } from './actions.js'
 import { bindMenus } from './menu.js'
-import { search } from './search.js'
-import { addPlaylist } from './playlists.js'
 import { saveOverlaySettings, syncHideOverlayInfoAvailability, onIpChange, changeLocale, isConfigFieldChanged } from './settings.js'
 import { onTwitchRewardChange, stopTwitchPolling, bindTwitchFieldTracking, bindTwitchRewardFormEvents } from './twitch/index.js'
 import { trackChanges } from './save-result.js'
@@ -30,12 +28,9 @@ export function bindEvents() {
     if (actionElement) dispatchAction(actionElement, event)
   })
 
-  dom.searchInput?.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') search()
-  })
-
-  dom.playlistUrlInput?.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') addPlaylist()
+  // Enter in a field presses the button that the field names in data-submit, so the key does what a click does
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && event.target.dataset?.submit) document.getElementById(event.target.dataset.submit).click()
   })
 
   dom.showVideo?.addEventListener('change', () => {

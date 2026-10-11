@@ -117,8 +117,7 @@ export async function saveReward() {
       renderTwitchRewards()
       await saveTwitchConfig()
       toastSuccess(t('toast.twitchRewardCreated'))
-    },
-    { button: dom.twitchSaveRewardBtn }
+    }
   )
 }
 

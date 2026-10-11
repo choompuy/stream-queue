@@ -35,8 +35,7 @@ export async function addPlaylist() {
       setValue(dom.playlistUrlInput, '')
       await loadPlaylists()
       toastSuccess(t('toast.playlistAdded'))
-    },
-    { button: dom.playlistAddBtn }
+    }
   )
 }
 
@@ -50,8 +49,6 @@ export function activatePlaylist(id) {
 }
 
 export async function deletePlaylist(id) {
-  if (!confirm(t('playlists.deleteConfirm'))) return
-
   await run('deleting playlist', async () => {
     const result = await api.removePlaylist(id)
     await loadPlaylists()

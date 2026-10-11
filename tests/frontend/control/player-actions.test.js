@@ -8,6 +8,7 @@ const { initI18n } = await import('../../../public/js/i18n.js')
 await initI18n('en')
 const { state } = await import('../../../public/js/control/state.js')
 const { playPauseCurrent, skipCurrent, playerActions } = await import('../../../public/js/control/player-actions.js')
+const { dispatchAction } = await import('../../../public/js/control/actions.js')
 
 state.current = track('a')
 panel.route('GET /api/state', { current: track('a'), queue: [], isPaused: false })
@@ -40,11 +41,12 @@ test('play and pause', async (t) => {
     state.isPaused = false
     const button = panel.$('#playPauseBtn')
 
-    const pending = playPauseCurrent()
+    const pending = dispatchAction(button, new window.Event('click'))
     assert.equal(button.disabled, true)
 
     answer.resolve({})
     await pending
+    await new Promise((resolve) => setImmediate(resolve))
     assert.equal(button.disabled, false)
   })
 

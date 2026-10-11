@@ -3,13 +3,12 @@ import { translateErrorCode } from '../shared.js'
 import { ApiError } from './api.js'
 import { log } from './log.js'
 import { toastError } from './toast.js'
-import { withLoading } from './ui.js'
 
 export function errorMessage(error) {
   return translateErrorCode(t, error?.code, error?.params, error?.message || String(error))
 }
 
-export function run(label, action, { button = null, silent = false, onError = null } = {}) {
+export function run(label, action, { silent = false, onError = null } = {}) {
   const execute = async () => {
     try {
       return await action()
@@ -21,5 +20,5 @@ export function run(label, action, { button = null, silent = false, onError = nu
     }
   }
 
-  return button ? withLoading(button, execute) : execute()
+  return execute()
 }
