@@ -1,7 +1,7 @@
 import { formatDuration } from '../../shared.js'
 import { PLUS_ICON, PLAY_ICON } from '../../icons.js'
 import { t } from '../../i18n.js'
-import { dom } from '../state.js'
+import { dom } from '../dom.js'
 import { blockTrackItem, createListView, dataAttributes, row, rowMenu, statusPill, unblockTrackItem } from './primitives.js'
 
 export const fallbackView = createListView(dom.fallbackListWrapper, {

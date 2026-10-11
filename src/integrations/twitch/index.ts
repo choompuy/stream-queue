@@ -26,7 +26,8 @@ import { getState, skipCurrent } from '../../player.js'
 import { registerRedemptionHandler, type RedemptionOutcome } from '../../finish.js'
 import { AppError } from '../../types.js'
 import type { FailureReason, QueueItem } from '../../types.js'
-import { createLogger } from '../../logger.js'
+import { createLogger, describeError } from '../../logger.js'
+import { emit } from '../../state-events.js'
 
 const log = createLogger('TWITCH')
 const chatLog = createLogger('TWITCH CHAT')
@@ -52,9 +53,9 @@ const trackRedemption = (event: TwitchChannelPointsRedemption): TrackedRedemptio
   userName: event.user_name
 })
 
-function handleChannelPointsPlaybackOutcome(tracked: TrackedRedemption, outcome: RedemptionOutcome): void {
+function handleChannelPointsPlaybackOutcome(tracked: TrackedRedemption, outcome: RedemptionOutcome, twitchClient: TwitchClient): void {
   if (outcome.status === 'failed') {
-    void cancelRedemption(tracked, client, outcome.reason)
+    void cancelRedemption(tracked, twitchClient, outcome.reason)
     return
   }
 
@@ -63,7 +64,7 @@ function handleChannelPointsPlaybackOutcome(tracked: TrackedRedemption, outcome:
     return
   }
 
-  void fulfillRedemption(tracked, client)
+  void fulfillRedemption(tracked, twitchClient)
 }
 
 export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = {}): void {
@@ -77,9 +78,11 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
     scopes: config.scopes,
     onTokenUpdated: (tokenData) => {
       updateTwitchOAuthState({ tokenData })
-    }
+    },
+    onAuthStateChange: () => emit('twitch')
   })
-  client = new TwitchClient(oauth)
+  const twitchClient = new TwitchClient(oauth)
+  client = twitchClient
 
   const secrets = getSecrets()
 
@@ -89,11 +92,11 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
   }
 
   if (secrets.twitch.userInfo) {
-    client.setCachedUserInfo(secrets.twitch.userInfo)
+    twitchClient.setCachedUserInfo(secrets.twitch.userInfo)
     log.log('Restored Twitch user info from storage')
   }
 
-  registerRedemptionHandler(handleChannelPointsPlaybackOutcome)
+  registerRedemptionHandler((tracked, outcome) => handleChannelPointsPlaybackOutcome(tracked, outcome, twitchClient))
 
   log.log('Twitch integration initialized')
 
@@ -101,37 +104,32 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
   void startChat()
 }
 
-async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemption): Promise<void> {
-  log.log(`Channel Points redemption: ${event.reward.title} by ${event.user_name}`)
-
+async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemption, twitchClient: TwitchClient): Promise<void> {
   const configuredRewardId = getTwitchConfig().channelPointsRewardId
   if (!configuredRewardId || event.reward.id !== configuredRewardId) {
     log.log(`Ignoring redemption with non-matching reward ID: ${event.reward.id} (configured: ${configuredRewardId || 'none'})`)
     return
   }
 
+  log.log(`Channel Points redemption: ${event.reward.title} by ${event.user_name}`)
+
   const tracked = trackRedemption(event)
 
   const query = event.user_input.trim()
   if (!query) {
     log.error(`Empty song request in redemption: ${event.id}`)
-    await cancelRedemption(tracked, client, { code: 'SONG_NOT_FOUND' })
+    await cancelRedemption(tracked, twitchClient, { code: 'SONG_NOT_FOUND' })
     return
   }
 
-  if (!client) {
-    log.error(`Twitch client is not initialized for redemption: ${event.id}`)
-    return
-  }
-
-  const result = await requestSong(query, event.user_name, false, tracked)
+  const result = await requestSong(query, event.user_name, { channelPointsRedemption: tracked })
 
   if (result.outcome !== 'added') {
     const reason: FailureReason =
       result.outcome === 'invalid-url' ? { code: 'INVALID_YOUTUBE_URL' } : result.outcome === 'not-found' ? { code: 'SONG_NOT_FOUND' } : result.reason
 
     log.error(`Song request failed for redemption ${event.id}: ${result.outcome}`)
-    await cancelRedemption(tracked, client, reason)
+    await cancelRedemption(tracked, twitchClient, reason)
     return
   }
 
@@ -147,37 +145,49 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
   await replyInChat(buildRedemptionAcceptedMessage(event.user_name, result.added))
 }
 
-async function startEventSub(): Promise<void> {
+let eventSubStart: Promise<void> | null = null
+
+// One run at a time: device authorization finishing together with "refresh connection" must not connect the same socket twice
+function startEventSub(): Promise<void> {
+  eventSubStart ??= connectEventSub().finally(() => {
+    eventSubStart = null
+  })
+  return eventSubStart
+}
+
+async function connectEventSub(): Promise<void> {
   if (!oauth || !client) return
 
-  // already created: if it is down (it gave up earlier, or the first connect failed) it is woken up, not replaced
-  if (eventSub) {
-    if (!eventSub.isConnected()) await eventSub.connect().catch(() => eventSub?.retryInBackground())
-    return
+  if (!eventSub) {
+    if (!client.getCachedUserInfo()) {
+      log.log('Twitch account not connected, EventSub will not start')
+      return
+    }
+
+    if (!oauth.getConfig().clientId) {
+      log.log('Twitch client ID not configured, EventSub will not start')
+      return
+    }
+
+    const twitchClient = client
+    eventSub = new TwitchEventSub({
+      client: twitchClient,
+      onChannelPointsRedemption: (event) => handleChannelPointsRedemption(event, twitchClient)
+    })
+    eventSub.onStatusChange = () => emit('twitch')
   }
 
-  if (!client.getCachedUserInfo()) {
-    log.log('Twitch account not connected, EventSub will not start')
-    return
-  }
+  if (!eventSub.isConnected()) await connectOrRetry(eventSub, 'Twitch EventSub', log)
+}
 
-  if (!oauth.getConfig().clientId) {
-    log.log('Twitch client ID not configured, EventSub will not start')
-    return
-  }
-
-  eventSub = new TwitchEventSub({
-    client,
-    onChannelPointsRedemption: handleChannelPointsRedemption
-  })
-
+// Without a network at startup the integration must not stay dead: the same instance keeps retrying by itself
+async function connectOrRetry(socket: TwitchEventSub | TwitchChat, name: string, logger: ReturnType<typeof createLogger>): Promise<void> {
   try {
-    await eventSub.connect()
-    log.log('Twitch EventSub connected')
+    await socket.connect()
+    logger.log(`${name} connected`)
   } catch (error) {
-    // without a network at startup the integration must not stay dead: the same instance keeps retrying by itself
-    log.error(`Failed to start EventSub, will keep retrying: ${error instanceof Error ? error.message : error}`)
-    eventSub.retryInBackground()
+    logger.error(`Failed to start ${name}, will keep retrying: ${describeError(error)}`)
+    socket.retryInBackground()
   }
 }
 
@@ -206,7 +216,7 @@ async function replyInChat(message: string): Promise<void> {
   if (!chat?.isConnected() && chatStart) await Promise.race([chatStart, wait(CHAT_START_WAIT_MS)])
   if (!chat) return
   await chat.sendMessage(message).catch((error) => {
-    chatLog.error(`Failed to send chat reply: ${error instanceof Error ? error.message : error}`)
+    chatLog.error(`Failed to send chat reply: ${describeError(error)}`)
   })
 }
 
@@ -275,33 +285,25 @@ function startChat(): Promise<void> {
 async function connectChat(): Promise<void> {
   if (!oauth || !client) return
 
-  if (chat) {
-    if (!chat.isConnected()) await chat.connect().catch(() => chat?.retryInBackground())
-    return
+  if (!chat) {
+    const userInfo = client.getCachedUserInfo()
+    if (!userInfo) {
+      chatLog.log('Twitch account not connected, chat will not start')
+      return
+    }
+
+    // Started whenever the account is connected, with or without enabled commands: the replies to redemptions
+    // (accepted, refunded) go through the chat too, and which commands react is decided per message
+    chat = new TwitchChat({
+      oauth,
+      channelLogin: userInfo.login,
+      botLogin: userInfo.login,
+      onMessage: handleChatMessage
+    })
+    chat.onStatusChange = () => emit('twitch')
   }
 
-  const userInfo = client.getCachedUserInfo()
-  if (!userInfo) {
-    chatLog.log('Twitch account not connected, chat will not start')
-    return
-  }
-
-  // Started whenever the account is connected, with or without enabled commands: the replies to redemptions
-  // (accepted, refunded) go through the chat too, and which commands react is decided per message
-  chat = new TwitchChat({
-    oauth,
-    channelLogin: userInfo.login,
-    botLogin: userInfo.login,
-    onMessage: handleChatMessage
-  })
-
-  try {
-    await chat.connect()
-    chatLog.log('Twitch chat connected')
-  } catch (error) {
-    chatLog.error(`Failed to start chat, will keep retrying: ${error instanceof Error ? error.message : error}`)
-    chat.retryInBackground()
-  }
+  if (!chat.isConnected()) await connectOrRetry(chat, 'Twitch chat', chatLog)
 }
 
 export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeResponse> {
@@ -343,7 +345,7 @@ export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeRespon
     })
     // nobody awaits this promise: a refusal, an expired code or a cancel is logged here instead of becoming an unhandled rejection
     .catch((error) => {
-      if (generation === deviceAuthorizationGeneration) log.error(`Twitch authorization failed: ${error instanceof Error ? error.message : error}`)
+      if (generation === deviceAuthorizationGeneration) log.error(`Twitch authorization failed: ${describeError(error)}`)
       else log.log('Twitch authorization was cancelled')
     })
     .finally(() => {
@@ -385,7 +387,7 @@ async function setRedemptionStatus(
       await twitchClient.updateRedemptionStatus(redemption, status)
       return 'done'
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error)
+      const reason = describeError(error)
 
       if (isNoLongerOpen(error)) {
         log.log(
@@ -410,12 +412,7 @@ async function setRedemptionStatus(
   return 'failed'
 }
 
-async function fulfillRedemption(redemption: TrackedRedemption, twitchClient: TwitchClient | null): Promise<void> {
-  if (!twitchClient) {
-    log.error(`Cannot fulfill redemption ${redemption.id}: Twitch client not initialized`)
-    return
-  }
-
+async function fulfillRedemption(redemption: TrackedRedemption, twitchClient: TwitchClient): Promise<void> {
   const result = await setRedemptionStatus(redemption, twitchClient, 'FULFILLED')
 
   if (result === 'done') {
@@ -431,13 +428,7 @@ async function fulfillRedemption(redemption: TrackedRedemption, twitchClient: Tw
   log.error(`Redemption ${redemption.id} was played but could not be fulfilled, it is left for a manual decision`)
 }
 
-async function cancelRedemption(redemption: TrackedRedemption, twitchClient: TwitchClient | null, reason: FailureReason): Promise<void> {
-  if (!twitchClient) {
-    log.error(`Cannot cancel redemption ${redemption.id}: Twitch client not initialized`)
-    await replyInChat(buildRedemptionRefundFailedMessage(redemption.userName))
-    return
-  }
-
+async function cancelRedemption(redemption: TrackedRedemption, twitchClient: TwitchClient, reason: FailureReason): Promise<void> {
   const result = await setRedemptionStatus(redemption, twitchClient, 'CANCELED')
 
   // "points refunded" goes to chat only when Twitch confirmed it: the points stay held otherwise
@@ -521,7 +512,7 @@ export async function refreshConnection(): Promise<TwitchUserInfo> {
     log.log('Twitch connection refreshed')
     return userInfo
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error)
+    const reason = describeError(error)
     log.error(`Failed to refresh connection: ${reason}`)
     throw new AppError('TWITCH_REFRESH_ERROR', reason)
   }

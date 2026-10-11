@@ -18,13 +18,13 @@ writeFileSync(stateFile, original)
 test('importing the player modules has no side effects', async () => {
   const player = await import('../../src/player.js')
   const queue = await import('../../src/queue.js')
-  const { notifyStateChange } = await import('../../src/state-events.js')
+  const { emit } = await import('../../src/state-events.js')
   const { flushAllStores } = await import('../../src/persist.js')
 
   assert.equal(player.getState().current, null, 'the saved state must not be loaded until initState() is called')
 
   queue.setCurrent(null)
-  notifyStateChange()
+  emit('state')
   await flushAllStores()
 
   assert.equal(readFileSync(stateFile, 'utf8'), original, 'the state file must not be written until initState() is called')

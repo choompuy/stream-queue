@@ -14,36 +14,16 @@ export const cachePath = (name: string): string => join(getCacheDir(), name)
 
 export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
 
+const isPlain = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+// Two plain objects are merged key by key; anything else (a list, a null, a value of another kind) is taken from `data` as it is
 export function deepMerge<T>(defaults: T, data: DeepPartial<T>): T {
-  if (
-    defaults === null ||
-    data === null ||
-    typeof defaults !== 'object' ||
-    typeof data !== 'object' ||
-    Array.isArray(defaults) ||
-    Array.isArray(data)
-  ) {
-    return data as T
-  }
+  if (!isPlain(defaults) || !isPlain(data)) return data as T
 
-  const result = { ...defaults } as Record<string, unknown>
+  const result: Record<string, unknown> = { ...defaults }
 
-  for (const key of Object.keys(data)) {
-    const value = (data as Record<string, unknown>)[key]
-    const defaultValue = result[key]
-
-    if (
-      value &&
-      defaultValue &&
-      typeof value === 'object' &&
-      typeof defaultValue === 'object' &&
-      !Array.isArray(value) &&
-      !Array.isArray(defaultValue)
-    ) {
-      result[key] = deepMerge(defaultValue, value as DeepPartial<typeof defaultValue>)
-    } else if (value !== undefined) {
-      result[key] = value
-    }
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) result[key] = deepMerge(result[key], value as DeepPartial<unknown>)
   }
 
   return result as T
@@ -134,6 +114,24 @@ export function createFileStore<T>(location: string | (() => string)) {
     flush,
     path: resolvePath
   }
+}
+
+/**
+ * Reads a file that holds a list. Valid JSON is not always what the code expects (a file edited by hand, one left by an
+ * older version): what is not a list becomes an empty one, and an item that fails `isItem` is dropped
+ */
+export function loadList<T>(store: { load: (defaults: T[]) => T[]; path: () => string }, isItem: (value: unknown) => value is T): T[] {
+  const stored: unknown = store.load([])
+
+  if (!Array.isArray(stored)) {
+    log.warn(`${store.path()} does not hold a list, it is ignored`)
+    return []
+  }
+
+  const items = stored.filter(isItem)
+  if (items.length !== stored.length) log.warn(`Ignored ${stored.length - items.length} invalid entries in ${store.path()}`)
+
+  return items
 }
 
 export async function flushAllStores(): Promise<void> {

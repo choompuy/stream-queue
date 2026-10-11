@@ -1,10 +1,10 @@
 import { getConfig } from './config.js'
 import { getVideoById, searchSongs, selectBestSong } from './youtube/index.js'
 import { parseYouTubeUrl } from './youtube/url.js'
-import { logRejection, logAcceptance } from './activity.js'
+import { logRejection, logAcceptance, logSkippedWithOpenReward } from './activity.js'
 import { QueueItem, Song, AppError, AddedSong, FailureReason } from './types.js'
 import { isBlocked } from './blocklist.js'
-import { notifyStateChange } from './state-events.js'
+import { emit } from './state-events.js'
 import { finishItem } from './finish.js'
 import { createLogger, describeError } from './logger.js'
 
@@ -20,7 +20,10 @@ const isQueued = (videoId: string): boolean => queue.some((item) => item.videoId
 
 function getUserActiveCount(username: string): number {
   const key = username.toLowerCase()
-  return queue.filter((item) => item.requestedBy.toLowerCase() === key).length
+  const isTheirs = (item: QueueItem): boolean => item.requestedBy.toLowerCase() === key
+  const playing = currentSong !== null && !currentSong.isFallback && isTheirs(currentSong)
+
+  return queue.filter(isTheirs).length + (playing ? 1 : 0)
 }
 
 function isActiveNonFallback(videoId: string): boolean {
@@ -57,7 +60,7 @@ export function detachChannelPointsRedemptions(): number {
     }
   }
 
-  if (detached > 0) notifyStateChange()
+  if (detached > 0) emit('state')
   return detached
 }
 
@@ -71,7 +74,7 @@ export function getCurrent(): QueueItem | null {
 
 export function setPaused(value: boolean): void {
   isPaused = value
-  notifyStateChange()
+  emit('state')
 }
 
 export function getIsPaused(): boolean {
@@ -83,15 +86,14 @@ export function shiftQueue(): QueueItem | null {
 }
 
 export type AddOptions = {
-  addToQueue?: boolean
   bypassLimits?: boolean
   channelPointsRedemption?: QueueItem['channelPointsRedemption']
 }
 
-function assertCanRequestSong(requestedBy: string, { addToQueue = true, bypassLimits = false }: AddOptions = {}): void {
+function assertCanRequestSong(requestedBy: string, { bypassLimits = false }: AddOptions = {}): void {
   const config = getConfig()
 
-  if (addToQueue && queue.length >= config.maxQueueSize) {
+  if (currentSong !== null && queue.length >= config.maxQueueSize) {
     throw new AppError('QUEUE_FULL', 'the queue is full')
   }
 
@@ -123,38 +125,42 @@ export function assertCanAddSong(song: Song, requestedBy: string, options: AddOp
   assertCanRequestSong(requestedBy, options)
 }
 
-export function addSong(song: Song, requestedBy: string, options: AddOptions = {}): QueueItem {
-  const { addToQueue = true, channelPointsRedemption } = options
-
+export function addSong(song: Song, requestedBy: string, options: AddOptions = {}): { item: QueueItem; started: boolean } {
   assertCanAddSong(song, requestedBy, options)
 
   const item: QueueItem = {
     ...song,
     requestedBy,
-    ...(channelPointsRedemption ? { channelPointsRedemption } : {})
+    ...(options.channelPointsRedemption ? { channelPointsRedemption: options.channelPointsRedemption } : {})
   }
+  const started = currentSong === null
 
-  if (addToQueue) {
+  if (started) {
+    setCurrent(item)
+  } else {
     queue.push(item)
     log.log(`added "${song.title}" at position ${queue.length}`)
-  } else {
-    log.log(`"${song.title}" will be set as current (not added to queue)`)
+    emit('state')
   }
 
-  notifyStateChange()
-
-  return item
+  return { item, started }
 }
 
 export function setCurrent(item: QueueItem | null): void {
   const previous = currentSong
   currentSong = item
 
+  // still attached = nobody closed it, so the track was skipped or replaced with its reward open
+  if (previous?.channelPointsRedemption && previous !== item) {
+    log.warn(`"${previous.title}" was bought with Channel Points: the reward stays UNFULFILLED on Twitch until it is fulfilled or refunded there`)
+    logSkippedWithOpenReward(previous)
+  }
+
   if (item?.videoId !== previous?.videoId) {
     log.log(item ? `now playing "${item.title}"` : 'nothing is playing')
   }
 
-  notifyStateChange()
+  emit('state')
 }
 
 export function removeByVideoId(videoId: string): QueueItem | null {
@@ -173,7 +179,7 @@ export function removeAt(index: number): QueueItem | null {
     finishItem(item, { code: 'TRACK_REMOVED' })
   }
 
-  notifyStateChange()
+  emit('state')
 
   return item ?? null
 }
@@ -186,7 +192,7 @@ export function clearQueue(): QueueItem[] {
 
   for (const item of cleared) finishItem(item, { code: 'QUEUE_CLEARED' })
 
-  notifyStateChange()
+  emit('state')
 
   return cleared
 }
@@ -197,22 +203,23 @@ export type RequestSongResult =
   | { outcome: 'added'; added: AddedSong }
   | { outcome: 'error'; reason: FailureReason }
 
-export async function requestSong(
-  query: string,
-  requestedBy: string,
-  bypassFilters: boolean,
+type RequestOptions = {
+  // an admin request (from this computer): the filters and the limits do not apply
+  bypassFilters?: boolean
+  // set when a Channel Points redemption paid for the request: the track carries it until the redemption is closed
   channelPointsRedemption?: QueueItem['channelPointsRedemption']
-): Promise<RequestSongResult> {
+}
+
+export async function requestSong(query: string, requestedBy: string, { bypassFilters = false, channelPointsRedemption }: RequestOptions = {}): Promise<RequestSongResult> {
   let song: Song | null = null
 
   try {
-    assertCanRequestSong(requestedBy, { addToQueue: currentSong !== null, bypassLimits: bypassFilters })
+    assertCanRequestSong(requestedBy, { bypassLimits: bypassFilters })
 
     const { isYouTube, videoId } = parseYouTubeUrl(query)
     log.log(`[REQUEST] ${requestedBy} → ${videoId ? `YouTube URL: ${videoId}` : `Search: "${query}"`}`)
 
     if (isYouTube && !videoId) {
-      log.log(`[REJECT] ${requestedBy} → INVALID_YOUTUBE_URL`)
       logRejection(requestedBy, query, 'INVALID_YOUTUBE_URL')
       return { outcome: 'invalid-url' }
     }
@@ -230,30 +237,21 @@ export async function requestSong(
     }
 
     if (!song) {
-      log.log(`[REJECT] ${requestedBy} → SONG_NOT_FOUND`)
       logRejection(requestedBy, query, 'SONG_NOT_FOUND')
       return { outcome: 'not-found' }
     }
 
-    const wasEmpty = currentSong === null
-    const item = addSong(song, requestedBy, { addToQueue: !wasEmpty, bypassLimits: bypassFilters, channelPointsRedemption })
+    const { item, started } = addSong(song, requestedBy, { bypassLimits: bypassFilters, channelPointsRedemption })
 
-    if (wasEmpty) {
-      setCurrent(item)
-      log.log(`[ACCEPT] ${requestedBy} → "${song.title}" - now playing`)
-    } else {
-      log.log(`[ACCEPT] ${requestedBy} → "${song.title}" - queued`)
-    }
-
+    log.log(`[ACCEPT] ${requestedBy} → "${song.title}" - ${started ? 'now playing' : 'queued'}`)
     logAcceptance(requestedBy, query, song.title, song.videoId)
 
-    const position = wasEmpty ? 0 : queue.length
+    const position = started ? 0 : queue.length
 
-    return { outcome: 'added', added: { song: item, started: wasEmpty, position } }
+    return { outcome: 'added', added: { song: item, started, position } }
   } catch (error) {
-    // an expected refusal (duplicate, limit, filter) is routine; anything else is a bug or an outage and keeps its details
-    if (error instanceof AppError) log.log(`[REJECT] ${requestedBy} → ${error.code}`)
-    else log.error(`[REJECT] ${requestedBy} → unexpected error while adding song: ${describeError(error, true)}`)
+    // an expected refusal (duplicate, limit, filter) is routine and logRejection() writes it down; anything else is a bug or an outage and keeps its details
+    if (!(error instanceof AppError)) log.error(`Unexpected error while adding a song for ${requestedBy}: ${describeError(error, true)}`)
 
     const reasonCode = error instanceof AppError ? error.code : 'SERVER_ERROR'
     const reasonParams = error instanceof AppError ? error.params : undefined

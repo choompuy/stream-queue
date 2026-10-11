@@ -8,7 +8,11 @@ import {
   getErrorMessage,
   translateErrorCode,
   setFieldState,
-  setError
+  setError,
+  setText,
+  setClass,
+  setValue,
+  setChecked
 } from '../../public/js/shared.js'
 
 test('escapeHtml', async (t) => {
@@ -65,6 +69,24 @@ test('formatViews', async (t) => {
 
   await t.test('below one thousand', () => {
     assert.equal(formatViews(999), '999')
+  })
+
+  await t.test('round numbers have no ".0"', () => {
+    assert.equal(formatViews(1000), '1K')
+    assert.equal(formatViews(3_000_000), '3M')
+  })
+
+  await t.test('no count at all is zero', () => {
+    assert.equal(formatViews(null), '0')
+    assert.equal(formatViews(undefined), '0')
+  })
+
+  await t.test('follows the language of the panel: the units and the decimal mark', () => {
+    const russian = (views) => formatViews(views, 'ru').replace(/\s/g, ' ')
+
+    assert.equal(russian(2_500_000), '2,5 млн')
+    assert.equal(russian(15_400), '15,4 тыс.')
+    assert.equal(russian(999), '999')
   })
 })
 
@@ -146,8 +168,13 @@ test('setFieldState / setError', async (t) => {
     setError(input, false)
     assert.deepEqual([...input.classes], ['changed'])
   })
+})
 
-  await t.test('missing element is ignored', () => {
-    assert.doesNotThrow(() => setFieldState(null, 'saved'))
+test('the helpers that write to an element', async (t) => {
+  await t.test('throw when the element is missing, so a wrong id is not silently ignored', () => {
+    assert.throws(() => setText(null, 'x'), TypeError)
+    assert.throws(() => setClass(null, 'x'), TypeError)
+    assert.throws(() => setValue(null, 'x'), TypeError)
+    assert.throws(() => setChecked(null, true), TypeError)
   })
 })

@@ -1,5 +1,6 @@
-import { dataPath, createFileStore } from './persist.js'
+import { dataPath, createFileStore, loadList } from './persist.js'
 import { createLogger, describeError } from './logger.js'
+import { isValidVideoId } from './youtube/url.js'
 
 export type BlockedTrack = {
   videoId: string
@@ -14,13 +15,20 @@ const TITLE_MAX_LENGTH = 200
 const log = createLogger('BLOCKLIST')
 const store = createFileStore<BlockedTrack[]>(() => dataPath('blocklist.json'))
 
+function isBlockedTrack(value: unknown): value is BlockedTrack {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+
+  return isValidVideoId(v.videoId) && typeof v.title === 'string' && Number.isFinite(v.blockedAt)
+}
+
 // read from disk on first use, not when the module is imported
 let blocked: BlockedTrack[] | null = null
 let blockedIds: Set<string> | null = null
 
 function ensureLoaded(): { list: BlockedTrack[]; ids: Set<string> } {
   if (!blocked || !blockedIds) {
-    blocked = store.load([])
+    blocked = loadList(store, isBlockedTrack)
     blockedIds = new Set(blocked.map((t) => t.videoId))
   }
   return { list: blocked, ids: blockedIds }

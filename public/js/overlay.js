@@ -1,5 +1,8 @@
 import { $, formatDuration, createLogger, getErrorMessage, show, setClass, setText } from './shared.js'
 import { initI18n, t, getCurrentLocale } from './i18n.js'
+import { loadYouTubeApi } from './youtube-api.js'
+import { claimPlayback } from './playback-lock.js'
+import { connectEvents } from './sse.js'
 
 let player = null
 let currentState = null
@@ -14,7 +17,8 @@ let resetCounter = 0
 
 const log = createLogger('PREVIEW')
 
-const isPlaybackSource = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+// only one overlay on this computer plays the music: the others (and any overlay opened by another address) just show the badge
+let isPlaybackSource = false
 
 const REQUEST_TIMEOUT_MS = 8000
 const STALE_POLL_MS = 15000
@@ -27,17 +31,15 @@ const temporaryErrorRetries = new Map()
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-const dom = {
-  nowPlayingVideo: $('nowPlayingVideo'),
-  badge: $('badge'),
-  currentThumbnail: $('currentThumbnail'),
-  currentTitle: $('currentTitle'),
-  currentRequester: $('currentRequester'),
-  progressBar: $('progressBar'),
-  elapsedTime: $('elapsedTime'),
-  nextPlaying: $('nextPlaying'),
-  nextTitle: $('nextTitle'),
-  nextElapsedTime: $('nextElapsedTime')
+// the elements of overlay.html, found when the overlay starts
+let dom = null
+
+// a change that is announced while a read is running may not be in that read: it is read once more when this one is done
+let refetchRequested = false
+
+function requestRefresh() {
+  if (fetchStartedAt) refetchRequested = true
+  else fetchOverlayState()
 }
 
 async function fetchOverlayState() {
@@ -63,6 +65,11 @@ async function fetchOverlayState() {
     log('Error fetching settings:', error)
   } finally {
     if (fetchStartedAt === startedAt) fetchStartedAt = 0
+
+    if (refetchRequested) {
+      refetchRequested = false
+      fetchOverlayState()
+    }
   }
 }
 
@@ -276,7 +283,7 @@ function onPlayerStateChange(event) {
 }
 
 function onPlayerError(event) {
-  const message = getErrorMessage(event.data, t || ((key) => key))
+  const message = getErrorMessage(event.data, t)
   log(`Player error: ${message}`)
   const videoId = currentState?.current?.videoId
 
@@ -366,7 +373,9 @@ async function resetPlayer() {
     oldElement.replaceWith(newElement)
   }
 
-  await new Promise((resolve) => requestAnimationFrame(resolve))
+  // one frame for the page to drop the old player. A page that is not shown (an OBS source that is hidden) never draws one,
+  // and the failure must not wait for it: the queue stands until the failure is reported
+  await Promise.race([new Promise((resolve) => requestAnimationFrame(resolve)), sleep(100)])
 
   if (!isPlaybackSource || typeof YT === 'undefined' || !YT.Player) return token
 
@@ -374,41 +383,72 @@ async function resetPlayer() {
   return token
 }
 
-// OBS often starts before the network is up: a failed load of the API script is retried, with growing pauses, until it works
-function loadYouTubeApi(attempt = 0) {
-  const tag = document.createElement('script')
-  tag.src = 'https://www.youtube.com/iframe_api'
-
-  tag.onerror = () => {
-    tag.remove()
-    const delay = Math.min(2000 * 2 ** Math.min(attempt, 5), 30000)
-    log(`YouTube API failed to load, retrying in ${delay / 1000}s`)
-    setTimeout(() => loadYouTubeApi(attempt + 1), delay)
-  }
-
-  const firstScriptTag = document.getElementsByTagName('script')[0]
-  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag)
+function enablePlayback() {
+  log('This overlay plays the music')
+  isPlaybackSource = true
+  dom.nowPlayingVideo.classList.remove('hidden')
+  loadYouTubeApi().then(createPlayer)
 }
 
-if (isPlaybackSource) {
-  window.onYouTubeIframeAPIReady = () => {
-    log('YouTube API ready')
-    createPlayer()
+// The events say when to read the state. What the viewer sees is this page, so a read every 15 s stays under them as a net,
+// and while the events are down the page reads every second, as it always did
+const SAFETY_POLL_TICKS = 15
+
+/**
+ * Starts the overlay on the page that is open. Nothing runs on import, so the overlay can be started (and stopped) by a test.
+ *
+ * `locks` is the Web Locks API that decides which overlay plays the music; by default the one of the browser.
+ * Returns `refresh` (read the state now) and `stop` (stop reading it).
+ */
+export function startOverlay({ locks } = {}) {
+  dom = {
+    nowPlayingVideo: $('nowPlayingVideo'),
+    badge: $('badge'),
+    currentThumbnail: $('currentThumbnail'),
+    currentTitle: $('currentTitle'),
+    currentRequester: $('currentRequester'),
+    progressBar: $('progressBar'),
+    elapsedTime: $('elapsedTime'),
+    nextPlaying: $('nextPlaying'),
+    nextTitle: $('nextTitle'),
+    nextElapsedTime: $('nextElapsedTime')
   }
 
-  loadYouTubeApi()
-} else {
-  log('Non-localhost origin: read-only widget, no embedded player')
+  const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+
+  // hidden until the lock is granted: a waiting overlay must not show an empty video frame
   dom.nowPlayingVideo.classList.add('hidden')
-}
 
-async function init() {
-  await fetchOverlayState()
-}
+  if (isLocalhost) claimPlayback(enablePlayback, locks)
+  else log('Non-localhost origin: read-only widget, no embedded player')
 
-init()
-
-setInterval(() => {
   fetchOverlayState()
-  updateProgress()
-}, 1000)
+
+  let eventsOpen = false
+  let quietTicks = 0
+
+  const events = connectEvents({
+    topics: ['state'],
+    onChange: requestRefresh,
+    onStatus: (status) => {
+      eventsOpen = status === 'open'
+    }
+  })
+
+  const timer = setInterval(() => {
+    updateProgress()
+
+    if (!eventsOpen || ++quietTicks >= SAFETY_POLL_TICKS) {
+      quietTicks = 0
+      fetchOverlayState()
+    }
+  }, 1000)
+
+  return {
+    refresh: fetchOverlayState,
+    stop() {
+      clearInterval(timer)
+      events.close()
+    }
+  }
+}

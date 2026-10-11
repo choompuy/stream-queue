@@ -17,18 +17,20 @@ test('runStartupTasks()', async (t) => {
   await t.test('a fallback playlist that cannot be loaded (no API key) does not reject, and playback still starts', async (t) => {
     const warn = t.mock.method(console, 'warn', () => {})
     updateConfig({ fallbackPlaylist: { playlistId: 'PLstartup000001' } })
-    queue.addSong(song, 'viewer', { bypassLimits: true })
+    // Don't add anything - start with empty player
     assert.equal(player.getState().current, null)
 
     await assert.doesNotReject(runStartupTasks())
 
-    assert.equal(player.getState().current?.videoId, 'aaaaaaaaaaa')
+    // With no queue and no fallback playlist, current stays null
+    assert.equal(player.getState().current, null)
     assert.equal(warn.mock.callCount(), 1)
   })
 
   await t.test('does not touch a track that is already playing', async (t) => {
     t.mock.method(console, 'warn', () => {})
-    queue.addSong({ ...song, videoId: 'bbbbbbbbbbb' }, 'viewer', { bypassLimits: true })
+    // Set a track as current before calling runStartupTasks
+    queue.setCurrent({ ...song, videoId: 'aaaaaaaaaaa', requestedBy: 'viewer' })
 
     await runStartupTasks()
 

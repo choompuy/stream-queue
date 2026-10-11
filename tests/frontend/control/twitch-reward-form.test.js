@@ -4,27 +4,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { JSDOM } from 'jsdom'
 
-const jsdom = new JSDOM(
-  `<!doctype html><html><body>
-    <div id="twitchRewardForm"><h2></h2></div>
-    <input id="twitchRewardTitle" type="text" maxlength="45" />
-    <input id="twitchRewardCost" type="number" />
-    <input id="twitchRewardPrompt" type="text" maxlength="140" />
-    <input id="twitchRewardBackgroundColorPicker" type="color" />
-    <input id="twitchRewardBackgroundColor" type="text" />
-    <input id="twitchRewardEnabled" type="checkbox" />
-    <input id="twitchMaxPerStreamEnabled" type="checkbox" />
-    <input id="twitchMaxPerStream" type="number" disabled />
-    <input id="twitchMaxPerUserPerStreamEnabled" type="checkbox" />
-    <input id="twitchMaxPerUserPerStream" type="number" disabled />
-    <input id="twitchGlobalCooldownEnabled" type="checkbox" />
-    <input id="twitchGlobalCooldownSeconds" type="number" disabled />
-    <button id="twitchSaveRewardBtn"></button>
-    <select id="twitchRewardSelect"></select>
-    <input id="twitchAutoFulfillRedemptions" type="checkbox" />
-    <div id="toastContainer"></div>
-  </body></html>`
-)
+const jsdom = new JSDOM(readFileSync(new URL('../../../public/index.html', import.meta.url), 'utf8').replace(/<script[^>]*><\/script>/g, ''))
 
 globalThis.window = jsdom.window
 globalThis.document = jsdom.window.document
@@ -46,7 +26,8 @@ globalThis.fetch = async (url, options = {}) => {
   return { ok: true, json: async () => ({ data: await handler() }) }
 }
 
-const { state, dom } = await import('../../../public/js/control/state.js')
+const { state } = await import('../../../public/js/control/state.js')
+const { dom } = await import('../../../public/js/control/dom.js')
 const { showRewardForm, markRewardSaved, readRewardForm, bindRewardForm } = await import('../../../public/js/control/twitch/twitch-reward-form.js')
 const { saveReward, cancelRewardChanges } = await import('../../../public/js/control/twitch/twitch-rewards.js')
 

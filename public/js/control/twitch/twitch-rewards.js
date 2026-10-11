@@ -2,14 +2,15 @@ import { setChecked, setFieldState, setValue } from '../../shared.js'
 import { t } from '../../i18n.js'
 import { api } from '../api.js'
 import { run } from '../run.js'
-import { state, dom } from '../state.js'
+import { state } from '../state.js'
+import { dom } from '../dom.js'
 import { reportSaveResult, trackChanges } from '../save-result.js'
 import { toastSuccess } from '../toast.js'
 import { showRewardForm, markRewardSaved, readRewardForm, bindRewardForm } from './twitch-reward-form.js'
 
 export async function loadTwitchRewards() {
   const response = await api.getTwitchRewards()
-  state.twitch.rewards = response?.rewards ?? []
+  state.twitch.rewards = response.rewards
   renderTwitchRewards()
 }
 
@@ -50,7 +51,7 @@ export function renderTwitchRewards() {
 }
 
 export function onTwitchRewardChange() {
-  state.twitch.selectedRewardId = dom.twitchRewardSelect?.value ?? ''
+  state.twitch.selectedRewardId = dom.twitchRewardSelect.value
   showSelectedReward()
   saveTwitchConfig()
 }
@@ -67,7 +68,7 @@ export function applyRewardConfig(config) {
 
 export async function saveTwitchConfig() {
   const rewardId = state.twitch.selectedRewardId || ''
-  const autoFulfillRedemptions = dom.twitchAutoFulfillRedemptions?.checked ?? false
+  const autoFulfillRedemptions = dom.twitchAutoFulfillRedemptions.checked
   const entries = [
     { input: dom.twitchRewardSelect, path: 'channelPointsRewardId', changed: rewardId !== state.twitch.savedRewardId },
     {
@@ -116,19 +117,18 @@ export async function saveReward() {
       renderTwitchRewards()
       await saveTwitchConfig()
       toastSuccess(t('toast.twitchRewardCreated'))
-    },
-    { button: dom.twitchSaveRewardBtn }
+    }
   )
 }
 
 export function bindTwitchRewardTracking() {
   trackChanges(dom.twitchRewardSelect, () => dom.twitchRewardSelect.value !== state.twitch.savedRewardId)
   trackChanges(dom.twitchAutoFulfillRedemptions, () => dom.twitchAutoFulfillRedemptions.checked !== state.twitch.savedAutoFulfillRedemptions)
-  dom.twitchAutoFulfillRedemptions?.addEventListener('change', saveTwitchConfig)
+  dom.twitchAutoFulfillRedemptions.addEventListener('change', saveTwitchConfig)
 }
 
 export function bindTwitchRewardFormEvents() {
-  dom.twitchCreateNewRewardBtn?.addEventListener('click', () => {
+  dom.twitchCreateNewRewardBtn.addEventListener('click', () => {
     setValue(dom.twitchRewardSelect, '')
     state.twitch.selectedRewardId = ''
     showRewardForm()

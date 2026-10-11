@@ -205,15 +205,3 @@ test('twitch routes reject requests from a non-loopback address', async (t) => {
     assert.equal(response.status, 200)
   })
 })
-
-test('twitch routes with simulated remote address', async (t) => {
-  // Verify the localOnly middleware helper function works correctly
-  const { isLoopbackAddress } = await import('../../../src/local-only.js')
-
-  await t.test('isLoopbackAddress correctly identifies loopback addresses', () => {
-    assert.equal(isLoopbackAddress('127.0.0.1'), true)
-    assert.equal(isLoopbackAddress('::1'), true)
-    assert.equal(isLoopbackAddress('192.168.1.20'), false)
-    assert.equal(isLoopbackAddress('10.0.0.5'), false)
-  })
-})

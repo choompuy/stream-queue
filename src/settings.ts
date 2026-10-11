@@ -1,6 +1,6 @@
 import { createConfigModule, rules } from './config-helper.js'
 import { dataPath } from './persist.js'
-import { notifyStateChange } from './state-events.js'
+import { emit } from './state-events.js'
 import type { Settings } from './types.js'
 
 const POSITIONS = ['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const satisfies readonly Settings['position'][]
@@ -38,6 +38,6 @@ export const validateSettingsUpdates = settings.validateConfigUpdates
 /** Applies the valid part of `updates`; the HTTP layer uses validateSettingsUpdates() to refuse the rest. */
 export function updateSettings(updates: Partial<Settings>): Settings {
   const { config } = settings.updateConfig(updates)
-  notifyStateChange()
+  emit('state')
   return config
 }

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { NextFunction, Request, Response } from 'express'
-import { isLoopbackAddress, localOnly } from '../../src/local-only.js'
+import { localOnly } from '../../src/local-only.js'
 
 function run(remoteAddress: string | undefined) {
   const result = { nextCalled: false, status: 0, body: undefined as Record<string, any> | undefined }
@@ -22,18 +22,6 @@ function run(remoteAddress: string | undefined) {
   localOnly(req, res, next)
   return result
 }
-
-test('isLoopbackAddress()', async (t) => {
-  await t.test('recognises IPv4, IPv6 and IPv4-mapped loopback addresses', () => {
-    for (const address of ['127.0.0.1', '127.1.2.3', '::1', '::ffff:127.0.0.1']) assert.equal(isLoopbackAddress(address), true, address)
-  })
-
-  await t.test('rejects everything else', () => {
-    for (const address of ['192.168.1.20', '10.0.0.5', '::ffff:192.168.1.20', '8.8.8.8', '', undefined, '1127.0.0.1']) {
-      assert.equal(isLoopbackAddress(address), false, String(address))
-    }
-  })
-})
 
 test('localOnly middleware', async (t) => {
   await t.test('lets a request from this machine through', () => {

@@ -8,7 +8,9 @@ export class ApiError extends Error {
   }
 }
 
-async function request(url, options = {}) {
+// `partial`: the endpoint answers a save with some refused fields as INVALID_CONFIG plus the stored config and the list of refused fields,
+// which is a result to show and not a failure
+async function request(url, options = {}, { partial = false } = {}) {
   let response
 
   try {
@@ -33,7 +35,7 @@ async function request(url, options = {}) {
   }
 
   if (!response.ok) {
-    if (body?.code === 'INVALID_CONFIG' && body?.data) {
+    if (partial && body?.code === 'INVALID_CONFIG' && body?.data) {
       return body.data
     }
 
@@ -48,7 +50,7 @@ async function request(url, options = {}) {
 }
 
 const post = (url, body) => request(url, { method: 'POST', ...(body !== undefined && { body: JSON.stringify(body) }) })
-const put = (url, body) => request(url, { method: 'PUT', body: JSON.stringify(body) })
+const put = (url, body, flags) => request(url, { method: 'PUT', body: JSON.stringify(body) }, flags)
 const patch = (url, body) => request(url, { method: 'PATCH', body: JSON.stringify(body) })
 const del = (url) => request(url, { method: 'DELETE' })
 const id = encodeURIComponent
@@ -58,7 +60,7 @@ export const api = {
   updateSettings: (settings) => put('/api/settings', settings),
 
   getConfig: () => request('/api/config'),
-  updateConfig: (config) => put('/api/config', config),
+  updateConfig: (config) => put('/api/config', config, { partial: true }),
 
   getSecrets: () => request('/api/secrets'),
   updateSecrets: (secrets) => put('/api/secrets', secrets),
@@ -101,7 +103,6 @@ export const api = {
   createTwitchReward: (data) => post('/api/integrations/twitch/rewards', data),
   updateTwitchReward: (rewardId, data) => patch(`/api/integrations/twitch/rewards/${id(rewardId)}`, data),
   disconnectTwitch: () => post('/api/integrations/twitch/disconnect'),
-  refreshTwitch: () => post('/api/integrations/twitch/refresh'),
   getTwitchConfig: () => request('/api/integrations/twitch/config'),
-  updateTwitchConfig: (config) => put('/api/integrations/twitch/config', config)
+  updateTwitchConfig: (config) => put('/api/integrations/twitch/config', config, { partial: true })
 }

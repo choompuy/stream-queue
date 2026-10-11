@@ -1,14 +1,33 @@
 import { ActivityEntry, ActivityReasonCode, QueueItem } from './types.js'
-import { dataPath, createFileStore } from './persist.js'
+import { dataPath, createFileStore, loadList } from './persist.js'
 import { createLogger, describeError } from './logger.js'
+import { emit } from './state-events.js'
 
 const ACTIVITY_LIMIT = 100
 
 const store = createFileStore<ActivityEntry[]>(() => dataPath('activity.json'))
 
-// read from disk on first use, not when the module is imported
+const isNullableString = (value: unknown): boolean => value === null || typeof value === 'string'
+
+function isActivityEntry(value: unknown): value is ActivityEntry {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+
+  return (
+    typeof v.requestedBy === 'string' &&
+    typeof v.query === 'string' &&
+    isNullableString(v.title) &&
+    isNullableString(v.videoId) &&
+    typeof v.status === 'string' &&
+    isNullableString(v.reasonCode) &&
+    (v.reasonParams === undefined || (typeof v.reasonParams === 'object' && v.reasonParams !== null)) &&
+    Number.isFinite(v.at)
+  )
+}
+
+// read from disk on first use, not when the module is imported; a file that grew past the limit is cut to it
 let loaded: ActivityEntry[] | null = null
-const entries = (): ActivityEntry[] => (loaded ??= store.load([]))
+const entries = (): ActivityEntry[] => (loaded ??= loadList(store, isActivityEntry).slice(0, ACTIVITY_LIMIT))
 
 const log = createLogger('ACTIVITY')
 
@@ -26,6 +45,7 @@ export function logActivity(entry: Omit<ActivityEntry, 'at'>): void {
     list.length = ACTIVITY_LIMIT
   }
   save()
+  emit('activity')
 }
 
 export function getActivity(): ActivityEntry[] {
@@ -35,6 +55,7 @@ export function getActivity(): ActivityEntry[] {
 export function clearActivity(): void {
   entries().length = 0
   save()
+  emit('activity')
   log.log('cleared')
 }
 
@@ -46,6 +67,7 @@ export function logRejection(
   reasonCode: ActivityReasonCode,
   options: { title?: string | null; videoId?: string | null; reasonParams?: ReasonParams } = {}
 ): void {
+  log.log(`[REJECT] ${requestedBy} → ${reasonCode}`)
   logActivity({
     requestedBy,
     query,

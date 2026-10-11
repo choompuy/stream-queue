@@ -1,12 +1,10 @@
-import { CONFIG_FIELDS, dom } from './state.js'
+import { dom } from './dom.js'
 import { switchPageTab, switchSection } from './tabs.js'
 import { dispatchAction } from './actions.js'
 import { bindMenus } from './menu.js'
-import { search } from './search.js'
-import { addPlaylist } from './playlists.js'
-import { saveOverlaySettings, syncHideOverlayInfoAvailability, onIpChange, changeLocale, isConfigFieldChanged } from './settings.js'
+import { saveOverlaySettings, syncHideOverlayInfoAvailability, onIpChange, changeLocale } from './settings.js'
 import { onTwitchRewardChange, stopTwitchPolling, bindTwitchFieldTracking, bindTwitchRewardFormEvents } from './twitch/index.js'
-import { trackChanges } from './save-result.js'
+import { trackForm } from './form.js'
 import { setError } from '../shared.js'
 
 export function bindEvents() {
@@ -29,36 +27,24 @@ export function bindEvents() {
     if (actionElement) dispatchAction(actionElement, event)
   })
 
-  dom.searchInput?.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') search()
+  // Enter in a field presses the button that the field names in data-submit, so the key does what a click does
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && event.target.dataset?.submit) document.getElementById(event.target.dataset.submit).click()
   })
 
-  dom.playlistUrlInput?.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') addPlaylist()
-  })
-
-  dom.showVideo?.addEventListener('change', () => {
+  dom.showVideo.addEventListener('change', () => {
     syncHideOverlayInfoAvailability()
     saveOverlaySettings()
   })
-  dom.hideOverlayInfo?.addEventListener('change', saveOverlaySettings)
-  dom.overlayOpacity?.addEventListener('change', saveOverlaySettings)
-  dom.badgePosition?.addEventListener('change', saveOverlaySettings)
-  dom.selectIp?.addEventListener('change', onIpChange)
-  dom.twitchRewardSelect?.addEventListener('change', onTwitchRewardChange)
+  dom.hideOverlayInfo.addEventListener('change', saveOverlaySettings)
+  dom.overlayOpacity.addEventListener('change', saveOverlaySettings)
+  dom.badgePosition.addEventListener('change', saveOverlaySettings)
+  dom.selectIp.addEventListener('change', onIpChange)
+  dom.twitchRewardSelect.addEventListener('change', onTwitchRewardChange)
   window.addEventListener('pagehide', stopTwitchPolling)
-  dom.localeSelect?.addEventListener('change', (event) => changeLocale(event.target.value))
+  dom.localeSelect.addEventListener('change', (event) => changeLocale(event.target.value))
 
   const settingsInputs = [
-    dom.cfgMinViews,
-    dom.cfgMinDuration,
-    dom.cfgMaxDuration,
-    dom.cfgMaxQueue,
-    dom.cfgMaxPerUser,
-    dom.cfgContentMode,
-    dom.cfgRegionCode,
-    dom.cfgAllowShorts,
-    dom.cfgAllowLiveStreams,
     dom.secYoutubeKey,
     dom.showVideo,
     dom.hideOverlayInfo,
@@ -74,7 +60,7 @@ export function bindEvents() {
     }
   })
 
-  CONFIG_FIELDS.forEach((field) => trackChanges(dom[field.dom], () => isConfigFieldChanged(field)))
+  trackForm(dom.botSettingsPanel)
   bindTwitchFieldTracking()
   bindTwitchRewardFormEvents()
 }

@@ -1,4 +1,5 @@
 import { getSecrets } from '../secrets.js'
+import { describeError } from '../logger.js'
 import { getConfig } from '../config.js'
 import { Song, AppError, Config, FilterFailureReason } from '../types.js'
 import { VideoItem } from './types.js'
@@ -95,15 +96,10 @@ const FILTER_RULES: FilterRule[] = [
     message: 'this video is age-restricted'
   },
   {
-    reason: 'NOT_PLAYABLE',
-    check: (_s, v) => Boolean(v.status?.uploadStatus) && v.status!.uploadStatus !== 'processed',
-    message: 'this video is not playable'
-  },
-  {
     // a scheduled stream or a premiere has nothing to play yet, whatever the setting for live streams says
     reason: 'NOT_PLAYABLE',
-    check: (_s, v) => isUpcoming(v),
-    message: 'this video has not started yet'
+    check: (_s, v) => (Boolean(v.status?.uploadStatus) && v.status!.uploadStatus !== 'processed') || isUpcoming(v),
+    message: 'this video is not playable'
   },
   {
     reason: 'IS_LIVE',
@@ -158,7 +154,7 @@ export async function youtube<T>(path: string, params: Record<string, string>, {
       response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
     } catch (error) {
       if (attempt >= attempts) {
-        const message = `YouTube API is unreachable: ${error instanceof Error ? error.message : error}`
+        const message = `YouTube API is unreachable: ${describeError(error)}`
         // a timeout may have reached YouTube, anything else (DNS, no route, refused) did not
         throw isTimeout(error) ? new AppError('YOUTUBE_ERROR', message) : new RequestNotSentError('YOUTUBE_ERROR', message)
       }
@@ -245,4 +241,18 @@ export function throwFilterError(reason: FilterFailureReason, config: Config): n
   const rule = FILTER_RULES.find((r) => r.reason === reason)
   if (!rule) throw new AppError('YOUTUBE_ERROR', `no filter rule registered for reason: ${reason}`)
   throw new AppError(reason, rule.message, rule.params?.(config))
+}
+
+const BATCH_SIZE = 50
+
+export async function fetchVideos(ids: string[]): Promise<VideoItem[]> {
+  const found = new Map<string, VideoItem>()
+
+  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+    const { items } = await youtube<{ items?: VideoItem[] }>('videos', { part: VIDEO_DETAILS_PART, id: ids.slice(i, i + BATCH_SIZE).join(',') })
+    for (const video of items ?? []) found.set(video.id, video)
+  }
+
+  // videos.list answers in no guaranteed order: the caller's order (search relevance, playlist position) is kept
+  return ids.flatMap((id) => found.get(id) ?? [])
 }

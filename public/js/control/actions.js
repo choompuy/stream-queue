@@ -1,4 +1,5 @@
-import { log } from './state.js'
+import { t } from '../i18n.js'
+import { log } from './log.js'
 import { playerActions } from './player-actions.js'
 import { searchActions } from './search.js'
 import { queueActions } from './queue.js'
@@ -36,6 +37,8 @@ export const ACTIONS = createActionRegistry(
   menuActions
 )
 
+// Every button of the panel goes through here, so what all of them share is done once:
+// a button with data-confirm asks first, and a button whose action takes time stays disabled until the action is over
 export function dispatchAction(element, event) {
   const name = element.dataset.action
   const handler = ACTIONS[name]
@@ -45,5 +48,17 @@ export function dispatchAction(element, event) {
     return undefined
   }
 
-  return handler(element, event)
+  if (element.dataset.confirm && !confirm(t(element.dataset.confirm))) return undefined
+
+  const result = handler(element, event)
+
+  if (typeof result?.then === 'function' && 'disabled' in element) {
+    element.disabled = true
+    const enable = () => {
+      element.disabled = false
+    }
+    result.then(enable, enable)
+  }
+
+  return result
 }

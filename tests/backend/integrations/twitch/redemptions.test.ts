@@ -109,11 +109,6 @@ test('cancelRedemption()', async (t) => {
     assert.equal(calls.length, 3)
     assert.deepEqual(sent, [refundFailed()])
   })
-
-  await t.test('without a Twitch client the refund is reported as failed', async () => {
-    await _test.cancelRedemption(redemption, null, reason)
-    assert.deepEqual(sent, [refundFailed()])
-  })
 })
 
 test('fulfillRedemption()', async (t) => {

@@ -7,7 +7,7 @@ import { join } from 'node:path'
 // data/ and cache/ are read relative to the working directory: keep the test away from the real ones
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
-const { registerRedemptionHandler, registerClosedChangeListener, restoreClosedRedemptions, getClosedRedemptionIds } = await import('../../src/finish.js')
+const { registerRedemptionHandler } = await import('../../src/finish.js')
 const { getActivity, clearActivity } = await import('../../src/activity.js')
 const queue = await import('../../src/queue.js')
 const player = await import('../../src/player.js')
@@ -46,18 +46,20 @@ function reset(): void {
   run++
 }
 
-const add = (videoId: string, id: string) => queue.addSong(song(videoId), `user-${id}`, { channelPointsRedemption: redemption(id) })
+const add = (videoId: string, id: string) => queue.addSong(song(videoId), `user-${id}`, { channelPointsRedemption: redemption(id) }).item
 
 test('a Channel Points redemption is closed by the way its track leaves', async (t) => {
   t.beforeEach(reset)
 
   await t.test('removing it from the queue refunds the points', () => {
+    queue.setCurrent({ ...song(D), requestedBy: 'someone' })
     add(A, 'r1')
     queue.removeByVideoId(A)
     assert.deepEqual(outcomes, [`${tag('r1')}:CANCELED/TRACK_REMOVED`])
   })
 
   await t.test('clearing the queue refunds every redemption in it', () => {
+    queue.setCurrent({ ...song(D), requestedBy: 'someone' })
     add(A, 'r1')
     add(B, 'r2')
     queue.clearQueue()
@@ -114,6 +116,7 @@ test('a Channel Points redemption is closed by the way its track leaves', async 
   })
 
   await t.test('a track without a redemption is ignored', () => {
+    queue.setCurrent({ ...song(D), requestedBy: 'someone' })
     queue.addSong(song(A), 'chatter')
     queue.removeByVideoId(A)
     assert.deepEqual(outcomes, [])
@@ -138,6 +141,7 @@ test('removeByVideoId()', async (t) => {
   })
 
   await t.test('an id that is not in the queue removes nothing', () => {
+    queue.setCurrent({ ...song(D), requestedBy: 'someone' })
     add(A, 'r1')
     assert.equal(queue.removeByVideoId(B), null)
     assert.equal(queue.getQueue().length, 1)
@@ -190,42 +194,5 @@ test('detachChannelPointsRedemptions()', async (t) => {
   await t.test('returns 0 and changes nothing when there is nothing to forget', () => {
     queue.hydrateQueue({ queue: [{ ...song(B), requestedBy: 'u2' }] })
     assert.equal(queue.detachChannelPointsRedemptions(), 0)
-  })
-})
-
-test('closed redemptions across a restart', async (t) => {
-  t.beforeEach(reset)
-
-  await t.test('a restored track whose redemption was already closed does not close it again', () => {
-    restoreClosedRedemptions([tag('old1')])
-    queue.setCurrent({ ...song(A), requestedBy: 'viewer', channelPointsRedemption: redemption('old1') })
-
-    player.endCurrent(A)
-
-    assert.deepEqual(outcomes, [])
-  })
-
-  await t.test('the closed ids are available to be saved, and the listener hears every closing', () => {
-    let heard = 0
-    registerClosedChangeListener(() => void heard++)
-
-    queue.setCurrent({ ...song(A), requestedBy: 'viewer', channelPointsRedemption: redemption('r9') })
-    player.endCurrent(A)
-
-    assert.equal(heard, 1)
-    assert.ok(getClosedRedemptionIds().includes(tag('r9')))
-    registerClosedChangeListener(null)
-  })
-
-  await t.test('a failing listener does not stop the redemption from being closed', () => {
-    registerClosedChangeListener(() => {
-      throw new Error('disk full')
-    })
-
-    queue.setCurrent({ ...song(A), requestedBy: 'viewer', channelPointsRedemption: redemption('r10') })
-    player.endCurrent(A)
-
-    assert.deepEqual(outcomes, [`${tag('r10')}:FULFILLED`])
-    registerClosedChangeListener(null)
   })
 })

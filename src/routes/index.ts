@@ -12,6 +12,7 @@ import { router as playerRouter } from './player.js'
 import { router as fallbackRouter } from './fallback.js'
 import { router as chatRouter } from './chat.js'
 import { router as twitchRouter } from './twitch.js'
+import { handleEvents } from '../sse.js'
 
 const log = createLogger('API')
 
@@ -19,6 +20,8 @@ export const apiRouter = express.Router()
 
 apiRouter.use(systemRouter)
 apiRouter.use(settingsRouter)
+
+apiRouter.get('/events', handleEvents)
 
 apiRouter.use('/playlists', playlistsRouter)
 apiRouter.use('/blocklist', blocklistRouter)

@@ -3,12 +3,17 @@ import { t } from '../../i18n.js'
 import { api, ApiError } from '../api.js'
 import { run } from '../run.js'
 import { toastInfo } from '../toast.js'
-import { state, dom, log } from '../state.js'
+import { state } from '../state.js'
+import { dom } from '../dom.js'
+import { log } from '../log.js'
 import { loadTwitchRewards, renderTwitchRewards } from './twitch-rewards.js'
 
 const POLL_INTERVAL_MS = 2000
 
-const UNHEALTHY_POLLS_BEFORE_WARNING = 2
+// A connection that is down for a moment (a reconnect takes seconds) is not worth a red warning: it is shown only if it stays down
+const OFFLINE_WARNING_DELAY_MS = 6000
+
+let offlineTimer = null
 
 let pollController = null
 
@@ -66,13 +71,33 @@ function isUnhealthy(health) {
   return Boolean(health) && (health.auth === 'reauthorize' || !health.eventSub || !health.chat)
 }
 
+// A refused login ('reauthorize') is shown at once, a connection that is down only after it stayed down for a while
+function trackHealth(health) {
+  state.twitch.health = health ?? null
+
+  const down = isUnhealthy(state.twitch.health) && state.twitch.health.auth !== 'reauthorize'
+  if (!down) {
+    clearTimeout(offlineTimer)
+    offlineTimer = null
+    state.twitch.offlineWarning = false
+    return
+  }
+
+  if (state.twitch.offlineWarning || offlineTimer) return
+
+  offlineTimer = setTimeout(() => {
+    offlineTimer = null
+    state.twitch.offlineWarning = true
+    renderTwitchHealth(Boolean(state.twitch.connected && state.twitch.user))
+  }, OFFLINE_WARNING_DELAY_MS)
+}
+
 // no status -> disconnected
 function applyStatus(status) {
   state.twitch.connected = Boolean(status?.connected)
   state.twitch.user = status?.user ?? null
   state.twitch.connectedAt = status?.connectedAt ?? null
-  state.twitch.health = status?.health ?? null
-  state.twitch.unhealthyPolls = isUnhealthy(state.twitch.health) ? 1 : 0
+  trackHealth(status?.health)
 }
 
 export function refreshTwitchHealth() {
@@ -89,8 +114,7 @@ export function refreshTwitchHealth() {
         return
       }
 
-      state.twitch.health = status.health ?? null
-      state.twitch.unhealthyPolls = isUnhealthy(state.twitch.health) ? state.twitch.unhealthyPolls + 1 : 0
+      trackHealth(status.health)
       renderTwitchHealth(true)
     },
     { silent: true }
@@ -148,14 +172,11 @@ export function connectTwitch() {
         if (!navigated) authWindow?.close()
         if (pollController === controller) pollController = null
       }
-    },
-    { button: dom.twitchConnectBtn }
+    }
   )
 }
 
 export function disconnectTwitch() {
-  if (!confirm(t('settings.twitch.disconnectConfirm'))) return
-
   return run('disconnecting Twitch', async () => {
     stopTwitchPolling()
     const result = await api.disconnectTwitch()
@@ -201,7 +222,7 @@ function renderTwitchHealth(isConnected) {
 
   if (isConnected && health) {
     if (health.auth === 'reauthorize') key = 'settings.twitch.healthReauthorize'
-    else if (isUnhealthy(health) && state.twitch.unhealthyPolls >= UNHEALTHY_POLLS_BEFORE_WARNING) key = 'settings.twitch.healthOffline'
+    else if (state.twitch.offlineWarning) key = 'settings.twitch.healthOffline'
   }
 
   setText(dom.twitchHealthWarning, key ? t(key) : '')
@@ -228,12 +249,10 @@ export function renderTwitchConnection() {
   setText(dom.twitchChanelName, isConnected ? '@' + user.displayName : t('settings.twitch.notConnected'))
   setClass(dom.twitchChanelName, 'text-green', isConnected)
   setClass(dom.twitchChanelName, 'text-red', !isConnected)
-  if (dom.twitchChanelImg) {
-    const avatar = isConnected ? user.profileImageUrl : ''
-    if (avatar) dom.twitchChanelImg.src = avatar
-    else dom.twitchChanelImg.removeAttribute('src')
-    show(dom.twitchChanelImg, Boolean(avatar))
-  }
+  const avatar = isConnected ? user.profileImageUrl : ''
+  if (avatar) dom.twitchChanelImg.src = avatar
+  else dom.twitchChanelImg.removeAttribute('src')
+  show(dom.twitchChanelImg, Boolean(avatar))
 
   show(dom.twitchConnectBtn, !isConnected)
   show(dom.twitchDisconnectBtn, isConnected)

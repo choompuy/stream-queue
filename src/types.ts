@@ -63,8 +63,8 @@ export type Song = {
 export type QueueItem = Song & {
   requestedBy: string
   isFallback?: boolean
-  // set only when the song was added via a Twitch Channel Points redemption; carries what
-  // cancelRedemption() needs to refund the points and notify the requester in chat
+  // set only when the song was added via a Twitch Channel Points redemption, and removed once the redemption is closed;
+  // carries what finishItem() needs to fulfill or refund the points and notify the requester in chat
   channelPointsRedemption?: { id: string; rewardId: string; userName: string }
 }
 
@@ -72,28 +72,6 @@ export type PlayerState = {
   current: QueueItem | null
   queue: QueueItem[]
   isPaused: boolean
-}
-
-type SearchCacheEntry = {
-  results: Song[]
-  expiresAt: number
-  filtersVersion: string
-}
-
-type VideoCacheEntry = {
-  song: Song | null
-  reason: FilterFailureReason | null
-  expiresAt: number
-  filtersVersion: string
-}
-
-export type CacheFile = {
-  searches: Record<string, SearchCacheEntry>
-  videos: Record<string, VideoCacheEntry>
-  quota: {
-    date: string
-    searches: number
-  }
 }
 
 export type ApiError = { success: false; error: string; code: string; params?: Record<string, string | number> }
@@ -133,7 +111,6 @@ export type FailureReason = { code: ActivityReasonCode; params?: Record<string, 
 
 export type ApiErrorCode =
   | ActivityReasonCode
-  | AppErrorCode
   | 'INVALID_QUERY'
   | 'INVALID_VIDEO_ID'
   | 'USERNAME_REQUIRED'
@@ -149,7 +126,6 @@ export type ApiErrorCode =
   | 'PAYLOAD_TOO_LARGE'
   | 'INVALID_REQUEST'
   | 'SERVER_ERROR'
-  | 'RATE_LIMITED'
 
 export class AppError extends Error {
   constructor(

@@ -346,12 +346,6 @@ button:disabled {
   letter-spacing: 1px;
 }
 
-.panel-body {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
 .section-tabs {
   display: flex;
   padding-inline: 1rem;
@@ -689,15 +683,6 @@ button:disabled {
   margin-block: auto;
 }
 
-.settings-input.error {
-  border-color: var(--accent-red);
-  background-color: var(--accent-red-bg);
-}
-
-.settings-input.error:focus {
-  border-color: var(--accent-red);
-}
-
 .settings-input.changed,
 .settings-input.changed:focus {
   border-color: var(--accent-yellow);
@@ -708,6 +693,12 @@ button:disabled {
 .settings-input.saved:focus {
   border-color: var(--accent-green);
   background-color: var(--accent-green-bg);
+}
+
+.settings-input.error,
+.settings-input.error:focus {
+  border-color: var(--accent-red);
+  background-color: var(--accent-red-bg);
 }
 
 .settings-input-short {
@@ -734,8 +725,7 @@ button:disabled {
   gap: 0.5rem;
 }
 
-.field-row .start,
-.field-row .end {
+.field-row .start {
   display: inline-flex;
   align-items: center;
   min-width: 0;

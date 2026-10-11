@@ -1,5 +1,7 @@
 import { api } from './api.js'
-import { state, dom, selectors, renderStats } from './state.js'
+import { state, selectors } from './state.js'
+import { dom } from './dom.js'
+import { renderStats } from './stats.js'
 import { views } from './views/index.js'
 import { run } from './run.js'
 import { renderCurrent, renderNext, renderPlayPause, syncPlayer } from './player.js'
@@ -21,9 +23,9 @@ export function refreshState(silent = false) {
 
       const trackChanged = state.current?.videoId !== nextState.current?.videoId
       state.current = nextState.current
-      state.queue = nextState.queue ?? []
-      state.isPaused = Boolean(nextState.isPaused)
-      state.nextTrack = nextState.nextTrack ?? null
+      state.queue = nextState.queue
+      state.isPaused = nextState.isPaused
+      state.nextTrack = nextState.nextTrack
       renderState()
 
       if (trackChanged) await refreshFallbackState(silent)
@@ -58,15 +60,12 @@ export function removeFromQueue(videoId) {
 }
 
 export async function clearQueue() {
-  if (!confirm(t('queue.clearConfirm'))) return
-
   await run(
     'clearing queue',
     async () => {
       await api.clearQueue()
       await refreshState()
-    },
-    { button: dom.clearQueueBtn }
+    }
   )
 }
 

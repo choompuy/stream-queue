@@ -7,6 +7,10 @@
     <link rel="stylesheet" href="css/app.css" media="print" onload="this.media = 'all'" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <title>StreamQueue - Control Panel</title>
+    <meta
+      name="description"
+      content="Self-hosted YouTube song request queue for streamers. Manage song requests, playlists, playback and a fallback playlist from a simple web control panel"
+    />
   </head>
   <body>
     <header class="box-shadow">
@@ -136,6 +140,7 @@
               class="input"
               type="search"
               id="searchInput"
+              data-submit="searchBtn"
               aria-label="YouTube URL or search"
               data-i18n-aria-label="search.label"
               placeholder="YouTube URL or search..."
@@ -187,7 +192,7 @@
           <div class="section-tab section-tab-queue" data-section="queue">
             <div class="section-tab-header">
               <h2><span data-i18n="queue.title">Queue</span> <span class="text-sm text-secondary" id="queueCount">0/0</span></h2>
-              <button type="button" id="clearQueueBtn" class="btn btn-secondary btn-danger" data-action="clear-queue" data-i18n-title="queue.clear">
+              <button type="button" id="clearQueueBtn" class="btn btn-secondary btn-danger" data-action="clear-queue" data-confirm="queue.clearConfirm" data-i18n-title="queue.clear">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                   <path
                     stroke="currentColor"
@@ -291,7 +296,7 @@
             </div>
             <div class="row-list-wrapper" id="fallbackListWrapper" data-list="fallback">
               <div class="row-list"></div>
-              <div class="empty" data-i18n="fallback.empty">Fallback is empty</div>
+              <div class="empty" data-i18n="fallback.empty">Playlist is empty</div>
             </div>
           </div>
 
@@ -304,6 +309,7 @@
                   id="clearActivityBtn"
                   class="btn btn-secondary btn-danger"
                   data-action="clear-activity"
+                  data-confirm="activity.clearConfirm"
                   data-i18n-title="activity.clear"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
@@ -346,6 +352,7 @@
           <div class="row">
             <input
               id="playlistUrlInput"
+              data-submit="playlistAddBtn"
               aria-label="Playlist URL or ID"
               data-i18n-aria-label="playlists.urlLabel"
               class="input"
@@ -362,7 +369,7 @@
             <div class="empty">
               <div data-i18n="playlists.empty.title">No saved playlists yet</div>
               <div class="text-sm text-muted" data-i18n="playlists.empty.description">
-                Add a YouTube playlist above, then activate it to use as your fallback rotation.
+                Add a YouTube playlist above, then activate it to use as your fallback rotation
               </div>
             </div>
           </div>
@@ -468,7 +475,7 @@
             </div>
           </div>
 
-          <div class="section-tab panel">
+          <div id="botSettingsPanel" class="section-tab panel">
             <div class="section-tab-header">
               <h2 data-i18n="settings.bot.title">Bot Settings</h2>
             </div>
@@ -491,41 +498,41 @@
             <div class="settings-section-column">
               <label class="field">
                 <span class="field-label" data-i18n="settings.bot.limits.minViews">Min views</span>
-                <input class="settings-input input" type="number" id="cfgMinViews" min="0" />
+                <input class="settings-input input" type="number" id="cfgMinViews" name="minViews" min="0" />
               </label>
               <label class="field">
                 <span class="field-label" data-i18n="settings.bot.limits.minDuration">Min duration (sec)</span>
-                <input class="settings-input input" type="number" id="cfgMinDuration" min="0" />
+                <input class="settings-input input" type="number" id="cfgMinDuration" name="minDurationSeconds" min="0" />
               </label>
               <label class="field">
                 <span class="field-label" data-i18n="settings.bot.limits.maxDuration">Max duration (sec)</span>
-                <input class="settings-input input" type="number" id="cfgMaxDuration" min="0" />
+                <input class="settings-input input" type="number" id="cfgMaxDuration" name="maxDurationSeconds" min="0" />
               </label>
 
               <label class="field">
                 <span class="field-label" data-i18n="settings.bot.limits.maxQueue">Max queue size</span>
-                <input class="settings-input input" type="number" id="cfgMaxQueue" min="1" />
+                <input class="settings-input input" type="number" id="cfgMaxQueue" name="maxQueueSize" min="1" />
               </label>
               <label class="field">
                 <span class="field-label" data-i18n="settings.bot.limits.maxPerUser">Max requests per user</span>
-                <input class="settings-input input" type="number" id="cfgMaxPerUser" min="0" />
+                <input class="settings-input input" type="number" id="cfgMaxPerUser" name="maxRequestsPerUser" min="0" />
               </label>
             </div>
 
             <div class="settings-section">
               <label class="field-row">
                 <span class="field-label" data-i18n="settings.bot.limits.allowShorts">Shorts</span>
-                <input class="settings-input checkbox" type="checkbox" id="cfgAllowShorts" />
+                <input class="settings-input checkbox" type="checkbox" id="cfgAllowShorts" name="allowShorts" />
               </label>
 
               <label class="field-row">
-                <span class="field-label" data-i18n="settings.bot.limits.allowLiveStreams">Live Streams</span>
-                <input class="settings-input checkbox" type="checkbox" id="cfgAllowLiveStreams" />
+                <span class="field-label" data-i18n="settings.bot.limits.allowLiveStreams">Live streams</span>
+                <input class="settings-input checkbox" type="checkbox" id="cfgAllowLiveStreams" name="allowLiveStreams" />
               </label>
 
               <label class="field">
                 <span class="field-label" data-i18n="settings.bot.limits.contentMode">Content</span>
-                <select class="settings-input input" id="cfgContentMode">
+                <select class="settings-input input" id="cfgContentMode" name="contentMode">
                   <option value="music" data-i18n="settings.bot.limits.contentModeMusic">Music only</option>
                   <option value="any" data-i18n="settings.bot.limits.contentModeAny">Any video</option>
                 </select>
@@ -539,14 +546,14 @@
                 <input
                   class="settings-input settings-input-short input"
                   type="text"
-                  id="cfgRegionCode"
+                  id="cfgRegionCode" name="regionCode"
                   maxlength="2"
                   placeholder="US"
                   style="text-transform: uppercase"
                 />
                 <span class="text-muted text-xs" data-i18n="settings.bot.regionCodeNote">
                   Two-letter country code (ISO 3166-1, e.g. US, RU, DE). Tracks not licensed for this region are skipped instead of being queued.
-                  Leave empty to disable.
+                  Leave empty to disable
                 </span>
               </label>
             </div>
@@ -564,11 +571,12 @@
 
             <div class="settings-section">
               <span id="twitchNotConfigured" class="text-muted text-xs hidden" data-i18n="settings.twitch.clientCredentialsNote">
-                Create an application in the Twitch Developer Console to get your Client ID and Client Secret
+                No Twitch Client ID found. Create an application of type Public in the Twitch Developer Console, put its Client ID into the .env file
+                next to the app as TWITCH_CLIENT_ID=..., and restart the app. A secret is not needed
               </span>
 
               <div id="twitchChannelField" class="field">
-                <span class="field-label" data-i18n="settings.twitch.chanel">Not connected</span>
+                <span class="field-label" data-i18n="settings.twitch.chanel">Twitch channel</span>
                 <div class="field-row">
                   <div class="start">
                     <img id="twitchChanelImg" class="thumbnail hidden" alt="User avatar" />
@@ -591,6 +599,7 @@
                       id="twitchDisconnectBtn"
                       class="btn btn-secondary btn-danger hidden"
                       data-action="disconnect-twitch"
+                      data-confirm="settings.twitch.disconnectConfirm"
                       data-i18n="settings.twitch.disconnect"
                     >
                       Disconnect
@@ -705,32 +714,32 @@
               <label class="field" for="chatCmdNowCommand" data-chat-command="now">
                 <span class="field-label" data-i18n="settings.twitchChat.commands.now">Now playing</span>
                 <div class="field-row">
-                  <input class="settings-input input" type="text" id="chatCmdNowCommand" placeholder="!sg now" />
-                  <select class="settings-input input" id="chatCmdNowPermission">
+                  <input class="settings-input input" type="text" id="chatCmdNowCommand" name="chatCommands.now.command" placeholder="!sg now" />
+                  <select class="settings-input input" id="chatCmdNowPermission" name="chatCommands.now.permission">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <input class="settings-input checkbox" type="checkbox" id="chatCmdNowEnabled" />
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdNowEnabled" name="chatCommands.now.enabled" />
                 </div>
               </label>
 
               <label class="field" for="chatCmdQueueCommand" data-chat-command="queue">
                 <span class="field-label" data-i18n="settings.twitchChat.commands.queue">Queue</span>
                 <div class="field-row">
-                  <input class="settings-input input" type="text" id="chatCmdQueueCommand" placeholder="!sg queue" />
-                  <select class="settings-input input" id="chatCmdQueuePermission">
+                  <input class="settings-input input" type="text" id="chatCmdQueueCommand" name="chatCommands.queue.command" placeholder="!sg queue" />
+                  <select class="settings-input input" id="chatCmdQueuePermission" name="chatCommands.queue.permission">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <input class="settings-input checkbox" type="checkbox" id="chatCmdQueueEnabled" />
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdQueueEnabled" name="chatCommands.queue.enabled" />
                 </div>
               </label>
 
               <label class="field" for="chatCmdPlainCooldown">
                 <span class="field-label" data-i18n="settings.twitchChat.plainCooldown">Queue command cooldown (seconds)</span>
-                <input class="settings-input settings-input-short input" type="number" id="chatCmdPlainCooldown" min="0" />
+                <input class="settings-input settings-input-short input" type="number" id="chatCmdPlainCooldown" name="chatCommands.plainCooldownSeconds" min="0" />
                 <div class="text-muted text-xs" data-i18n="settings.twitchChat.plainCooldownNote">
                   Applies to "now"/"queue" commands to prevent spam.
                 </div>
@@ -741,45 +750,45 @@
               <label class="field" for="chatCmdSkipCommand" data-chat-command="skip">
                 <span class="field-label" data-i18n="settings.twitchChat.commands.skip">Skip track</span>
                 <div class="field-row">
-                  <input class="settings-input input" type="text" id="chatCmdSkipCommand" placeholder="!sg skip" />
-                  <select class="settings-input input" id="chatCmdSkipPermission">
+                  <input class="settings-input input" type="text" id="chatCmdSkipCommand" name="chatCommands.skip.command" placeholder="!sg skip" />
+                  <select class="settings-input input" id="chatCmdSkipPermission" name="chatCommands.skip.permission">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <input class="settings-input checkbox" type="checkbox" id="chatCmdSkipEnabled" />
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdSkipEnabled" name="chatCommands.skip.enabled" />
                 </div>
               </label>
 
               <label class="field" for="chatCmdPauseCommand" data-chat-command="pause">
                 <span class="field-label" data-i18n="settings.twitchChat.commands.pause">Pause</span>
                 <div class="field-row">
-                  <input class="settings-input input" type="text" id="chatCmdPauseCommand" placeholder="!sg pause" />
-                  <select class="settings-input input" id="chatCmdPausePermission">
+                  <input class="settings-input input" type="text" id="chatCmdPauseCommand" name="chatCommands.pause.command" placeholder="!sg pause" />
+                  <select class="settings-input input" id="chatCmdPausePermission" name="chatCommands.pause.permission">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <input class="settings-input checkbox" type="checkbox" id="chatCmdPauseEnabled" />
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdPauseEnabled" name="chatCommands.pause.enabled" />
                 </div>
               </label>
 
               <label class="field" for="chatCmdResumeCommand" data-chat-command="resume">
                 <span class="field-label" data-i18n="settings.twitchChat.commands.resume">Resume</span>
                 <div class="field-row">
-                  <input class="settings-input input" type="text" id="chatCmdResumeCommand" placeholder="!sg resume" />
-                  <select class="settings-input input" id="chatCmdResumePermission">
+                  <input class="settings-input input" type="text" id="chatCmdResumeCommand" name="chatCommands.resume.command" placeholder="!sg resume" />
+                  <select class="settings-input input" id="chatCmdResumePermission" name="chatCommands.resume.permission">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <input class="settings-input checkbox" type="checkbox" id="chatCmdResumeEnabled" />
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdResumeEnabled" name="chatCommands.resume.enabled" />
                 </div>
               </label>
 
               <label class="field" for="chatCmdCooldown">
                 <span class="field-label" data-i18n="settings.twitchChat.cooldown">Control command cooldown (seconds)</span>
-                <input class="settings-input settings-input-short input" type="number" id="chatCmdCooldown" min="0" />
+                <input class="settings-input settings-input-short input" type="number" id="chatCmdCooldown" name="chatCommands.controlCooldownSeconds" min="0" />
                 <div class="text-muted text-xs" data-i18n="settings.twitchChat.cooldownNote">
                   Applies only to skip/pause/resume - a shared cooldown so two moderators can't trigger the same action back to back.
                 </div>
@@ -828,8 +837,8 @@
       </section>
     </main>
 
-    <div id="toastContainer" class="toast-container"></div>
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
-    <script type="module" src="js/control/index.js"></script>
+    <script type="module" src="js/control/main.js"></script>
   </body>
 </html>

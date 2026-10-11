@@ -1,16 +1,5 @@
 import { getCurrentLocale } from '../i18n.js'
 
-export function withLoading(button, action) {
-  if (!button) return action()
-
-  button.disabled = true
-  return Promise.resolve()
-    .then(action)
-    .finally(() => {
-      button.disabled = false
-    })
-}
-
 export function formatDateTime(timestamp, joiner = ', ') {
   if (!timestamp) return '-'
 
@@ -23,7 +12,6 @@ export function formatDateTime(timestamp, joiner = ', ') {
 }
 
 export function toggleActive(element, isActive) {
-  if (!element) return
   if (isActive) {
     element.classList.add('active')
   } else {

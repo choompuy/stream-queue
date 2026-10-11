@@ -12,6 +12,8 @@ export type TwitchOAuthOptions = {
   clientId: string
   scopes?: string[]
   onTokenUpdated?: (tokenData: TwitchTokenData) => void
+  // the saved login was refused by Twitch, or works again
+  onAuthStateChange?: () => void
 }
 
 export type TwitchDeviceCodeResponse = {
@@ -44,7 +46,7 @@ export type TwitchUsersResponse = {
   }>
 }
 
-export type TwitchRedemptionStatus = 'UNFULFILLED' | 'FULFILLED' | 'CANCELED'
+type TwitchRedemptionStatus = 'UNFULFILLED' | 'FULFILLED' | 'CANCELED'
 export type TwitchRedemptionUpdateStatus = 'FULFILLED' | 'CANCELED'
 
 export type TwitchChannelPointsRedemption = {
@@ -64,10 +66,6 @@ export type TwitchChannelPointsRedemption = {
     cost: number
     prompt: string
   }
-}
-
-export type TwitchRedemptionsResponse = {
-  data: TwitchChannelPointsRedemption[]
 }
 
 export type TwitchCustomReward = {
@@ -116,10 +114,6 @@ export type TwitchUpdateCustomReward = {
   global_cooldown_seconds?: number
 }
 
-export type TwitchCreateCustomRewardResponse = {
-  data: TwitchCustomReward[]
-}
-
 export type TwitchCustomRewardsResponse = {
   data: TwitchCustomReward[]
 }
@@ -165,7 +159,7 @@ export type TwitchChatCommandConfig = {
   permission: TwitchChatPermission
 }
 
-export type TwitchChatCommandsConfig = {
+type TwitchChatCommandsConfig = {
   now: TwitchChatCommandConfig
   queue: TwitchChatCommandConfig
   skip: TwitchChatCommandConfig

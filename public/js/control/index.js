@@ -1,10 +1,12 @@
 import { api } from './api.js'
-import { dom, log } from './state.js'
+import { dom } from './dom.js'
+import { log } from './log.js'
 import { initI18n } from '../i18n.js'
 import './player.js'
 import { run } from './run.js'
 import { bindEvents } from './events.js'
 import { createPoller } from './polling.js'
+import { connectEvents, serialized } from '../sse.js'
 import { refreshState } from './queue.js'
 import { refreshFallbackState } from './fallback.js'
 import { loadActivity } from './activity.js'
@@ -15,21 +17,33 @@ import { loadTwitchSettings, loadTwitchConfig, loadTwitchSecrets, refreshTwitchH
 import { isDashboardActive } from './tabs.js'
 import { setError } from '../shared.js'
 
-const POLLING = [
-  { run: () => refreshState(true), every: 2000 },
-  { run: () => refreshFallbackState(true), every: 30000 },
-  { run: () => loadActivity(true), every: 5000 }
-]
+// What each topic reads again. Only what the person looks at is read: the rest is read when it is shown again
+const TOPICS = {
+  state: { read: () => refreshState(true), isShown: isDashboardActive },
+  activity: { read: () => loadActivity(true), isShown: isDashboardActive },
+  fallback: { read: () => refreshFallbackState(true), isShown: isDashboardActive },
+  twitch: { read: () => refreshTwitchHealth(), isShown: () => document.visibilityState === 'visible' }
+}
 
-async function init() {
+// one at a time per topic: a late answer must not overwrite a newer one
+for (const topic of Object.values(TOPICS)) topic.read = serialized(topic.read)
+
+const refreshTopic = (name) => (TOPICS[name].isShown() ? TOPICS[name].read() : undefined)
+
+// the net under the events: while they are down the panel polls, slowly, as it used to
+const SAFETY_POLL_MS = 10000
+
+/**
+ * Starts the control panel on the page that is open. Nothing runs on import, so the panel can be started by a test.
+ * Returns `stop`, which closes the events and the safety net.
+ */
+export async function startControlPanel() {
   const settings = await run('fetching settings', () => api.getSettings(), { silent: true })
   const locale = settings?.locale
 
   await initI18n(locale)
-  if (dom.localeSelect) {
-    setError(dom.localeSelect, false)
-    dom.localeSelect.value = locale ?? dom.localeSelect.value
-  }
+  setError(dom.localeSelect, false)
+  dom.localeSelect.value = locale ?? dom.localeSelect.value
 
   bindEvents()
 
@@ -41,18 +55,34 @@ async function init() {
   await loadTwitchConfig()
   await Promise.allSettled([loadActivity(), loadBlocklist(), loadPlaylists(), refreshState(), refreshFallbackState()])
 
-  const poller = createPoller(POLLING, { shouldRun: isDashboardActive })
-  poller.start()
+  const safetyNet = createPoller(
+    Object.keys(TOPICS).map((name) => ({ run: () => refreshTopic(name), every: SAFETY_POLL_MS }))
+  )
 
-  const twitchPoller = createPoller([{ run: refreshTwitchHealth, every: 4000 }], { shouldRun: () => document.visibilityState === 'visible' })
-  twitchPoller.start()
-
-  window.addEventListener('pagehide', () => {
-    poller.stop()
-    twitchPoller.stop()
+  const events = connectEvents({
+    topics: Object.keys(TOPICS),
+    onChange: refreshTopic,
+    onStatus: (status) => {
+      if (status === 'down') safetyNet.start()
+      else safetyNet.stop()
+    }
   })
 
-  log('Control panel initialized')
-}
+  // a tab hidden for a while heard nothing (the browser may even have paused it): read the status again when it is back
+  const onVisibilityChange = () => {
+    if (document.visibilityState === 'visible') refreshTopic('twitch')
+  }
+  document.addEventListener('visibilitychange', onVisibilityChange)
 
-init()
+  const stop = () => {
+    events.close()
+    safetyNet.stop()
+    document.removeEventListener('visibilitychange', onVisibilityChange)
+    window.removeEventListener('pagehide', stop)
+  }
+  window.addEventListener('pagehide', stop)
+
+  log('Control panel initialized')
+
+  return { stop }
+}

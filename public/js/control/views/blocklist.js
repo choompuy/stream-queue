@@ -1,5 +1,5 @@
 import { youtubeThumbnail } from '../../shared.js'
-import { dom } from '../state.js'
+import { dom } from '../dom.js'
 import { formatDateTime } from '../ui.js'
 import { createListView, row, unblockTrackItem } from './primitives.js'
 

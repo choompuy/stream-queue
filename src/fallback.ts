@@ -1,8 +1,8 @@
 import { getConfig, updateConfig } from './config.js'
 import { fetchPlaylistSongs } from './youtube/index.js'
-import { Song, QueueItem, Config, FallbackPlaylist, FallbackStateResponse, AppError } from './types.js'
+import { Song, QueueItem, FallbackPlaylist, FallbackStateResponse, AppError } from './types.js'
 import { addSong, getCurrent, setCurrent } from './queue.js'
-import { notifyStateChange } from './state-events.js'
+import { emit } from './state-events.js'
 import { isBlocked } from './blocklist.js'
 import { createLogger } from './logger.js'
 
@@ -80,60 +80,39 @@ function toFallbackQueueItem(song: Song): QueueItem {
   }
 }
 
-function computeNextIndex(config: Config, cursor: number): number | null {
-  if (!config.fallbackPlaylist.enabled || !fallbackOrder.length) return null
+function findNext(): { index: number; song: Song } | null {
+  const { enabled, repeat } = getConfig().fallbackPlaylist
+  const total = fallbackOrder.length
+  if (!enabled) return null
 
-  const nextIndex = cursor + 1
-  if (nextIndex < fallbackOrder.length) return nextIndex
-
-  return config.fallbackPlaylist.repeat ? 0 : null
-}
-
-function hasPlayableTracks(): boolean {
-  return fallbackOrder.some((videoId) => fallbackTracksById.has(videoId))
+  for (let step = 1; step <= total; step++) {
+    let index = fallbackCursor + step
+    if (index >= total) {
+      if (!repeat) return null
+      index %= total
+    }
+    const song = findTrack(fallbackOrder[index])
+    if (song && !isBlocked(song.videoId)) return { index, song }
+  }
+  return null
 }
 
 export function peekNextFallbackTrack(): QueueItem | null {
-  if (!hasPlayableTracks()) return null
-
-  const config = getConfig()
-  const attempts = fallbackOrder.length || 1
-  let cursor = fallbackCursor
-
-  for (let i = 0; i < attempts; i++) {
-    const nextIndex = computeNextIndex(config, cursor)
-    if (nextIndex === null) return null
-
-    cursor = nextIndex
-    const song = findTrack(fallbackOrder[cursor])
-    if (song && !isBlocked(song.videoId)) return toFallbackQueueItem(song)
-  }
-
-  return null
+  const next = findNext()
+  return next ? toFallbackQueueItem(next.song) : null
 }
 
 export function advanceFallback(): QueueItem | null {
-  if (!hasPlayableTracks()) return null
+  const next = findNext()
+  if (!next) return null
+  fallbackCursor = next.index
+  return toFallbackQueueItem(next.song)
+}
 
-  const config = getConfig()
-  const attempts = fallbackOrder.length || 1
-
-  for (let i = 0; i < attempts; i++) {
-    const nextIndex = computeNextIndex(config, fallbackCursor)
-
-    if (nextIndex === null) {
-      if (config.fallbackPlaylist.enabled && fallbackOrder.length) fallbackCursor = fallbackOrder.length
-      return null
-    }
-
-    fallbackCursor = nextIndex
-    const song = findTrack(fallbackOrder[fallbackCursor])
-    if (!song || isBlocked(song.videoId)) continue
-
-    return toFallbackQueueItem(song)
-  }
-
-  return null
+// the rotation decides what plays next (state) and what the playlist view shows (fallback)
+function changed(): void {
+  emit('state')
+  emit('fallback')
 }
 
 export async function refreshFallback(): Promise<FallbackStateResponse> {
@@ -141,7 +120,7 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
 
   if (!playlistId) {
     resetRotation()
-    notifyStateChange()
+    changed()
     return getFallbackState()
   }
 
@@ -155,43 +134,26 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
     return getFallbackState()
   }
 
-  const isFirstLoad = loadedFallbackPlaylistId !== playlistId
-  const activeId = activeFallbackVideoId()
-
-  if (isFirstLoad) {
-    setSourceTracks(newTracks)
-    fallbackOrder = buildOrder(newTracks, config.fallbackPlaylist.shuffle, null)
-    fallbackCursor = -1
-  } else {
-    const newIds = new Set(newTracks.map((track) => track.videoId))
-    const orderBefore = fallbackOrder
-    const inRotation = new Set(orderBefore)
-
-    const addedIds = newTracks.map((track) => track.videoId).filter((id) => !inRotation.has(id))
-    const removedCount = orderBefore.filter((id) => !newIds.has(id)).length
-
-    setSourceTracks(newTracks)
-
-    const activeIndexBefore = activeId ? orderBefore.indexOf(activeId) : -1
-    fallbackOrder = orderBefore.filter((id) => newIds.has(id))
-    fallbackOrder.push(...(config.fallbackPlaylist.shuffle ? shuffle(addedIds) : addedIds))
-
-    if (activeId && newIds.has(activeId)) {
-      fallbackCursor = fallbackOrder.indexOf(activeId)
-    } else if (activeIndexBefore >= 0) {
-      const survivedBeforeActive = orderBefore.slice(0, activeIndexBefore).filter((id) => newIds.has(id)).length
-      fallbackCursor = survivedBeforeActive - 1
-    }
-
-    log.log(`Refreshed: +${addedIds.length} added, -${removedCount} removed, ${fallbackOrder.length} in rotation`)
-  }
-
+  const playingId = getCurrent()?.isFallback ? getCurrent()!.videoId : activeFallbackVideoId()
+  setSourceTracks(newTracks)
+  fallbackOrder = buildOrder(newTracks, config.fallbackPlaylist.shuffle, playingId)
+  fallbackCursor = playingId ? fallbackOrder.indexOf(playingId) : -1
   loadedFallbackPlaylistId = playlistId
   lastFallbackRefreshAt = Date.now()
 
   log.log(`Loaded ${fallbackTracksById.size} tracks from playlist ${playlistId}`)
-  notifyStateChange()
+  changed()
   return getFallbackState()
+}
+
+// The playlist id is already stored; if it cannot be loaded, only that id goes back to what it was
+export async function refreshFallbackOrRollback(previousPlaylistId: string | null): Promise<void> {
+  try {
+    await refreshFallback()
+  } catch (error) {
+    updateConfig({ fallbackPlaylist: { playlistId: previousPlaylistId } })
+    throw error
+  }
 }
 
 /** Re-orders the rotation for the given shuffle mode, keeping the playing track in place. Does not touch the config. */
@@ -200,7 +162,7 @@ export function reorderFallback(shuffleOn: boolean): void {
   const activeId = current?.isFallback ? current.videoId : activeFallbackVideoId()
   fallbackOrder = buildOrder([...fallbackTracksById.values()], shuffleOn, activeId)
   fallbackCursor = activeId ? fallbackOrder.indexOf(activeId) : -1
-  notifyStateChange()
+  changed()
 }
 
 type FallbackFlag = 'shuffle' | 'repeat' | 'enabled'
@@ -224,7 +186,7 @@ export function clearFallback(): FallbackStateResponse {
   resetRotation()
 
   updateConfig({ fallbackPlaylist: { playlistId: null } })
-  notifyStateChange()
+  changed()
   log.log('cleared')
   return getFallbackState()
 }
@@ -273,7 +235,7 @@ export function queueFallbackTrack(videoId: string): QueueItem | null {
   const song = findTrack(videoId)
   if (!song) return null
 
-  return addSong(song, FALLBACK_REQUESTER, { bypassLimits: true })
+  return addSong(song, FALLBACK_REQUESTER, { bypassLimits: true }).item
 }
 
 export const getFallbackSourceTracks = (): Song[] => [...fallbackTracksById.values()]
@@ -285,11 +247,6 @@ export function getFallbackProgress(): Omit<FallbackSnapshot, 'sourceTracks'> {
     playlistId: loadedFallbackPlaylistId,
     lastRefreshedAt: lastFallbackRefreshAt
   }
-}
-
-/** @internal exported for tests (the state file saves the progress and the track list separately) */
-export function getFallbackSnapshot(): FallbackSnapshot {
-  return { sourceTracks: getFallbackSourceTracks(), ...getFallbackProgress() }
 }
 
 // Puts the rotation position on `videoId` (the fallback track that is playing), if it is in the rotation

@@ -11,10 +11,13 @@ const express = (await import('express')).default
 const { router } = await import('../../../src/routes/playlists.js')
 const { getConfig } = await import('../../../src/config.js')
 const { upsertPlaylist } = await import('../../../src/playlists.js')
+const { errorHandler } = await import('../../../src/error-handler.js')
 
 const app = express()
 app.use(express.json())
 app.use('/api/playlists', router)
+// the routes pass errors on with next(), the real server turns them into API errors in this handler
+app.use(errorHandler)
 
 const server = app.listen(0)
 const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/playlists`

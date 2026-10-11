@@ -1,5 +1,6 @@
 import { refreshState } from './queue.js'
 import { refreshFallbackState, scrollToActiveFallback } from './fallback.js'
+import { loadActivity } from './activity.js'
 import { setClass, show } from '../shared.js'
 
 export let activeTab = 'dashboard'
@@ -20,8 +21,10 @@ export function switchPageTab(tabName) {
   })
 
   if (!wasDashboard && tabName === 'dashboard') {
+    // nothing was read while the dashboard was hidden
     refreshState()
     refreshFallbackState()
+    loadActivity()
   }
 }
 

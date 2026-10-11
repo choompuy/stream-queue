@@ -1,5 +1,7 @@
 import { api } from './api.js'
-import { state, dom, log } from './state.js'
+import { state } from './state.js'
+import { dom } from './dom.js'
+import { log } from './log.js'
 import { views } from './views/index.js'
 import { run } from './run.js'
 import { refreshFallbackState } from './fallback.js'
@@ -10,14 +12,12 @@ import { setValue } from '../shared.js'
 export function loadPlaylists() {
   return run('loading playlists', async () => {
     const data = await api.getPlaylists()
-    state.playlists = data.playlists ?? []
+    state.playlists = data.playlists
     renderPlaylists()
   })
 }
 
 export function renderPlaylists() {
-  if (!dom.playlistsListWrapper) return
-
   const activeId = state.config?.fallbackPlaylist?.playlistId ?? ''
   views.playlists.render(state.playlists.map((playlist) => ({ ...playlist, isActive: playlist.id === activeId })))
 }
@@ -33,8 +33,7 @@ export async function addPlaylist() {
       setValue(dom.playlistUrlInput, '')
       await loadPlaylists()
       toastSuccess(t('toast.playlistAdded'))
-    },
-    { button: dom.playlistAddBtn }
+    }
   )
 }
 
@@ -48,8 +47,6 @@ export function activatePlaylist(id) {
 }
 
 export async function deletePlaylist(id) {
-  if (!confirm(t('playlists.deleteConfirm'))) return
-
   await run('deleting playlist', async () => {
     const result = await api.removePlaylist(id)
     await loadPlaylists()

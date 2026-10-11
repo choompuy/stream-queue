@@ -68,34 +68,4 @@ test('run', async (t) => {
     )
     assert.deepEqual(seen, ['boom'])
   })
-
-  await t.test('with a button, it is disabled during the action and re-enabled after', async () => {
-    const button = { disabled: false }
-    let disabledDuringAction = null
-
-    await run(
-      'doing a thing',
-      () => {
-        disabledDuringAction = button.disabled
-      },
-      { button }
-    )
-
-    assert.equal(disabledDuringAction, true)
-    assert.equal(button.disabled, false)
-  })
-
-  await t.test('with a button, it is re-enabled even after a silent failure', async () => {
-    const button = { disabled: false }
-
-    await run(
-      'doing a thing',
-      () => {
-        throw new Error('boom')
-      },
-      { button, silent: true }
-    )
-
-    assert.equal(button.disabled, false)
-  })
 })

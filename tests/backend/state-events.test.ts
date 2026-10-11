@@ -1,14 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { onStateChange, notifyStateChange } from '../../src/state-events.js'
+import { on, emit } from '../../src/state-events.js'
 
-test('state change listeners', async (t) => {
+test('change listeners', async (t) => {
   await t.test('every listener is called on each notification', () => {
     const calls: string[] = []
-    const off1 = onStateChange(() => calls.push('a'))
-    const off2 = onStateChange(() => calls.push('b'))
+    const off1 = on('state', () => calls.push('a'))
+    const off2 = on('state', () => calls.push('b'))
 
-    notifyStateChange()
+    emit('state')
     off1()
     off2()
 
@@ -19,14 +19,14 @@ test('state change listeners', async (t) => {
     const errors = t.mock.method(console, 'error', () => {})
     const calls: string[] = []
     const off = [
-      onStateChange(() => calls.push('before')),
-      onStateChange(() => {
+      on('state', () => calls.push('before')),
+      on('state', () => {
         throw new Error('boom')
       }),
-      onStateChange(() => calls.push('after'))
+      on('state', () => calls.push('after'))
     ]
 
-    assert.doesNotThrow(() => notifyStateChange())
+    assert.doesNotThrow(() => emit('state'))
     off.forEach((fn) => fn())
 
     assert.deepEqual(calls, ['before', 'after'])
@@ -35,22 +35,33 @@ test('state change listeners', async (t) => {
 
   await t.test('unsubscribing stops notifications', () => {
     let count = 0
-    const off = onStateChange(() => count++)
+    const off = on('state', () => count++)
 
-    notifyStateChange()
+    emit('state')
     off()
-    notifyStateChange()
+    emit('state')
 
     assert.equal(count, 1)
+  })
+
+  await t.test('topics are separate: a listener only hears its own topic', () => {
+    const heard: string[] = []
+    const offs = [on('state', () => heard.push('state')), on('activity', () => heard.push('activity')), on('twitch', () => heard.push('twitch'))]
+
+    emit('activity')
+    emit('twitch')
+    offs.forEach((off) => off())
+
+    assert.deepEqual(heard, ['activity', 'twitch'])
   })
 
   await t.test('registering the same function twice notifies it once', () => {
     let count = 0
     const listener = () => count++
-    const off = onStateChange(listener)
-    onStateChange(listener)
+    const off = on('state', listener)
+    on('state', listener)
 
-    notifyStateChange()
+    emit('state')
     off()
 
     assert.equal(count, 1)
@@ -58,14 +69,14 @@ test('state change listeners', async (t) => {
 
   await t.test('a listener may unsubscribe itself while being notified', () => {
     const calls: string[] = []
-    const offSelf = onStateChange(() => {
+    const offSelf = on('state', () => {
       calls.push('self')
       offSelf()
     })
-    const offOther = onStateChange(() => calls.push('other'))
+    const offOther = on('state', () => calls.push('other'))
 
-    notifyStateChange()
-    notifyStateChange()
+    emit('state')
+    emit('state')
     offOther()
 
     assert.deepEqual(calls, ['self', 'other', 'other'])

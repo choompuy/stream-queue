@@ -6,51 +6,11 @@ import { JSDOM } from 'jsdom'
 
 const PUBLIC_DIR = pathToFileURL(fileURLToPath(new URL('../../../public/', import.meta.url)))
 
-const jsdom = new JSDOM(
-  `<!doctype html><html><body>
-    <div id="twitchNotConfigured" class="hidden"></div>
-    <div id="twitchConnectionControls" class="hidden"></div>
-    <div id="twitchAuthorization" class="hidden"></div>
-    <span id="twitchAuthorizationCode"></span>
-    <button id="twitchConnectBtn"></button>
-    <button id="twitchDisconnectBtn" class="hidden"></button>
-    <div id="twitchRewardSection" class="hidden"></div>
-    <select id="twitchRewardSelect"></select>
-    <div id="twitchChatCommandsPanel" class="hidden"></div>
-    <input type="checkbox" id="chatCmdNowEnabled" />
-    <input id="chatCmdNowCommand" />
-    <select id="chatCmdNowPermission"><option value="everyone"></option><option value="moderator"></option><option value="broadcaster"></option></select>
-    <input type="checkbox" id="chatCmdQueueEnabled" />
-    <input id="chatCmdQueueCommand" />
-    <select id="chatCmdQueuePermission"><option value="everyone"></option><option value="moderator"></option><option value="broadcaster"></option></select>
-    <input type="checkbox" id="chatCmdSkipEnabled" />
-    <input id="chatCmdSkipCommand" />
-    <select id="chatCmdSkipPermission"><option value="everyone"></option><option value="moderator"></option><option value="broadcaster"></option></select>
-    <input type="checkbox" id="chatCmdPauseEnabled" />
-    <input id="chatCmdPauseCommand" />
-    <select id="chatCmdPausePermission"><option value="everyone"></option><option value="moderator"></option><option value="broadcaster"></option></select>
-    <input type="checkbox" id="chatCmdResumeEnabled" />
-    <input id="chatCmdResumeCommand" />
-    <select id="chatCmdResumePermission"><option value="everyone"></option><option value="moderator"></option><option value="broadcaster"></option></select>
-    <input id="chatCmdCooldown" />
-    <input id="chatCmdPlainCooldown" />
-    <input id="secYoutubeKey" />
-    <div id="secretsStatus"></div>
-    <span id="queueCount"></span>
-    <span id="tabQueueCount"></span>
-    <div id="queueListWrapper"></div>
-    <span id="playlistsCount"></span>
-    <div id="playlistsListWrapper"></div>
-    <div id="toastContainer"></div>
-  </body></html>`
-)
+const jsdom = new JSDOM(readFileSync(new URL('../../../public/index.html', import.meta.url), 'utf8').replace(/<script[^>]*><\/script>/g, ''))
 
 globalThis.window = jsdom.window
 globalThis.document = jsdom.window.document
 
-// disconnectTwitch() asks for confirmation; a test flips this to simulate the user cancelling
-let confirmAnswer = true
-globalThis.confirm = () => confirmAnswer
 
 // requests the control panel makes, keyed by "METHOD path"
 let handlers = {}
@@ -118,7 +78,10 @@ jsdom.window.open = (url) => {
 }
 
 const { t: translate, loadTranslations } = await import(new URL('js/i18n.js', PUBLIC_DIR))
-const { state, dom, CHAT_COMMAND_FIELDS } = await import(new URL('js/control/state.js', PUBLIC_DIR))
+const { state } = await import(new URL('js/control/state.js', PUBLIC_DIR))
+const { dom } = await import(new URL('js/control/dom.js', PUBLIC_DIR))
+// the five chat commands, and the id of their inputs: chatCmd<Name>Enabled / Command / Permission
+const CHAT_COMMAND_FIELDS = ['now', 'queue', 'skip', 'pause', 'resume'].map((key) => ({ key, dom: `chatCmd${key[0].toUpperCase()}${key.slice(1)}` }))
 const settings = await import(new URL('js/control/twitch/index.js', PUBLIC_DIR))
 const configSettings = await import(new URL('js/control/settings.js', PUBLIC_DIR))
 
@@ -155,7 +118,6 @@ function reset() {
   requests = []
   openedWindows = []
   lastBody = null
-  confirmAnswer = true
   settings.stopTwitchPolling()
 
   state.twitch.configured = true
@@ -279,24 +241,6 @@ test('connectTwitch', async (t) => {
     await drain(settings.connectTwitch())
 
     assert.equal(openedWindows[0].closed, true, 'a failed connect must not leave a blank tab behind')
-    assert.equal(dom.twitchConnectBtn.disabled, false)
-  })
-
-  await t.test('disables the connect button for the whole polling window', async () => {
-    let disabledWhilePolling = null
-
-    handlers = {
-      'POST /api/integrations/twitch/connect': () => deviceCode(),
-      'GET /api/integrations/twitch': () => {
-        disabledWhilePolling = dom.twitchConnectBtn.disabled
-        return { connected: true, user: { displayName: 'streamer' } }
-      },
-      'GET /api/integrations/twitch/rewards': () => ({ rewards: [] })
-    }
-
-    await drain(settings.connectTwitch())
-
-    assert.equal(disabledWhilePolling, true, 'a second click must not start a second poll loop')
     assert.equal(dom.twitchConnectBtn.disabled, false)
   })
 
@@ -461,21 +405,6 @@ test('loadTwitchSettings', async (t) => {
     await settings.loadTwitchSettings()
 
     assert.equal(state.twitch.selectedRewardId, 'reward-gone')
-  })
-})
-
-test('disconnectTwitch asks for confirmation first', async (t) => {
-  t.beforeEach(reset)
-
-  await t.test('cancelling the confirmation changes nothing and sends no request', async () => {
-    state.twitch.connected = true
-    state.twitch.user = { displayName: 'streamer' }
-    confirmAnswer = false
-
-    await settings.disconnectTwitch()
-
-    assert.equal(state.twitch.connected, true)
-    assert.deepEqual(requests, [])
   })
 })
 
@@ -697,12 +626,13 @@ test('saveTwitchChatCommands()', async (t) => {
     settings.bindTwitchFieldTracking()
 
     const toggle = dom.chatCmdSkipEnabled
+    // a real change event bubbles up to the form, where it is heard
     toggle.checked = !CHAT_COMMANDS_CONFIG.skip.enabled
-    toggle.dispatchEvent(new jsdom.window.Event('change'))
+    toggle.dispatchEvent(new jsdom.window.Event('change', { bubbles: true }))
     assert.ok(toggle.classList.contains('changed'))
 
     toggle.checked = CHAT_COMMANDS_CONFIG.skip.enabled
-    toggle.dispatchEvent(new jsdom.window.Event('change'))
+    toggle.dispatchEvent(new jsdom.window.Event('change', { bubbles: true }))
     assert.equal(toggle.classList.contains('changed'), false)
   })
 
@@ -837,6 +767,7 @@ test('saveConfigSetting() and the YouTube API key', async (t) => {
 
     assert.ok(toasts().includes(translate('toast.apiKeyNotSaved')))
     assert.equal(toasts().includes(translate('toast.settingsSaved')), false)
+    assert.equal(toasts().includes('not saved 0'), false, 'nothing was refused, so there is no count of refused fields either')
   })
 })
 
@@ -864,11 +795,6 @@ test('cancelConfigChanges()', async (t) => {
 
 test('disconnectTwitch(): redemptions left open', async (t) => {
   const { disconnectTwitch } = await import('../../../public/js/control/twitch/twitch-connection.js')
-  const originalConfirm = globalThis.confirm
-  globalThis.confirm = () => true
-  t.after(() => {
-    globalThis.confirm = originalConfirm
-  })
 
   const toasts = () => [...document.querySelectorAll('#toastContainer .toast')].map((toast) => toast.textContent)
 

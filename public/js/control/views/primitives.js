@@ -7,16 +7,8 @@ export function createListView(wrapper, { renderRow, getKey, cache = true }) {
     console.warn('[UI] createListView: no getKey provided — falling back to a naive key that may not detect all changes')
   }
 
-  const list = wrapper?.querySelector('.row-list')
-  const empty = wrapper?.querySelector('.empty')
-
-  if (!wrapper || !list || !empty) {
-    return {
-      render: () => {},
-      clear: () => {},
-      invalidate: () => {}
-    }
-  }
+  const list = wrapper.querySelector('.row-list')
+  const empty = wrapper.querySelector('.empty')
 
   let lastKey = null
 

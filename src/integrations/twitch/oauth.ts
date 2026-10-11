@@ -1,4 +1,4 @@
-import { createLogger } from '../../logger.js'
+import { createLogger, describeError } from '../../logger.js'
 import { AppError } from '../../types.js'
 import type {
   TwitchAuthConfig,
@@ -27,12 +27,18 @@ function postForm(url: string, params: URLSearchParams): Promise<Response> {
   })
 }
 
+async function oauthError(response: Response, fallback: string): Promise<Error> {
+  const body = (await response.json().catch(() => ({}))) as TwitchErrorResponse
+  return new Error(`${fallback}: ${body.message || `HTTP ${response.status}`}`)
+}
+
 export class TwitchOAuth {
   private config: TwitchAuthConfig
   private tokenData: TwitchTokenData | null = null
   private refreshPromise: Promise<TwitchTokenData> | null = null
   private authFailed = false
   private onTokenUpdated?: (tokenData: TwitchTokenData) => void
+  private onAuthStateChange?: () => void
 
   constructor(config: TwitchOAuthOptions) {
     this.config = {
@@ -41,6 +47,7 @@ export class TwitchOAuth {
     }
 
     this.onTokenUpdated = config.onTokenUpdated
+    this.onAuthStateChange = config.onAuthStateChange
 
     if (!this.config.clientId) log.log('Twitch client ID not configured')
   }
@@ -63,13 +70,13 @@ export class TwitchOAuth {
     try {
       const response = await postForm('https://id.twitch.tv/oauth2/device', params)
 
-      if (!response.ok) throw await this.createOAuthError(response, 'Device authorization failed')
+      if (!response.ok) throw await oauthError(response, 'Device authorization failed')
 
       const data = (await response.json()) as TwitchDeviceCodeResponse
       log.log('Device code requested')
       return data
     } catch (error) {
-      log.error(`Device code request failed: ${error instanceof Error ? error.message : error}`)
+      log.error(`Device code request failed: ${describeError(error)}`)
       throw error
     }
   }
@@ -94,18 +101,15 @@ export class TwitchOAuth {
         response = await postForm(TOKEN_URL, params)
       } catch (error) {
         // a dropped connection or a timeout while the user is still entering the code must not end the authorization
-        log.warn(`Device authorization poll failed, will retry: ${error instanceof Error ? error.message : error}`)
+        log.warn(`Device authorization poll failed, will retry: ${describeError(error)}`)
         continue
       }
 
       if (response.ok) {
-        const data = (await response.json()) as TwitchTokenResponse
-        this.tokenData = this.createTokenData(data)
-        this.authFailed = false
-        this.onTokenUpdated?.(this.tokenData)
+        const tokenData = this.store((await response.json()) as TwitchTokenResponse)
 
         log.log('Device authorization successful')
-        return this.tokenData
+        return tokenData
       }
 
       const error = (await response.json().catch(() => ({}))) as TwitchErrorResponse
@@ -147,7 +151,7 @@ export class TwitchOAuth {
       const tokenData = await this.refreshAccessToken()
       return tokenData.accessToken
     } catch (error) {
-      log.error(`Failed to get valid access token: ${error instanceof Error ? error.message : error}`)
+      log.error(`Failed to get valid access token: ${describeError(error)}`)
       return null
     }
   }
@@ -173,7 +177,7 @@ export class TwitchOAuth {
   clearTokenData(): void {
     this.tokenData = null
     this.refreshPromise = null
-    this.authFailed = false
+    this.setAuthFailed(false)
     log.log('Token data cleared')
   }
 
@@ -189,13 +193,20 @@ export class TwitchOAuth {
           const response = await postForm(REVOKE_URL, new URLSearchParams({ client_id: clientId, token }))
           if (!response.ok) log.warn(`Token revoke was refused with ${response.status}`)
         } catch (error) {
-          log.warn(`Token revoke failed: ${error instanceof Error ? error.message : error}`)
+          log.warn(`Token revoke failed: ${describeError(error)}`)
         }
       })
     )
   }
 
   // True once Twitch has refused the refresh token: the account has to be connected again
+  private setAuthFailed(failed: boolean): void {
+    if (this.authFailed === failed) return
+
+    this.authFailed = failed
+    this.onAuthStateChange?.()
+  }
+
   needsReauthorization(): boolean {
     return this.authFailed
   }
@@ -228,51 +239,29 @@ export class TwitchOAuth {
       if (!response.ok) {
         // Twitch refused the refresh token itself (expired after 30 days of a public client, revoked, password changed):
         // retrying is pointless, the account has to be connected again. A network error or a 5xx is not that
-        if (response.status === 400 || response.status === 401) this.authFailed = true
-        throw await this.createOAuthError(response, 'Token refresh failed')
+        if (response.status === 400 || response.status === 401) this.setAuthFailed(true)
+        throw await oauthError(response, 'Token refresh failed')
       }
 
-      const data = (await response.json()) as TwitchTokenResponse
-      this.tokenData = this.createTokenData(data)
-      this.authFailed = false
-      this.onTokenUpdated?.(this.tokenData)
+      const tokenData = this.store((await response.json()) as TwitchTokenResponse)
       log.log('Token refresh successful')
-      return this.tokenData
+      return tokenData
     } catch (error) {
-      log.error(`${error instanceof Error ? error.message : error}`)
+      log.error(describeError(error))
       throw error
     }
   }
 
-  private createTokenData(data: TwitchTokenResponse): TwitchTokenData {
-    return {
+  private store(data: TwitchTokenResponse): TwitchTokenData {
+    this.tokenData = {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
       expiresAt: Date.now() + data.expires_in * 1000,
       scope: data.scope
     }
-  }
+    this.setAuthFailed(false)
+    this.onTokenUpdated?.(this.tokenData)
 
-  private async parseOAuthError(response: Response): Promise<{ code: string; message: string }> {
-    try {
-      const error = (await response.json()) as TwitchErrorResponse & { error?: string }
-      return {
-        code: error.status || '',
-        message: error.message || `OAuth request failed with HTTP ${response.status}`
-      }
-    } catch {
-      return {
-        code: '',
-        message: `OAuth request failed with HTTP ${response.status}`
-      }
-    }
-  }
-
-  private async createOAuthError(response: Response, fallback: string): Promise<Error> {
-    const error = await this.parseOAuthError(response)
-    const message = error.message ? `${fallback}: ${error.message}` : fallback
-    const oauthError = new Error(message) as Error & { code?: string }
-    if (error.code) oauthError.code = error.code
-    return oauthError
+    return this.tokenData
   }
 }

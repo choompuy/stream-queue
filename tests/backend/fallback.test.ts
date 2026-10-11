@@ -9,7 +9,7 @@ process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 const fallback = await import('../../src/fallback.js')
 const { getConfig, updateConfig } = await import('../../src/config.js')
 const { setCurrent } = await import('../../src/queue.js')
-const { onStateChange } = await import('../../src/state-events.js')
+const { on } = await import('../../src/state-events.js')
 
 const IDS = Array.from({ length: 12 }, (_, i) => `track${String(i).padStart(2, '0')}`)
 const song = (videoId: string) => ({
@@ -28,7 +28,7 @@ beforeEach(() => {
   updateConfig({ fallbackPlaylist: { shuffle: false } })
 })
 
-const order = () => fallback.getFallbackSnapshot().order
+const order = () => fallback.getFallbackProgress().order
 
 test('reorderFallback()', async (t) => {
   await t.test('re-orders the rotation without touching the stored shuffle flag', () => {
@@ -62,7 +62,7 @@ test('toggleFallbackShuffle()', async (t) => {
 test('state persistence hooks', async (t) => {
   function countNotifications(action: () => void): number {
     let count = 0
-    const off = onStateChange(() => count++)
+    const off = on('state', () => count++)
     action()
     off()
     return count
@@ -87,7 +87,7 @@ test('state persistence hooks', async (t) => {
       countNotifications(() => fallback.clearFallback()),
       1
     )
-    assert.deepEqual(fallback.getFallbackSnapshot().order, [])
-    assert.equal(fallback.getFallbackSnapshot().playlistId, null)
+    assert.deepEqual(fallback.getFallbackProgress().order, [])
+    assert.equal(fallback.getFallbackProgress().playlistId, null)
   })
 })

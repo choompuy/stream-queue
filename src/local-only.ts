@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from 'express'
 import os from 'node:os'
 import { fail } from './http.js'
 
-export function isLoopbackAddress(address: string | undefined): boolean {
+function isLoopbackAddress(address: string | undefined): boolean {
   if (!address) return false
   return address === '::1' || address.startsWith('127.') || address.startsWith('::ffff:127.')
 }

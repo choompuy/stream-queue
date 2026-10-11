@@ -106,7 +106,8 @@ console.error = (...a) => {
 const logs = []
 console.log = (...a) => logs.push(a.join(' '))
 
-await import(pathToFileURL(`${ROOT}/js/control/index.js`).href)
+const { startControlPanel } = await import(pathToFileURL(`${ROOT}/js/control/index.js`).href)
+await startControlPanel()
 await new Promise((r) => setTimeout(r, 300))
 
 const $ = (sel) => document.querySelector(sel)

@@ -1,11 +1,11 @@
 import express from 'express'
 import { ConfigResponse } from '../types.js'
-import { ok, fail, failFromError, asyncHandler } from '../http.js'
-import { getConfig, updateConfig, restoreConfig } from '../config.js'
+import { ok, fail, failFromError } from '../http.js'
+import { getConfig, updateConfig } from '../config.js'
 import { parsePlaylistId, isValidPlaylistId } from '../youtube/url.js'
 import { fetchPlaylistMeta } from '../youtube/index.js'
 import { getPlaylists, upsertPlaylist, removePlaylist } from '../playlists.js'
-import { refreshFallback, clearFallback } from '../fallback.js'
+import { clearFallback, refreshFallbackOrRollback } from '../fallback.js'
 import { createLogger } from '../logger.js'
 
 const log = createLogger('PLAYLISTS')
@@ -16,28 +16,25 @@ router.get('/', (_req, res) => {
   ok(res, { playlists: getPlaylists() })
 })
 
-router.post(
-  '/',
-  asyncHandler(async (req, res) => {
-    const raw = typeof req.body?.playlistId === 'string' ? req.body.playlistId : ''
-    const parsedId = parsePlaylistId(raw)
+router.post('/', async (req, res) => {
+  const raw = typeof req.body?.playlistId === 'string' ? req.body.playlistId : ''
+  const parsedId = parsePlaylistId(raw)
 
-    if (!parsedId) {
-      return fail(res, 'invalid playlist ID or URL', 'INVALID_PLAYLIST_ID', 400)
-    }
+  if (!parsedId) {
+    return fail(res, 'invalid playlist ID or URL', 'INVALID_PLAYLIST_ID', 400)
+  }
 
-    try {
-      const meta = await fetchPlaylistMeta(parsedId)
-      if (!meta) {
-        return fail(res, 'playlist not found', 'PLAYLIST_NOT_FOUND', 404)
-      }
-      const saved = upsertPlaylist(meta)
-      ok(res, { playlist: saved }, 201)
-    } catch (error) {
-      failFromError(res, error)
+  try {
+    const meta = await fetchPlaylistMeta(parsedId)
+    if (!meta) {
+      return fail(res, 'playlist not found', 'PLAYLIST_NOT_FOUND', 404)
     }
-  })
-)
+    const saved = upsertPlaylist(meta)
+    ok(res, { playlist: saved }, 201)
+  } catch (error) {
+    failFromError(res, error)
+  }
+})
 
 router.delete('/:id', (req, res) => {
   const removed = removePlaylist(req.params.id)
@@ -55,42 +52,25 @@ router.delete('/:id', (req, res) => {
   ok(res, { playlists: getPlaylists(), fallbackCleared: wasActive })
 })
 
-router.post(
-  '/:id/activate',
-  asyncHandler<{ id: string }>(async (req, res) => {
-    const { id } = req.params
+router.post('/:id/activate', async (req, res) => {
+  const { id } = req.params
 
-    if (!isValidPlaylistId(id)) {
-      return fail(res, 'invalid playlist ID or URL', 'INVALID_PLAYLIST_ID', 400)
-    }
+  if (!isValidPlaylistId(id)) {
+    return fail(res, 'invalid playlist ID or URL', 'INVALID_PLAYLIST_ID', 400)
+  }
 
-    if (!getPlaylists().some((playlist) => playlist.id === id)) {
-      return fail(res, 'playlist not found', 'PLAYLIST_NOT_FOUND', 404)
-    }
+  if (!getPlaylists().some((playlist) => playlist.id === id)) {
+    return fail(res, 'playlist not found', 'PLAYLIST_NOT_FOUND', 404)
+  }
 
-    const previous = getConfig()
+  const previousId = getConfig().fallbackPlaylist.playlistId
+  if (previousId === id) {
+    clearFallback()
+    log.log(`deactivated playlist "${id}"`)
+    return ok<ConfigResponse>(res, getConfig())
+  }
 
-    if (previous.fallbackPlaylist.playlistId === id) {
-      clearFallback()
-      log.log(`deactivated playlist "${id}"`)
-      return ok<ConfigResponse>(res, getConfig())
-    }
-
-    const { rejected } = updateConfig({ fallbackPlaylist: { playlistId: id } })
-
-    if (rejected.length) {
-      restoreConfig(previous)
-      return fail(res, 'invalid config fields', 'INVALID_CONFIG', 400, { fields: rejected.join(', ') })
-    }
-
-    try {
-      await refreshFallback()
-    } catch (error) {
-      log.error(`Failed to activate playlist: ${error instanceof Error ? error.message : error}`)
-      restoreConfig(previous)
-      return failFromError(res, error)
-    }
-
-    ok<ConfigResponse>(res, getConfig())
-  })
-)
+  updateConfig({ fallbackPlaylist: { playlistId: id } })
+  await refreshFallbackOrRollback(previousId)
+  ok<ConfigResponse>(res, getConfig())
+})

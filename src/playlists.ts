@@ -1,4 +1,4 @@
-import { dataPath, createFileStore } from './persist.js'
+import { dataPath, createFileStore, loadList } from './persist.js'
 import { createLogger, describeError } from './logger.js'
 
 export type SavedPlaylist = {
@@ -12,9 +12,23 @@ export type SavedPlaylist = {
 const log = createLogger('PLAYLISTS')
 const store = createFileStore<SavedPlaylist[]>(() => dataPath('playlists.json'))
 
+function isSavedPlaylist(value: unknown): value is SavedPlaylist {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+
+  return (
+    typeof v.id === 'string' &&
+    v.id.length > 0 &&
+    typeof v.title === 'string' &&
+    typeof v.thumbnail === 'string' &&
+    Number.isFinite(v.itemCount) &&
+    Number.isFinite(v.addedAt)
+  )
+}
+
 // read from disk on first use, not when the module is imported
 let loaded: SavedPlaylist[] | null = null
-const current = (): SavedPlaylist[] => (loaded ??= store.load([]))
+const current = (): SavedPlaylist[] => (loaded ??= loadList(store, isSavedPlaylist))
 
 function save(): void {
   store.scheduleSave(
