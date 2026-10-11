@@ -30,7 +30,7 @@ export const state = {
     rewards: [],
     selectedRewardId: '',
     savedRewardId: '',
-    chatCommands: null,
+    config: null,
     editingReward: null,
     savedAutoFulfillRedemptions: false
   }

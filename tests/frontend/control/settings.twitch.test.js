@@ -80,7 +80,8 @@ jsdom.window.open = (url) => {
 const { t: translate, loadTranslations } = await import(new URL('js/i18n.js', PUBLIC_DIR))
 const { state } = await import(new URL('js/control/state.js', PUBLIC_DIR))
 const { dom } = await import(new URL('js/control/dom.js', PUBLIC_DIR))
-const { CHAT_COMMAND_FIELDS } = await import(new URL('js/control/fields.js', PUBLIC_DIR))
+// the five chat commands, and the id of their inputs: chatCmd<Name>Enabled / Command / Permission
+const CHAT_COMMAND_FIELDS = ['now', 'queue', 'skip', 'pause', 'resume'].map((key) => ({ key, dom: `chatCmd${key[0].toUpperCase()}${key.slice(1)}` }))
 const settings = await import(new URL('js/control/twitch/index.js', PUBLIC_DIR))
 const configSettings = await import(new URL('js/control/settings.js', PUBLIC_DIR))
 
@@ -625,12 +626,13 @@ test('saveTwitchChatCommands()', async (t) => {
     settings.bindTwitchFieldTracking()
 
     const toggle = dom.chatCmdSkipEnabled
+    // a real change event bubbles up to the form, where it is heard
     toggle.checked = !CHAT_COMMANDS_CONFIG.skip.enabled
-    toggle.dispatchEvent(new jsdom.window.Event('change'))
+    toggle.dispatchEvent(new jsdom.window.Event('change', { bubbles: true }))
     assert.ok(toggle.classList.contains('changed'))
 
     toggle.checked = CHAT_COMMANDS_CONFIG.skip.enabled
-    toggle.dispatchEvent(new jsdom.window.Event('change'))
+    toggle.dispatchEvent(new jsdom.window.Event('change', { bubbles: true }))
     assert.equal(toggle.classList.contains('changed'), false)
   })
 
@@ -765,6 +767,7 @@ test('saveConfigSetting() and the YouTube API key', async (t) => {
 
     assert.ok(toasts().includes(translate('toast.apiKeyNotSaved')))
     assert.equal(toasts().includes(translate('toast.settingsSaved')), false)
+    assert.equal(toasts().includes('not saved 0'), false, 'nothing was refused, so there is no count of refused fields either')
   })
 })
 

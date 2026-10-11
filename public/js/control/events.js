@@ -1,11 +1,10 @@
 import { dom } from './dom.js'
-import { CONFIG_FIELDS } from './fields.js'
 import { switchPageTab, switchSection } from './tabs.js'
 import { dispatchAction } from './actions.js'
 import { bindMenus } from './menu.js'
-import { saveOverlaySettings, syncHideOverlayInfoAvailability, onIpChange, changeLocale, isConfigFieldChanged } from './settings.js'
+import { saveOverlaySettings, syncHideOverlayInfoAvailability, onIpChange, changeLocale } from './settings.js'
 import { onTwitchRewardChange, stopTwitchPolling, bindTwitchFieldTracking, bindTwitchRewardFormEvents } from './twitch/index.js'
-import { trackChanges } from './save-result.js'
+import { trackForm } from './form.js'
 import { setError } from '../shared.js'
 
 export function bindEvents() {
@@ -46,15 +45,6 @@ export function bindEvents() {
   dom.localeSelect.addEventListener('change', (event) => changeLocale(event.target.value))
 
   const settingsInputs = [
-    dom.cfgMinViews,
-    dom.cfgMinDuration,
-    dom.cfgMaxDuration,
-    dom.cfgMaxQueue,
-    dom.cfgMaxPerUser,
-    dom.cfgContentMode,
-    dom.cfgRegionCode,
-    dom.cfgAllowShorts,
-    dom.cfgAllowLiveStreams,
     dom.secYoutubeKey,
     dom.showVideo,
     dom.hideOverlayInfo,
@@ -70,7 +60,7 @@ export function bindEvents() {
     }
   })
 
-  CONFIG_FIELDS.forEach((field) => trackChanges(dom[field.dom], () => isConfigFieldChanged(field)))
+  trackForm(dom.botSettingsPanel)
   bindTwitchFieldTracking()
   bindTwitchRewardFormEvents()
 }

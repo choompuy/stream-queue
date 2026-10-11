@@ -9,6 +9,7 @@ const { initI18n } = await import('../../../public/js/i18n.js')
 await initI18n('en')
 const { state } = await import('../../../public/js/control/state.js')
 const { bindEvents } = await import('../../../public/js/control/events.js')
+const { fillForm } = await import('../../../public/js/control/form.js')
 const { isDashboardActive } = await import('../../../public/js/control/tabs.js')
 
 bindEvents()
@@ -173,7 +174,7 @@ test('the settings inputs', async (t) => {
   })
 
   await t.test('a bot setting is yellow while it differs from the stored one, and plain again when it matches', () => {
-    state.config = { minViews: 10 }
+    fillForm(panel.$('#botSettingsPanel'), { minViews: 10 })
     const input = panel.$('#cfgMinViews')
 
     input.value = '11'

@@ -1,8 +1,8 @@
-import { escapeHtml, show, setError, setFieldState, setValue, setChecked } from '../shared.js'
+import { escapeHtml, show, setError, setValue, setChecked } from '../shared.js'
 import { api, ApiError } from './api.js'
 import { state } from './state.js'
 import { dom } from './dom.js'
-import { CONFIG_FIELDS, OVERLAY_FIELDS } from './fields.js'
+import { OVERLAY_FIELDS } from './fields.js'
 import { log } from './log.js'
 import { run } from './run.js'
 import { syncPlayer } from './player.js'
@@ -10,7 +10,7 @@ import { renderQueue } from './queue.js'
 import { renderPlaylists } from './playlists.js'
 import { t } from '../i18n.js'
 import { toastError } from './toast.js'
-import { reportSaveResult } from './save-result.js'
+import { fillForm, saveForm, toastSaveResult } from './form.js'
 
 let qrCodePromise
 
@@ -173,25 +173,14 @@ export function toggleQr() {
 export function loadConfig() {
   return run('loading config', async () => {
     state.config = await api.getConfig()
-    applyConfig()
+    fillForm(dom.botSettingsPanel, state.config)
   })
-}
-
-// puts the stored config into the inputs and clears their changed/saved/error marks
-function applyConfig() {
-  for (const field of CONFIG_FIELDS) {
-    const input = dom[field.dom]
-    if (!input) continue
-    setFieldState(input, null)
-
-    writeField(field, input, storedFieldValue(field))
-  }
 }
 
 export function cancelConfigChanges() {
   if (!state.config) return
 
-  applyConfig()
+  fillForm(dom.botSettingsPanel, state.config)
   setValue(dom.secYoutubeKey, '')
 }
 
@@ -205,75 +194,35 @@ export function loadSecrets() {
   })
 }
 
-function readFieldValue(field, input) {
-  if (field.type === 'checkbox') return input.checked
-  if (field.type === 'number') return Number(input.value)
-  if (field.type === 'nullableText') return input.value.trim() || null
-  return input.value.trim()
-}
-
-function storedFieldValue(field) {
-  return field.path ? state.config?.[field.path]?.[field.key] : state.config?.[field.key]
-}
-
-export function isConfigFieldChanged(field) {
-  const input = dom[field.dom]
-  return Boolean(input) && readFieldValue(field, input) !== storedFieldValue(field)
-}
-
-export async function saveConfigSetting() {
-  const config = {}
-  const entries = []
-
-  for (const field of CONFIG_FIELDS) {
-    const input = dom[field.dom]
-    if (!input) continue
-
-    const value = readFieldValue(field, input)
-    entries.push({ input, field, path: field.path ? `${field.path}.${field.key}` : field.key, changed: value !== storedFieldValue(field) })
-
-    if (field.path) {
-      config[field.path] ??= {}
-      config[field.path][field.key] = value
-    } else {
-      config[field.key] = value
-    }
-  }
-
+export function saveConfigSetting() {
   const youtubeApiKey = dom.secYoutubeKey.value.trim()
 
-  await run(
-    'saving config',
-    async () => {
-      // partial save: the server stores every valid field and lists the refused ones
-      const { config: saved, rejected } = await api.updateConfig(config)
-      state.config = saved
+  return run('saving config', async () => {
+    // partial save: the server stores every valid field and lists the refused ones
+    const result = await saveForm(dom.botSettingsPanel, async (config) => {
+      const answer = await api.updateConfig(config)
+      state.config = answer.config
+      return answer
+    })
 
-      for (const { input, field, path } of entries) {
-        if (rejected.includes(path)) continue
+    let apiKeyFailed = false
 
-        writeField(field, input, storedFieldValue(field))
+    if (youtubeApiKey) {
+      try {
+        await api.updateSecrets({ youtubeApiKey })
+        dom.secYoutubeKey.value = ''
+        await loadSecrets()
+      } catch (error) {
+        log('Error saving API key:', error)
+        toastError(t('toast.apiKeyNotSaved'))
+        apiKeyFailed = true
       }
-
-      let apiKeyFailed = false
-
-      if (youtubeApiKey) {
-        try {
-          await api.updateSecrets({ youtubeApiKey })
-          dom.secYoutubeKey.value = ''
-          await loadSecrets()
-        } catch (error) {
-          log('Error saving API key:', error)
-          toastError(t('toast.apiKeyNotSaved'))
-          apiKeyFailed = true
-        }
-      }
-
-      renderQueue()
-      renderPlaylists()
-      reportSaveResult(entries, rejected, 'toast.settingsSaved', { successToast: !apiKeyFailed })
     }
-  )
+
+    renderQueue()
+    renderPlaylists()
+    toastSaveResult(result, 'toast.settingsSaved', { successToast: !apiKeyFailed })
+  })
 }
 
 export const settingsActions = {

@@ -18,7 +18,7 @@ export function loadTwitchConfig() {
     const config = await api.getTwitchConfig()
 
     applyRewardConfig(config)
-    applyChatCommands(config?.chatCommands)
+    applyChatCommands(config)
   })
 }
 

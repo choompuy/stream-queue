@@ -90,7 +90,7 @@ for (const [name, document] of Object.entries(pages)) {
 test('the scripts find the elements they look for', async (t) => {
   const idsIn = (source) => [...source.matchAll(/\$\('([A-Za-z0-9_-]+)'\)/g)].map((match) => match[1])
 
-  await t.test('the control panel in index.html: every dom.<id> that the scripts read, and the ids that fields.js names', () => {
+  await t.test('the control panel in index.html: every dom.<id> that the scripts read', () => {
     const controlDir = fileURLToPath(new URL('../../public/js/control', import.meta.url))
     const sources = (dir) =>
       readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
@@ -98,17 +98,31 @@ test('the scripts find the elements they look for', async (t) => {
       )
     const code = sources(controlDir).join('\n').replace(/^import .*$/gm, '')
     const used = [...code.matchAll(/\bdom\.([A-Za-z0-9_]+)/g)].map((match) => match[1])
-    // fields.js names the input of a field (or the start of the ids of a chat command, which has three)
-    const named = [...read('js/control/fields.js').matchAll(/\bdom: '(\w+)'/g)].flatMap((match) => (match[1].startsWith('chatCmd') ? ['Enabled', 'Command', 'Permission'].map((part) => match[1] + part) : [match[1]]))
-
-    assert.ok(used.length > 100 && named.length > 10, 'the scan found almost nothing')
-    assert.deepEqual([...new Set([...used, ...named])].filter((id) => !pages['index.html'].getElementById(id)), [])
+    assert.ok(used.length > 100, 'the scan found almost nothing')
+    assert.deepEqual([...new Set(used)].filter((id) => !pages['index.html'].getElementById(id)), [])
   })
 
   await t.test('the overlay in overlay.html', () => {
     const missing = idsIn(read('js/overlay.js')).filter((id) => !pages['overlay.html'].getElementById(id))
 
     assert.deepEqual(missing, [])
+  })
+})
+
+test('the forms of index.html', async (t) => {
+  const document = pages['index.html']
+
+  await t.test('name each value once: an input name is the path of its value in the stored object', () => {
+    for (const panel of ['botSettingsPanel', 'twitchChatCommandsPanel']) {
+      const names = [...document.getElementById(panel).querySelectorAll('[name]')].map((input) => input.name)
+
+      assert.ok(names.length >= 9, `${panel} has only ${names.length} named inputs`)
+      assert.deepEqual(names.filter((name, index) => names.indexOf(name) !== index), [], panel)
+    }
+  })
+
+  await t.test('keep the API key out of the form: it goes to another endpoint', () => {
+    assert.equal(document.getElementById('secYoutubeKey').hasAttribute('name'), false)
   })
 })
 
