@@ -11,7 +11,7 @@ import type {
 } from './types.js'
 import { TwitchOAuth } from './oauth.js'
 import { AppError } from '../../types.js'
-import { createLogger } from '../../logger.js'
+import { createLogger, describeError } from '../../logger.js'
 
 const log = createLogger('TWITCH CLIENT')
 
@@ -46,7 +46,7 @@ export class TwitchClient {
     try {
       refreshedToken = await this.oauth.refreshAccessToken()
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error)
+      const reason = describeError(error)
       log.error(`Token refresh failed: ${reason}`)
       throw new AppError(
         'TWITCH_REFRESH_ERROR',

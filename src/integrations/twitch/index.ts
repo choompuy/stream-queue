@@ -216,7 +216,7 @@ async function replyInChat(message: string): Promise<void> {
   if (!chat?.isConnected() && chatStart) await Promise.race([chatStart, wait(CHAT_START_WAIT_MS)])
   if (!chat) return
   await chat.sendMessage(message).catch((error) => {
-    chatLog.error(`Failed to send chat reply: ${error instanceof Error ? error.message : error}`)
+    chatLog.error(`Failed to send chat reply: ${describeError(error)}`)
   })
 }
 
@@ -345,7 +345,7 @@ export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeRespon
     })
     // nobody awaits this promise: a refusal, an expired code or a cancel is logged here instead of becoming an unhandled rejection
     .catch((error) => {
-      if (generation === deviceAuthorizationGeneration) log.error(`Twitch authorization failed: ${error instanceof Error ? error.message : error}`)
+      if (generation === deviceAuthorizationGeneration) log.error(`Twitch authorization failed: ${describeError(error)}`)
       else log.log('Twitch authorization was cancelled')
     })
     .finally(() => {
@@ -387,7 +387,7 @@ async function setRedemptionStatus(
       await twitchClient.updateRedemptionStatus(redemption, status)
       return 'done'
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error)
+      const reason = describeError(error)
 
       if (isNoLongerOpen(error)) {
         log.log(
@@ -512,7 +512,7 @@ export async function refreshConnection(): Promise<TwitchUserInfo> {
     log.log('Twitch connection refreshed')
     return userInfo
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error)
+    const reason = describeError(error)
     log.error(`Failed to refresh connection: ${reason}`)
     throw new AppError('TWITCH_REFRESH_ERROR', reason)
   }

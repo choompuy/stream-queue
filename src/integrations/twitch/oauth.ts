@@ -1,4 +1,4 @@
-import { createLogger } from '../../logger.js'
+import { createLogger, describeError } from '../../logger.js'
 import { AppError } from '../../types.js'
 import type {
   TwitchAuthConfig,
@@ -76,7 +76,7 @@ export class TwitchOAuth {
       log.log('Device code requested')
       return data
     } catch (error) {
-      log.error(`Device code request failed: ${error instanceof Error ? error.message : error}`)
+      log.error(`Device code request failed: ${describeError(error)}`)
       throw error
     }
   }
@@ -101,7 +101,7 @@ export class TwitchOAuth {
         response = await postForm(TOKEN_URL, params)
       } catch (error) {
         // a dropped connection or a timeout while the user is still entering the code must not end the authorization
-        log.warn(`Device authorization poll failed, will retry: ${error instanceof Error ? error.message : error}`)
+        log.warn(`Device authorization poll failed, will retry: ${describeError(error)}`)
         continue
       }
 
@@ -151,7 +151,7 @@ export class TwitchOAuth {
       const tokenData = await this.refreshAccessToken()
       return tokenData.accessToken
     } catch (error) {
-      log.error(`Failed to get valid access token: ${error instanceof Error ? error.message : error}`)
+      log.error(`Failed to get valid access token: ${describeError(error)}`)
       return null
     }
   }
@@ -193,7 +193,7 @@ export class TwitchOAuth {
           const response = await postForm(REVOKE_URL, new URLSearchParams({ client_id: clientId, token }))
           if (!response.ok) log.warn(`Token revoke was refused with ${response.status}`)
         } catch (error) {
-          log.warn(`Token revoke failed: ${error instanceof Error ? error.message : error}`)
+          log.warn(`Token revoke failed: ${describeError(error)}`)
         }
       })
     )
@@ -247,7 +247,7 @@ export class TwitchOAuth {
       log.log('Token refresh successful')
       return tokenData
     } catch (error) {
-      log.error(`${error instanceof Error ? error.message : error}`)
+      log.error(describeError(error))
       throw error
     }
   }

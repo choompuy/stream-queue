@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express'
 import { fail } from './http.js'
-import { createLogger } from './logger.js'
+import { createLogger, describeError } from './logger.js'
 import { on, TOPICS, type Topic } from './state-events.js'
 
 const log = createLogger('SSE')
@@ -40,7 +40,7 @@ export function createEventStreams({ maxClients = 20, pingEveryMs = 25_000, coal
     try {
       client.res.write(frame)
     } catch (error) {
-      log.warn(`Dropping a stream that cannot be written to: ${error instanceof Error ? error.message : error}`)
+      log.warn(`Dropping a stream that cannot be written to: ${describeError(error)}`)
       close(client)
     }
   }

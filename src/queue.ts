@@ -220,7 +220,6 @@ export async function requestSong(query: string, requestedBy: string, { bypassFi
     log.log(`[REQUEST] ${requestedBy} → ${videoId ? `YouTube URL: ${videoId}` : `Search: "${query}"`}`)
 
     if (isYouTube && !videoId) {
-      log.log(`[REJECT] ${requestedBy} → INVALID_YOUTUBE_URL`)
       logRejection(requestedBy, query, 'INVALID_YOUTUBE_URL')
       return { outcome: 'invalid-url' }
     }
@@ -238,7 +237,6 @@ export async function requestSong(query: string, requestedBy: string, { bypassFi
     }
 
     if (!song) {
-      log.log(`[REJECT] ${requestedBy} → SONG_NOT_FOUND`)
       logRejection(requestedBy, query, 'SONG_NOT_FOUND')
       return { outcome: 'not-found' }
     }
@@ -252,9 +250,8 @@ export async function requestSong(query: string, requestedBy: string, { bypassFi
 
     return { outcome: 'added', added: { song: item, started, position } }
   } catch (error) {
-    // an expected refusal (duplicate, limit, filter) is routine; anything else is a bug or an outage and keeps its details
-    if (error instanceof AppError) log.log(`[REJECT] ${requestedBy} → ${error.code}`)
-    else log.error(`[REJECT] ${requestedBy} → unexpected error while adding song: ${describeError(error, true)}`)
+    // an expected refusal (duplicate, limit, filter) is routine and logRejection() writes it down; anything else is a bug or an outage and keeps its details
+    if (!(error instanceof AppError)) log.error(`Unexpected error while adding a song for ${requestedBy}: ${describeError(error, true)}`)
 
     const reasonCode = error instanceof AppError ? error.code : 'SERVER_ERROR'
     const reasonParams = error instanceof AppError ? error.params : undefined

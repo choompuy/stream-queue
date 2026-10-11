@@ -1,4 +1,5 @@
 import { getSecrets } from '../secrets.js'
+import { describeError } from '../logger.js'
 import { getConfig } from '../config.js'
 import { Song, AppError, Config, FilterFailureReason } from '../types.js'
 import { VideoItem } from './types.js'
@@ -153,7 +154,7 @@ export async function youtube<T>(path: string, params: Record<string, string>, {
       response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
     } catch (error) {
       if (attempt >= attempts) {
-        const message = `YouTube API is unreachable: ${error instanceof Error ? error.message : error}`
+        const message = `YouTube API is unreachable: ${describeError(error)}`
         // a timeout may have reached YouTube, anything else (DNS, no route, refused) did not
         throw isTimeout(error) ? new AppError('YOUTUBE_ERROR', message) : new RequestNotSentError('YOUTUBE_ERROR', message)
       }

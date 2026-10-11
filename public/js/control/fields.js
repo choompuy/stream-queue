@@ -12,6 +12,15 @@ export const CONFIG_FIELDS = [
   { key: 'contentMode', dom: 'cfgContentMode', type: 'text' }
 ]
 
+// The inputs of the overlay settings: `key` is the name in the saved settings, `dom` a key of `dom`. An 'integer' is read with
+// parseInt, so that an empty input is not a number (and not a 0); `fallback` fills the input when the server sent nothing
+export const OVERLAY_FIELDS = [
+  { key: 'showVideo', dom: 'showVideo', type: 'checkbox' },
+  { key: 'hideOverlayInfo', dom: 'hideOverlayInfo', type: 'checkbox' },
+  { key: 'opacity', dom: 'overlayOpacity', type: 'integer', fallback: 100 },
+  { key: 'position', dom: 'badgePosition', type: 'text', fallback: 'bottom-right' }
+]
+
 // Each Twitch chat command has three sub-fields (enabled/command/permission), rendered from
 // <name>Enabled / <name>Command / <name>Permission, which are keys of `dom`.
 export const CHAT_COMMAND_FIELDS = [

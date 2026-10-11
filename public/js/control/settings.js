@@ -2,7 +2,7 @@ import { escapeHtml, show, setError, setFieldState, setValue, setChecked } from 
 import { api, ApiError } from './api.js'
 import { state } from './state.js'
 import { dom } from './dom.js'
-import { CONFIG_FIELDS } from './fields.js'
+import { CONFIG_FIELDS, OVERLAY_FIELDS } from './fields.js'
 import { log } from './log.js'
 import { run } from './run.js'
 import { syncPlayer } from './player.js'
@@ -40,15 +40,15 @@ export function loadOverlaySettings() {
     state.settings = await api.getSettings()
     renderOverlayUrl()
 
-    setError(dom.showVideo, false)
-    setChecked(dom.showVideo, state.settings.showVideo)
-    setError(dom.hideOverlayInfo, false)
-    setChecked(dom.hideOverlayInfo, state.settings.hideOverlayInfo)
+    for (const field of OVERLAY_FIELDS) {
+      const input = dom[field.dom]
+      if (!input) continue
+
+      setError(input, false)
+      writeField(field, input, state.settings[field.key] ?? field.fallback)
+    }
+
     syncHideOverlayInfoAvailability()
-    setError(dom.overlayOpacity, false)
-    setValue(dom.overlayOpacity, state.settings.opacity ?? 100)
-    setError(dom.badgePosition, false)
-    setValue(dom.badgePosition, state.settings.position || 'bottom-right')
   })
 }
 
@@ -58,26 +58,25 @@ export function syncHideOverlayInfoAvailability() {
 
 export function saveOverlaySettings() {
   return run('saving settings', async () => {
-    setError(dom.showVideo, false)
-    setError(dom.hideOverlayInfo, false)
-    setError(dom.overlayOpacity, false)
-    setError(dom.badgePosition, false)
+    const changes = {}
+    let valid = true
 
-    const opacity = Number.parseInt(dom.overlayOpacity?.value, 10)
-    if (dom.overlayOpacity && Number.isNaN(opacity)) {
-      setError(dom.overlayOpacity)
-      return
+    for (const field of OVERLAY_FIELDS) {
+      const input = dom[field.dom]
+      if (!input) continue
+
+      setError(input, false)
+
+      const value = readOverlayField(field, input)
+      if (Number.isNaN(value)) {
+        setError(input)
+        valid = false
+      } else if (value !== state.settings[field.key]) {
+        changes[field.key] = value
+      }
     }
 
-    const wanted = {
-      showVideo: dom.showVideo?.checked ?? state.settings.showVideo,
-      hideOverlayInfo: dom.hideOverlayInfo?.checked ?? state.settings.hideOverlayInfo,
-      opacity: dom.overlayOpacity ? opacity : state.settings.opacity,
-      position: dom.badgePosition?.value ?? state.settings.position
-    }
-
-    const changes = Object.fromEntries(Object.entries(wanted).filter(([key, value]) => value !== state.settings[key]))
-    if (Object.keys(changes).length === 0) return
+    if (!valid || Object.keys(changes).length === 0) return
 
     try {
       state.settings = await api.updateSettings(changes)
@@ -86,14 +85,25 @@ export function saveOverlaySettings() {
       if (error instanceof ApiError && error.code === 'INVALID_SETTINGS' && error.params?.fields) {
         const rejectedFields = error.params.fields.split(', ')
 
-        if (rejectedFields.includes('showVideo')) setError(dom.showVideo)
-        if (rejectedFields.includes('hideOverlayInfo')) setError(dom.hideOverlayInfo)
-        if (rejectedFields.includes('opacity')) setError(dom.overlayOpacity)
-        if (rejectedFields.includes('position')) setError(dom.badgePosition)
+        for (const field of OVERLAY_FIELDS) {
+          if (rejectedFields.includes(field.key)) setError(dom[field.dom])
+        }
       }
       throw error
     }
   })
+}
+
+function readOverlayField(field, input) {
+  if (field.type === 'checkbox') return input.checked
+  if (field.type === 'integer') return Number.parseInt(input.value, 10)
+  return input.value
+}
+
+// puts a value into an input: a checkbox is checked, anything else gets the value
+function writeField(field, input, value) {
+  if (field.type === 'checkbox') setChecked(input, value)
+  else setValue(input, value)
 }
 
 // The overlay only plays music when it is opened as localhost, and OBS runs on this computer: the link must say localhost
@@ -182,10 +192,7 @@ function applyConfig() {
     if (!input) continue
     setFieldState(input, null)
 
-    const value = storedFieldValue(field)
-
-    if (field.type === 'checkbox') setChecked(input, value)
-    else setValue(input, value)
+    writeField(field, input, storedFieldValue(field))
   }
 }
 
@@ -253,9 +260,7 @@ export async function saveConfigSetting() {
       for (const { input, field, path } of entries) {
         if (rejected.includes(path)) continue
 
-        const serverValue = storedFieldValue(field)
-        if (field.type === 'checkbox') setChecked(input, serverValue)
-        else setValue(input, serverValue)
+        writeField(field, input, storedFieldValue(field))
       }
 
       let apiKeyFailed = false

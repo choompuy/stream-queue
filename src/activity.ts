@@ -67,6 +67,7 @@ export function logRejection(
   reasonCode: ActivityReasonCode,
   options: { title?: string | null; videoId?: string | null; reasonParams?: ReasonParams } = {}
 ): void {
+  log.log(`[REJECT] ${requestedBy} → ${reasonCode}`)
   logActivity({
     requestedBy,
     query,

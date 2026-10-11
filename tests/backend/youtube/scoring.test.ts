@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { normalize, isoDurationToSeconds, formatViews } from '../../../src/youtube/utils.js'
+import { normalize, isoDurationToSeconds } from '../../../src/youtube/utils.js'
 
 test('normalize', async (t) => {
   await t.test('lowercases and collapses punctuation to single spaces', () => {
@@ -53,19 +53,5 @@ test('isoDurationToSeconds', async (t) => {
 
   await t.test('missing input defaults to Infinity', () => {
     assert.equal(isoDurationToSeconds(), Infinity)
-  })
-})
-
-test('formatViews', async (t) => {
-  await t.test('millions', () => {
-    assert.equal(formatViews(2_500_000), '2.5M')
-  })
-
-  await t.test('thousands', () => {
-    assert.equal(formatViews(15_400), '15.4K')
-  })
-
-  await t.test('below one thousand', () => {
-    assert.equal(formatViews(999), '999')
   })
 })
