@@ -12,12 +12,12 @@ const YOUTUBE_URL_HINT = /(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com|youtube-
 
 export function clearSearchResults() {
   views.search.clear()
-  if (dom.searchInput) dom.searchInput.value = ''
+  dom.searchInput.value = ''
   show(dom.searchListWrapper, false)
 }
 
 export function search() {
-  const query = dom.searchInput?.value.trim()
+  const query = dom.searchInput.value.trim()
   if (!query) return
 
   return run(

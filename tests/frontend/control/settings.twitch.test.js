@@ -6,44 +6,7 @@ import { JSDOM } from 'jsdom'
 
 const PUBLIC_DIR = pathToFileURL(fileURLToPath(new URL('../../../public/', import.meta.url)))
 
-const jsdom = new JSDOM(
-  `<!doctype html><html><body>
-    <div id="twitchNotConfigured" class="hidden"></div>
-    <div id="twitchConnectionControls" class="hidden"></div>
-    <div id="twitchAuthorization" class="hidden"></div>
-    <span id="twitchAuthorizationCode"></span>
-    <button id="twitchConnectBtn"></button>
-    <button id="twitchDisconnectBtn" class="hidden"></button>
-    <div id="twitchRewardSection" class="hidden"></div>
-    <select id="twitchRewardSelect"></select>
-    <div id="twitchChatCommandsPanel" class="hidden"></div>
-    <input type="checkbox" id="chatCmdNowEnabled" />
-    <input id="chatCmdNowCommand" />
-    <select id="chatCmdNowPermission"><option value="everyone"></option><option value="moderator"></option><option value="broadcaster"></option></select>
-    <input type="checkbox" id="chatCmdQueueEnabled" />
-    <input id="chatCmdQueueCommand" />
-    <select id="chatCmdQueuePermission"><option value="everyone"></option><option value="moderator"></option><option value="broadcaster"></option></select>
-    <input type="checkbox" id="chatCmdSkipEnabled" />
-    <input id="chatCmdSkipCommand" />
-    <select id="chatCmdSkipPermission"><option value="everyone"></option><option value="moderator"></option><option value="broadcaster"></option></select>
-    <input type="checkbox" id="chatCmdPauseEnabled" />
-    <input id="chatCmdPauseCommand" />
-    <select id="chatCmdPausePermission"><option value="everyone"></option><option value="moderator"></option><option value="broadcaster"></option></select>
-    <input type="checkbox" id="chatCmdResumeEnabled" />
-    <input id="chatCmdResumeCommand" />
-    <select id="chatCmdResumePermission"><option value="everyone"></option><option value="moderator"></option><option value="broadcaster"></option></select>
-    <input id="chatCmdCooldown" />
-    <input id="chatCmdPlainCooldown" />
-    <input id="secYoutubeKey" />
-    <div id="secretsStatus"></div>
-    <span id="queueCount"></span>
-    <span id="tabQueueCount"></span>
-    <div id="queueListWrapper"></div>
-    <span id="playlistsCount"></span>
-    <div id="playlistsListWrapper"></div>
-    <div id="toastContainer"></div>
-  </body></html>`
-)
+const jsdom = new JSDOM(readFileSync(new URL('../../../public/index.html', import.meta.url), 'utf8').replace(/<script[^>]*><\/script>/g, ''))
 
 globalThis.window = jsdom.window
 globalThis.document = jsdom.window.document

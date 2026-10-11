@@ -53,7 +53,7 @@ export function loadOverlaySettings() {
 }
 
 export function syncHideOverlayInfoAvailability() {
-  if (dom.hideOverlayInfo) dom.hideOverlayInfo.disabled = !dom.showVideo?.checked
+  dom.hideOverlayInfo.disabled = !dom.showVideo.checked
 }
 
 export function saveOverlaySettings() {
@@ -109,16 +109,12 @@ function writeField(field, input, value) {
 // The overlay only plays music when it is opened as localhost, and OBS runs on this computer: the link must say localhost
 // even when the panel itself was opened by the computer's LAN address
 export function renderOverlayUrl() {
-  if (!dom.overlayUrl) return
-
   const url = `http://localhost${location.port ? `:${location.port}` : ''}/overlay`
   dom.overlayUrl.href = url
   dom.overlayUrl.textContent = url
 }
 
 export function copyOverlayUrl() {
-  if (!dom.overlayUrl) return
-
   navigator.clipboard?.writeText(dom.overlayUrl.href).catch((error) => {
     log('Copy failed:', error)
   })
@@ -127,7 +123,7 @@ export function copyOverlayUrl() {
 export function loadNetworkInfo() {
   return run('loading network info', async () => {
     state.network = await api.getNetworkInfo()
-    const ips = state.network?.ips ?? []
+    const { ips } = state.network
 
     if (!ips.length) state.selectedIp = 'localhost'
     else if (!state.selectedIp || !ips.includes(state.selectedIp)) state.selectedIp = ips[0]
@@ -138,9 +134,7 @@ export function loadNetworkInfo() {
 }
 
 function renderIpSelect() {
-  if (!dom.selectIp) return
-
-  const ips = state.network?.ips ?? []
+  const { ips } = state.network
   show(dom.selectIp, ips.length > 1)
   if (ips.length <= 1) return
 
@@ -150,12 +144,12 @@ function renderIpSelect() {
 }
 
 export async function renderQrUrl() {
-  if (!dom.controlPanelQr || dom.controlPanelQr.classList.contains('hidden') || !state.selectedIp) return
+  if (dom.controlPanelQr.classList.contains('hidden') || !state.selectedIp) return
 
   const QRCode = await loadQRCode()
   if (typeof QRCode === 'undefined') return
 
-  const port = state.network?.port ?? location.port
+  const { port } = state.network
 
   dom.controlPanelQr.innerHTML = ''
   new QRCode(dom.controlPanelQr, {
@@ -171,8 +165,6 @@ export function onIpChange() {
 }
 
 export function toggleQr() {
-  if (!dom.controlPanelQr) return
-
   const isHidden = dom.controlPanelQr.classList.contains('hidden')
   show(dom.controlPanelQr, isHidden)
   renderQrUrl()
@@ -248,7 +240,7 @@ export async function saveConfigSetting() {
     }
   }
 
-  const youtubeApiKey = dom.secYoutubeKey?.value.trim() ?? ''
+  const youtubeApiKey = dom.secYoutubeKey.value.trim()
 
   await run(
     'saving config',

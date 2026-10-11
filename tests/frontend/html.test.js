@@ -1,6 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { JSDOM } from 'jsdom'
 
 const read = (path) => readFileSync(new URL(`../../public/${path}`, import.meta.url), 'utf8')
@@ -88,10 +90,19 @@ for (const [name, document] of Object.entries(pages)) {
 test('the scripts find the elements they look for', async (t) => {
   const idsIn = (source) => [...source.matchAll(/\$\('([A-Za-z0-9_-]+)'\)/g)].map((match) => match[1])
 
-  await t.test('the control panel (dom.js) in index.html', () => {
-    const missing = idsIn(read('js/control/dom.js')).filter((id) => !pages['index.html'].getElementById(id))
+  await t.test('the control panel in index.html: every dom.<id> that the scripts read, and the ids that fields.js names', () => {
+    const controlDir = fileURLToPath(new URL('../../public/js/control', import.meta.url))
+    const sources = (dir) =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+        entry.isDirectory() ? sources(join(dir, entry.name)) : entry.name.endsWith('.js') && !['dom.js', 'fields.js'].includes(entry.name) ? [readFileSync(join(dir, entry.name), 'utf8')] : []
+      )
+    const code = sources(controlDir).join('\n').replace(/^import .*$/gm, '')
+    const used = [...code.matchAll(/\bdom\.([A-Za-z0-9_]+)/g)].map((match) => match[1])
+    // fields.js names the input of a field (or the start of the ids of a chat command, which has three)
+    const named = [...read('js/control/fields.js').matchAll(/\bdom: '(\w+)'/g)].flatMap((match) => (match[1].startsWith('chatCmd') ? ['Enabled', 'Command', 'Permission'].map((part) => match[1] + part) : [match[1]]))
 
-    assert.deepEqual(missing, [])
+    assert.ok(used.length > 100 && named.length > 10, 'the scan found almost nothing')
+    assert.deepEqual([...new Set([...used, ...named])].filter((id) => !pages['index.html'].getElementById(id)), [])
   })
 
   await t.test('the overlay in overlay.html', () => {

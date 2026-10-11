@@ -8,7 +8,11 @@ import {
   getErrorMessage,
   translateErrorCode,
   setFieldState,
-  setError
+  setError,
+  setText,
+  setClass,
+  setValue,
+  setChecked
 } from '../../public/js/shared.js'
 
 test('escapeHtml', async (t) => {
@@ -164,8 +168,13 @@ test('setFieldState / setError', async (t) => {
     setError(input, false)
     assert.deepEqual([...input.classes], ['changed'])
   })
+})
 
-  await t.test('missing element is ignored', () => {
-    assert.doesNotThrow(() => setFieldState(null, 'saved'))
+test('the helpers that write to an element', async (t) => {
+  await t.test('throw when the element is missing, so a wrong id is not silently ignored', () => {
+    assert.throws(() => setText(null, 'x'), TypeError)
+    assert.throws(() => setClass(null, 'x'), TypeError)
+    assert.throws(() => setValue(null, 'x'), TypeError)
+    assert.throws(() => setChecked(null, true), TypeError)
   })
 })

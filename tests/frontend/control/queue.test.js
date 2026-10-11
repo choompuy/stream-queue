@@ -50,14 +50,6 @@ test('refreshState', async (t) => {
 
     assert.equal(state.current.videoId, V('d'))
   })
-
-  await t.test('a missing queue, pause flag and next track fall back to empty values', async () => {
-    panel.route('GET /api/state', { current: null })
-
-    await queue.refreshState(true)
-
-    assert.deepEqual([state.current, state.queue, state.isPaused, state.nextTrack], [null, [], false, null])
-  })
 })
 
 test('renderQueue', async (t) => {

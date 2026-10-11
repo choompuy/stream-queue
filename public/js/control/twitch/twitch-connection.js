@@ -249,12 +249,10 @@ export function renderTwitchConnection() {
   setText(dom.twitchChanelName, isConnected ? '@' + user.displayName : t('settings.twitch.notConnected'))
   setClass(dom.twitchChanelName, 'text-green', isConnected)
   setClass(dom.twitchChanelName, 'text-red', !isConnected)
-  if (dom.twitchChanelImg) {
-    const avatar = isConnected ? user.profileImageUrl : ''
-    if (avatar) dom.twitchChanelImg.src = avatar
-    else dom.twitchChanelImg.removeAttribute('src')
-    show(dom.twitchChanelImg, Boolean(avatar))
-  }
+  const avatar = isConnected ? user.profileImageUrl : ''
+  if (avatar) dom.twitchChanelImg.src = avatar
+  else dom.twitchChanelImg.removeAttribute('src')
+  show(dom.twitchChanelImg, Boolean(avatar))
 
   show(dom.twitchConnectBtn, !isConnected)
   show(dom.twitchDisconnectBtn, isConnected)

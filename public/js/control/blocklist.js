@@ -11,7 +11,7 @@ import { refreshFallbackState } from './fallback.js'
 export function loadBlocklist() {
   return run('loading blocklist', async () => {
     const data = await api.getBlocklist()
-    state.blocklist = data.entries ?? []
+    state.blocklist = data.entries
     views.blocklist.render(state.blocklist)
     renderStats()
   })

@@ -68,7 +68,7 @@ function clearFieldStates() {
 export function showRewardForm(reward = null) {
   state.twitch.editingReward = reward && { ...reward }
 
-  setText(dom.twitchRewardForm?.querySelector('h2'), t(reward ? 'settings.twitch.editReward' : 'settings.twitch.createReward'))
+  setText(dom.twitchRewardForm.querySelector('h2'), t(reward ? 'settings.twitch.editReward' : 'settings.twitch.createReward'))
   setValue(dom.twitchRewardTitle, reward?.title || '')
   setValue(dom.twitchRewardCost, reward?.cost || '')
   setValue(dom.twitchRewardPrompt, reward?.prompt || '')
@@ -100,17 +100,17 @@ function check(input, valid) {
 
 // marks every invalid input and returns the request body, or null when something is invalid
 export function readRewardForm() {
-  const title = dom.twitchRewardTitle?.value.trim()
-  const cost = Number(dom.twitchRewardCost?.value)
-  const prompt = dom.twitchRewardPrompt?.value.trim()
-  const typedColor = dom.twitchRewardBackgroundColor?.value.trim() ?? ''
+  const title = dom.twitchRewardTitle.value.trim()
+  const cost = Number(dom.twitchRewardCost.value)
+  const prompt = dom.twitchRewardPrompt.value.trim()
+  const typedColor = dom.twitchRewardBackgroundColor.value.trim()
   const color = typedColor ? normalizeColor(typedColor) : null
   const data = {
     title,
     cost,
     // an empty prompt has to be sent to clear it on an existing reward
     prompt: state.twitch.editingReward ? prompt : prompt || undefined,
-    is_enabled: Boolean(dom.twitchRewardEnabled?.checked),
+    is_enabled: dom.twitchRewardEnabled.checked,
     background_color: color ?? undefined
   }
 

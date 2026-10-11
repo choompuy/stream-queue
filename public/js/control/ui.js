@@ -12,7 +12,6 @@ export function formatDateTime(timestamp, joiner = ', ') {
 }
 
 export function toggleActive(element, isActive) {
-  if (!element) return
   if (isActive) {
     element.classList.add('active')
   } else {

@@ -23,9 +23,9 @@ export function refreshState(silent = false) {
 
       const trackChanged = state.current?.videoId !== nextState.current?.videoId
       state.current = nextState.current
-      state.queue = nextState.queue ?? []
-      state.isPaused = Boolean(nextState.isPaused)
-      state.nextTrack = nextState.nextTrack ?? null
+      state.queue = nextState.queue
+      state.isPaused = nextState.isPaused
+      state.nextTrack = nextState.nextTrack
       renderState()
 
       if (trackChanged) await refreshFallbackState(silent)

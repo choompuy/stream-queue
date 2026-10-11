@@ -33,17 +33,17 @@ export function bindEvents() {
     if (event.key === 'Enter' && event.target.dataset?.submit) document.getElementById(event.target.dataset.submit).click()
   })
 
-  dom.showVideo?.addEventListener('change', () => {
+  dom.showVideo.addEventListener('change', () => {
     syncHideOverlayInfoAvailability()
     saveOverlaySettings()
   })
-  dom.hideOverlayInfo?.addEventListener('change', saveOverlaySettings)
-  dom.overlayOpacity?.addEventListener('change', saveOverlaySettings)
-  dom.badgePosition?.addEventListener('change', saveOverlaySettings)
-  dom.selectIp?.addEventListener('change', onIpChange)
-  dom.twitchRewardSelect?.addEventListener('change', onTwitchRewardChange)
+  dom.hideOverlayInfo.addEventListener('change', saveOverlaySettings)
+  dom.overlayOpacity.addEventListener('change', saveOverlaySettings)
+  dom.badgePosition.addEventListener('change', saveOverlaySettings)
+  dom.selectIp.addEventListener('change', onIpChange)
+  dom.twitchRewardSelect.addEventListener('change', onTwitchRewardChange)
   window.addEventListener('pagehide', stopTwitchPolling)
-  dom.localeSelect?.addEventListener('change', (event) => changeLocale(event.target.value))
+  dom.localeSelect.addEventListener('change', (event) => changeLocale(event.target.value))
 
   const settingsInputs = [
     dom.cfgMinViews,

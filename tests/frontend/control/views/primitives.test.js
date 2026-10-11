@@ -159,11 +159,4 @@ test('createListView', async (t) => {
     view.render(['a'])
     assert.equal(renderCount, 2)
   })
-
-  await t.test('missing wrapper/list/empty degrades to safe no-ops instead of throwing', () => {
-    const view = createListView(null, { renderRow: () => '<div></div>' })
-    assert.doesNotThrow(() => view.render(['a']))
-    assert.doesNotThrow(() => view.clear())
-    assert.doesNotThrow(() => view.invalidate())
-  })
 })

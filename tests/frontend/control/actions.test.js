@@ -123,6 +123,17 @@ test('the actions of the page', async (t) => {
     assert.deepEqual([...new Set(named)].filter((name) => !(name in ACTIONS)), [])
   })
 
+  await t.test('every registered action is used by the page or the views, and every handler is a function', () => {
+    const code = sources(CONTROL_DIR).join('\n')
+    const used = new Set([
+      ...panel.$$('[data-action]').map((element) => element.dataset.action),
+      ...[...code.matchAll(/data-action="([\w-]+)"/g), ...code.matchAll(/\baction: '([\w-]+)'/g)].map((match) => match[1])
+    ])
+
+    assert.deepEqual(Object.keys(ACTIONS).filter((name) => !used.has(name)), [])
+    assert.deepEqual(Object.entries(ACTIONS).filter(([, handler]) => typeof handler !== 'function').map(([name]) => name), [])
+  })
+
   await t.test('every action that the views put on their rows and buttons has a handler', () => {
     const code = sources(CONTROL_DIR).join('\n')
     const named = [...code.matchAll(/data-action="([\w-]+)"/g), ...code.matchAll(/\baction: '([\w-]+)'/g)].map((match) => match[1])

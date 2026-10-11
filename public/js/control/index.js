@@ -42,10 +42,8 @@ export async function startControlPanel() {
   const locale = settings?.locale
 
   await initI18n(locale)
-  if (dom.localeSelect) {
-    setError(dom.localeSelect, false)
-    dom.localeSelect.value = locale ?? dom.localeSelect.value
-  }
+  setError(dom.localeSelect, false)
+  dom.localeSelect.value = locale ?? dom.localeSelect.value
 
   bindEvents()
 

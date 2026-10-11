@@ -1,25 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { JSDOM } from 'jsdom'
 
-const jsdom = new JSDOM(
-  `<!doctype html><html><body>
-    <span id="twitchNotConfigured" class="hidden"></span>
-    <div id="twitchChannelField">
-      <img id="twitchChanelImg" class="hidden" />
-      <span id="twitchChanelName"></span>
-      <div id="twitchConnectionControls"></div>
-    </div>
-    <span id="twitchHealthWarning" class="hidden"></span>
-    <button id="twitchConnectBtn"></button>
-    <button id="twitchDisconnectBtn" class="hidden"></button>
-    <div id="twitchAuthorization" class="hidden"></div>
-    <div id="twitchRewardSection" class="hidden"></div>
-    <div id="twitchRewardForm" class="hidden"></div>
-    <div id="twitchChatCommandsPanel" class="hidden"></div>
-    <div id="toastContainer"></div>
-  </body></html>`
-)
+const jsdom = new JSDOM(readFileSync(new URL('../../../public/index.html', import.meta.url), 'utf8').replace(/<script[^>]*><\/script>/g, ''))
 
 globalThis.window = jsdom.window
 globalThis.document = jsdom.window.document

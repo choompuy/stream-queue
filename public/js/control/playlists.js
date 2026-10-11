@@ -12,14 +12,12 @@ import { setValue } from '../shared.js'
 export function loadPlaylists() {
   return run('loading playlists', async () => {
     const data = await api.getPlaylists()
-    state.playlists = data.playlists ?? []
+    state.playlists = data.playlists
     renderPlaylists()
   })
 }
 
 export function renderPlaylists() {
-  if (!dom.playlistsListWrapper) return
-
   const activeId = state.config?.fallbackPlaylist?.playlistId ?? ''
   views.playlists.render(state.playlists.map((playlist) => ({ ...playlist, isActive: playlist.id === activeId })))
 }
