@@ -100,22 +100,26 @@ function applyStatus(status) {
   trackHealth(status?.health)
 }
 
-export function refreshTwitchHealth() {
+// Reads the connection again and shows it as it is now. The account changes without this page doing it: a login finished in
+// another tab, or in this one before it was reloaded (nobody here waits for it any more), or a disconnect done elsewhere
+export function refreshTwitchStatus() {
   return run(
     'refreshing Twitch status',
     async () => {
-      if (!state.twitch.configured || !state.twitch.connected) return
+      if (!state.twitch.configured) return
 
+      const wasConnected = Boolean(state.twitch.connected && state.twitch.user)
       const status = await api.getTwitchStatus()
 
-      if (!status.connected) {
-        applyStatus(null)
-        renderTwitchConnection()
-        return
-      }
+      applyStatus(status.connected ? status : null)
+      renderTwitchConnection()
 
-      trackHealth(status.health)
-      renderTwitchHealth(true)
+      if (status.connected && !wasConnected) {
+        // the login this page may still be waiting for is over
+        stopTwitchPolling()
+        show(dom.twitchAuthorization, false)
+        await loadTwitchRewards()
+      }
     },
     { silent: true }
   )

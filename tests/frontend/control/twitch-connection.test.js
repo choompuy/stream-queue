@@ -16,9 +16,10 @@ globalThis.fetch = async (url) => {
 }
 
 const { state } = await import('../../../public/js/control/state.js')
-const { renderTwitchConnection, refreshTwitchHealth } = await import('../../../public/js/control/twitch/twitch-connection.js')
+const { renderTwitchConnection, refreshTwitchStatus } = await import('../../../public/js/control/twitch/twitch-connection.js')
 
 const el = (id) => document.getElementById(id)
+const show = (id) => el(id).classList.remove('hidden')
 const hidden = (id) => el(id).classList.contains('hidden')
 
 const user = { displayName: 'Streamer', login: 'streamer', profileImageUrl: 'https://example.com/a.png' }
@@ -62,14 +63,14 @@ test('the connection warning', async (t) => {
     connected(up)
     status = { connected: true, user, health: down }
 
-    await refreshTwitchHealth()
+    await refreshTwitchStatus()
     t.mock.timers.tick(5999)
 
     assert.equal(hidden('twitchHealthWarning'), true)
 
     // the timer belongs to this test's clock: a healthy answer takes it back, so that the next test starts clean
     status = { connected: true, user, health: up }
-    await refreshTwitchHealth()
+    await refreshTwitchStatus()
   })
 
   await t.test('is shown when it stays down for 6 seconds', async (t) => {
@@ -77,7 +78,7 @@ test('the connection warning', async (t) => {
     connected(up)
     status = { connected: true, user, health: down }
 
-    await refreshTwitchHealth()
+    await refreshTwitchStatus()
     t.mock.timers.tick(6000)
 
     assert.equal(hidden('twitchHealthWarning'), false)
@@ -87,11 +88,11 @@ test('the connection warning', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] })
     connected(up)
     status = { connected: true, user, health: down }
-    await refreshTwitchHealth()
+    await refreshTwitchStatus()
     t.mock.timers.tick(3000)
 
     status = { connected: true, user, health: up }
-    await refreshTwitchHealth()
+    await refreshTwitchStatus()
     t.mock.timers.tick(10000)
 
     assert.equal(hidden('twitchHealthWarning'), true)
@@ -104,7 +105,7 @@ test('the connection warning', async (t) => {
     assert.equal(hidden('twitchHealthWarning'), false)
 
     status = { connected: true, user, health: up }
-    await refreshTwitchHealth()
+    await refreshTwitchStatus()
     assert.equal(hidden('twitchHealthWarning'), true)
     assert.equal(state.twitch.offlineWarning, false)
   })
@@ -118,22 +119,89 @@ test('the connection warning', async (t) => {
   await t.test('an account disconnected elsewhere is shown as disconnected', async () => {
     connected(up)
     status = { connected: false, user: null, health: null }
-    await refreshTwitchHealth()
+    await refreshTwitchStatus()
     assert.equal(state.twitch.connected, false)
     assert.equal(hidden('twitchDisconnectBtn'), true)
   })
 
-  await t.test('is not requested at all while the account is not connected', async () => {
-    Object.assign(state.twitch, { configured: true, connected: false })
-    status = null
+})
+
+test('a connection made elsewhere', async (t) => {
+  await t.test('shows up on the next refresh, also on a page that was reloaded in the middle of the login', async () => {
+    // the panel was loaded while nobody was logged in; the login is finished later, in another tab
+    Object.assign(state.twitch, { configured: true, connected: false, user: null, health: null, offlineWarning: false })
+    show('twitchAuthorization')
+    renderTwitchConnection()
+    assert.equal(hidden('twitchDisconnectBtn'), true)
+
+    status = { connected: true, user, health: up, connectedAt: 1700000000000 }
+    await refreshTwitchStatus()
+
+    assert.equal(state.twitch.connected, true)
+    assert.equal(state.twitch.user.displayName, 'Streamer')
+    assert.equal(el('twitchChanelName').textContent, '@Streamer')
+    assert.equal(hidden('twitchDisconnectBtn'), false)
+    assert.equal(hidden('twitchConnectBtn'), true)
+    assert.equal(hidden('twitchRewardSection'), false)
+    assert.equal(hidden('twitchAuthorization'), true, 'the code that nobody enters any more is gone')
+  })
+
+  await t.test('the rewards are loaded once, when the account turns up, and not on every refresh', async () => {
+    Object.assign(state.twitch, { configured: true, connected: false, user: null, health: null })
+    status = { connected: true, user, health: up }
+    let rewardRequests = 0
+    const original = globalThis.fetch
+    globalThis.fetch = async (url, ...rest) => {
+      if (String(url).includes('/rewards')) rewardRequests++
+      return original(url, ...rest)
+    }
+
+    try {
+      await refreshTwitchStatus()
+      await refreshTwitchStatus()
+    } finally {
+      globalThis.fetch = original
+    }
+
+    assert.equal(rewardRequests, 1)
+  })
+
+  await t.test('an account that is not connected is still asked about, so that a later login is seen', async () => {
+    Object.assign(state.twitch, { configured: true, connected: false, user: null })
+    status = { connected: false, user: null, health: null }
     let requested = false
     const original = globalThis.fetch
     globalThis.fetch = async (...args) => {
       requested = true
       return original(...args)
     }
-    await refreshTwitchHealth()
-    globalThis.fetch = original
+
+    try {
+      await refreshTwitchStatus()
+    } finally {
+      globalThis.fetch = original
+    }
+
+    assert.equal(requested, true)
+    assert.equal(state.twitch.connected, false)
+    assert.equal(hidden('twitchDisconnectBtn'), true)
+  })
+
+  await t.test('without a Client ID there is nothing to ask', async () => {
+    Object.assign(state.twitch, { configured: false, connected: false })
+    let requested = false
+    const original = globalThis.fetch
+    globalThis.fetch = async (...args) => {
+      requested = true
+      return original(...args)
+    }
+
+    try {
+      await refreshTwitchStatus()
+    } finally {
+      globalThis.fetch = original
+    }
+
     assert.equal(requested, false)
   })
 })

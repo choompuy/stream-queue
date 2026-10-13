@@ -13,7 +13,7 @@ import { loadActivity } from './activity.js'
 import { loadBlocklist } from './blocklist.js'
 import { loadPlaylists } from './playlists.js'
 import { loadSecrets, loadConfig, loadOverlaySettings, loadNetworkInfo } from './settings.js'
-import { loadTwitchSettings, loadTwitchConfig, loadTwitchSecrets, refreshTwitchHealth } from './twitch/index.js'
+import { loadTwitchSettings, loadTwitchConfig, loadTwitchSecrets, refreshTwitchStatus } from './twitch/index.js'
 import { isDashboardActive } from './tabs.js'
 import { setError } from '../shared.js'
 
@@ -22,7 +22,7 @@ const TOPICS = {
   state: { read: () => refreshState(true), isShown: isDashboardActive },
   activity: { read: () => loadActivity(true), isShown: isDashboardActive },
   fallback: { read: () => refreshFallbackState(true), isShown: isDashboardActive },
-  twitch: { read: () => refreshTwitchHealth(), isShown: () => document.visibilityState === 'visible' }
+  twitch: { read: () => refreshTwitchStatus(), isShown: () => document.visibilityState === 'visible' }
 }
 
 // one at a time per topic: a late answer must not overwrite a newer one

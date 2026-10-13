@@ -42,6 +42,10 @@ let eventSub: TwitchEventSub | null = null
 let chat: TwitchChat | null = null
 let deviceAuthorizationPromise: Promise<unknown> | null = null
 let deviceAuthorizationGeneration = 0
+
+// the ids of the redemptions handled so far (the latest ones only)
+const HANDLED_REDEMPTIONS_LIMIT = 500
+const handledRedemptions = new Set<string>()
 const lastRun = { plainCooldownSeconds: 0, controlCooldownSeconds: 0 }
 
 // what is kept with a queued track about the redemption that paid for it
@@ -110,6 +114,14 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
     log.log(`Ignoring redemption with non-matching reward ID: ${event.reward.id} (configured: ${configuredRewardId || 'none'})`)
     return
   }
+
+  // a repeated delivery of the same redemption must not take the points twice
+  if (handledRedemptions.has(event.id)) {
+    log.log(`Ignoring redemption ${event.id}: it was already handled`)
+    return
+  }
+  handledRedemptions.add(event.id)
+  if (handledRedemptions.size > HANDLED_REDEMPTIONS_LIMIT) handledRedemptions.delete(handledRedemptions.values().next().value as string)
 
   log.log(`Channel Points redemption: ${event.reward.title} by ${event.user_name}`)
 
@@ -306,6 +318,14 @@ async function connectChat(): Promise<void> {
   if (!chat.isConnected()) await connectOrRetry(chat, 'Twitch chat', chatLog)
 }
 
+// What a login that waits for the code finds out is not used any more once it is cancelled (it only logs that it was)
+function cancelDeviceAuthorization(): void {
+  if (deviceAuthorizationPromise) log.log('Device authorization cancelled')
+
+  deviceAuthorizationGeneration++
+  deviceAuthorizationPromise = null
+}
+
 export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeResponse> {
   if (!oauth || !client) {
     throw new AppError('TWITCH_AUTH_ERROR', 'Twitch integration not initialized')
@@ -315,12 +335,13 @@ export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeRespon
     throw new AppError('TWITCH_AUTH_ERROR', 'Twitch account is already connected')
   }
 
-  if (deviceAuthorizationPromise) {
-    throw new AppError('TWITCH_AUTH_ERROR', 'Twitch authorization is already in progress')
-  }
+  // a closed dialog must not lock the next attempt for the minutes the old code stays valid: a new start replaces the waiting one
+  cancelDeviceAuthorization()
+  const generation = deviceAuthorizationGeneration
 
   const device = await oauth.requestDeviceCode()
-  const generation = ++deviceAuthorizationGeneration
+  // another start (or a disconnect) came while the code was being requested: this one is no longer wanted
+  if (generation !== deviceAuthorizationGeneration) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch authorization was cancelled')
 
   deviceAuthorizationPromise = oauth
     .pollForToken(device.device_code, device.interval, device.expires_in)
@@ -477,12 +498,8 @@ export async function disconnect(): Promise<number> {
     chat = null
   }
 
-  // Cancel any active device authorization to prevent "resurrection"
-  deviceAuthorizationGeneration++
-  if (deviceAuthorizationPromise) {
-    deviceAuthorizationPromise = null
-    log.log('Device authorization cancelled due to disconnect')
-  }
+  // a login that is still waiting for the code must not bring the account back after the disconnect
+  cancelDeviceAuthorization()
 
   const detached = detachChannelPointsRedemptions()
   if (detached > 0) log.warn(`${detached} queued redemption(s) stay UNFULFILLED on Twitch: fulfill or refund them in the rewards queue`)
@@ -536,6 +553,7 @@ export const _test = {
   },
   cancelRedemption,
   fulfillRedemption,
+  handleChannelPointsRedemption,
   setRetryDelay: (ms: number) => {
     retryDelayMs = ms
   }
@@ -553,5 +571,6 @@ export async function _resetIntegration(): Promise<void> {
   chat = null
   deviceAuthorizationPromise = null
   deviceAuthorizationGeneration = 0
+  handledRedemptions.clear()
   lastRun.plainCooldownSeconds = lastRun.controlCooldownSeconds = 0
 }
