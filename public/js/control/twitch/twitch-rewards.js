@@ -1,18 +1,11 @@
-import { setChecked, setFieldState, setValue } from '../../shared.js'
 import { t } from '../../i18n.js'
 import { api } from '../api.js'
 import { run } from '../run.js'
 import { state } from '../state.js'
 import { dom } from '../dom.js'
-import { reportSaveResult, trackChanges } from '../save-result.js'
+import { fillForm, saveForm, toastSaveResult, trackForm } from '../form.js'
 import { toastSuccess } from '../toast.js'
-import { showRewardForm, markRewardSaved, readRewardForm, bindRewardForm } from './twitch-reward-form.js'
-
-export async function loadTwitchRewards() {
-  const response = await api.getTwitchRewards()
-  state.twitch.rewards = response.rewards
-  renderTwitchRewards()
-}
+import { showRewardForm, bindRewardForm } from './twitch-reward-form.js'
 
 function option(select, value, text, selected = false) {
   const element = select.ownerDocument.createElement('option')
@@ -22,32 +15,42 @@ function option(select, value, text, selected = false) {
   return element
 }
 
-// no reward selected -> blank form to create one, a known reward -> the form filled with it
-function showSelectedReward() {
-  const id = state.twitch.selectedRewardId ?? ''
-  const reward = state.twitch.rewards.find((r) => r.id === id)
-
-  if (!id) showRewardForm()
-  else if (reward) showRewardForm(reward)
-}
-
-export function renderTwitchRewards() {
+// the select of the rewards of the channel (its form is not touched)
+function renderRewardOptions() {
   const select = dom.twitchRewardSelect
-  if (!select) return
-
   const { rewards, selectedRewardId } = state.twitch
 
   if (!rewards.length) {
     select.replaceChildren(option(select, '', t('settings.twitch.noRewards')))
-    showRewardForm()
-    return
+  } else {
+    select.replaceChildren(
+      option(select, '', t('settings.twitch.rewardNone')),
+      ...rewards.map((reward) => option(select, reward.id, `${reward.title} (${reward.cost})`, reward.id === selectedRewardId))
+    )
   }
 
+  // the options are new: what is stored is what they are measured against
+  if (state.twitch.config) fillForm(dom.twitchRewardSection, state.twitch.config)
+}
+
+// the reward that is selected goes into the form, no reward selected is a blank form to create one
+function showSelectedReward() {
+  showRewardForm(state.twitch.rewards.find((reward) => reward.id === state.twitch.selectedRewardId))
+}
+
+export function renderTwitchRewards() {
+  renderRewardOptions()
   showSelectedReward()
-  select.replaceChildren(
-    option(select, '', t('settings.twitch.rewardNone')),
-    ...rewards.map((reward) => option(select, reward.id, `${reward.title} (${reward.cost})`, reward.id === selectedRewardId))
-  )
+}
+
+async function readRewards() {
+  state.twitch.rewards = (await api.getTwitchRewards()).rewards
+  renderRewardOptions()
+}
+
+export async function loadTwitchRewards() {
+  await readRewards()
+  showSelectedReward()
 }
 
 export function onTwitchRewardChange() {
@@ -57,33 +60,21 @@ export function onTwitchRewardChange() {
 }
 
 export function applyRewardConfig(config) {
-  state.twitch.selectedRewardId = config?.channelPointsRewardId ?? ''
-  state.twitch.savedRewardId = state.twitch.selectedRewardId
-  state.twitch.savedAutoFulfillRedemptions = config?.autoFulfillRedemptions ?? false
+  state.twitch.selectedRewardId = config.channelPointsRewardId ?? ''
   renderTwitchRewards()
-  setFieldState(dom.twitchRewardSelect, null)
-  setChecked(dom.twitchAutoFulfillRedemptions, state.twitch.savedAutoFulfillRedemptions)
-  setFieldState(dom.twitchAutoFulfillRedemptions, null)
+  fillForm(dom.twitchRewardSection, config)
 }
 
-export async function saveTwitchConfig() {
-  const rewardId = state.twitch.selectedRewardId || ''
-  const autoFulfillRedemptions = dom.twitchAutoFulfillRedemptions.checked
-  const entries = [
-    { input: dom.twitchRewardSelect, path: 'channelPointsRewardId', changed: rewardId !== state.twitch.savedRewardId },
-    {
-      input: dom.twitchAutoFulfillRedemptions,
-      path: 'autoFulfillRedemptions',
-      changed: autoFulfillRedemptions !== state.twitch.savedAutoFulfillRedemptions
-    }
-  ]
+// the selected reward and the auto-fulfil switch are saved at once, whenever one of them changes
+export function saveTwitchConfig() {
+  return run('saving Twitch config', async () => {
+    const result = await saveForm(dom.twitchRewardSection, async (body) => {
+      const answer = await api.updateTwitchConfig(body)
+      state.twitch.config = answer.config
+      return answer
+    })
 
-  await run('saving Twitch config', async () => {
-    const { config, rejected } = await api.updateTwitchConfig({ channelPointsRewardId: rewardId || null, autoFulfillRedemptions })
-
-    state.twitch.savedRewardId = config.channelPointsRewardId ?? ''
-    state.twitch.savedAutoFulfillRedemptions = config.autoFulfillRedemptions ?? false
-    reportSaveResult(entries, rejected, 'toast.twitchSettingsSaved')
+    toastSaveResult(result, 'toast.twitchSettingsSaved')
   })
 }
 
@@ -92,44 +83,37 @@ export function cancelRewardChanges() {
   showRewardForm(state.twitch.editingReward)
 }
 
-export async function saveReward() {
-  const data = readRewardForm()
-  if (!data) return
+export function saveReward() {
+  const editing = state.twitch.editingReward
 
-  const previous = state.twitch.editingReward
-  const isEdit = Boolean(previous)
+  return run(editing ? 'updating Twitch reward' : 'creating Twitch reward', async () => {
+    const result = await saveForm(dom.twitchRewardForm, (body) => (editing ? api.updateTwitchReward(editing.id, body) : api.createTwitchReward(body)))
 
-  await run(
-    isEdit ? 'updating Twitch reward' : 'creating Twitch reward',
-    async () => {
-      const response = isEdit ? await api.updateTwitchReward(previous.id, data) : await api.createTwitchReward(data)
-      if (!response?.reward) return
+    if (result.refused) return toastSaveResult(result, 'toast.twitchRewardUpdated')
 
-      await loadTwitchRewards()
+    await readRewards()
 
-      if (isEdit) {
-        markRewardSaved(response.reward, previous)
-        toastSuccess(t('toast.twitchRewardUpdated'))
-        return
-      }
-
-      state.twitch.selectedRewardId = response.reward.id
-      renderTwitchRewards()
-      await saveTwitchConfig()
-      toastSuccess(t('toast.twitchRewardCreated'))
+    if (editing) {
+      state.twitch.editingReward = result.config
+      return toastSaveResult(result, 'toast.twitchRewardUpdated')
     }
-  )
+
+    state.twitch.selectedRewardId = result.config.id
+    renderTwitchRewards()
+    await saveTwitchConfig()
+    toastSuccess(t('toast.twitchRewardCreated'))
+  })
 }
 
 export function bindTwitchRewardTracking() {
-  trackChanges(dom.twitchRewardSelect, () => dom.twitchRewardSelect.value !== state.twitch.savedRewardId)
-  trackChanges(dom.twitchAutoFulfillRedemptions, () => dom.twitchAutoFulfillRedemptions.checked !== state.twitch.savedAutoFulfillRedemptions)
+  trackForm(dom.twitchRewardSection)
+  trackForm(dom.twitchRewardForm)
   dom.twitchAutoFulfillRedemptions.addEventListener('change', saveTwitchConfig)
 }
 
 export function bindTwitchRewardFormEvents() {
   dom.twitchCreateNewRewardBtn.addEventListener('click', () => {
-    setValue(dom.twitchRewardSelect, '')
+    dom.twitchRewardSelect.value = ''
     state.twitch.selectedRewardId = ''
     showRewardForm()
   })

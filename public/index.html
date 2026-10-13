@@ -623,7 +623,7 @@
               <label class="field">
                 <span class="field-label" data-i18n="settings.twitch.reward">Channel Points reward</span>
                 <div class="field-row">
-                  <select class="settings-input input" id="twitchRewardSelect">
+                  <select class="settings-input input" id="twitchRewardSelect" name="channelPointsRewardId">
                     <option value="" data-i18n="settings.twitch.rewardNone">Select reward</option>
                   </select>
                   <button type="button" class="btn btn-secondary" id="twitchCreateNewRewardBtn" data-i18n="settings.twitch.createReward">
@@ -636,7 +636,7 @@
               <div class="field">
                 <label class="field-row">
                   <span class="field-label" data-i18n="settings.twitch.autoFulfillRedemptions">Auto-fulfill redemptions</span>
-                  <input class="settings-input checkbox" type="checkbox" id="twitchAutoFulfillRedemptions" />
+                  <input class="settings-input checkbox" type="checkbox" id="twitchAutoFulfillRedemptions" name="autoFulfillRedemptions" />
                 </label>
                 <div class="text-muted text-xs" data-i18n="settings.twitch.autoFulfillRedemptionsNote">
                   Automatically fulfill redemptions when the track finishes playing successfully
@@ -651,47 +651,47 @@
               <div class="settings-section">
                 <label class="field">
                   <span class="field-label" data-i18n="settings.twitch.createRewardTitle">Reward title</span>
-                  <input class="settings-input input" type="text" id="twitchRewardTitle" maxlength="45" />
+                  <input class="settings-input input" type="text" id="twitchRewardTitle" name="title" maxlength="45" />
                 </label>
                 <label class="field">
                   <span class="field-label" data-i18n="settings.twitch.createRewardCost">Cost (points)</span>
-                  <input class="settings-input settings-input-short input" type="number" id="twitchRewardCost" min="1" />
+                  <input class="settings-input settings-input-short input" type="number" id="twitchRewardCost" name="cost" min="1" />
                 </label>
                 <label class="field">
                   <span class="field-label" data-i18n="settings.twitch.createRewardPrompt">Description (optional)</span>
-                  <input class="settings-input input" type="text" id="twitchRewardPrompt" maxlength="140" />
+                  <input class="settings-input input" type="text" id="twitchRewardPrompt" name="prompt" maxlength="140" />
                 </label>
                 <label class="field" for="twitchRewardBackgroundColor">
                   <span class="field-label" data-i18n="settings.twitch.createRewardBackgroundColor">Background color (hex, optional)</span>
                   <div class="field-row">
                     <input class="settings-input input" type="color" id="twitchRewardBackgroundColorPicker" />
-                    <input class="settings-input input" type="text" id="twitchRewardBackgroundColor" maxlength="7" placeholder="#00FF00" />
+                    <input class="settings-input input" type="text" id="twitchRewardBackgroundColor" name="backgroundColor" maxlength="7" placeholder="#00FF00" />
                   </div>
                 </label>
                 <label class="field-row">
                   <span class="field-label" data-i18n="settings.twitch.createRewardEnabled">Enable reward</span>
-                  <input class="settings-input checkbox" type="checkbox" id="twitchRewardEnabled" />
+                  <input class="settings-input checkbox" type="checkbox" id="twitchRewardEnabled" name="isEnabled" />
                 </label>
 
                 <label class="field" for="twitchMaxPerStream">
                   <span class="field-label" data-i18n="settings.twitch.maxPerStream">Max per stream</span>
                   <div class="field-row">
-                    <input class="settings-input input" type="number" id="twitchMaxPerStream" min="1" disabled />
-                    <input class="settings-input checkbox" type="checkbox" id="twitchMaxPerStreamEnabled" />
+                    <input class="settings-input input" type="number" id="twitchMaxPerStream" name="limits.maxPerStream.value" min="1" disabled />
+                    <input class="settings-input checkbox" type="checkbox" id="twitchMaxPerStreamEnabled" name="limits.maxPerStream.enabled" data-enables="twitchMaxPerStream" />
                   </div>
                 </label>
                 <label class="field" for="twitchMaxPerUserPerStream">
                   <span class="field-label" data-i18n="settings.twitch.maxPerUserPerStream">Max per user per stream</span>
                   <div class="field-row">
-                    <input class="settings-input input" type="number" id="twitchMaxPerUserPerStream" min="1" disabled />
-                    <input class="settings-input checkbox" type="checkbox" id="twitchMaxPerUserPerStreamEnabled" />
+                    <input class="settings-input input" type="number" id="twitchMaxPerUserPerStream" name="limits.maxPerUserPerStream.value" min="1" disabled />
+                    <input class="settings-input checkbox" type="checkbox" id="twitchMaxPerUserPerStreamEnabled" name="limits.maxPerUserPerStream.enabled" data-enables="twitchMaxPerUserPerStream" />
                   </div>
                 </label>
                 <label class="field" for="twitchGlobalCooldownSeconds">
                   <span class="field-label" data-i18n="settings.twitch.globalCooldown">Global cooldown (seconds)</span>
                   <div class="field-row">
-                    <input class="settings-input input" type="number" id="twitchGlobalCooldownSeconds" min="1" disabled />
-                    <input class="settings-input checkbox" type="checkbox" id="twitchGlobalCooldownEnabled" />
+                    <input class="settings-input input" type="number" id="twitchGlobalCooldownSeconds" name="limits.globalCooldownSeconds.value" min="1" disabled />
+                    <input class="settings-input checkbox" type="checkbox" id="twitchGlobalCooldownEnabled" name="limits.globalCooldownSeconds.enabled" data-enables="twitchGlobalCooldownSeconds" />
                   </div>
                 </label>
               </div>

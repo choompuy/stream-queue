@@ -126,8 +126,10 @@ function reset() {
   state.twitch.connectedAt = null
   state.twitch.rewards = []
   state.twitch.selectedRewardId = ''
+  state.twitch.config = null
 
   dom.twitchRewardSelect.innerHTML = ''
+  dom.twitchAutoFulfillRedemptions.checked = false
   dom.twitchRewardSelect.classList.remove('error')
   dom.twitchNotConfigured.classList.add('hidden')
   dom.twitchConnectionControls.classList.add('hidden')
@@ -441,7 +443,7 @@ const CHAT_COMMANDS_CONFIG = {
   plainCooldownSeconds: 3
 }
 
-test('the reward id is saved from state, not from the select element', async (t) => {
+test('the selected reward is saved as the select shows it', async (t) => {
   t.beforeEach(reset)
 
   await t.test('sends the selected reward id to the Twitch config endpoint', async () => {
@@ -463,7 +465,7 @@ test('the reward id is saved from state, not from the select element', async (t)
     assert.deepEqual(sent, { channelPointsRewardId: 'reward-1', autoFulfillRedemptions: false })
   })
 
-  await t.test('sends null when no reward is selected', async () => {
+  await t.test('sends the empty selection as it is: the server turns it into null', async () => {
     let sent = null
     handlers = {
       'PUT /api/integrations/twitch/config': () => {
@@ -474,7 +476,7 @@ test('the reward id is saved from state, not from the select element', async (t)
 
     await settings.saveTwitchConfig()
 
-    assert.deepEqual(sent, { channelPointsRewardId: null, autoFulfillRedemptions: false })
+    assert.deepEqual(sent, { channelPointsRewardId: '', autoFulfillRedemptions: false })
   })
 
   await t.test('shows a success toast on success', async () => {

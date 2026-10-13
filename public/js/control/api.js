@@ -49,9 +49,9 @@ async function request(url, options = {}, { partial = false } = {}) {
   return body?.data ?? null
 }
 
-const post = (url, body) => request(url, { method: 'POST', ...(body !== undefined && { body: JSON.stringify(body) }) })
+const post = (url, body, flags) => request(url, { method: 'POST', ...(body !== undefined && { body: JSON.stringify(body) }) }, flags)
 const put = (url, body, flags) => request(url, { method: 'PUT', body: JSON.stringify(body) }, flags)
-const patch = (url, body) => request(url, { method: 'PATCH', body: JSON.stringify(body) })
+const patch = (url, body, flags) => request(url, { method: 'PATCH', body: JSON.stringify(body) }, flags)
 const del = (url) => request(url, { method: 'DELETE' })
 const id = encodeURIComponent
 
@@ -100,8 +100,8 @@ export const api = {
   getTwitchStatus: () => request('/api/integrations/twitch'),
   connectTwitch: () => post('/api/integrations/twitch/connect'),
   getTwitchRewards: () => request('/api/integrations/twitch/rewards'),
-  createTwitchReward: (data) => post('/api/integrations/twitch/rewards', data),
-  updateTwitchReward: (rewardId, data) => patch(`/api/integrations/twitch/rewards/${id(rewardId)}`, data),
+  createTwitchReward: (data) => post('/api/integrations/twitch/rewards', data, { partial: true }),
+  updateTwitchReward: (rewardId, data) => patch(`/api/integrations/twitch/rewards/${id(rewardId)}`, data, { partial: true }),
   disconnectTwitch: () => post('/api/integrations/twitch/disconnect'),
   getTwitchConfig: () => request('/api/integrations/twitch/config'),
   updateTwitchConfig: (config) => put('/api/integrations/twitch/config', config, { partial: true })

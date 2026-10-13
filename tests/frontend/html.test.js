@@ -113,11 +113,20 @@ test('the forms of index.html', async (t) => {
   const document = pages['index.html']
 
   await t.test('name each value once: an input name is the path of its value in the stored object', () => {
-    for (const panel of ['botSettingsPanel', 'twitchChatCommandsPanel']) {
+    for (const panel of ['botSettingsPanel', 'twitchChatCommandsPanel', 'twitchRewardForm', 'twitchRewardSection']) {
       const names = [...document.getElementById(panel).querySelectorAll('[name]')].map((input) => input.name)
 
-      assert.ok(names.length >= 9, `${panel} has only ${names.length} named inputs`)
+      assert.ok(names.length >= 2, `${panel} has only ${names.length} named inputs`)
       assert.deepEqual(names.filter((name, index) => names.indexOf(name) !== index), [], panel)
+    }
+  })
+
+  await t.test('let a checkbox with data-enables switch an input that is in the same form', () => {
+    for (const toggle of document.querySelectorAll('[data-enables]')) {
+      const target = document.getElementById(toggle.dataset.enables)
+
+      assert.ok(target?.name, `${toggle.id} switches ${toggle.dataset.enables}, which is not a named input`)
+      assert.equal(toggle.closest('[id$="Form"], [id$="Panel"], [id$="Section"]'), target.closest('[id$="Form"], [id$="Panel"], [id$="Section"]'))
     }
   })
 

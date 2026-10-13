@@ -10,12 +10,11 @@ export function bindChatCommandTracking() {
 }
 
 export function applyChatCommands(config) {
-  state.twitch.config = config
   fillForm(dom.twitchChatCommandsPanel, config)
 }
 
 export function cancelChatCommandChanges() {
-  applyChatCommands(state.twitch.config)
+  fillForm(dom.twitchChatCommandsPanel, state.twitch.config)
 }
 
 export function saveTwitchChatCommands() {

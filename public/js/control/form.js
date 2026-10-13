@@ -24,7 +24,7 @@ const valueOf = (input) => {
 const defaultOf = (input) => {
   if (input.type === 'checkbox') return input.defaultChecked
   if (input.type === 'number') return input.defaultValue === '' ? null : Number(input.defaultValue)
-  if (input.tagName === 'SELECT') return ([...input.options].find((option) => option.defaultSelected) ?? input.options[0]).value
+  if (input.tagName === 'SELECT') return ([...input.options].find((option) => option.defaultSelected) ?? input.options[0])?.value ?? ''
   return input.defaultValue.trim()
 }
 
@@ -52,7 +52,7 @@ export function fillForm(form, config, { skip = [] } = {}) {
     if (input.type === 'checkbox') {
       input.checked = input.defaultChecked = Boolean(value)
     } else if (input.tagName === 'SELECT') {
-      input.value = String(value)
+      input.value = String(value ?? '')
       for (const option of input.options) option.defaultSelected = option.value === input.value
     } else {
       input.value = input.defaultValue = String(value ?? '')
@@ -60,15 +60,37 @@ export function fillForm(form, config, { skip = [] } = {}) {
 
     setFieldState(input, null)
   }
+
+  syncEnables(form)
 }
 
-// yellow while an input differs from what was stored, plain again as soon as it matches; one listener for the whole form
+// A checkbox with data-enables="<id of an input>" switches that input on and off: while it is off, the input is locked.
+function syncEnables(form) {
+  for (const toggle of form.querySelectorAll('[data-enables]')) document.getElementById(toggle.dataset.enables).disabled = !toggle.checked
+}
+
+// yellow while an input differs from what was stored, plain again as soon as it matches
+export function markChanged(input) {
+  setFieldState(input, isChanged(input) ? 'changed' : null)
+}
+
+// marks the inputs of the form as they change; one listener for the whole form
 export function trackForm(form) {
   const update = (event) => {
-    if (event.target.name) setFieldState(event.target, isChanged(event.target) ? 'changed' : null)
+    if (event.target.name) markChanged(event.target)
   }
 
   for (const type of ['input', 'change', 'focusin']) form.addEventListener(type, update)
+
+  // turning a switch off locks its input and empties it
+  form.addEventListener('change', ({ target }) => {
+    if (!target.dataset.enables) return
+
+    const input = document.getElementById(target.dataset.enables)
+    input.disabled = !target.checked
+    if (!target.checked) input.value = ''
+    markChanged(input)
+  })
 }
 
 /**

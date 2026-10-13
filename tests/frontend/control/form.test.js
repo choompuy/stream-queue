@@ -6,7 +6,7 @@ const panel = setupPanel()
 
 const { initI18n } = await import('../../../public/js/i18n.js')
 await initI18n('en')
-const { readForm, fillForm, isChanged, trackForm, saveForm, toastSaveResult } = await import('../../../public/js/control/form.js')
+const { readForm, fillForm, isChanged, markChanged, trackForm, saveForm, toastSaveResult } = await import('../../../public/js/control/form.js')
 
 document.body.insertAdjacentHTML(
   'beforeend',
@@ -17,10 +17,16 @@ document.body.insertAdjacentHTML(
     <select id="mode" name="contentMode"><option value="music">music</option><option value="any">any</option></select>
     <input id="skipCommand" name="chatCommands.skip.command" type="text" />
     <input id="loose" type="text" />
+  </div>
+  <div id="demo2">
+    <input id="limitOn" name="limit.enabled" type="checkbox" data-enables="limitValue" />
+    <input id="limitValue" name="limit.value" type="number" />
+    <select id="empty" name="pick"></select>
   </div>`
 )
 
 const form = document.getElementById('demo')
+const form2 = document.getElementById('demo2')
 const input = (id) => document.getElementById(id)
 const marks = (id) => ['changed', 'saved', 'error'].filter((name) => input(id).classList.contains(name))
 const fire = (id, type) => input(id).dispatchEvent(new window.Event(type, { bubbles: true }))
@@ -128,6 +134,53 @@ test('trackForm', async (t) => {
     fire('loose', 'input')
 
     assert.deepEqual(marks('loose'), [])
+  })
+})
+
+test('a checkbox that switches another input (data-enables)', async (t) => {
+  await t.test('locks the input when the form is filled with the switch off, and unlocks it with the switch on', () => {
+    fillForm(form2, { limit: { enabled: false, value: null } })
+    assert.equal(input('limitValue').disabled, true)
+
+    fillForm(form2, { limit: { enabled: true, value: 5 } })
+    assert.equal(input('limitValue').disabled, false)
+    assert.equal(input('limitValue').value, '5')
+  })
+
+  await t.test('turning the switch off locks the input and empties it, and the emptied input is marked as changed', () => {
+    fillForm(form2, { limit: { enabled: true, value: 5 } })
+    trackForm(form2)
+
+    input('limitOn').checked = false
+    fire('limitOn', 'change')
+
+    assert.equal(input('limitValue').disabled, true)
+    assert.equal(input('limitValue').value, '')
+    assert.deepEqual(marks('limitValue'), ['changed'])
+    assert.deepEqual(marks('limitOn'), ['changed'])
+  })
+
+  await t.test('turning it on again unlocks the input', () => {
+    input('limitOn').checked = true
+    fire('limitOn', 'change')
+
+    assert.equal(input('limitValue').disabled, false)
+  })
+})
+
+test('a select', async (t) => {
+  await t.test('with no options is not an error, and a stored null selects nothing', () => {
+    assert.equal(isChanged(input('empty')), false)
+
+    fillForm(form2, { pick: null })
+    assert.equal(input('empty').value, '')
+  })
+
+  await t.test('markChanged marks one input by what it was filled with', () => {
+    fillForm(form, { minViews: 10 })
+    input('views').value = '12'
+    markChanged(input('views'))
+    assert.deepEqual(marks('views'), ['changed'])
   })
 })
 

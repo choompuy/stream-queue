@@ -1,5 +1,6 @@
 import { api } from '../api.js'
 import { run } from '../run.js'
+import { state } from '../state.js'
 import { applyChatCommands, bindChatCommandTracking, cancelChatCommandChanges, saveTwitchChatCommands } from './twitch-chat-commands.js'
 import { connectTwitch, disconnectTwitch } from './twitch-connection.js'
 import { applyRewardConfig, bindTwitchRewardTracking, cancelRewardChanges, saveReward } from './twitch-rewards.js'
@@ -17,6 +18,7 @@ export function loadTwitchConfig() {
   return run('loading Twitch config', async () => {
     const config = await api.getTwitchConfig()
 
+    state.twitch.config = config
     applyRewardConfig(config)
     applyChatCommands(config)
   })

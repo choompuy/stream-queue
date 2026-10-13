@@ -76,12 +76,9 @@ export type TwitchCustomReward = {
   is_enabled: boolean
   is_user_input_required: boolean
   background_color?: string
-  is_max_per_stream_enabled?: boolean
-  max_per_stream?: number
-  is_max_per_user_per_stream_enabled?: boolean
-  max_per_user_per_stream?: number
-  is_global_cooldown_enabled?: boolean
-  global_cooldown_seconds?: number
+  max_per_stream_setting?: { is_enabled: boolean; max_per_stream: number }
+  max_per_user_per_stream_setting?: { is_enabled: boolean; max_per_user_per_stream: number }
+  global_cooldown_setting?: { is_enabled: boolean; global_cooldown_seconds: number }
 }
 
 export type TwitchCreateCustomReward = {

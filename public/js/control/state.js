@@ -29,10 +29,8 @@ export const state = {
     offlineWarning: false,
     rewards: [],
     selectedRewardId: '',
-    savedRewardId: '',
     config: null,
-    editingReward: null,
-    savedAutoFulfillRedemptions: false
+    editingReward: null
   }
 }
 

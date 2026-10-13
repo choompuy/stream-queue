@@ -242,7 +242,6 @@
       "songNotFound": "Could not find a suitable track",
       "usernameRequired": "Username is required",
       "invalidInput": "Invalid input: {{fields}}",
-      "invalidReward": "Check the reward setting: {{field}}",
       "queueItemNotFound": "Queue item not found",
       "trackNotFound": "Track not found in fallback",
       "serverError": "Internal server error",
