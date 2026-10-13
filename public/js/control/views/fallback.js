@@ -15,11 +15,7 @@ export const fallbackView = createListView(dom.fallbackListWrapper, {
       title: track.title,
       subtitle: track.channelTitle,
       meta: formatDuration(track.duration),
-      extra: track.isActive
-        ? statusPill(t('fallback.playing'), 'info')
-        : track.isBlocked
-          ? statusPill(t('blocklist.blockedLabel'), 'rejected')
-          : '',
+      extra: track.isActive ? statusPill(t('fallback.playing'), 'info') : track.isBlocked ? statusPill(t('blocklist.blockedLabel'), 'rejected') : '',
       actions: track.isBlocked
         ? unblockTrackItem(track.videoId)
         : rowMenu([

@@ -113,7 +113,7 @@ test('the forms of index.html', async (t) => {
   const document = pages['index.html']
 
   await t.test('name each value once: an input name is the path of its value in the stored object', () => {
-    for (const panel of ['botSettingsPanel', 'twitchChatCommandsPanel', 'twitchRewardForm', 'twitchRewardSection']) {
+    for (const panel of ['botSettingsPanel', 'twitchChatCommandsPanel', 'twitchRewardForm', 'twitchRewardSection', 'overlaySettingsPanel']) {
       const names = [...document.getElementById(panel).querySelectorAll('[name]')].map((input) => input.name)
 
       assert.ok(names.length >= 2, `${panel} has only ${names.length} named inputs`)

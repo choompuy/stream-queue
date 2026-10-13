@@ -2,7 +2,7 @@ import { dom } from './dom.js'
 import { switchPageTab, switchSection } from './tabs.js'
 import { dispatchAction } from './actions.js'
 import { bindMenus } from './menu.js'
-import { saveOverlaySettings, syncHideOverlayInfoAvailability, onIpChange, changeLocale } from './settings.js'
+import { saveOverlaySettings, onIpChange, changeLocale } from './settings.js'
 import { onTwitchRewardChange, stopTwitchPolling, bindTwitchFieldTracking, bindTwitchRewardFormEvents } from './twitch/index.js'
 import { trackForm } from './form.js'
 import { setError } from '../shared.js'
@@ -32,13 +32,11 @@ export function bindEvents() {
     if (event.key === 'Enter' && event.target.dataset?.submit) document.getElementById(event.target.dataset.submit).click()
   })
 
-  dom.showVideo.addEventListener('change', () => {
-    syncHideOverlayInfoAvailability()
-    saveOverlaySettings()
+  // the overlay settings are saved as soon as one of them changes
+  dom.overlaySettingsPanel.addEventListener('change', (event) => {
+    if (event.target.name) saveOverlaySettings()
   })
-  dom.hideOverlayInfo.addEventListener('change', saveOverlaySettings)
-  dom.overlayOpacity.addEventListener('change', saveOverlaySettings)
-  dom.badgePosition.addEventListener('change', saveOverlaySettings)
+  trackForm(dom.overlaySettingsPanel)
   dom.selectIp.addEventListener('change', onIpChange)
   dom.twitchRewardSelect.addEventListener('change', onTwitchRewardChange)
   window.addEventListener('pagehide', stopTwitchPolling)
@@ -46,10 +44,6 @@ export function bindEvents() {
 
   const settingsInputs = [
     dom.secYoutubeKey,
-    dom.showVideo,
-    dom.hideOverlayInfo,
-    dom.overlayOpacity,
-    dom.badgePosition,
     dom.localeSelect
   ]
 

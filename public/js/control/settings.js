@@ -1,8 +1,7 @@
-import { escapeHtml, show, setError, setValue, setChecked } from '../shared.js'
-import { api, ApiError } from './api.js'
+import { escapeHtml, show, setValue } from '../shared.js'
+import { api } from './api.js'
 import { state } from './state.js'
 import { dom } from './dom.js'
-import { OVERLAY_FIELDS } from './fields.js'
 import { log } from './log.js'
 import { run } from './run.js'
 import { syncPlayer } from './player.js'
@@ -39,71 +38,22 @@ export function loadOverlaySettings() {
   return run('loading settings', async () => {
     state.settings = await api.getSettings()
     renderOverlayUrl()
-
-    for (const field of OVERLAY_FIELDS) {
-      const input = dom[field.dom]
-      if (!input) continue
-
-      setError(input, false)
-      writeField(field, input, state.settings[field.key] ?? field.fallback)
-    }
-
-    syncHideOverlayInfoAvailability()
+    fillForm(dom.overlaySettingsPanel, state.settings)
   })
 }
 
-export function syncHideOverlayInfoAvailability() {
-  dom.hideOverlayInfo.disabled = !dom.showVideo.checked
-}
-
+// the overlay settings are saved at once, whenever one of them changes
 export function saveOverlaySettings() {
   return run('saving settings', async () => {
-    const changes = {}
-    let valid = true
+    const result = await saveForm(dom.overlaySettingsPanel, async (body) => {
+      const answer = await api.updateSettings(body)
+      state.settings = answer.config
+      return answer
+    })
 
-    for (const field of OVERLAY_FIELDS) {
-      const input = dom[field.dom]
-      if (!input) continue
-
-      setError(input, false)
-
-      const value = readOverlayField(field, input)
-      if (Number.isNaN(value)) {
-        setError(input)
-        valid = false
-      } else if (value !== state.settings[field.key]) {
-        changes[field.key] = value
-      }
-    }
-
-    if (!valid || Object.keys(changes).length === 0) return
-
-    try {
-      state.settings = await api.updateSettings(changes)
-      syncPlayer()
-    } catch (error) {
-      if (error instanceof ApiError && error.code === 'INVALID_SETTINGS' && error.params?.fields) {
-        const rejectedFields = error.params.fields.split(', ')
-
-        for (const field of OVERLAY_FIELDS) {
-          if (rejectedFields.includes(field.key)) setError(dom[field.dom])
-        }
-      }
-      throw error
-    }
+    syncPlayer()
+    toastSaveResult(result, 'toast.settingsSaved', { successToast: false })
   })
-}
-
-function readOverlayField(field, input) {
-  if (field.type === 'checkbox') return input.checked
-  if (field.type === 'integer') return Number.parseInt(input.value, 10)
-  return input.value
-}
-
-// puts a value into an input: a checkbox is checked, anything else gets the value
-function writeField(field, input, value) {
-  if (field.type === 'checkbox') setChecked(input, value)
-  else setValue(input, value)
 }
 
 // The overlay only plays music when it is opened as localhost, and OBS runs on this computer: the link must say localhost

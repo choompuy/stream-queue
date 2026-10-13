@@ -30,9 +30,10 @@ test('validateSettingsUpdates()', async (t) => {
 test('updateSettings()', async (t) => {
   await t.test('applies the valid part only', () => {
     updateSettings({ showVideo: false, hideOverlayInfo: false, opacity: 100, position: 'bottom-right', locale: 'en' })
-    const result = updateSettings({ position: 'top-right', showVideo: 'yes' as never, locale: 'xx' as never })
+    const { config, rejected } = updateSettings({ position: 'top-right', showVideo: 'yes' as never, locale: 'xx' as never })
 
-    assert.deepEqual(result, { showVideo: false, hideOverlayInfo: false, opacity: 100, position: 'top-right', locale: 'en' })
-    assert.deepEqual(getSettings(), result)
+    assert.deepEqual(config, { showVideo: false, hideOverlayInfo: false, opacity: 100, position: 'top-right', locale: 'en' })
+    assert.deepEqual(rejected.sort(), ['locale', 'showVideo'])
+    assert.deepEqual(getSettings(), config)
   })
 })

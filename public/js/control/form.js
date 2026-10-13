@@ -88,7 +88,7 @@ export function trackForm(form) {
 
     const input = document.getElementById(target.dataset.enables)
     input.disabled = !target.checked
-    if (!target.checked) input.value = ''
+    if (!target.checked && input.type !== 'checkbox') input.value = ''
     markChanged(input)
   })
 }

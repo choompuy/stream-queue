@@ -35,9 +35,9 @@ export const getSettings = settings.getConfig
 /** Pure validation: what is safe to apply, and the names of every field that was refused (invalid or unknown). */
 export const validateSettingsUpdates = settings.validateConfigUpdates
 
-/** Applies the valid part of `updates`; the HTTP layer uses validateSettingsUpdates() to refuse the rest. */
-export function updateSettings(updates: Partial<Settings>): Settings {
-  const { config } = settings.updateConfig(updates)
+/** Applies the valid part of `updates` and names the fields that were refused (invalid or unknown), like every save of the panel. */
+export function updateSettings(updates: Partial<Settings>): { config: Settings; rejected: string[] } {
+  const result = settings.updateConfig(updates)
   emit('state')
-  return config
+  return result
 }

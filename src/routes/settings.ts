@@ -3,7 +3,7 @@ import { ConfigResponse, SettingsResponse } from '../types.js'
 import { ok, fail, sendConfigUpdate } from '../http.js'
 import { localOnly } from '../local-only.js'
 import { getConfig, updateConfig } from '../config.js'
-import { getSettings, updateSettings, validateSettingsUpdates } from '../settings.js'
+import { getSettings, updateSettings } from '../settings.js'
 import { getPublicSecretsView, SecretsResponse, updateSecrets } from '../secrets.js'
 import { parsePlaylistId } from '../youtube/url.js'
 import { refreshFallbackOrRollback, reorderFallback } from '../fallback.js'
@@ -14,15 +14,10 @@ router.get('/settings', (_req, res) => {
   ok<SettingsResponse>(res, getSettings())
 })
 
+// a partial save, like the config: the valid fields are stored, the refused ones are named
 router.put('/settings', (req, res) => {
-  const updates = req.body ?? {}
-
-  const { rejected } = validateSettingsUpdates(updates)
-  if (rejected.length) {
-    return fail(res, 'invalid settings fields', 'INVALID_SETTINGS', 400, { fields: rejected.join(', ') })
-  }
-
-  ok<SettingsResponse>(res, updateSettings(updates))
+  const { config, rejected } = updateSettings(req.body ?? {})
+  sendConfigUpdate(res, config, rejected)
 })
 
 router.get('/config', (_req, res) => {

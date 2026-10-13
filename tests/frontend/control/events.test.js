@@ -146,7 +146,7 @@ test('the settings inputs', async (t) => {
     let sent = null
     panel.route('PUT /api/settings', (body) => {
       sent = body
-      return { ...state.settings, ...body }
+      return { config: { ...state.settings, ...body }, rejected: [] }
     })
     // the other controls show what is stored, as after loadOverlaySettings()
     panel.$('#overlayOpacity').value = '100'
@@ -157,8 +157,17 @@ test('the settings inputs', async (t) => {
     fire(panel.$('#showVideo'), 'change')
     await flush()
 
-    assert.deepEqual(sent, { showVideo: false })
+    assert.deepEqual(sent, { showVideo: false, hideOverlayInfo: false, opacity: 100, position: 'bottom-right' })
     assert.equal(panel.$('#hideOverlayInfo').disabled, true)
+  })
+
+  await t.test('a control of the overlay panel that is no setting (the IP list) does not save anything', async () => {
+    panel.calls.length = 0
+
+    fire(panel.$('#selectIp'), 'change')
+    await flush()
+
+    assert.deepEqual(panel.calls, [])
   })
 
   await t.test('typing into a field takes the red mark off it, and so does choosing a value', () => {

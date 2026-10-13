@@ -16,7 +16,7 @@ async function boot(t, { current = null, isPaused = false, settings = {}, locks 
 
   const env = setupPanel({ page: 'overlay.html', url: 'http://localhost:4747/overlay' })
   const youtube = installYouTube()
-  const sources = events ? installEventSource() : (globalThis.EventSource = undefined, [])
+  const sources = events ? installEventSource() : ((globalThis.EventSource = undefined), [])
 
   const server = { current, isPaused, nextTrack: null }
   const sent = { ended: [], failures: [] }
@@ -93,8 +93,9 @@ test('the badge', async (t) => {
 
     await elapse(1000)
 
-    assert.equal(env.$('#progressBar').style.width, '30%')
-    assert.equal(env.$('#elapsedTime').textContent, '0:30 / 1:40')
+    assert.equal(env.$('#progressBar').style.getPropertyValue('--progress'), '30%')
+    assert.equal(env.$('#elapsedTimeCurrent').textContent, '0:30')
+    assert.equal(env.$('#elapsedTimeEnd').textContent, '/ 1:40')
   })
 })
 

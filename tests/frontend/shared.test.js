@@ -40,7 +40,11 @@ test('formatDuration', async (t) => {
   })
 
   await t.test('zero', () => {
-    assert.equal(formatDuration(0), '0:00')
+    assert.equal(formatDuration(0, true), 'LIVE')
+  })
+
+  await t.test('live', () => {
+    assert.equal(formatDuration(0), 'LIVE')
   })
 })
 

@@ -82,6 +82,16 @@ body {
   text-overflow: ellipsis;
 }
 
+.truncate-2line {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: wrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .box-shadow {
   box-shadow: rgba(0, 0, 0, 0.4) 0 0.25rem 0.875rem 0;
 }

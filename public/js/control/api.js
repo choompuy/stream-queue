@@ -57,7 +57,7 @@ const id = encodeURIComponent
 
 export const api = {
   getSettings: () => request('/api/settings'),
-  updateSettings: (settings) => put('/api/settings', settings),
+  updateSettings: (settings) => put('/api/settings', settings, { partial: true }),
 
   getConfig: () => request('/api/config'),
   updateConfig: (config) => put('/api/config', config, { partial: true }),

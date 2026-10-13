@@ -71,15 +71,17 @@ test('api', async (t) => {
     assert.equal(error.cause, reply)
   })
 
-  await t.test('a partial save is a result for the config endpoints: the stored config and the refused fields', async () => {
+  await t.test('a partial save is a result for the endpoints that save a form: the stored config and the refused fields', async () => {
     answer(400, refusedSave)
     assert.deepEqual(await api.updateConfig({ maxQueueSize: 0 }), refusedSave.data)
     assert.deepEqual(await api.updateTwitchConfig({}), refusedSave.data)
+    assert.deepEqual(await api.updateSettings({ opacity: 5 }), refusedSave.data)
+    assert.deepEqual(await api.createTwitchReward({}), refusedSave.data)
   })
 
   await t.test('the same answer from any other endpoint is a failure', async () => {
     answer(400, refusedSave)
-    const error = await failure(() => api.updateSettings({ opacity: 5 }))
+    const error = await failure(() => api.clearQueue())
 
     assert.equal(error.code, 'INVALID_CONFIG')
   })

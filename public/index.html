@@ -381,31 +381,31 @@
           <h1 data-i18n="settings.title">Settings</h1>
         </div>
         <div class="settings-wrapper">
-          <div class="section-tab panel">
+          <div id="overlaySettingsPanel" class="section-tab panel">
             <div class="section-tab-header">
               <h2 data-i18n="settings.overlay.title">Overlay</h2>
             </div>
             <div class="settings-section">
               <label class="field-row">
                 <span class="field-label" data-i18n="settings.overlay.showVideo">Show video</span>
-                <input class="settings-input checkbox" type="checkbox" id="showVideo" />
+                <input class="settings-input checkbox" type="checkbox" id="showVideo" name="showVideo" data-enables="hideOverlayInfo" />
               </label>
 
               <label class="field-row">
                 <span class="field-label" data-i18n="settings.overlay.hideOverlayInfo">Video only (hide title and progress)</span>
-                <input class="settings-input checkbox" type="checkbox" id="hideOverlayInfo" />
+                <input class="settings-input checkbox" type="checkbox" id="hideOverlayInfo" name="hideOverlayInfo" />
               </label>
             </div>
 
             <div class="settings-section-column">
               <label class="field">
                 <span class="field-label" data-i18n="settings.overlay.opacity">Overlay opacity (%)</span>
-                <input class="settings-input input" type="number" id="overlayOpacity" min="0" max="100" />
+                <input class="settings-input input" type="number" id="overlayOpacity" name="opacity" min="0" max="100" />
               </label>
 
               <label class="field">
                 <span class="field-label" data-i18n="settings.overlay.badgePosition">Badge position</span>
-                <select class="settings-input input" id="badgePosition">
+                <select class="settings-input input" id="badgePosition" name="position">
                   <option value="top-left" data-i18n="settings.overlay.positionTopLeft">Top Left</option>
                   <option value="top-right" data-i18n="settings.overlay.positionTopRight">Top Right</option>
                   <option value="bottom-left" data-i18n="settings.overlay.positionBottomLeft">Bottom Left</option>

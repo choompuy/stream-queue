@@ -11,11 +11,12 @@ const { state } = await import('../../../public/js/control/state.js')
 const settings = await import('../../../public/js/control/settings.js')
 
 const stored = { showVideo: true, hideOverlayInfo: false, opacity: 100, position: 'bottom-right' }
-let puts = []
+const puts = []
 panel.route('GET /api/settings', () => ({ ...stored }))
 panel.route('PUT /api/settings', (body) => {
   puts.push(body)
-  return { ...stored, ...body }
+  Object.assign(stored, body)
+  return { config: { ...stored }, rejected: [] }
 })
 
 const field = (id) => panel.$(`#${id}`)
@@ -53,42 +54,36 @@ test('saving the overlay settings', async (t) => {
   panel.route('GET /api/settings', { ...stored })
   await settings.loadOverlaySettings()
 
-  await t.test('nothing is sent when nothing changed', async () => {
-    puts = []
-
-    await settings.saveOverlaySettings()
-
-    assert.deepEqual(puts, [])
-  })
-
-  await t.test('only the changed fields are sent, and the answer of the server becomes the state', async () => {
+  await t.test('sends the whole form: the server stores what changed, and its answer becomes the state', async () => {
     field('overlayOpacity').value = '55'
 
     await settings.saveOverlaySettings()
 
-    assert.deepEqual(puts, [{ opacity: 55 }])
+    assert.deepEqual(puts.at(-1), { showVideo: true, hideOverlayInfo: false, opacity: 55, position: 'bottom-right' })
     assert.equal(state.settings.opacity, 55)
+    assert.equal(field('overlayOpacity').classList.contains('saved'), true)
+    assert.equal(field('showVideo').classList.contains('saved'), false, 'only what changed is marked')
+    assert.equal(panel.toasts().includes('Settings saved'), false, 'an autosave is silent: the green mark is enough')
   })
 
-  await t.test('an opacity that is not a number is marked and not sent', async () => {
-    puts = []
+  await t.test('an empty opacity is sent as it is, and the server refusing it marks the field', async () => {
+    panel.route('PUT /api/settings', (body) => {
+      puts.push(body)
+      return [400, { error: 'raw', code: 'INVALID_CONFIG', params: { fields: 'opacity' }, data: { config: { ...stored }, rejected: ['opacity'] } }]
+    })
     field('overlayOpacity').value = ''
 
     await settings.saveOverlaySettings()
 
-    assert.deepEqual(puts, [])
-    assert.equal(hasError('overlayOpacity'), true)
-  })
-
-  await t.test('a field the server refuses is marked, the state stays, and the error is shown', async () => {
-    field('overlayOpacity').value = '70'
-    panel.route('PUT /api/settings', [400, { error: 'raw', code: 'INVALID_SETTINGS', params: { fields: 'opacity' } }])
-
-    await settings.saveOverlaySettings()
-
+    assert.equal(puts.at(-1).opacity, null)
     assert.equal(hasError('overlayOpacity'), true)
     assert.equal(hasError('showVideo'), false)
-    assert.equal(state.settings.opacity, 55)
-    assert.ok(panel.toasts().includes('Invalid overlay settings: opacity'))
+    assert.equal(state.settings.opacity, 55, 'the stored settings are still the old ones')
+    assert.ok(panel.toasts().includes('Saved 0, not saved 1 (invalid values)'))
+  })
+
+  await t.test('what is stored shows on the controls again, the refused field keeps what was typed', async () => {
+    assert.equal(field('overlayOpacity').value, '')
+    assert.equal(field('badgePosition').value, 'bottom-right')
   })
 })

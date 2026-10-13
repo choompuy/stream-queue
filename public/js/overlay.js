@@ -97,10 +97,13 @@ function renderCurrent() {
 
   if (currentState.nextTrack) {
     setText(dom.nextTitle, currentState.nextTrack.title)
-    setText(dom.nextElapsedTime, formatDuration(Math.floor(currentState.nextTrack.duration)))
+
+    setText(dom.nextElapsedTime, formatDuration(currentState.nextTrack.duration))
     show(dom.nextPlaying)
+    setClass(dom.currentTitle, 'truncate-2line', false)
   } else {
     show(dom.nextPlaying, false)
+    setClass(dom.currentTitle, 'truncate-2line', !settings.showVideo)
   }
   updateMediaVisibility()
 }
@@ -172,16 +175,24 @@ function configurePlayer() {
 
 function updateProgress() {
   if (!isPlaybackSource || !player || !isPlayerReady || typeof player.getCurrentTime !== 'function' || !currentState?.current) {
-    dom.progressBar.style.width = '0%'
-    setText(dom.elapsedTime, '0:00 / 0:00')
     return
   }
 
   const currentTime = player.getCurrentTime() || 0
   const duration = currentState.current.duration
-  const progress = duration > 0 ? ((currentTime / duration) * 100).toFixed(2) : 0
-  dom.progressBar.style.width = `${progress}%`
-  setText(dom.elapsedTime, `${formatDuration(Math.floor(currentTime))} / ${formatDuration(duration)}`)
+
+  setText(dom.elapsedTimeCurrent, formatDuration(currentTime, true))
+
+  if (currentTime > 0 || duration > 0) {
+    setText(dom.elapsedTimeEnd, `${duration <= 0 || settings.showVideo ? '/ ' : ''}${formatDuration(duration)}`)
+
+    dom.progressBar.style.setProperty('--progress', `${Math.floor((currentTime / duration) * 100)}%`)
+    show(dom.progressBar, duration > 0)
+    show(dom.elapsedTimeEnd)
+  } else {
+    show(dom.progressBar, false)
+    show(dom.elapsedTimeEnd, false)
+  }
 }
 
 // The server only listens to these two reports, so a lost one stalls the whole queue: they are retried until they get through.
@@ -408,7 +419,8 @@ export function startOverlay({ locks } = {}) {
     currentTitle: $('currentTitle'),
     currentRequester: $('currentRequester'),
     progressBar: $('progressBar'),
-    elapsedTime: $('elapsedTime'),
+    elapsedTimeCurrent: $('elapsedTimeCurrent'),
+    elapsedTimeEnd: $('elapsedTimeEnd'),
     nextPlaying: $('nextPlaying'),
     nextTitle: $('nextTitle'),
     nextElapsedTime: $('nextElapsedTime')

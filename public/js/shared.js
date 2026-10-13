@@ -14,9 +14,13 @@ export function escapeHtml(value) {
   )
 }
 
-export function formatDuration(seconds) {
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
+export function formatDuration(duration, isNullable = true) {
+  if (isNullable) {
+    if (!duration || duration <= 0) return 'LIVE'
+  }
+
+  const mins = Math.floor(duration / 60)
+  const secs = Math.floor(duration) % 60
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 

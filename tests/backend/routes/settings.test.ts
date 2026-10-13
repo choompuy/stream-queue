@@ -157,14 +157,22 @@ test('PUT /api/settings', async (t) => {
     assert.deepEqual(await getSettings(), { showVideo: true, hideOverlayInfo: false, opacity: 100, position: 'top-left', locale: 'en' })
   })
 
-  await t.test('invalid and unknown fields are a 400 that names them, and nothing is applied', async () => {
+  await t.test('invalid and unknown fields are a 400 that names them, and the valid ones are still stored', async () => {
     const before = await getSettings()
-    const response = await putSettings({ showVideo: false, position: 'nowhere', locale: 'xx', extra: 1 })
+    const response = await putSettings({ showVideo: !before.showVideo, position: 'nowhere', locale: 'xx', extra: 1 })
     const body = (await response.json()) as Record<string, any>
 
     assert.equal(response.status, 400)
-    assert.equal(body.code, 'INVALID_SETTINGS')
-    assert.deepEqual(body.params.fields.split(', ').sort(), ['extra', 'locale', 'position'])
-    assert.deepEqual(await getSettings(), before)
+    assert.equal(body.code, 'INVALID_CONFIG')
+    assert.deepEqual(body.data.rejected.sort(), ['extra', 'locale', 'position'])
+    assert.equal(body.data.config.showVideo, !before.showVideo, 'the answer is the stored settings')
+    assert.deepEqual(await getSettings(), { ...before, showVideo: !before.showVideo })
+  })
+
+  await t.test('a valid save answers with the stored settings and nothing refused', async () => {
+    const body = (await (await putSettings({ opacity: 40 })).json()) as Record<string, any>
+
+    assert.deepEqual(body.data.rejected, [])
+    assert.equal(body.data.config.opacity, 40)
   })
 })
