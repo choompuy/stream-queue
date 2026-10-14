@@ -33,6 +33,9 @@ let stateOverride = null
 let failStateWith500 = false
 let blocklist = [{ videoId: V('c'), title: 'Blocked one', blockedAt: Date.now() }]
 
+// like the server: every track says whether it is on the list of blocked tracks
+const withBlocked = (tracks) => tracks.map((item) => ({ ...item, isBlocked: blocklist.some((entry) => entry.videoId === item.videoId) }))
+
 const routes = {
   'GET /api/locale': () => ({ locale: 'en' }),
   'GET /api/settings': () => ({ showVideo: true, position: 'bottom-right' }),
@@ -62,10 +65,11 @@ const routes = {
   }),
   'GET /api/state': () => {
     if (failStateWith500) return [500, { error: 'boom', code: 'SERVER_ERROR' }]
-    return stateOverride ?? { current: track('a'), queue: [track('b'), track('c')], isPaused: false, nextTrack: null }
+    const state = stateOverride ?? { current: track('a'), queue: [track('b'), track('c')], isPaused: false, nextTrack: null }
+    return { ...state, queue: withBlocked(state.queue) }
   },
   'GET /api/fallback': () => ({
-    upNext: [track('e'), track('f')],
+    upNext: withBlocked([track('e'), track('f')]),
     activeVideoId: V('f'),
     lastRefreshedAt: Date.now(),
     sourceCount: 2,

@@ -2,7 +2,7 @@ import { escapeHtml, formatDuration } from '../../shared.js'
 import { PLUS_ICON } from '../../icons.js'
 import { t } from '../../i18n.js'
 import { dom } from '../dom.js'
-import { createListView, row } from './primitives.js'
+import { createListView, row, statusPill } from './primitives.js'
 
 export const searchView = createListView(dom.searchListWrapper, {
   cache: false,
@@ -11,6 +11,7 @@ export const searchView = createListView(dom.searchListWrapper, {
       thumbnail: song.thumbnail,
       title: song.title,
       subtitle: song.channelTitle,
+      extra: song.isBlocked ? statusPill(t('blocklist.blockedLabel'), 'rejected') : '',
       meta: formatDuration(song.duration),
       actions: `
         <button

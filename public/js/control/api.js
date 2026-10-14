@@ -8,6 +8,12 @@ export class ApiError extends Error {
   }
 }
 
+// What the panel does after it changed something on the server: while the events are not open nothing else would tell it to read again
+let afterChange = () => {}
+export const onServerChange = (callback) => {
+  afterChange = callback
+}
+
 // `partial`: the endpoint answers a save with some refused fields as INVALID_CONFIG plus the stored config and the list of refused fields,
 // which is a result to show and not a failure
 async function request(url, options = {}, { partial = false } = {}) {
@@ -36,6 +42,7 @@ async function request(url, options = {}, { partial = false } = {}) {
 
   if (!response.ok) {
     if (partial && body?.code === 'INVALID_CONFIG' && body?.data) {
+      if (options.method) afterChange()
       return body.data
     }
 
@@ -46,6 +53,7 @@ async function request(url, options = {}, { partial = false } = {}) {
     })
   }
 
+  if (options.method) afterChange()
   return body?.data ?? null
 }
 

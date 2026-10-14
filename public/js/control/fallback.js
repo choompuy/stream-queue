@@ -1,5 +1,5 @@
 import { api } from './api.js'
-import { state, selectors } from './state.js'
+import { state } from './state.js'
 import { dom } from './dom.js'
 import { renderStats } from './stats.js'
 import { views } from './views/index.js'
@@ -43,7 +43,7 @@ export function renderFallback() {
       datetime: formatDateTime(data.lastRefreshedAt)
     })
   )
-  views.fallback.render(selectors.markBlocked(tracks).map((track) => ({ ...track, isActive: track.videoId === activeVideoId })))
+  views.fallback.render(tracks.map((track) => ({ ...track, isActive: track.videoId === activeVideoId })))
   scrollToActiveFallback()
   renderStats()
 }

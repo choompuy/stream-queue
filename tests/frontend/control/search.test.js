@@ -36,6 +36,17 @@ test('search', async (t) => {
     assert.equal(wrapperHidden(), false)
   })
 
+  await t.test('a result that the server says is blocked shows the blocked pill, the others do not', async () => {
+    panel.route('GET /api/search?q=mixed&admin=1', { results: [track('b', { isBlocked: false }), track('c', { isBlocked: true })] })
+    input.value = 'mixed'
+
+    await search()
+
+    const rows = results()
+    assert.equal(rows[0].querySelector('.status-pill'), null)
+    assert.ok(rows[1].querySelector('.status-pill'))
+  })
+
   await t.test('after a failed search the next one is sent', async () => {
     panel.route('GET /api/search?q=broken&admin=1', [500, { error: 'boom', code: 'SERVER_ERROR' }])
     panel.calls.length = 0

@@ -135,13 +135,14 @@ export class AppError extends Error {
   }
 }
 
-export type StateResponse = PlayerState & { nextTrack: QueueItem | null }
+export type Blockable<T> = T & { isBlocked: boolean }
+export type StateResponse = Omit<PlayerState, 'queue'> & { queue: Blockable<QueueItem>[]; nextTrack: QueueItem | null }
 export type PlayerActionResponse = StateResponse & { message: string }
 export type SettingsResponse = Settings
 export type OverlayStateResponse = { state: StateResponse; settings: Settings }
 export type ConfigResponse = Config
 export type ConfigUpdateResponse<T = Config> = { config: T; rejected: string[] }
-export type SearchResponse = { results: Song[] }
+export type SearchResponse = { results: Blockable<Song>[] }
 export type AddedSong = {
   song: QueueItem
   started: boolean
@@ -151,7 +152,7 @@ export type QueueRequestResponse = AddedSong & { state: StateResponse; message: 
 export type FallbackEnqueueResponse = { song: QueueItem; state: StateResponse }
 export type FallbackStateResponse = FallbackPlaylist & {
   lastRefreshedAt: number | null
-  upNext: Song[]
+  upNext: Blockable<Song>[]
   sourceCount: number
   activeVideoId: string | null
 }

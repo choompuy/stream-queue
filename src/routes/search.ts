@@ -3,6 +3,7 @@ import { SearchResponse } from '../types.js'
 import { ok, fail } from '../http.js'
 import { isLocalAddress } from '../local-only.js'
 import { searchSongs } from '../youtube/index.js'
+import { markBlocked } from '../blocklist.js'
 
 export const router = express.Router()
 
@@ -15,5 +16,5 @@ router.get('/', async (req, res) => {
   }
 
   const songs = await searchSongs(query, bypassFilters)
-  ok<SearchResponse>(res, { results: songs })
+  ok<SearchResponse>(res, { results: markBlocked(songs) })
 })

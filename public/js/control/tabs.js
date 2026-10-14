@@ -1,6 +1,7 @@
 import { refreshState } from './queue.js'
 import { refreshFallbackState, scrollToActiveFallback } from './fallback.js'
 import { loadActivity } from './activity.js'
+import { loadBlocklist } from './blocklist.js'
 import { setClass, show } from '../shared.js'
 
 export let activeTab = 'dashboard'
@@ -25,6 +26,7 @@ export function switchPageTab(tabName) {
     refreshState()
     refreshFallbackState()
     loadActivity()
+    loadBlocklist()
   }
 }
 

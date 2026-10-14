@@ -1,6 +1,8 @@
 import { dataPath, createFileStore, loadList } from './persist.js'
 import { createLogger, describeError } from './logger.js'
 import { isValidVideoId } from './youtube/url.js'
+import { emit } from './state-events.js'
+import type { Blockable } from './types.js'
 
 export type BlockedTrack = {
   videoId: string
@@ -49,6 +51,18 @@ export function isBlocked(videoId: string): boolean {
   return ensureLoaded().ids.has(videoId)
 }
 
+// What the panel gets: every track says whether it is blocked, so the panel does not have to match lists
+export function markBlocked<T extends { videoId: string }>(tracks: T[]): Blockable<T>[] {
+  return tracks.map((track) => ({ ...track, isBlocked: isBlocked(track.videoId) }))
+}
+
+// a blocked track changes the queue (it is skipped), the playlist (it is not played) and the list of blocked tracks
+function changed(): void {
+  emit('blocklist')
+  emit('state')
+  emit('fallback')
+}
+
 export function blockTrack(videoId: string, title: string): BlockedTrack {
   const { list, ids } = ensureLoaded()
 
@@ -64,6 +78,7 @@ export function blockTrack(videoId: string, title: string): BlockedTrack {
     }
 
     save()
+    changed()
   }
   return list.find((t) => t.videoId === videoId)!
 }
@@ -76,6 +91,7 @@ export function unblockTrack(videoId: string): boolean {
 
   if (blocked.length !== before) {
     save()
+    changed()
     return true
   }
 

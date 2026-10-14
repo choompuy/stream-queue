@@ -1,4 +1,4 @@
-import { api } from './api.js'
+import { api, onServerChange } from './api.js'
 import { dom } from './dom.js'
 import { log } from './log.js'
 import { initI18n } from '../i18n.js'
@@ -22,6 +22,7 @@ const TOPICS = {
   state: { read: () => refreshState(true), isShown: isDashboardActive },
   activity: { read: () => loadActivity(true), isShown: isDashboardActive },
   fallback: { read: () => refreshFallbackState(true), isShown: isDashboardActive },
+  blocklist: { read: () => loadBlocklist(true), isShown: isDashboardActive },
   twitch: { read: () => refreshTwitchStatus(), isShown: () => document.visibilityState === 'visible' }
 }
 
@@ -55,17 +56,23 @@ export async function startControlPanel() {
   await loadTwitchConfig()
   await Promise.allSettled([loadActivity(), loadBlocklist(), loadPlaylists(), refreshState(), refreshFallbackState()])
 
-  const safetyNet = createPoller(
-    Object.keys(TOPICS).map((name) => ({ run: () => refreshTopic(name), every: SAFETY_POLL_MS }))
-  )
+  const safetyNet = createPoller(Object.keys(TOPICS).map((name) => ({ run: () => refreshTopic(name), every: SAFETY_POLL_MS })))
+
+  let eventsOpen = false
 
   const events = connectEvents({
     topics: Object.keys(TOPICS),
     onChange: refreshTopic,
     onStatus: (status) => {
+      eventsOpen = status === 'open'
       if (status === 'down') safetyNet.start()
       else safetyNet.stop()
     }
+  })
+
+  // with the events open the server announces what a request changed; without them the panel reads at once
+  onServerChange(() => {
+    if (!eventsOpen) Object.keys(TOPICS).forEach(refreshTopic)
   })
 
   // a tab hidden for a while heard nothing (the browser may even have paused it): read the status again when it is back
@@ -77,6 +84,7 @@ export async function startControlPanel() {
   const stop = () => {
     events.close()
     safetyNet.stop()
+    onServerChange(() => {})
     document.removeEventListener('visibilitychange', onVisibilityChange)
     window.removeEventListener('pagehide', stop)
   }

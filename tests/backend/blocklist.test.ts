@@ -6,7 +6,8 @@ import { join } from 'node:path'
 
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
-const { getBlockedTracks, isBlocked, blockTrack, unblockTrack } = await import('../../src/blocklist.js')
+const { getBlockedTracks, isBlocked, blockTrack, unblockTrack, markBlocked } = await import('../../src/blocklist.js')
+const { on } = await import('../../src/state-events.js')
 
 beforeEach(() => {
   for (const track of getBlockedTracks()) unblockTrack(track.videoId)
@@ -108,5 +109,57 @@ test('getBlockedTracks()', async (t) => {
     tracks.pop()
 
     assert.equal(getBlockedTracks().length, 1)
+  })
+})
+
+test('markBlocked()', async (t) => {
+  await t.test('says for every track whether it is blocked, and keeps the rest of the track as it is', () => {
+    blockTrack('aaaaaaaaaaa', 'First')
+    const tracks = [
+      { videoId: 'aaaaaaaaaaa', title: 'First' },
+      { videoId: 'bbbbbbbbbbb', title: 'Second' }
+    ]
+
+    assert.deepEqual(markBlocked(tracks), [
+      { videoId: 'aaaaaaaaaaa', title: 'First', isBlocked: true },
+      { videoId: 'bbbbbbbbbbb', title: 'Second', isBlocked: false }
+    ])
+    assert.equal('isBlocked' in tracks[0], false, 'the tracks that were given are not changed')
+  })
+})
+
+test('what a change of the blocklist announces', async (t) => {
+  const heard: string[] = []
+  const offs = (['blocklist', 'state', 'fallback', 'activity'] as const).map((topic) => on(topic, () => heard.push(topic)))
+  t.after(() => offs.forEach((off) => off()))
+  beforeEach(() => {
+    heard.length = 0
+  })
+
+  await t.test('blocking a track announces the list, the queue and the playlist: all three show it', () => {
+    blockTrack('aaaaaaaaaaa', 'First')
+
+    assert.deepEqual(heard.sort(), ['blocklist', 'fallback', 'state'])
+  })
+
+  await t.test('blocking a track that is blocked already announces nothing: nothing changed', () => {
+    blockTrack('aaaaaaaaaaa', 'First')
+    heard.length = 0
+
+    blockTrack('aaaaaaaaaaa', 'First again')
+
+    assert.deepEqual(heard, [])
+  })
+
+  await t.test('unblocking announces the same three, unblocking a track that is not blocked announces nothing', () => {
+    blockTrack('aaaaaaaaaaa', 'First')
+    heard.length = 0
+
+    unblockTrack('aaaaaaaaaaa')
+    assert.deepEqual(heard.sort(), ['blocklist', 'fallback', 'state'])
+
+    heard.length = 0
+    unblockTrack('aaaaaaaaaaa')
+    assert.deepEqual(heard, [])
   })
 })

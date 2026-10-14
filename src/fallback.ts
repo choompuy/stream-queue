@@ -3,7 +3,7 @@ import { fetchPlaylistSongs } from './youtube/index.js'
 import { Song, QueueItem, FallbackPlaylist, FallbackStateResponse, AppError } from './types.js'
 import { addSong, getCurrent, setCurrent } from './queue.js'
 import { emit } from './state-events.js'
-import { isBlocked } from './blocklist.js'
+import { isBlocked, markBlocked } from './blocklist.js'
 import { createLogger } from './logger.js'
 
 const log = createLogger('FALLBACK')
@@ -203,13 +203,11 @@ export function getFallbackState(): FallbackStateResponse {
     repeat: config.fallbackPlaylist.repeat,
     sourceCount: fallbackTracksById.size,
     activeVideoId: current?.isFallback ? current.videoId : null,
-    upNext: fallbackOrder
-      .map((videoId) => {
-        const track = findTrack(videoId)
-        if (!track) return null
-        return { ...track }
-      })
-      .filter((track): track is Song => track !== null)
+    upNext: markBlocked(
+      fallbackOrder
+        .map((videoId) => findTrack(videoId))
+        .filter((track): track is Song => track !== undefined && track !== null)
+    )
   }
 }
 

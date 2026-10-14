@@ -55,8 +55,8 @@ test('refreshState', async (t) => {
 test('renderQueue', async (t) => {
   await t.test('shows the counts, and marks the blocked track', () => {
     state.config = { maxQueueSize: 5 }
-    state.queue = [track('a'), track('c')]
-    state.blocklist = [{ videoId: V('c'), title: 'Track c', blockedAt: 1 }]
+    // the server says which tracks are blocked: the panel does not match them with the list itself
+    state.queue = [track('a', { isBlocked: false }), track('c', { isBlocked: true })]
 
     queue.renderQueue()
 

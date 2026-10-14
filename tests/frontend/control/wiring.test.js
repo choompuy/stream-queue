@@ -1,6 +1,7 @@
 import { test, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import { setupPanel, installEventSource, flush, deferred, makeTrack as track } from './panel-env.js'
+import { api } from '../../../public/js/control/api.js'
 
 const panel = setupPanel()
 const sources = installEventSource()
@@ -22,11 +23,13 @@ panel.route('GET /api/fallback', { upNext: [], activeVideoId: null, lastRefreshe
 panel.route('GET /api/integrations/twitch', twitchStatus)
 panel.route('GET /api/integrations/twitch/config', {})
 panel.route('GET /api/integrations/twitch/rewards', { rewards: [] })
+panel.route('GET /api/blocklist', { entries: [] })
+panel.route('POST /api/queue/clear', {})
 
 const { startControlPanel } = await import('../../../public/js/control/index.js')
 const { switchPageTab } = await import('../../../public/js/control/tabs.js')
 
-const READ = { state: 'GET /api/state', activity: 'GET /api/activity', fallback: 'GET /api/fallback', twitch: 'GET /api/integrations/twitch' }
+const READ = { state: 'GET /api/state', activity: 'GET /api/activity', fallback: 'GET /api/fallback', twitch: 'GET /api/integrations/twitch', blocklist: 'GET /api/blocklist' }
 const source = () => sources.at(-1)
 
 // the events are coalesced for 100 ms, then the reads run
@@ -38,9 +41,9 @@ async function elapse(ms) {
 const panelHandle = await startControlPanel()
 
 test('the control panel and its events', async (t) => {
-  await t.test('opens one connection for the four topics', () => {
+  await t.test('opens one connection for the five topics', () => {
     assert.equal(sources.length, 1)
-    assert.equal(source().url, '/api/events?topics=state,activity,fallback,twitch')
+    assert.equal(source().url, '/api/events?topics=state,activity,fallback,blocklist,twitch')
   })
 
   await t.test('everything is read again each time the connection comes up: what changed while it was down was never announced', async () => {
@@ -117,6 +120,28 @@ test('the control panel and its events', async (t) => {
 
     await elapse(30_000)
     assert.deepEqual(panel.calls, [])
+  })
+
+  await t.test('a change that the panel makes is left to the events while they are open, and read at once while they are down', async () => {
+    source().emit('open')
+    await elapse(100)
+    panel.calls.length = 0
+
+    await api.clearQueue()
+    await elapse(100)
+    assert.deepEqual(panel.calls, ['POST /api/queue/clear'], 'open: the server announces what changed')
+
+    source().emit('error')
+    await elapse(10_000)
+    panel.calls.length = 0
+
+    await api.clearQueue()
+    await elapse(0)
+    assert.equal(panel.calls[0], 'POST /api/queue/clear')
+    for (const topic of ['state', 'activity', 'fallback', 'blocklist']) assert.equal(panel.count(READ[topic]), 1, topic)
+
+    source().emit('open')
+    await elapse(100)
   })
 
   await t.test('stop() closes the connection and nothing is read afterwards', async () => {

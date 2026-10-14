@@ -1,5 +1,5 @@
 import { api } from './api.js'
-import { state, selectors } from './state.js'
+import { state } from './state.js'
 import { dom } from './dom.js'
 import { renderStats } from './stats.js'
 import { views } from './views/index.js'
@@ -48,7 +48,7 @@ export function renderQueue() {
   setText(dom.queueCount, `${state.queue.length}/${maxQueueSize}`)
   setText(dom.tabQueueCount, state.queue.length)
 
-  views.queue.render(selectors.markBlocked(state.queue))
+  views.queue.render(state.queue)
 }
 
 export function removeFromQueue(videoId) {

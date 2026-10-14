@@ -34,12 +34,3 @@ export const state = {
     editingReward: null
   }
 }
-
-export const selectors = {
-  blockedIds: () => new Set(state.blocklist.map((entry) => entry.videoId)),
-
-  markBlocked(items) {
-    const blocked = selectors.blockedIds()
-    return items.map((item) => ({ ...item, isBlocked: blocked.has(item.videoId) }))
-  }
-}

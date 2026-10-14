@@ -32,7 +32,7 @@ function requestedTopics(query: unknown): Set<Topic> {
  */
 export function createEventStreams({ maxClients = 20, pingEveryMs = 25_000, coalesceMs = 50, retryMs = 3000 }: EventStreamOptions = {}) {
   const clients = new Set<Client>()
-  const sequence: Record<Topic, number> = { state: 0, activity: 0, fallback: 0, twitch: 0 }
+  const sequence = Object.fromEntries(TOPICS.map((topic) => [topic, 0])) as Record<Topic, number>
   const timers = new Map<Topic, ReturnType<typeof setTimeout>>()
   let unsubscribe: (() => void) | null = null
 

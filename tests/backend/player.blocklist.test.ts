@@ -164,3 +164,31 @@ test('reportPlaybackFailure()', async (t) => {
     assert.equal(player.getState().current, null)
   })
 })
+
+test('what the panel gets', async (t) => {
+  await t.test('the state says which queued tracks are blocked', () => {
+    enqueue('a', 'b')
+    block('b')
+
+    assert.deepEqual(
+      player.getState().queue.map((item) => [item.videoId, item.isBlocked]),
+      [
+        ['a', false],
+        ['b', true]
+      ]
+    )
+  })
+
+  await t.test('the playlist says which of its tracks are blocked', () => {
+    setFallback(['f1', 'f2'])
+    block('f2')
+
+    assert.deepEqual(
+      fallback.getFallbackState().upNext.map((track) => [track.videoId, track.isBlocked]),
+      [
+        ['f1', false],
+        ['f2', true]
+      ]
+    )
+  })
+})

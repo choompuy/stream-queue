@@ -26,6 +26,7 @@ const active = (selector) => panel.$(selector).classList.contains('active')
 panel.route('GET /api/state', { current: track('a'), queue: [], isPaused: false })
 panel.route('GET /api/fallback', { upNext: [], activeVideoId: null, lastRefreshedAt: 1, sourceCount: 0, shuffle: false, repeat: false, enabled: false })
 panel.route('GET /api/activity', { entries: [] })
+panel.route('GET /api/blocklist', { entries: [] })
 
 test('the tabs', async (t) => {
   await t.test('a click on a page tab shows that page, and only it', () => {
@@ -47,6 +48,7 @@ test('the tabs', async (t) => {
     assert.equal(isDashboardActive(), true)
     assert.equal(panel.count('GET /api/state'), 1)
     assert.equal(panel.count('GET /api/activity'), 1)
+    assert.equal(panel.count('GET /api/blocklist'), 1)
     assert.ok(panel.count('GET /api/fallback') >= 1, 'the playlist is read too (twice when the track changed)')
   })
 
