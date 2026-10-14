@@ -3,7 +3,7 @@ import { switchPageTab, switchSection } from './tabs.js'
 import { dispatchAction } from './actions.js'
 import { bindMenus } from './menu.js'
 import { saveOverlaySettings, onIpChange, changeLocale } from './settings.js'
-import { onTwitchRewardChange, stopTwitchPolling, bindTwitchFieldTracking, bindTwitchRewardFormEvents } from './twitch/index.js'
+import { onTwitchRewardChange, bindTwitchFieldTracking, bindTwitchRewardFormEvents } from './twitch/index.js'
 import { trackForm } from './form.js'
 import { setError } from '../shared.js'
 
@@ -39,7 +39,6 @@ export function bindEvents() {
   trackForm(dom.overlaySettingsPanel)
   dom.selectIp.addEventListener('change', onIpChange)
   dom.twitchRewardSelect.addEventListener('change', onTwitchRewardChange)
-  window.addEventListener('pagehide', stopTwitchPolling)
   dom.localeSelect.addEventListener('change', (event) => changeLocale(event.target.value))
 
   const settingsInputs = [

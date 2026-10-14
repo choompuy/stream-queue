@@ -9,6 +9,7 @@ import { errorHandler } from './error-handler.js'
 import { apiRouter } from './routes/index.js'
 import { initializeTwitchIntegration } from './integrations/twitch/index.js'
 import { getTwitchClientId } from './env.js'
+import { clearTwitchAuthorization } from './secrets.js'
 import { createLogger, describeError, enableFileLogging, flushLogs } from './logger.js'
 import { hostCheck } from './host-check.js'
 import { installShutdownHandlers } from './shutdown.js'
@@ -49,6 +50,7 @@ async function main() {
   installShutdownHandlers()
 
   initState()
+  clearTwitchAuthorization()
   const twitchClientId = getTwitchClientId()
 
   if (twitchClientId) initializeTwitchIntegration({ clientId: twitchClientId })

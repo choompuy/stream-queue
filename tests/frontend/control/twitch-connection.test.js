@@ -205,3 +205,61 @@ test('a connection made elsewhere', async (t) => {
     assert.equal(requested, false)
   })
 })
+
+const waiting = (expiresAt) => ({ userCode: 'ABCD-1234', verificationUri: 'https://www.twitch.tv/activate', expiresAt })
+
+test('a login that waits for its code', async (t) => {
+  t.beforeEach(() => {
+    Object.assign(state.twitch, { configured: true, connected: false, user: null, health: null, offlineWarning: false, authorization: null })
+    document.getElementById('toastContainer').innerHTML = ''
+  })
+
+  await t.test('is shown with its code and address by a page that was loaded (or reloaded) while the login waits', async () => {
+    status = { connected: false, user: null, authorization: waiting(Date.now() + 60_000) }
+
+    await refreshTwitchStatus()
+
+    assert.equal(hidden('twitchAuthorization'), false)
+    assert.equal(el('twitchAuthorizationLink').getAttribute('href'), 'https://www.twitch.tv/activate')
+    assert.equal(el('twitchAuthorizationLink').textContent, 'https://www.twitch.tv/activate')
+  })
+
+  await t.test('goes away, with a message, when nobody entered the code in time', async () => {
+    state.twitch.authorization = waiting(Date.now() - 1000)
+    status = { connected: false, user: null, authorization: null }
+
+    await refreshTwitchStatus()
+
+    assert.equal(hidden('twitchAuthorization'), true)
+    assert.ok(document.getElementById('toastContainer').textContent.includes('twitchAuthExpired'))
+  })
+
+  await t.test('goes away quietly when it was replaced or refused before its time', async () => {
+    state.twitch.authorization = waiting(Date.now() + 10 * 60_000)
+    status = { connected: false, user: null, authorization: null }
+
+    await refreshTwitchStatus()
+
+    assert.equal(hidden('twitchAuthorization'), true)
+    assert.equal(document.getElementById('toastContainer').textContent, '')
+  })
+
+  await t.test('shows the newest code when it was replaced by another one', async () => {
+    state.twitch.authorization = waiting(Date.now() + 60_000)
+    status = { connected: false, user: null, authorization: { ...waiting(Date.now() + 120_000), userCode: 'WXYZ-9876' } }
+
+    await refreshTwitchStatus()
+
+    assert.equal(document.getElementById('toastContainer').textContent, '')
+  })
+
+  await t.test('is not shown next to an account that is already connected', async () => {
+    state.twitch.authorization = waiting(Date.now() + 60_000)
+    status = { connected: true, user, health: up, authorization: waiting(Date.now() + 60_000) }
+
+    await refreshTwitchStatus()
+
+    assert.equal(hidden('twitchAuthorization'), true)
+    assert.equal(state.twitch.authorization, null)
+  })
+})

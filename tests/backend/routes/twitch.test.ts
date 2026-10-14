@@ -14,6 +14,7 @@ const express = (await import('express')).default
 const { router: twitchRouter } = await import('../../../src/routes/twitch.js')
 const { initializeTwitchIntegration } = await import('../../../src/integrations/twitch/index.js')
 const { getTwitchConfig } = await import('../../../src/integrations/twitch/config.js')
+const { updateTwitchOAuthState } = await import('../../../src/secrets.js')
 
 // Initialize Twitch integration for tests
 initializeTwitchIntegration({
@@ -102,6 +103,21 @@ test('twitch routes localOnly protection', async (t) => {
     assert.equal(body.success, true)
     assert.ok('connected' in body.data)
     assert.equal(body.data.connected, false) // No connection in test environment
+    assert.equal(body.data.authorization, null)
+  })
+
+  await t.test('GET / reports a login that waits for its code, until the code expires', async () => {
+    const expiresAt = Date.now() + 60_000
+    updateTwitchOAuthState({ authorization: { userCode: 'ABCD-1234', verificationUri: 'https://www.twitch.tv/activate', expiresAt } })
+
+    const waiting = (await (await api('/')).json()) as Record<string, any>
+    assert.deepEqual(waiting.data.authorization, { userCode: 'ABCD-1234', verificationUri: 'https://www.twitch.tv/activate', expiresAt })
+
+    updateTwitchOAuthState({ authorization: { userCode: 'ABCD-1234', verificationUri: 'https://www.twitch.tv/activate', expiresAt: Date.now() - 1 } })
+    const expired = (await (await api('/')).json()) as Record<string, any>
+    assert.equal(expired.data.authorization, null)
+
+    updateTwitchOAuthState({ authorization: null })
   })
 
   await t.test('GET /config returns the current Twitch config', async () => {

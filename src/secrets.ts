@@ -2,7 +2,7 @@ import { dataPath, type DeepPartial } from './persist.js'
 import { createConfigModule, field, type FieldRule, type Schema } from './config-helper.js'
 import { emit } from './state-events.js'
 import { getTwitchClientId } from './env.js'
-import { AppError, type TwitchSecrets, type TwitchTokenData, type TwitchUserInfo } from './types.js'
+import { AppError, type TwitchAuthorization, type TwitchSecrets, type TwitchTokenData, type TwitchUserInfo } from './types.js'
 
 export type Secrets = {
   youtubeApiKey: string
@@ -33,17 +33,25 @@ function isValidUserInfo(value: unknown): value is TwitchUserInfo {
   return typeof v.id === 'string' && typeof v.login === 'string' && typeof v.displayName === 'string' && typeof v.profileImageUrl === 'string'
 }
 
+function isValidAuthorization(value: unknown): value is TwitchAuthorization {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+
+  return typeof v.userCode === 'string' && typeof v.verificationUri === 'string' && typeof v.expiresAt === 'number' && Number.isFinite(v.expiresAt)
+}
+
 const nullable = (isValid: (value: unknown) => boolean): FieldRule => field({ validate: (v) => v === null || isValid(v) })
 
 const TWITCH_SCHEMA: Schema = {
   tokenData: nullable(isValidTokenData),
   userInfo: nullable(isValidUserInfo),
-  connectedAt: nullable((v) => typeof v === 'number' && Number.isFinite(v))
+  connectedAt: nullable((v) => typeof v === 'number' && Number.isFinite(v)),
+  authorization: nullable(isValidAuthorization)
 }
 
 const secrets = createConfigModule<Secrets>({
   filePath: () => dataPath('secrets.json'),
-  defaults: { youtubeApiKey: '', twitch: { tokenData: null, userInfo: null, connectedAt: null } },
+  defaults: { youtubeApiKey: '', twitch: { tokenData: null, userInfo: null, connectedAt: null, authorization: null } },
   schema: {
     // An empty string is allowed: it clears the key
     youtubeApiKey: field({ normalize: (v) => (typeof v === 'string' ? v.trim() : v), validate: (v) => typeof v === 'string' }),
@@ -76,14 +84,23 @@ export function updateTwitchOAuthState(updates: Partial<TwitchSecrets>): void {
 }
 
 export function clearTwitchOAuthState(): void {
-  const { tokenData, userInfo, connectedAt } = getSecrets().twitch
-  if (tokenData === null && userInfo === null && connectedAt === null) return
+  const { tokenData, userInfo, connectedAt, authorization } = getSecrets().twitch
+  if (tokenData === null && userInfo === null && connectedAt === null && authorization === null) return
 
   updateTwitchOAuthState({
     tokenData: null,
     userInfo: null,
-    connectedAt: null
+    connectedAt: null,
+    authorization: null
   })
+}
+
+// A login that waits for the code lives in the memory of the process that started it, and ends when that process does:
+// whatever is still written here after a start is left over, and must not make the panel wait for a code nobody checks
+export function clearTwitchAuthorization(): void {
+  if (getSecrets().twitch.authorization === null) return
+
+  updateTwitchOAuthState({ authorization: null })
 }
 
 // only the last 4 characters are shown
@@ -110,7 +127,9 @@ export function getPublicSecretsView() {
             profileImageUrl: twitch.userInfo.profileImageUrl
           }
         : null,
-      connectedAt: twitch.connectedAt
+      connectedAt: twitch.connectedAt,
+      // an expired code is no login any more, whatever the file still says
+      authorization: twitch.authorization && twitch.authorization.expiresAt > Date.now() ? twitch.authorization : null
     }
   }
 }

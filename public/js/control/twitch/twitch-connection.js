@@ -2,47 +2,19 @@ import { show, setText, setClass } from '../../shared.js'
 import { t } from '../../i18n.js'
 import { api, ApiError } from '../api.js'
 import { run } from '../run.js'
-import { toastInfo } from '../toast.js'
+import { toastError, toastInfo } from '../toast.js'
 import { state } from '../state.js'
 import { dom } from '../dom.js'
 import { log } from '../log.js'
 import { loadTwitchRewards, renderTwitchRewards } from './twitch-rewards.js'
 
-const POLL_INTERVAL_MS = 2000
-
 // A connection that is down for a moment (a reconnect takes seconds) is not worth a red warning: it is shown only if it stays down
 const OFFLINE_WARNING_DELAY_MS = 6000
 
+// the server drops the code a moment before or after its own deadline: a code that went away this close to it has expired
+const EXPIRY_TOLERANCE_MS = 5000
+
 let offlineTimer = null
-
-let pollController = null
-
-export function stopTwitchPolling() {
-  pollController?.abort()
-  pollController = null
-}
-
-// resolves to false when the wait was cut short by an abort
-function delay(ms, signal) {
-  return new Promise((resolve) => {
-    if (signal.aborted) {
-      resolve(false)
-      return
-    }
-
-    const onAbort = () => {
-      clearTimeout(timer)
-      resolve(false)
-    }
-
-    const timer = setTimeout(() => {
-      signal.removeEventListener('abort', onAbort)
-      resolve(true)
-    }, ms)
-
-    signal.addEventListener('abort', onAbort, { once: true })
-  })
-}
 
 function openAuthorizationWindow() {
   try {
@@ -97,11 +69,14 @@ function applyStatus(status) {
   state.twitch.connected = Boolean(status?.connected)
   state.twitch.user = status?.user ?? null
   state.twitch.connectedAt = status?.connectedAt ?? null
-  trackHealth(status?.health)
+  // what the login waits for is only shown while there is no account yet
+  state.twitch.authorization = status?.connected ? null : (status?.authorization ?? null)
+  trackHealth(status?.connected ? status.health : null)
 }
 
 // Reads the connection again and shows it as it is now. The account changes without this page doing it: a login finished in
-// another tab, or in this one before it was reloaded (nobody here waits for it any more), or a disconnect done elsewhere
+// another tab, or in this one before it was reloaded (nobody here waits for it any more), or a disconnect done elsewhere.
+// The server says when (the "twitch" event), this page does not ask in between
 export function refreshTwitchStatus() {
   return run(
     'refreshing Twitch status',
@@ -109,16 +84,17 @@ export function refreshTwitchStatus() {
       if (!state.twitch.configured) return
 
       const wasConnected = Boolean(state.twitch.connected && state.twitch.user)
+      const waitingFor = state.twitch.authorization
       const status = await api.getTwitchStatus()
 
-      applyStatus(status.connected ? status : null)
+      applyStatus(status)
       renderTwitchConnection()
 
-      if (status.connected && !wasConnected) {
-        // the login this page may still be waiting for is over
-        stopTwitchPolling()
-        show(dom.twitchAuthorization, false)
-        await loadTwitchRewards()
+      if (status.connected && !wasConnected) await loadTwitchRewards()
+
+      // a code that went away without anybody entering it: it expired. A refused or replaced one is not worth a message
+      if (waitingFor && !status.connected && !status.authorization && waitingFor.expiresAt <= Date.now() + EXPIRY_TOLERANCE_MS) {
+        toastError(t('api.errors.twitchAuthExpired'))
       }
     },
     { silent: true }
@@ -129,64 +105,39 @@ export function connectTwitch() {
   // opened up-front so the popup is attributed to the click and not to the API response
   const authWindow = openAuthorizationWindow()
 
-  stopTwitchPolling()
-  const controller = new AbortController()
-  pollController = controller
-  const { signal } = controller
+  return run('connecting Twitch', async () => {
+    let navigated = false
 
-  return run(
-    'connecting Twitch',
-    async () => {
-      let navigated = false
+    try {
+      const response = await api.connectTwitch()
 
-      try {
-        const response = await api.connectTwitch()
-
-        if (!response?.verificationUri || !response?.userCode) {
-          throw new ApiError('Twitch authorization data is missing', { code: 'TWITCH_AUTH_ERROR' })
-        }
-
-        if (signal.aborted) return
-
-        setText(dom.twitchAuthorizationCode, response.userCode)
-        show(dom.twitchAuthorization)
-        navigateAuthorizationWindow(authWindow, response.verificationUri)
-        navigated = true
-        const expiresAt = Date.now() + response.expiresIn * 1000
-
-        while (Date.now() < expiresAt) {
-          if (!(await delay(POLL_INTERVAL_MS, signal))) return
-
-          const status = await api.getTwitchStatus()
-          if (signal.aborted) return
-
-          if (status.connected) {
-            applyStatus(status)
-            show(dom.twitchAuthorization, false)
-            renderTwitchConnection()
-            await loadTwitchRewards()
-            return
-          }
-        }
-
-        show(dom.twitchAuthorization, false)
-        throw new ApiError('Twitch authorization expired', { code: 'TWITCH_AUTH_EXPIRED' })
-      } finally {
-        // the popup was opened before the request, so it is closed on every path that never sent it to Twitch
-        if (!navigated) authWindow?.close()
-        if (pollController === controller) pollController = null
+      if (!response?.verificationUri || !response?.userCode) {
+        throw new ApiError('Twitch authorization data is missing', { code: 'TWITCH_AUTH_ERROR' })
       }
+
+      // From here the server keeps the state of the login (and says when it ends): this page does not wait for it, and
+      // after a reload it shows the same code
+      state.twitch.authorization = {
+        userCode: response.userCode,
+        verificationUri: response.verificationUri,
+        expiresAt: Date.now() + response.expiresIn * 1000
+      }
+      renderTwitchConnection()
+
+      navigateAuthorizationWindow(authWindow, response.verificationUri)
+      navigated = true
+    } finally {
+      // the popup was opened before the request, so it is closed on every path that never sent it to Twitch
+      if (!navigated) authWindow?.close()
     }
-  )
+  })
 }
 
 export function disconnectTwitch() {
   return run('disconnecting Twitch', async () => {
-    stopTwitchPolling()
     const result = await api.disconnectTwitch()
     applyStatus(null)
     state.twitch.rewards = []
-    show(dom.twitchAuthorization, false)
     show(dom.twitchRewardForm, false)
     renderTwitchConnection()
     renderTwitchRewards()
@@ -233,6 +184,15 @@ function renderTwitchHealth(isConnected) {
   show(dom.twitchHealthWarning, Boolean(key))
 }
 
+// The code to enter and the page to enter it on, while a login waits for it
+function renderTwitchAuthorization(authorization) {
+  show(dom.twitchAuthorization, Boolean(authorization))
+  if (!authorization) return
+
+  dom.twitchAuthorizationLink.href = authorization.verificationUri
+  setText(dom.twitchAuthorizationLink, authorization.verificationUri)
+}
+
 export function renderTwitchConnection() {
   const { configured, connected, user } = state.twitch
 
@@ -241,7 +201,13 @@ export function renderTwitchConnection() {
   show(dom.twitchConnectionControls, configured)
 
   if (!configured) {
-    for (const element of [dom.twitchAuthorization, dom.twitchRewardSection, dom.twitchRewardForm, dom.twitchHealthWarning, dom.twitchChatCommandsPanel]) {
+    for (const element of [
+      dom.twitchAuthorization,
+      dom.twitchRewardSection,
+      dom.twitchRewardForm,
+      dom.twitchHealthWarning,
+      dom.twitchChatCommandsPanel
+    ]) {
       show(element, false)
     }
     return
@@ -249,6 +215,7 @@ export function renderTwitchConnection() {
 
   const isConnected = Boolean(connected && user)
   renderTwitchHealth(isConnected)
+  renderTwitchAuthorization(isConnected ? null : state.twitch.authorization)
 
   setText(dom.twitchChanelName, isConnected ? '@' + user.displayName : t('settings.twitch.notConnected'))
   setClass(dom.twitchChanelName, 'text-green', isConnected)

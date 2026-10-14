@@ -172,8 +172,15 @@ export type TwitchUserInfo = {
   profileImageUrl: string
 }
 
+export type TwitchAuthorization = {
+  userCode: string
+  verificationUri: string
+  expiresAt: number
+}
+
 export type TwitchSecrets = {
   tokenData: TwitchTokenData | null
   userInfo: TwitchUserInfo | null
   connectedAt: number | null
+  authorization: TwitchAuthorization | null
 }

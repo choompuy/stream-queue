@@ -10,7 +10,7 @@ import type {
   TwitchChatMessage,
   TwitchChatPermission
 } from './types.js'
-import { clearTwitchOAuthState, getPublicSecretsView, getSecrets, updateTwitchOAuthState } from '../../secrets.js'
+import { clearTwitchAuthorization, clearTwitchOAuthState, getPublicSecretsView, getSecrets, updateTwitchOAuthState } from '../../secrets.js'
 import { detachChannelPointsRedemptions, requestSong, setPaused } from '../../queue.js'
 import {
   buildNowPlayingMessage,
@@ -324,6 +324,7 @@ function cancelDeviceAuthorization(): void {
 
   deviceAuthorizationGeneration++
   deviceAuthorizationPromise = null
+  clearTwitchAuthorization()
 }
 
 export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeResponse> {
@@ -343,8 +344,13 @@ export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeRespon
   // another start (or a disconnect) came while the code was being requested: this one is no longer wanted
   if (generation !== deviceAuthorizationGeneration) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch authorization was cancelled')
 
+  // what the panel shows while the login waits (also after the page is reloaded): it ends with the login, however it ends
+  updateTwitchOAuthState({
+    authorization: { userCode: device.user_code, verificationUri: device.verification_uri, expiresAt: Date.now() + device.expires_in * 1000 }
+  })
+
   deviceAuthorizationPromise = oauth
-    .pollForToken(device.device_code, device.interval, device.expires_in)
+    .pollForToken(device.device_code, device.interval, device.expires_in, () => generation === deviceAuthorizationGeneration)
     .then(async () => {
       if (generation !== deviceAuthorizationGeneration) {
         throw new Error('Device authorization was cancelled')
@@ -370,7 +376,10 @@ export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeRespon
       else log.log('Twitch authorization was cancelled')
     })
     .finally(() => {
-      if (generation === deviceAuthorizationGeneration) deviceAuthorizationPromise = null
+      if (generation !== deviceAuthorizationGeneration) return
+
+      deviceAuthorizationPromise = null
+      clearTwitchAuthorization()
     })
 
   return device

@@ -81,7 +81,9 @@ export class TwitchOAuth {
     }
   }
 
-  async pollForToken(deviceCode: string, interval: number, expiresIn: number): Promise<TwitchTokenData> {
+  // `isWanted` says whether the login is still wanted: a login that was replaced or cancelled stops polling at once, and
+  // the tokens Twitch gave it in the meantime are revoked instead of replacing those of the account that is connected
+  async pollForToken(deviceCode: string, interval: number, expiresIn: number, isWanted: () => boolean = () => true): Promise<TwitchTokenData> {
     if (!deviceCode) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch device code is required')
     if (!this.config.clientId) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID not configured')
 
@@ -90,6 +92,8 @@ export class TwitchOAuth {
 
     while (Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, pollInterval))
+      if (!isWanted()) throw new Error('Device authorization was cancelled')
+
       const params = new URLSearchParams({
         client_id: this.config.clientId,
         device_code: deviceCode,
@@ -106,7 +110,15 @@ export class TwitchOAuth {
       }
 
       if (response.ok) {
-        const tokenData = this.store((await response.json()) as TwitchTokenResponse)
+        const data = (await response.json()) as TwitchTokenResponse
+
+        if (!isWanted()) {
+          // the code was entered after all, but nobody waits for it any more: the account must not change
+          await this.revoke([data.access_token, data.refresh_token])
+          throw new Error('Device authorization was cancelled')
+        }
+
+        const tokenData = this.store(data)
 
         log.log('Device authorization successful')
         return tokenData
@@ -183,8 +195,12 @@ export class TwitchOAuth {
 
   // Tells Twitch to forget the tokens (best effort: the account is disconnected locally whatever the answer)
   async revokeTokens(): Promise<void> {
+    await this.revoke([this.tokenData?.accessToken, this.tokenData?.refreshToken])
+  }
+
+  private async revoke(candidates: (string | undefined)[]): Promise<void> {
     const { clientId } = this.config
-    const tokens = [this.tokenData?.accessToken, this.tokenData?.refreshToken].filter((token): token is string => Boolean(token))
+    const tokens = candidates.filter((token): token is string => Boolean(token))
     if (!clientId || tokens.length === 0) return
 
     await Promise.all(

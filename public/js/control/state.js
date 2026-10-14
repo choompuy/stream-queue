@@ -27,6 +27,7 @@ export const state = {
     connectedAt: null,
     health: null,
     offlineWarning: false,
+    authorization: null,
     rewards: [],
     selectedRewardId: '',
     config: null,

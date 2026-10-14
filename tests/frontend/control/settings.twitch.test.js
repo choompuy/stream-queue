@@ -6,7 +6,9 @@ import { JSDOM } from 'jsdom'
 
 const PUBLIC_DIR = pathToFileURL(fileURLToPath(new URL('../../../public/', import.meta.url)))
 
-const jsdom = new JSDOM(readFileSync(new URL('../../../public/index.html', import.meta.url), 'utf8').replace(/<script[^>]*><\/script>/g, ''))
+const jsdom = new JSDOM(
+  readFileSync(new URL('../../../public/index.html', import.meta.url), 'utf8').replace(/<script[^>]*><\/script>/g, '')
+)
 
 globalThis.window = jsdom.window
 globalThis.document = jsdom.window.document
@@ -118,12 +120,12 @@ function reset() {
   requests = []
   openedWindows = []
   lastBody = null
-  settings.stopTwitchPolling()
 
   state.twitch.configured = true
   state.twitch.connected = false
   state.twitch.user = null
   state.twitch.connectedAt = null
+  state.twitch.authorization = null
   state.twitch.rewards = []
   state.twitch.selectedRewardId = ''
   state.twitch.config = null
@@ -155,11 +157,6 @@ function reset() {
 }
 
 const deviceCode = (expiresIn = 600) => ({ verificationUri: 'https://twitch.tv/activate', userCode: 'ABCD-1234', expiresIn })
-const statusSequence = (...statuses) => {
-  let index = 0
-  return () => statuses[Math.min(index++, statuses.length - 1)]
-}
-
 test('connectTwitch', async (t) => {
   t.beforeEach(() => {
     reset()
@@ -167,26 +164,19 @@ test('connectTwitch', async (t) => {
   })
   t.afterEach(() => mock.timers.reset())
 
-  await t.test('polls until Twitch reports a connection and then loads the rewards', async () => {
-    handlers = {
-      'POST /api/integrations/twitch/connect': () => deviceCode(),
-      'GET /api/integrations/twitch': statusSequence(
-        { connected: false },
-        { connected: true, user: { displayName: 'streamer' }, connectedAt: 1700000000000 }
-      ),
-      'GET /api/integrations/twitch/rewards': () => ({ rewards: REWARDS })
-    }
+  await t.test('shows the code and the page to enter it on, and then waits for the server instead of asking it', async () => {
+    handlers = { 'POST /api/integrations/twitch/connect': () => deviceCode() }
 
     await drain(settings.connectTwitch())
 
-    assert.equal(state.twitch.connected, true)
-    assert.equal(state.twitch.user.displayName, 'streamer')
-    assert.deepEqual(state.twitch.rewards, REWARDS)
-    assert.equal(dom.twitchAuthorizationCode.textContent, 'ABCD-1234')
-    assert.ok(dom.twitchAuthorization.classList.contains('hidden'))
-    assert.ok(dom.twitchConnectBtn.classList.contains('hidden'))
-    assert.ok(!dom.twitchDisconnectBtn.classList.contains('hidden'))
-    assert.ok(dom.twitchRewardSelect.innerHTML.includes('Song request'))
+    assert.equal(dom.twitchAuthorizationLink.getAttribute('href'), 'https://twitch.tv/activate')
+    assert.ok(!dom.twitchAuthorization.classList.contains('hidden'))
+    assert.equal(state.twitch.authorization.userCode, 'ABCD-1234')
+
+    mock.timers.tick(20 * 60 * 1000) // longer than the code lives
+    await flush()
+
+    assert.deepEqual(requests, ['POST /api/integrations/twitch/connect'], 'the page does not poll: the server says when the login ends')
   })
 
   await t.test('opens the authorization window before the API call and only then points it at Twitch', async () => {
@@ -196,9 +186,7 @@ test('connectTwitch', async (t) => {
         assert.equal(openedWindows.length, 1)
         assert.equal(openedWindows[0].url, '')
         return deviceCode()
-      },
-      'GET /api/integrations/twitch': () => ({ connected: true, user: { displayName: 'streamer' } }),
-      'GET /api/integrations/twitch/rewards': () => ({ rewards: [] })
+      }
     }
 
     const pending = settings.connectTwitch()
@@ -210,20 +198,6 @@ test('connectTwitch', async (t) => {
     assert.equal(openedWindows[0].opener, null)
   })
 
-  await t.test('reports an expired authorization as an ApiError and hides the code', async () => {
-    handlers = {
-      'POST /api/integrations/twitch/connect': () => deviceCode(0),
-      'GET /api/integrations/twitch': () => ({ connected: false })
-    }
-
-    await drain(settings.connectTwitch())
-
-    assert.equal(state.twitch.connected, false)
-    assert.ok(dom.twitchAuthorization.classList.contains('hidden'))
-    const toast = document.getElementById('toastContainer').textContent
-    assert.ok(toast.includes(translate('api.errors.twitchAuthExpired')), `expected an expiry toast, got "${toast}"`)
-  })
-
   await t.test('closes the popup and toasts when the device code response is incomplete', async () => {
     handlers = { 'POST /api/integrations/twitch/connect': () => ({ userCode: 'ABCD-1234' }) }
 
@@ -231,6 +205,7 @@ test('connectTwitch', async (t) => {
 
     assert.equal(openedWindows[0].closed, true)
     assert.ok(document.getElementById('toastContainer').textContent.length > 0)
+    assert.equal(state.twitch.authorization, null, 'a code that is not complete is not shown')
   })
 
   await t.test('closes the popup when the connect request itself fails', async () => {
@@ -246,26 +221,12 @@ test('connectTwitch', async (t) => {
     assert.equal(dom.twitchConnectBtn.disabled, false)
   })
 
-  await t.test('a second connect attempt cancels the poll loop of the first one', async () => {
-    handlers = {
-      'POST /api/integrations/twitch/connect': () => deviceCode(),
-      'GET /api/integrations/twitch': () => ({ connected: false })
-    }
+  await t.test('the connect button is usable again as soon as the code is shown (a new click replaces the code)', async () => {
+    handlers = { 'POST /api/integrations/twitch/connect': () => deviceCode() }
 
-    const first = settings.connectTwitch()
-    await flush()
-    mock.timers.tick(2000)
-    await flush()
+    await drain(settings.connectTwitch())
 
-    const pollsBefore = requests.filter((entry) => entry === 'GET /api/integrations/twitch').length
-    settings.stopTwitchPolling()
-    mock.timers.tick(2000)
-    await flush()
-    mock.timers.tick(2000)
-    await flush()
-
-    await first
-    assert.equal(requests.filter((entry) => entry === 'GET /api/integrations/twitch').length, pollsBefore)
+    assert.equal(dom.twitchConnectBtn.disabled, false)
   })
 })
 
@@ -293,28 +254,15 @@ test('disconnectTwitch', async (t) => {
     assert.ok(dom.twitchRewardSelect.innerHTML.includes(translate('settings.twitch.noRewards')))
   })
 
-  await t.test('stops an in-flight poll loop', async () => {
-    handlers = {
-      'POST /api/integrations/twitch/connect': () => deviceCode(),
-      'GET /api/integrations/twitch': () => ({ connected: false }),
-      'POST /api/integrations/twitch/disconnect': () => null
-    }
-
-    const connecting = settings.connectTwitch()
-    await flush()
-    mock.timers.tick(2000)
-    await flush()
+  await t.test('takes away the code of a login that was still waiting', async () => {
+    state.twitch.authorization = { userCode: 'ABCD-1234', verificationUri: 'https://twitch.tv/activate', expiresAt: Date.now() + 60_000 }
+    dom.twitchAuthorization.classList.remove('hidden')
+    handlers = { 'POST /api/integrations/twitch/disconnect': () => null }
 
     await settings.disconnectTwitch()
-    const pollsAtDisconnect = requests.filter((entry) => entry === 'GET /api/integrations/twitch').length
 
-    mock.timers.tick(2000)
-    await flush()
-    mock.timers.tick(2000)
-    await flush()
-    await connecting
-
-    assert.equal(requests.filter((entry) => entry === 'GET /api/integrations/twitch').length, pollsAtDisconnect)
+    assert.equal(state.twitch.authorization, null)
+    assert.ok(dom.twitchAuthorization.classList.contains('hidden'))
   })
 })
 

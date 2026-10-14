@@ -7,12 +7,12 @@ import type { TwitchTokenData, TwitchUserInfo } from '../../src/integrations/twi
 
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
-const { getSecrets, updateSecrets, updateTwitchOAuthState, clearTwitchOAuthState, getPublicSecretsView } =
+const { getSecrets, updateSecrets, updateTwitchOAuthState, clearTwitchOAuthState, clearTwitchAuthorization, getPublicSecretsView } =
   await import('../../src/secrets.js')
 
 beforeEach(() => {
   updateSecrets({ youtubeApiKey: ' ' }) // reset: a whitespace-only value is ignored, see below
-  updateTwitchOAuthState({ tokenData: null, userInfo: null, connectedAt: null })
+  updateTwitchOAuthState({ tokenData: null, userInfo: null, connectedAt: null, authorization: null })
 })
 
 afterEach(() => {
@@ -275,5 +275,53 @@ test('getPublicSecretsView()', async (t) => {
 
     assert.equal(view.twitch.user?.displayName, 'TestUser')
     assert.equal(view.twitch.user?.login, 'testuser')
+  })
+})
+
+const waiting = (expiresAt: number) => ({ userCode: 'ABCD-1234', verificationUri: 'https://www.twitch.tv/activate', expiresAt })
+
+test('the login that waits for a code (authorization)', async (t) => {
+  await t.test('is stored with the rest of the Twitch state and shown by the public view', () => {
+    const expiresAt = Date.now() + 60_000
+    updateTwitchOAuthState({ authorization: waiting(expiresAt) })
+
+    assert.deepEqual(getSecrets().twitch.authorization, waiting(expiresAt))
+    assert.deepEqual(getPublicSecretsView().twitch.authorization, waiting(expiresAt))
+  })
+
+  await t.test('an expired one is no login any more, whatever is still written', () => {
+    updateTwitchOAuthState({ authorization: waiting(Date.now() - 1) })
+
+    assert.notEqual(getSecrets().twitch.authorization, null)
+    assert.equal(getPublicSecretsView().twitch.authorization, null)
+  })
+
+  await t.test('a malformed one is refused and the stored value stays', () => {
+    updateTwitchOAuthState({ authorization: waiting(Date.now() + 60_000) })
+
+    assert.throws(() => updateTwitchOAuthState({ authorization: { userCode: 5 } as never }), { code: 'INVALID_INPUT' })
+    assert.equal(getSecrets().twitch.authorization?.userCode, 'ABCD-1234')
+  })
+
+  await t.test('clearTwitchAuthorization() removes it and leaves the account alone', () => {
+    updateTwitchOAuthState({ connectedAt: 1700000000000, authorization: waiting(Date.now() + 60_000) })
+
+    clearTwitchAuthorization()
+
+    assert.equal(getSecrets().twitch.authorization, null)
+    assert.equal(getSecrets().twitch.connectedAt, 1700000000000)
+  })
+
+  await t.test('clearTwitchAuthorization() on nothing changes nothing and says nothing', () => {
+    assert.doesNotThrow(() => clearTwitchAuthorization())
+    assert.equal(getSecrets().twitch.authorization, null)
+  })
+
+  await t.test('clearTwitchOAuthState() (disconnect) removes it too', () => {
+    updateTwitchOAuthState({ authorization: waiting(Date.now() + 60_000) })
+
+    clearTwitchOAuthState()
+
+    assert.equal(getSecrets().twitch.authorization, null)
   })
 })
