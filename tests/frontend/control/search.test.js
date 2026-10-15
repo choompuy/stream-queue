@@ -74,7 +74,7 @@ test('adding a track', async (t) => {
     await search()
 
     assert.deepEqual(sent, { query: 'https://youtu.be/dQw4w9WgXcQ', requestedBy: 'ControlPanel', admin: true })
-    assert.deepEqual(panel.calls, ['POST /api/queue/request', 'GET /api/state', 'GET /api/activity'])
+    assert.deepEqual(panel.calls, ['POST /api/queue/request'])
     assert.ok(panel.toasts().includes('Added to queue: Song [#3]'))
   })
 
@@ -97,13 +97,13 @@ test('adding a track', async (t) => {
     assert.equal(sent.query, `https://www.youtube.com/watch?v=${V('z')}`)
   })
 
-  await t.test('a refused request is reported, and the activity is reloaded to show the refusal', async () => {
+  await t.test('a refused request is only reported: the refusal in the activity is announced by the server', async () => {
     panel.route('POST /api/queue/request', [409, { error: 'raw', code: 'DUPLICATE' }])
     panel.calls.length = 0
 
     await searchActions['search-add']({ dataset: { videoId: V('z') } })
 
-    assert.deepEqual(panel.calls, ['POST /api/queue/request', 'GET /api/activity'])
+    assert.deepEqual(panel.calls, ['POST /api/queue/request'])
     assert.ok(panel.toasts().includes('This track is already in the queue'))
   })
 })

@@ -160,7 +160,9 @@ export function setCurrent(item: QueueItem | null): void {
     log.log(item ? `now playing "${item.title}"` : 'nothing is playing')
   }
 
+  // the playlist shows which of its tracks plays and what comes next: both follow the current track
   emit('state')
+  emit('fallback')
 }
 
 export function removeByVideoId(videoId: string): QueueItem | null {

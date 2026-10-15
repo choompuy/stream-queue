@@ -1,62 +1,50 @@
 import { api } from './api.js'
 import { state } from './state.js'
 import { dom } from './dom.js'
-import { log } from './log.js'
 import { views } from './views/index.js'
 import { run } from './run.js'
-import { refreshFallbackState } from './fallback.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 import { setValue } from '../shared.js'
 
-export function loadPlaylists() {
-  return run('loading playlists', async () => {
-    const data = await api.getPlaylists()
-    state.playlists = data.playlists
-    renderPlaylists()
-  })
-}
-
-export function renderPlaylists() {
-  const activeId = state.config?.fallbackPlaylist?.playlistId ?? ''
-  views.playlists.render(state.playlists.map((playlist) => ({ ...playlist, isActive: playlist.id === activeId })))
-}
-
-export async function addPlaylist() {
-  const value = dom.playlistUrlInput.value.trim()
-  if (!value) return
-
-  await run(
-    'adding playlist',
+export function loadPlaylists(silent = false) {
+  return run(
+    'loading playlists',
     async () => {
-      await api.addPlaylist(value)
-      setValue(dom.playlistUrlInput, '')
-      await loadPlaylists()
-      toastSuccess(t('toast.playlistAdded'))
-    }
+      state.playlists = (await api.getPlaylists()).playlists
+      renderPlaylists()
+    },
+    { silent }
   )
+}
+
+// every playlist says whether it is the active one
+export function renderPlaylists() {
+  views.playlists.render(state.playlists)
+}
+
+export function addPlaylist() {
+  const value = dom.playlistUrlInput.value.trim()
+  if (!value) return undefined
+
+  return run('adding playlist', async () => {
+    await api.addPlaylist(value)
+    setValue(dom.playlistUrlInput, '')
+    toastSuccess(t('toast.playlistAdded'))
+  })
 }
 
 export function activatePlaylist(id) {
   return run('activating playlist', async () => {
-    state.config = await api.activatePlaylist(id)
-    renderPlaylists()
-    await refreshFallbackState()
+    await api.activatePlaylist(id)
     toastSuccess(t('toast.playlistActivated'))
   })
 }
 
-export async function deletePlaylist(id) {
-  await run('deleting playlist', async () => {
-    const result = await api.removePlaylist(id)
-    await loadPlaylists()
+export function deletePlaylist(id) {
+  return run('deleting playlist', async () => {
+    await api.removePlaylist(id)
     toastSuccess(t('toast.playlistDeleted'))
-
-    if (result?.fallbackCleared) {
-      state.config = await api.getConfig()
-      await refreshFallbackState()
-      log('Fallback cleared - active playlist was removed')
-    }
   })
 }
 

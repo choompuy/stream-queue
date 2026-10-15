@@ -45,36 +45,37 @@ test('the switches of the playlist', async (t) => {
 })
 
 test('refreshing the playlist', async (t) => {
-  await t.test('asks the server to reload it, reads it, and says so', async () => {
-    panel.route('POST /api/fallback/refresh', {})
+  await t.test('asks the server to reload it, shows the playlist it answers with, and says so', async () => {
+    panel.route('POST /api/fallback/refresh', fallback({ sourceCount: 7 }))
     panel.calls.length = 0
 
     await actions.refreshFallback()
 
-    assert.deepEqual(panel.calls, ['POST /api/fallback/refresh', 'GET /api/fallback'])
+    assert.deepEqual(panel.calls, ['POST /api/fallback/refresh'])
+    assert.equal(state.fallback.sourceCount, 7, 'the playlist is the one the server answered with')
     assert.ok(panel.toasts().includes('Playlist refreshed'))
   })
 })
 
 test('a track of the playlist', async (t) => {
-  await t.test('"play now" starts it, reads the state, and names the track', async () => {
+  await t.test('"play now" starts it and names the track', async () => {
     state.fallback = fallback()
     panel.route(`POST /api/fallback/play/${V('f')}`, {})
     panel.calls.length = 0
 
     await actions.playFallbackNow(V('f'))
 
-    assert.deepEqual(panel.calls, [`POST /api/fallback/play/${V('f')}`, 'GET /api/state'])
+    assert.deepEqual(panel.calls, [`POST /api/fallback/play/${V('f')}`])
     assert.ok(panel.toasts().includes('Now playing: Track f'))
   })
 
-  await t.test('"add to queue" queues it and says at which place it stands', async () => {
-    panel.route(`POST /api/fallback/enqueue/${V('g')}`, {})
+  await t.test('"add to queue" queues it and says at which place it stands, as the server answers', async () => {
+    panel.route(`POST /api/fallback/enqueue/${V('g')}`, { song: {}, state: { queue: [track('b'), track('c')] } })
     panel.calls.length = 0
 
     await actions.enqueueFallbackTrack(V('g'))
 
-    assert.deepEqual(panel.calls, [`POST /api/fallback/enqueue/${V('g')}`, 'GET /api/state'])
+    assert.deepEqual(panel.calls, [`POST /api/fallback/enqueue/${V('g')}`])
     assert.ok(panel.toasts().includes('Added to queue: Track g [#2]'))
   })
 

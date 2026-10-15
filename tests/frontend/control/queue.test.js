@@ -32,15 +32,13 @@ test('refreshState', async (t) => {
     assert.equal(state.queue.length, 0)
   })
 
-  await t.test('the fallback playlist is reloaded when the track changed, not on every poll', async () => {
+  await t.test('a track that changed does not make the panel read the playlist: the server announces that itself', async () => {
     panel.route('GET /api/state', { current: track('d'), queue: [], isPaused: false })
     panel.calls.length = 0
 
     await queue.refreshState(true)
-    assert.equal(panel.count('GET /api/fallback'), 1)
 
-    await queue.refreshState(true)
-    assert.equal(panel.count('GET /api/fallback'), 1)
+    assert.deepEqual(panel.calls, ['GET /api/state'])
   })
 
   await t.test('a failed poll leaves the state as it was', async () => {
@@ -74,13 +72,13 @@ test('removeFromQueue', async (t) => {
   state.current = track('d')
   panel.route('GET /api/state', { current: track('d'), queue: [], isPaused: false })
 
-  await t.test('removes by video id, then reloads the queue and says so', async () => {
+  await t.test('removes by video id and says so: the new queue is announced by the server', async () => {
     panel.route(`DELETE /api/queue/video/${V('x')}`, {})
     panel.calls.length = 0
 
     await queue.removeFromQueue(V('x'))
 
-    assert.deepEqual(panel.calls, [`DELETE /api/queue/video/${V('x')}`, 'GET /api/state'])
+    assert.deepEqual(panel.calls, [`DELETE /api/queue/video/${V('x')}`])
     assert.ok(panel.toasts().includes('Removed from queue'))
   })
 
@@ -100,11 +98,11 @@ test('clearQueue', async (t) => {
   panel.route('GET /api/state', { current: track('d'), queue: [], isPaused: false })
   panel.route('POST /api/queue/clear', {})
 
-  await t.test('clears and reloads', async () => {
+  await t.test('clears, and the empty queue is announced by the server', async () => {
     panel.calls.length = 0
 
     await queue.clearQueue()
 
-    assert.deepEqual(panel.calls, ['POST /api/queue/clear', 'GET /api/state'])
+    assert.deepEqual(panel.calls, ['POST /api/queue/clear'])
   })
 })

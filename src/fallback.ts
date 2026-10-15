@@ -173,6 +173,7 @@ function toggleFallbackFlag(flag: FallbackFlag): FallbackStateResponse {
 
   updateConfig({ fallbackPlaylist: patch })
   if (flag === 'shuffle') reorderFallback(next)
+  else changed()
 
   log.log(`${flag}: ${next}`)
   return getFallbackState()
@@ -187,6 +188,7 @@ export function clearFallback(): FallbackStateResponse {
 
   updateConfig({ fallbackPlaylist: { playlistId: null } })
   changed()
+  emit('playlists')
   log.log('cleared')
   return getFallbackState()
 }

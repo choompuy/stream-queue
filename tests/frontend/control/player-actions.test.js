@@ -17,22 +17,22 @@ panel.route('POST /api/player/resume', {})
 panel.route('POST /api/player/skip', {})
 
 test('play and pause', async (t) => {
-  await t.test('pauses what is playing, then reads the state', async () => {
+  await t.test('pauses what is playing', async () => {
     state.isPaused = false
     panel.calls.length = 0
 
     await playPauseCurrent()
 
-    assert.deepEqual(panel.calls, ['POST /api/player/pause', 'GET /api/state'])
+    assert.deepEqual(panel.calls, ['POST /api/player/pause'])
   })
 
-  await t.test('resumes what is paused, then reads the state', async () => {
+  await t.test('resumes what is paused', async () => {
     state.isPaused = true
     panel.calls.length = 0
 
     await playPauseCurrent()
 
-    assert.deepEqual(panel.calls, ['POST /api/player/resume', 'GET /api/state'])
+    assert.deepEqual(panel.calls, ['POST /api/player/resume'])
   })
 
   await t.test('the button waits for the answer, so a second click cannot send the opposite command', async () => {
@@ -50,7 +50,7 @@ test('play and pause', async (t) => {
     assert.equal(button.disabled, false)
   })
 
-  await t.test('a refused command is reported and the state is not read as if it had worked', async () => {
+  await t.test('a refused command is reported', async () => {
     panel.route('POST /api/player/pause', [500, { error: 'raw', code: 'SERVER_ERROR' }])
     state.isPaused = false
     panel.calls.length = 0
@@ -64,12 +64,12 @@ test('play and pause', async (t) => {
 })
 
 test('skip', async (t) => {
-  await t.test('skips, then reads the state', async () => {
+  await t.test('skips', async () => {
     panel.calls.length = 0
 
     await skipCurrent()
 
-    assert.deepEqual(panel.calls, ['POST /api/player/skip', 'GET /api/state'])
+    assert.deepEqual(panel.calls, ['POST /api/player/skip'])
   })
 
   await t.test('the two buttons are wired to the two actions', () => {

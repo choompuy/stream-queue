@@ -49,7 +49,7 @@ test('dispatchAction', async (t) => {
 
     await dispatchAction(button, new window.Event('click'))
 
-    assert.deepEqual(panel.calls, ['POST /api/player/skip', 'GET /api/state'])
+    assert.deepEqual(panel.calls, ['POST /api/player/skip'])
   })
 
   await t.test('a button with data-confirm asks first: no leaves everything as it was, yes runs the action', async () => {
@@ -67,7 +67,7 @@ test('dispatchAction', async (t) => {
     await dispatchAction(button, clickEvent())
 
     assert.equal(asked, 'Clear entire queue?')
-    assert.deepEqual(panel.calls, ['POST /api/player/skip', 'GET /api/state'])
+    assert.deepEqual(panel.calls, ['POST /api/player/skip'])
     globalThis.confirm = () => true
   })
 

@@ -2,8 +2,7 @@ import { api } from './api.js'
 import { state } from './state.js'
 import { views } from './views/index.js'
 import { run } from './run.js'
-import { refreshState } from './queue.js'
-import { refreshFallbackState, renderFallback } from './fallback.js'
+import { renderFallback } from './fallback.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 
@@ -11,8 +10,8 @@ export function refreshFallback() {
   return run(
     'refreshing fallback',
     async () => {
-      await api.refreshFallback()
-      await refreshFallbackState()
+      state.fallback = await api.refreshFallback()
+      renderFallback()
       toastSuccess(t('toast.fallbackRefreshed'))
     }
   )
@@ -47,7 +46,6 @@ export function playFallbackNow(videoId) {
 
   return run('playing fallback track', async () => {
     await api.playFallback(videoId)
-    await refreshState()
     if (title) toastSuccess(t('toast.nowPlaying', { title }))
   })
 }
@@ -56,9 +54,8 @@ export function enqueueFallbackTrack(videoId) {
   const title = fallbackTitle(videoId)
 
   return run('queueing fallback track', async () => {
-    await api.enqueueFallback(videoId)
-    await refreshState()
-    if (title) toastSuccess(t('toast.addedToQueue', { title, position: state.queue.length }))
+    const answer = await api.enqueueFallback(videoId)
+    if (title) toastSuccess(t('toast.addedToQueue', { title, position: answer.state.queue.length }))
   })
 }
 

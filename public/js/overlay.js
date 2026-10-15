@@ -181,7 +181,7 @@ function updateProgress() {
   const currentTime = player.getCurrentTime() || 0
   const duration = currentState.current.duration
 
-  setText(dom.elapsedTimeCurrent, formatDuration(currentTime, true))
+  setText(dom.elapsedTimeCurrent, formatDuration(currentTime, false))
 
   if (currentTime > 0 || duration > 0) {
     setText(dom.elapsedTimeEnd, `${duration <= 0 || settings.showVideo ? '/ ' : ''}${formatDuration(duration)}`)

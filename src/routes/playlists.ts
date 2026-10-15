@@ -4,16 +4,23 @@ import { ok, fail, failFromError } from '../http.js'
 import { getConfig, updateConfig } from '../config.js'
 import { parsePlaylistId, isValidPlaylistId } from '../youtube/url.js'
 import { fetchPlaylistMeta } from '../youtube/index.js'
-import { getPlaylists, upsertPlaylist, removePlaylist } from '../playlists.js'
+import { getPlaylists, upsertPlaylist, removePlaylist, type PlaylistEntry } from '../playlists.js'
 import { clearFallback, refreshFallbackOrRollback } from '../fallback.js'
 import { createLogger } from '../logger.js'
+import { emit } from '../state-events.js'
 
 const log = createLogger('PLAYLISTS')
 
 export const router = express.Router()
 
+// every playlist says whether it is the active one, so the panel does not have to look it up in the config
+function playlistEntries(): PlaylistEntry[] {
+  const activeId = getConfig().fallbackPlaylist.playlistId
+  return getPlaylists().map((playlist) => ({ ...playlist, isActive: playlist.id === activeId }))
+}
+
 router.get('/', (_req, res) => {
-  ok(res, { playlists: getPlaylists() })
+  ok(res, { playlists: playlistEntries() })
 })
 
 router.post('/', async (req, res) => {
@@ -49,7 +56,7 @@ router.delete('/:id', (req, res) => {
     log.log(`active playlist "${req.params.id}" removed - fallback cleared`)
   }
 
-  ok(res, { playlists: getPlaylists(), fallbackCleared: wasActive })
+  ok(res, { playlists: playlistEntries(), fallbackCleared: wasActive })
 })
 
 router.post('/:id/activate', async (req, res) => {
@@ -72,5 +79,6 @@ router.post('/:id/activate', async (req, res) => {
 
   updateConfig({ fallbackPlaylist: { playlistId: id } })
   await refreshFallbackOrRollback(previousId)
+  emit('playlists')
   ok<ConfigResponse>(res, getConfig())
 })

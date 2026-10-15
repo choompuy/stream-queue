@@ -79,7 +79,7 @@ test('the buttons', async (t) => {
     click(panel.$('#skipBtn svg'))
     await flush()
 
-    assert.deepEqual(panel.calls, ['POST /api/player/skip', 'GET /api/state'])
+    assert.deepEqual(panel.calls, ['POST /api/player/skip'])
   })
 
   await t.test('a click on something that is no button does nothing', async () => {

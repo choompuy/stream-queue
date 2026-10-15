@@ -14,7 +14,7 @@ import { loadBlocklist } from './blocklist.js'
 import { loadPlaylists } from './playlists.js'
 import { loadSecrets, loadConfig, loadOverlaySettings, loadNetworkInfo } from './settings.js'
 import { loadTwitchSettings, loadTwitchConfig, loadTwitchSecrets, refreshTwitchStatus } from './twitch/index.js'
-import { isDashboardActive } from './tabs.js'
+import { isDashboardActive, isPlaylistsActive } from './tabs.js'
 import { setError } from '../shared.js'
 
 // What each topic reads again. Only what the person looks at is read: the rest is read when it is shown again
@@ -23,6 +23,7 @@ const TOPICS = {
   activity: { read: () => loadActivity(true), isShown: isDashboardActive },
   fallback: { read: () => refreshFallbackState(true), isShown: isDashboardActive },
   blocklist: { read: () => loadBlocklist(true), isShown: isDashboardActive },
+  playlists: { read: () => loadPlaylists(true), isShown: isPlaylistsActive },
   twitch: { read: () => refreshTwitchStatus(), isShown: () => document.visibilityState === 'visible' }
 }
 

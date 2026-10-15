@@ -9,7 +9,7 @@ process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
 const express = (await import('express')).default
 const { router } = await import('../../../src/routes/playlists.js')
-const { getConfig } = await import('../../../src/config.js')
+const { getConfig, updateConfig } = await import('../../../src/config.js')
 const { upsertPlaylist } = await import('../../../src/playlists.js')
 const { errorHandler } = await import('../../../src/error-handler.js')
 
@@ -50,6 +50,43 @@ test('POST /api/playlists/:id/activate', async (t) => {
 
     assert.equal(response.status, 400)
     assert.equal(((await response.json()) as Record<string, any>).code, 'NO_API_KEY')
+    assert.equal(getConfig().fallbackPlaylist.playlistId, null)
+  })
+})
+
+const list = async () => ((await (await fetch(base)).json()) as Record<string, any>).data.playlists as Array<{ id: string; isActive: boolean }>
+
+test('GET /api/playlists', async (t) => {
+  await t.test('says for every playlist whether it is the active one', async () => {
+    upsertPlaylist({ id: 'PLfirst000000001', title: 'First', thumbnail: '', itemCount: 1 })
+    upsertPlaylist({ id: 'PLsecond00000001', title: 'Second', thumbnail: '', itemCount: 2 })
+    updateConfig({ fallbackPlaylist: { playlistId: 'PLsecond00000001' } })
+
+    const playlists = await list()
+
+    assert.deepEqual(
+      playlists.filter((playlist) => playlist.id.startsWith('PLfirst') || playlist.id.startsWith('PLsecond')).map((playlist) => [playlist.id, playlist.isActive]),
+      [
+        ['PLfirst000000001', false],
+        ['PLsecond00000001', true]
+      ]
+    )
+  })
+})
+
+test('DELETE /api/playlists/:id', async (t) => {
+  await t.test('answers with the playlists that are left, with their active marks, and says when it cleared the active one', async () => {
+    updateConfig({ fallbackPlaylist: { playlistId: 'PLsecond00000001' } })
+
+    const response = await fetch(`${base}/PLsecond00000001`, { method: 'DELETE' })
+    const body = (await response.json()) as Record<string, any>
+
+    assert.equal(response.status, 200)
+    assert.equal(body.data.fallbackCleared, true)
+    assert.equal(
+      body.data.playlists.some((playlist: { isActive: boolean }) => playlist.isActive),
+      false
+    )
     assert.equal(getConfig().fallbackPlaylist.playlistId, null)
   })
 })

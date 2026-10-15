@@ -18,6 +18,7 @@ panel.route('GET /api/network-info', { ips: ['192.168.0.2'], port: 4747 })
 panel.route('GET /api/activity', { entries: [] })
 panel.route('GET /api/blocklist', { entries: [] })
 panel.route('GET /api/playlists', { playlists: [] })
+panel.route('GET /api/playlists', { playlists: [] })
 panel.route('GET /api/state', { current: track('a'), queue: [], isPaused: false })
 panel.route('GET /api/fallback', { upNext: [], activeVideoId: null, lastRefreshedAt: 1, sourceCount: 0, shuffle: false, repeat: false, enabled: false })
 panel.route('GET /api/integrations/twitch', twitchStatus)
@@ -41,9 +42,9 @@ async function elapse(ms) {
 const panelHandle = await startControlPanel()
 
 test('the control panel and its events', async (t) => {
-  await t.test('opens one connection for the five topics', () => {
+  await t.test('opens one connection for the six topics', () => {
     assert.equal(sources.length, 1)
-    assert.equal(source().url, '/api/events?topics=state,activity,fallback,blocklist,twitch')
+    assert.equal(source().url, '/api/events?topics=state,activity,fallback,blocklist,playlists,twitch')
   })
 
   await t.test('everything is read again each time the connection comes up: what changed while it was down was never announced', async () => {
@@ -62,6 +63,26 @@ test('the control panel and its events', async (t) => {
     await elapse(100)
 
     assert.deepEqual(panel.calls, [READ.activity])
+  })
+
+  await t.test('the playlists are read only while their page is shown, and when it is opened', async () => {
+    panel.calls.length = 0
+    source().emit('changed', { topic: 'playlists' })
+    await elapse(100)
+    assert.deepEqual(panel.calls, [], 'the dashboard is shown: nobody looks at the playlists')
+
+    switchPageTab('playlists')
+    await flush()
+    assert.deepEqual(panel.calls, ['GET /api/playlists'], 'opening the page reads them')
+
+    panel.calls.length = 0
+    source().emit('changed', { topic: 'playlists' })
+    await elapse(100)
+    assert.deepEqual(panel.calls, ['GET /api/playlists'])
+
+    switchPageTab('dashboard')
+    await flush()
+    panel.calls.length = 0
   })
 
   await t.test('changes that come while the dashboard is hidden are not read, except the Twitch status, which is shown on every tab', async () => {

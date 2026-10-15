@@ -2,8 +2,6 @@ import { api } from './api.js'
 import { dom } from './dom.js'
 import { views } from './views/index.js'
 import { run } from './run.js'
-import { refreshState } from './queue.js'
-import { loadActivity } from './activity.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 import { show } from '../shared.js'
@@ -40,15 +38,12 @@ export function addSong(query) {
     'adding song',
     async () => {
       const data = await api.requestSong(query)
-      await refreshState()
-      await loadActivity()
       toastSuccess(
         data.started
           ? t('toast.nowPlaying', { title: data.song.title })
           : t('toast.addedToQueue', { title: data.song.title, position: data.position })
       )
-    },
-    { onError: () => loadActivity() }
+    }
   )
 }
 

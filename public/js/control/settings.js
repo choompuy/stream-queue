@@ -6,7 +6,6 @@ import { log } from './log.js'
 import { run } from './run.js'
 import { syncPlayer } from './player.js'
 import { renderQueue } from './queue.js'
-import { renderPlaylists } from './playlists.js'
 import { t } from '../i18n.js'
 import { toastError } from './toast.js'
 import { fillForm, saveForm, toastSaveResult } from './form.js'
@@ -178,7 +177,6 @@ export function saveConfigSetting() {
     }
 
     renderQueue()
-    renderPlaylists()
     toastSaveResult(result, 'toast.settingsSaved', { successToast: !apiKeyFailed })
   })
 }

@@ -2,12 +2,14 @@ import { refreshState } from './queue.js'
 import { refreshFallbackState, scrollToActiveFallback } from './fallback.js'
 import { loadActivity } from './activity.js'
 import { loadBlocklist } from './blocklist.js'
+import { loadPlaylists } from './playlists.js'
 import { setClass, show } from '../shared.js'
 
 export let activeTab = 'dashboard'
 let activeSection = 'queue'
 
 export const isDashboardActive = () => activeTab === 'dashboard'
+export const isPlaylistsActive = () => activeTab === 'playlists'
 
 export function switchPageTab(tabName) {
   const wasDashboard = activeTab === 'dashboard'
@@ -28,6 +30,9 @@ export function switchPageTab(tabName) {
     loadActivity()
     loadBlocklist()
   }
+
+  // the playlists were not read while their page was hidden
+  if (tabName === 'playlists') loadPlaylists()
 }
 
 export function switchSection(sectionName) {

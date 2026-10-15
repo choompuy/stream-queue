@@ -5,7 +5,6 @@ import { renderStats } from './stats.js'
 import { views } from './views/index.js'
 import { run } from './run.js'
 import { renderCurrent, renderNext, renderPlayPause, syncPlayer } from './player.js'
-import { refreshFallbackState } from './fallback.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 import { setText } from '../shared.js'
@@ -21,14 +20,11 @@ export function refreshState(silent = false) {
       const nextState = await api.getState()
       if (requestId !== stateRequestId) return
 
-      const trackChanged = state.current?.videoId !== nextState.current?.videoId
       state.current = nextState.current
       state.queue = nextState.queue
       state.isPaused = nextState.isPaused
       state.nextTrack = nextState.nextTrack
       renderState()
-
-      if (trackChanged) await refreshFallbackState(silent)
     },
     { silent }
   )
@@ -54,19 +50,12 @@ export function renderQueue() {
 export function removeFromQueue(videoId) {
   return run('removing from queue', async () => {
     await api.removeFromQueue(videoId)
-    await refreshState()
     toastSuccess(t('toast.removedFromQueue'))
   })
 }
 
-export async function clearQueue() {
-  await run(
-    'clearing queue',
-    async () => {
-      await api.clearQueue()
-      await refreshState()
-    }
-  )
+export function clearQueue() {
+  return run('clearing queue', () => api.clearQueue())
 }
 
 export const queueActions = {
