@@ -181,7 +181,6 @@
       "autoFulfillRedemptions": "Auto-fulfill redemptions",
       "autoFulfillRedemptionsNote": "Automatically fulfill redemptions when the track finishes playing successfully",
       "noRewards": "No eligible rewards found",
-      "authorizationInstructions": "Open Twitch to authorize StreamQueue",
       "createReward": "Create reward",
       "editReward": "Edit reward",
       "createRewardTitle": "Reward title",

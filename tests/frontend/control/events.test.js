@@ -150,16 +150,18 @@ test('the settings inputs', async (t) => {
       sent = body
       return { config: { ...state.settings, ...body }, rejected: [] }
     })
-    // the other controls show what is stored, as after loadOverlaySettings()
-    panel.$('#overlayOpacity').value = '100'
+    // the controls show what is stored, as after loadOverlaySettings()
+    panel.$('#overlayOpacity').value = panel.$('#overlayOpacity').defaultValue = '100'
     panel.$('#badgePosition').value = 'bottom-right'
-    panel.$('#hideOverlayInfo').checked = false
+    for (const option of panel.$('#badgePosition').options) option.defaultSelected = option.value === 'bottom-right'
+    panel.$('#hideOverlayInfo').checked = panel.$('#hideOverlayInfo').defaultChecked = false
+    panel.$('#showVideo').defaultChecked = true
     panel.$('#showVideo').checked = false
 
     fire(panel.$('#showVideo'), 'change')
     await flush()
 
-    assert.deepEqual(sent, { showVideo: false, hideOverlayInfo: false, opacity: 100, position: 'bottom-right' })
+    assert.deepEqual(sent, { showVideo: false }, 'only the switch that was turned is sent')
     assert.equal(panel.$('#hideOverlayInfo').disabled, true)
   })
 

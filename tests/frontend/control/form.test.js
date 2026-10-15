@@ -61,6 +61,38 @@ test('readForm', async (t) => {
   })
 })
 
+test('readForm with changedOnly', async (t) => {
+  const base = { minViews: 10, region: { code: 'DE' }, allowShorts: false, contentMode: 'music', chatCommands: { skip: { command: '!sg skip' } } }
+
+  await t.test('takes only the inputs that differ from what the form was filled with, nested as usual', () => {
+    fillForm(form, base)
+    input('views').value = '25'
+    input('skipCommand').value = ' !sg next '
+
+    assert.deepEqual(readForm(form, { changedOnly: true }), { minViews: 25, chatCommands: { skip: { command: '!sg next' } } })
+  })
+
+  await t.test('an untouched form gives an empty body', () => {
+    fillForm(form, base)
+
+    assert.deepEqual(readForm(form, { changedOnly: true }), {})
+  })
+
+  await t.test('spaces around a value are no change (text is compared trimmed)', () => {
+    fillForm(form, base)
+    input('skipCommand').value = '  !sg skip  '
+
+    assert.deepEqual(readForm(form, { changedOnly: true }), {})
+  })
+
+  await t.test('without the option the whole form is read, as before', () => {
+    fillForm(form, base)
+
+    assert.equal(readForm(form).minViews, 10)
+    assert.equal(readForm(form).region.code, 'DE')
+  })
+})
+
 test('fillForm', async (t) => {
   const stored = { minViews: 10, region: { code: 'DE' }, allowShorts: true, contentMode: 'any', chatCommands: { skip: { command: '!sg skip' } } }
 
@@ -216,6 +248,27 @@ test('saveForm', async (t) => {
 
     input('views').value = '26'
     assert.equal(isChanged(input('views')), true)
+  })
+
+  await t.test('with changedOnly sends only what was changed, and still shows what the server stores for the rest', async () => {
+    fillForm(form, base)
+    input('views').value = '25'
+    let sent = null
+
+    // another panel changed the region and the shorts since this form was filled
+    await saveForm(
+      form,
+      async (body) => {
+        sent = body
+        return { config: { ...base, minViews: 25, region: { code: 'FR' }, allowShorts: true }, rejected: [] }
+      },
+      { changedOnly: true }
+    )
+
+    assert.deepEqual(sent, { minViews: 25 }, 'the old values of the other fields are not sent back over the new ones')
+    assert.equal(input('region').value, 'FR', 'the form shows what is stored now')
+    assert.equal(input('shorts').checked, true)
+    assert.deepEqual([marks('views'), marks('region')], [['saved'], []])
   })
 
   await t.test('a failed request leaves the form as it was', async () => {

@@ -19,7 +19,6 @@ const { state } = await import('../../../public/js/control/state.js')
 const { renderTwitchConnection, refreshTwitchStatus } = await import('../../../public/js/control/twitch/twitch-connection.js')
 
 const el = (id) => document.getElementById(id)
-const show = (id) => el(id).classList.remove('hidden')
 const hidden = (id) => el(id).classList.contains('hidden')
 
 const user = { displayName: 'Streamer', login: 'streamer', profileImageUrl: 'https://example.com/a.png' }
@@ -123,14 +122,12 @@ test('the connection warning', async (t) => {
     assert.equal(state.twitch.connected, false)
     assert.equal(hidden('twitchDisconnectBtn'), true)
   })
-
 })
 
 test('a connection made elsewhere', async (t) => {
   await t.test('shows up on the next refresh, also on a page that was reloaded in the middle of the login', async () => {
     // the panel was loaded while nobody was logged in; the login is finished later, in another tab
     Object.assign(state.twitch, { configured: true, connected: false, user: null, health: null, offlineWarning: false })
-    show('twitchAuthorization')
     renderTwitchConnection()
     assert.equal(hidden('twitchDisconnectBtn'), true)
 
@@ -143,7 +140,6 @@ test('a connection made elsewhere', async (t) => {
     assert.equal(hidden('twitchDisconnectBtn'), false)
     assert.equal(hidden('twitchConnectBtn'), true)
     assert.equal(hidden('twitchRewardSection'), false)
-    assert.equal(hidden('twitchAuthorization'), true, 'the code that nobody enters any more is gone')
   })
 
   await t.test('the rewards are loaded once, when the account turns up, and not on every refresh', async () => {
@@ -218,10 +214,6 @@ test('a login that waits for its code', async (t) => {
     status = { connected: false, user: null, authorization: waiting(Date.now() + 60_000) }
 
     await refreshTwitchStatus()
-
-    assert.equal(hidden('twitchAuthorization'), false)
-    assert.equal(el('twitchAuthorizationLink').getAttribute('href'), 'https://www.twitch.tv/activate')
-    assert.equal(el('twitchAuthorizationLink').textContent, 'https://www.twitch.tv/activate')
   })
 
   await t.test('goes away, with a message, when nobody entered the code in time', async () => {
@@ -230,7 +222,6 @@ test('a login that waits for its code', async (t) => {
 
     await refreshTwitchStatus()
 
-    assert.equal(hidden('twitchAuthorization'), true)
     assert.ok(document.getElementById('toastContainer').textContent.includes('twitchAuthExpired'))
   })
 
@@ -240,7 +231,6 @@ test('a login that waits for its code', async (t) => {
 
     await refreshTwitchStatus()
 
-    assert.equal(hidden('twitchAuthorization'), true)
     assert.equal(document.getElementById('toastContainer').textContent, '')
   })
 
@@ -253,13 +243,29 @@ test('a login that waits for its code', async (t) => {
     assert.equal(document.getElementById('toastContainer').textContent, '')
   })
 
+  await t.test('turns the connect button into "reconnect" (not a disabled one) while it waits, and back when it is over', async () => {
+    const button = el('twitchConnectBtn')
+
+    renderTwitchConnection()
+    assert.equal(button.getAttribute('data-i18n'), 'settings.twitch.connect')
+
+    status = { connected: false, user: null, authorization: waiting(Date.now() + 60_000) }
+    await refreshTwitchStatus()
+    assert.equal(button.disabled, false)
+    assert.equal(hidden('twitchConnectBtn'), false)
+
+    state.twitch.authorization = waiting(Date.now() - 1000)
+    status = { connected: false, user: null, authorization: null }
+    await refreshTwitchStatus()
+    assert.equal(button.getAttribute('data-i18n'), 'settings.twitch.connect')
+  })
+
   await t.test('is not shown next to an account that is already connected', async () => {
     state.twitch.authorization = waiting(Date.now() + 60_000)
     status = { connected: true, user, health: up, authorization: waiting(Date.now() + 60_000) }
 
     await refreshTwitchStatus()
 
-    assert.equal(hidden('twitchAuthorization'), true)
     assert.equal(state.twitch.authorization, null)
   })
 })

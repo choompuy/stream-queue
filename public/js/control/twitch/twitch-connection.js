@@ -69,7 +69,7 @@ function applyStatus(status) {
   state.twitch.connected = Boolean(status?.connected)
   state.twitch.user = status?.user ?? null
   state.twitch.connectedAt = status?.connectedAt ?? null
-  // what the login waits for is only shown while there is no account yet
+  // a login that waits for its code is only remembered while there is no account yet: the connect button is the way back to it
   state.twitch.authorization = status?.connected ? null : (status?.authorization ?? null)
   trackHealth(status?.connected ? status.health : null)
 }
@@ -102,6 +102,12 @@ export function refreshTwitchStatus() {
 }
 
 export function connectTwitch() {
+  const pending = state.twitch.authorization
+  if (pending && pending.expiresAt > Date.now() + EXPIRY_TOLERANCE_MS) {
+    window.open(pending.verificationUri, '_blank', 'noopener,noreferrer')
+    return
+  }
+
   // opened up-front so the popup is attributed to the click and not to the API response
   const authWindow = openAuthorizationWindow()
 
@@ -116,7 +122,7 @@ export function connectTwitch() {
       }
 
       // From here the server keeps the state of the login (and says when it ends): this page does not wait for it, and
-      // after a reload it shows the same code
+      // after a reload the same code is still there, with the button leading back to its page
       state.twitch.authorization = {
         userCode: response.userCode,
         verificationUri: response.verificationUri,
@@ -184,15 +190,6 @@ function renderTwitchHealth(isConnected) {
   show(dom.twitchHealthWarning, Boolean(key))
 }
 
-// The code to enter and the page to enter it on, while a login waits for it
-function renderTwitchAuthorization(authorization) {
-  show(dom.twitchAuthorization, Boolean(authorization))
-  if (!authorization) return
-
-  dom.twitchAuthorizationLink.href = authorization.verificationUri
-  setText(dom.twitchAuthorizationLink, authorization.verificationUri)
-}
-
 export function renderTwitchConnection() {
   const { configured, connected, user } = state.twitch
 
@@ -201,13 +198,7 @@ export function renderTwitchConnection() {
   show(dom.twitchConnectionControls, configured)
 
   if (!configured) {
-    for (const element of [
-      dom.twitchAuthorization,
-      dom.twitchRewardSection,
-      dom.twitchRewardForm,
-      dom.twitchHealthWarning,
-      dom.twitchChatCommandsPanel
-    ]) {
+    for (const element of [dom.twitchRewardSection, dom.twitchRewardForm, dom.twitchHealthWarning, dom.twitchChatCommandsPanel]) {
       show(element, false)
     }
     return
@@ -215,7 +206,6 @@ export function renderTwitchConnection() {
 
   const isConnected = Boolean(connected && user)
   renderTwitchHealth(isConnected)
-  renderTwitchAuthorization(isConnected ? null : state.twitch.authorization)
 
   setText(dom.twitchChanelName, isConnected ? '@' + user.displayName : t('settings.twitch.notConnected'))
   setClass(dom.twitchChanelName, 'text-green', isConnected)

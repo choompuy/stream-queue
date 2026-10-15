@@ -181,7 +181,6 @@
       "autoFulfillRedemptions": "Автоподтверждение награды",
       "autoFulfillRedemptionsNote": "Автоматически подтверждать награды при успешном завершении воспроизведения трека",
       "noRewards": "Подходящие награды не найдены",
-      "authorizationInstructions": "Откройте Twitch, чтобы завершить авторизацию",
       "createReward": "Создать награду",
       "editReward": "Редактировать награду",
       "createRewardTitle": "Название награды",

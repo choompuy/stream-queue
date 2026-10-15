@@ -110,7 +110,9 @@ function maskSecret(value: string): string {
   return `${'•'.repeat(value.length - 4)}${value.slice(-4)}`
 }
 
-export function getPublicSecretsView() {
+// `includeAuthorization`: the address of a login that waits for its code lets whoever opens it connect THEIR Twitch account
+// instead of the streamer's, so it is given to this computer only (the panel on it), never to the rest of the network
+export function getPublicSecretsView({ includeAuthorization = false }: { includeAuthorization?: boolean } = {}) {
   const { youtubeApiKey, twitch } = getSecrets()
 
   return {
@@ -129,7 +131,7 @@ export function getPublicSecretsView() {
         : null,
       connectedAt: twitch.connectedAt,
       // an expired code is no login any more, whatever the file still says
-      authorization: twitch.authorization && twitch.authorization.expiresAt > Date.now() ? twitch.authorization : null
+      authorization: includeAuthorization && twitch.authorization && twitch.authorization.expiresAt > Date.now() ? twitch.authorization : null
     }
   }
 }

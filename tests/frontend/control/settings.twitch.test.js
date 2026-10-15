@@ -6,13 +6,10 @@ import { JSDOM } from 'jsdom'
 
 const PUBLIC_DIR = pathToFileURL(fileURLToPath(new URL('../../../public/', import.meta.url)))
 
-const jsdom = new JSDOM(
-  readFileSync(new URL('../../../public/index.html', import.meta.url), 'utf8').replace(/<script[^>]*><\/script>/g, '')
-)
+const jsdom = new JSDOM(readFileSync(new URL('../../../public/index.html', import.meta.url), 'utf8').replace(/<script[^>]*><\/script>/g, ''))
 
 globalThis.window = jsdom.window
 globalThis.document = jsdom.window.document
-
 
 // requests the control panel makes, keyed by "METHOD path"
 let handlers = {}
@@ -135,7 +132,6 @@ function reset() {
   dom.twitchRewardSelect.classList.remove('error')
   dom.twitchNotConfigured.classList.add('hidden')
   dom.twitchConnectionControls.classList.add('hidden')
-  dom.twitchAuthorization.classList.add('hidden')
   dom.twitchConnectBtn.disabled = false
   dom.twitchConnectBtn.classList.remove('hidden')
   dom.twitchDisconnectBtn.classList.add('hidden')
@@ -169,8 +165,6 @@ test('connectTwitch', async (t) => {
 
     await drain(settings.connectTwitch())
 
-    assert.equal(dom.twitchAuthorizationLink.getAttribute('href'), 'https://twitch.tv/activate')
-    assert.ok(!dom.twitchAuthorization.classList.contains('hidden'))
     assert.equal(state.twitch.authorization.userCode, 'ABCD-1234')
 
     mock.timers.tick(20 * 60 * 1000) // longer than the code lives
@@ -241,7 +235,6 @@ test('disconnectTwitch', async (t) => {
     state.twitch.connected = true
     state.twitch.user = { displayName: 'streamer' }
     state.twitch.rewards = REWARDS
-    dom.twitchAuthorization.classList.remove('hidden')
     handlers = { 'POST /api/integrations/twitch/disconnect': () => null }
 
     await settings.disconnectTwitch()
@@ -249,20 +242,17 @@ test('disconnectTwitch', async (t) => {
     assert.equal(state.twitch.connected, false)
     assert.equal(state.twitch.user, null)
     assert.deepEqual(state.twitch.rewards, [])
-    assert.ok(dom.twitchAuthorization.classList.contains('hidden'))
     assert.ok(!dom.twitchConnectBtn.classList.contains('hidden'))
     assert.ok(dom.twitchRewardSelect.innerHTML.includes(translate('settings.twitch.noRewards')))
   })
 
   await t.test('takes away the code of a login that was still waiting', async () => {
     state.twitch.authorization = { userCode: 'ABCD-1234', verificationUri: 'https://twitch.tv/activate', expiresAt: Date.now() + 60_000 }
-    dom.twitchAuthorization.classList.remove('hidden')
     handlers = { 'POST /api/integrations/twitch/disconnect': () => null }
 
     await settings.disconnectTwitch()
 
     assert.equal(state.twitch.authorization, null)
-    assert.ok(dom.twitchAuthorization.classList.contains('hidden'))
   })
 })
 
@@ -394,7 +384,7 @@ const CHAT_COMMANDS_CONFIG = {
 test('the selected reward is saved as the select shows it', async (t) => {
   t.beforeEach(reset)
 
-  await t.test('sends the selected reward id to the Twitch config endpoint', async () => {
+  await t.test('sends the selected reward id (and nothing else) to the Twitch config endpoint', async () => {
     let sent = null
     handlers = {
       'GET /api/integrations/twitch': () => ({ connected: true, user: { displayName: 'streamer' } }),
@@ -410,7 +400,7 @@ test('the selected reward is saved as the select shows it', async (t) => {
     settings.onTwitchRewardChange()
     await settings.saveTwitchConfig()
 
-    assert.deepEqual(sent, { channelPointsRewardId: 'reward-1', autoFulfillRedemptions: false })
+    assert.deepEqual(sent, { channelPointsRewardId: 'reward-1' })
   })
 
   await t.test('sends the empty selection as it is: the server turns it into null', async () => {
@@ -422,9 +412,13 @@ test('the selected reward is saved as the select shows it', async (t) => {
       }
     }
 
+    // the stored selection is "reward-1": choosing "none" is a change
+    dom.twitchRewardSelect.innerHTML = '<option value="">none</option><option value="reward-1" selected>One</option>'
+    dom.twitchRewardSelect.value = ''
+
     await settings.saveTwitchConfig()
 
-    assert.deepEqual(sent, { channelPointsRewardId: '', autoFulfillRedemptions: false })
+    assert.deepEqual(sent, { channelPointsRewardId: '' })
   })
 
   await t.test('shows a success toast on success', async () => {
@@ -515,43 +509,71 @@ test('loadTwitchConfig() fills in the chat command fields', async (t) => {
 test('saveTwitchChatCommands()', async (t) => {
   t.beforeEach(reset)
 
-  await t.test('sends every command and the cooldown, reading straight from the DOM', async () => {
-    let sent = null
+  // what the panel was filled with: only what differs from it is sent
+  const filledWithStoredCommands = async () => {
+    handlers = { 'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }) }
+    await settings.loadTwitchConfig()
+  }
+
+  const recordSave = () => {
+    const box = { sent: null }
     handlers = {
       'PUT /api/integrations/twitch/config': () => {
-        sent = JSON.parse(lastBody)
+        box.sent = JSON.parse(lastBody)
         return { config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] }
       }
     }
+    return box
+  }
 
-    for (const field of CHAT_COMMAND_FIELDS) {
-      const expected = CHAT_COMMANDS_CONFIG[field.key]
-      dom[`${field.dom}Enabled`].checked = expected.enabled
-      dom[`${field.dom}Command`].value = expected.command
-      dom[`${field.dom}Permission`].value = expected.permission
-    }
-    dom.chatCmdCooldown.value = '7'
-    dom.chatCmdPlainCooldown.value = '3'
+  await t.test('sends the commands and the cooldown that were changed, reading straight from the DOM', async () => {
+    await filledWithStoredCommands()
+    const save = recordSave()
+
+    dom.chatCmdCooldown.value = '9'
+    dom.chatCmdSkipEnabled.checked = !CHAT_COMMANDS_CONFIG.skip.enabled
+    dom.chatCmdPauseCommand.value = '!sg hold'
 
     await settings.saveTwitchChatCommands()
 
-    assert.deepEqual(sent, { chatCommands: CHAT_COMMANDS_CONFIG })
+    assert.deepEqual(save.sent, {
+      chatCommands: {
+        controlCooldownSeconds: 9,
+        skip: { enabled: !CHAT_COMMANDS_CONFIG.skip.enabled },
+        pause: { command: '!sg hold' }
+      }
+    })
+  })
+
+  await t.test('sends nothing of what stays as stored (another panel may have changed it)', async () => {
+    await filledWithStoredCommands()
+    const save = recordSave()
+
+    await settings.saveTwitchChatCommands()
+
+    assert.deepEqual(save.sent, {})
   })
 
   await t.test('trims whitespace from a command before sending it', async () => {
-    let sent = null
-    handlers = {
-      'PUT /api/integrations/twitch/config': () => {
-        sent = JSON.parse(lastBody)
-        return { config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }, rejected: [] }
-      }
-    }
+    await filledWithStoredCommands()
+    const save = recordSave()
 
-    dom.chatCmdSkipCommand.value = '  !sg skip  '
+    dom.chatCmdSkipCommand.value = '  !sg next  '
 
     await settings.saveTwitchChatCommands()
 
-    assert.equal(sent.chatCommands.skip.command, '!sg skip')
+    assert.equal(save.sent.chatCommands.skip.command, '!sg next')
+  })
+
+  await t.test('a command that only gained spaces is no change', async () => {
+    await filledWithStoredCommands()
+    const save = recordSave()
+
+    dom.chatCmdSkipCommand.value = `  ${CHAT_COMMANDS_CONFIG.skip.command}  `
+
+    await settings.saveTwitchChatCommands()
+
+    assert.deepEqual(save.sent, {})
   })
 
   await t.test('marks only the toggles whose value really changed as saved', async () => {
@@ -754,7 +776,10 @@ test('disconnectTwitch(): redemptions left open', async (t) => {
 
     await disconnectTwitch()
 
-    assert.ok(toasts().some((text) => text.includes('3')), JSON.stringify(toasts()))
+    assert.ok(
+      toasts().some((text) => text.includes('3')),
+      JSON.stringify(toasts())
+    )
   })
 
   await t.test('nothing is shown when nothing was left open', async () => {

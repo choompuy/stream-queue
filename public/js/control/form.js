@@ -30,10 +30,14 @@ const defaultOf = (input) => {
 
 export const isChanged = (input) => valueOf(input) !== defaultOf(input)
 
-export function readForm(form) {
+// `changedOnly`: only the inputs that differ from what was stored. Another panel may have changed the others since this one
+// was filled, and sending them back would put the old values over the new ones
+export function readForm(form, { changedOnly = false } = {}) {
   const body = {}
 
   for (const input of formInputs(form)) {
+    if (changedOnly && !isChanged(input)) continue
+
     const keys = input.name.split('.')
     const last = keys.pop()
     const target = keys.reduce((object, key) => (object[key] ??= {}), body)
@@ -94,13 +98,14 @@ export function trackForm(form) {
 }
 
 /**
- * Sends the form with `save(body)`, which answers { config, rejected }, then shows the stored values and marks the fields:
+ * Sends the form with `save(body)` (all its fields, or the changed ones with `changedOnly`), which answers { config, rejected },
+ * then shows the stored values and marks the fields:
  * refused -> red (and keeps what was typed), stored with a new value -> green, the rest plain.
  * Returns { config, rejected, saved, refused } for toastSaveResult
  */
-export async function saveForm(form, save) {
+export async function saveForm(form, save, { changedOnly = false } = {}) {
   const changed = new Map(formInputs(form).map((input) => [input, isChanged(input)]))
-  const { config, rejected } = await save(readForm(form))
+  const { config, rejected } = await save(readForm(form, { changedOnly }))
   let saved = 0
   let refused = 0
 

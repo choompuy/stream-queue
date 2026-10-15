@@ -10,6 +10,7 @@ process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 const express = (await import('express')).default
 const { router } = await import('../../../src/routes/settings.js')
 const { errorHandler } = await import('../../../src/error-handler.js')
+const { updateTwitchOAuthState } = await import('../../../src/secrets.js')
 
 const app = express()
 app.use(express.json())
@@ -175,4 +176,36 @@ test('PUT /api/settings', async (t) => {
     assert.deepEqual(body.data.rejected, [])
     assert.equal(body.data.config.opacity, 40)
   })
+})
+
+async function readSecretsFrom(remoteAddress: string): Promise<Record<string, any>> {
+  const lan = express()
+  lan.use((req, _res, next) => {
+    Object.defineProperty(req.socket, 'remoteAddress', { value: remoteAddress, configurable: true })
+    next()
+  })
+  lan.use('/api', router)
+
+  const lanServer = lan.listen(0)
+  try {
+    const response = await fetch(`http://127.0.0.1:${(lanServer.address() as AddressInfo).port}/api/secrets`)
+    return ((await response.json()) as Record<string, any>).data
+  } finally {
+    lanServer.close()
+  }
+}
+
+test('GET /api/secrets and a login that waits for its code', async (t) => {
+  const login = { userCode: 'ABCD-1234', verificationUri: 'https://www.twitch.tv/activate', expiresAt: Date.now() + 60_000 }
+  updateTwitchOAuthState({ authorization: login })
+
+  await t.test('this computer sees the address', async () => {
+    assert.deepEqual((await readSecretsFrom('127.0.0.1')).twitch.authorization, login)
+  })
+
+  await t.test('another device on the network does not', async () => {
+    assert.equal((await readSecretsFrom('192.168.1.50')).twitch.authorization, null)
+  })
+
+  updateTwitchOAuthState({ authorization: null })
 })

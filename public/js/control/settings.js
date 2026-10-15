@@ -45,11 +45,15 @@ export function loadOverlaySettings() {
 // the overlay settings are saved at once, whenever one of them changes
 export function saveOverlaySettings() {
   return run('saving settings', async () => {
-    const result = await saveForm(dom.overlaySettingsPanel, async (body) => {
-      const answer = await api.updateSettings(body)
-      state.settings = answer.config
-      return answer
-    })
+    const result = await saveForm(
+      dom.overlaySettingsPanel,
+      async (body) => {
+        const answer = await api.updateSettings(body)
+        state.settings = answer.config
+        return answer
+      },
+      { changedOnly: true }
+    )
 
     syncPlayer()
     toastSaveResult(result, 'toast.settingsSaved', { successToast: false })
@@ -149,11 +153,15 @@ export function saveConfigSetting() {
 
   return run('saving config', async () => {
     // partial save: the server stores every valid field and lists the refused ones
-    const result = await saveForm(dom.botSettingsPanel, async (config) => {
-      const answer = await api.updateConfig(config)
-      state.config = answer.config
-      return answer
-    })
+    const result = await saveForm(
+      dom.botSettingsPanel,
+      async (config) => {
+        const answer = await api.updateConfig(config)
+        state.config = answer.config
+        return answer
+      },
+      { changedOnly: true }
+    )
 
     let apiKeyFailed = false
 

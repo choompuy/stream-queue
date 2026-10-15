@@ -141,16 +141,16 @@ test('device authorization', async (t) => {
   })
 
   await t.test('while the login waits, the code is written down for the panel (also for a reloaded one), and a replacement writes its own', async () => {
-    assert.equal(getPublicSecretsView().twitch.authorization, null)
+    assert.equal(getPublicSecretsView({ includeAuthorization: true }).twitch.authorization, null)
 
     await startDeviceAuthorization()
-    const first = getPublicSecretsView().twitch.authorization
+    const first = getPublicSecretsView({ includeAuthorization: true }).twitch.authorization
     assert.equal(first?.userCode, 'USER-1')
     assert.equal(first?.verificationUri, 'https://www.twitch.tv/activate')
     assert.ok((first?.expiresAt ?? 0) > Date.now())
 
     await startDeviceAuthorization()
-    assert.equal(getPublicSecretsView().twitch.authorization?.userCode, 'USER-2')
+    assert.equal(getPublicSecretsView({ includeAuthorization: true }).twitch.authorization?.userCode, 'USER-2')
   })
 
   await t.test('the code of a start that was replaced while it was requested is never written', async () => {
@@ -162,24 +162,24 @@ test('device authorization', async (t) => {
     releaseFirstCode()
     await first
 
-    assert.equal(getPublicSecretsView().twitch.authorization?.userCode, 'USER-2')
+    assert.equal(getPublicSecretsView({ includeAuthorization: true }).twitch.authorization?.userCode, 'USER-2')
   })
 
   await t.test('the code is removed when the login ends by itself (nobody entered it in time)', async () => {
     await startDeviceAuthorization()
-    assert.equal(getPublicSecretsView().twitch.authorization?.userCode, 'USER-1')
+    assert.equal(getPublicSecretsView({ includeAuthorization: true }).twitch.authorization?.userCode, 'USER-1')
 
     // the fake Twitch gives every code one second
     await sleep(1400)
 
-    assert.equal(getPublicSecretsView().twitch.authorization, null)
+    assert.equal(getPublicSecretsView({ includeAuthorization: true }).twitch.authorization, null)
   })
 
   await t.test('disconnect() removes the code and gives up a login that is still waiting for it', async () => {
     await startDeviceAuthorization()
     await disconnect()
 
-    assert.equal(getPublicSecretsView().twitch.authorization, null)
+    assert.equal(getPublicSecretsView({ includeAuthorization: true }).twitch.authorization, null)
   })
 
   await t.test('disconnect() gives up a login that is still waiting for the code', async () => {

@@ -221,3 +221,39 @@ test('twitch routes reject requests from a non-loopback address', async (t) => {
     assert.equal(response.status, 200)
   })
 })
+
+// a fake socket.remoteAddress, since fetch in the same process reports 127.0.0.1 for every request
+async function readStatusFrom(remoteAddress: string): Promise<Record<string, any>> {
+  const lan = express()
+  lan.use((req, _res, next) => {
+    Object.defineProperty(req.socket, 'remoteAddress', { value: remoteAddress, configurable: true })
+    next()
+  })
+  lan.use('/api/integrations/twitch', twitchRouter)
+
+  const lanServer = lan.listen(0)
+  try {
+    const response = await fetch(`http://127.0.0.1:${(lanServer.address() as AddressInfo).port}/api/integrations/twitch`)
+    return ((await response.json()) as Record<string, any>).data
+  } finally {
+    lanServer.close()
+  }
+}
+
+test('a login that waits for its code is shown to this computer only', async (t) => {
+  const login = { userCode: 'ABCD-1234', verificationUri: 'https://www.twitch.tv/activate', expiresAt: Date.now() + 60_000 }
+  updateTwitchOAuthState({ authorization: login })
+
+  await t.test('this computer sees the address', async () => {
+    assert.deepEqual((await readStatusFrom('127.0.0.1')).authorization, login)
+  })
+
+  await t.test('another device on the network does not: whoever opens the address connects their own account', async () => {
+    const status = await readStatusFrom('192.168.1.50')
+
+    assert.equal(status.authorization, null)
+    assert.ok('connected' in status && 'health' in status, 'the rest of the status is still open to it')
+  })
+
+  updateTwitchOAuthState({ authorization: null })
+})

@@ -19,11 +19,15 @@ export function cancelChatCommandChanges() {
 
 export function saveTwitchChatCommands() {
   return run('saving Twitch chat commands', async () => {
-    const result = await saveForm(dom.twitchChatCommandsPanel, async (body) => {
-      const answer = await api.updateTwitchConfig(body)
-      state.twitch.config = answer.config
-      return answer
-    })
+    const result = await saveForm(
+      dom.twitchChatCommandsPanel,
+      async (body) => {
+        const answer = await api.updateTwitchConfig(body)
+        state.twitch.config = answer.config
+        return answer
+      },
+      { changedOnly: true }
+    )
 
     toastSaveResult(result, 'toast.twitchChatCommandsSaved')
   })

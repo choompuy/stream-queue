@@ -286,14 +286,22 @@ test('the login that waits for a code (authorization)', async (t) => {
     updateTwitchOAuthState({ authorization: waiting(expiresAt) })
 
     assert.deepEqual(getSecrets().twitch.authorization, waiting(expiresAt))
-    assert.deepEqual(getPublicSecretsView().twitch.authorization, waiting(expiresAt))
+    assert.deepEqual(getPublicSecretsView({ includeAuthorization: true }).twitch.authorization, waiting(expiresAt))
+  })
+
+  await t.test('is left out of the public view unless it is asked for (it is meant for this computer only)', () => {
+    updateTwitchOAuthState({ authorization: waiting(Date.now() + 60_000) })
+
+    assert.equal(getPublicSecretsView().twitch.authorization, null)
+    assert.equal(getPublicSecretsView({ includeAuthorization: false }).twitch.authorization, null)
+    assert.notEqual(getPublicSecretsView({ includeAuthorization: true }).twitch.authorization, null)
   })
 
   await t.test('an expired one is no login any more, whatever is still written', () => {
     updateTwitchOAuthState({ authorization: waiting(Date.now() - 1) })
 
     assert.notEqual(getSecrets().twitch.authorization, null)
-    assert.equal(getPublicSecretsView().twitch.authorization, null)
+    assert.equal(getPublicSecretsView({ includeAuthorization: true }).twitch.authorization, null)
   })
 
   await t.test('a malformed one is refused and the stored value stays', () => {

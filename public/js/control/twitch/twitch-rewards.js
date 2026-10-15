@@ -68,11 +68,15 @@ export function applyRewardConfig(config) {
 // the selected reward and the auto-fulfil switch are saved at once, whenever one of them changes
 export function saveTwitchConfig() {
   return run('saving Twitch config', async () => {
-    const result = await saveForm(dom.twitchRewardSection, async (body) => {
-      const answer = await api.updateTwitchConfig(body)
-      state.twitch.config = answer.config
-      return answer
-    })
+    const result = await saveForm(
+      dom.twitchRewardSection,
+      async (body) => {
+        const answer = await api.updateTwitchConfig(body)
+        state.twitch.config = answer.config
+        return answer
+      },
+      { changedOnly: true }
+    )
 
     toastSaveResult(result, 'toast.twitchSettingsSaved')
   })

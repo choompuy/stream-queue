@@ -54,12 +54,12 @@ test('saving the overlay settings', async (t) => {
   panel.route('GET /api/settings', { ...stored })
   await settings.loadOverlaySettings()
 
-  await t.test('sends the whole form: the server stores what changed, and its answer becomes the state', async () => {
+  await t.test('sends only what changed, and the answer of the server becomes the state', async () => {
     field('overlayOpacity').value = '55'
 
     await settings.saveOverlaySettings()
 
-    assert.deepEqual(puts.at(-1), { showVideo: true, hideOverlayInfo: false, opacity: 55, position: 'bottom-right' })
+    assert.deepEqual(puts.at(-1), { opacity: 55 }, 'what another panel may have changed meanwhile is not sent back')
     assert.equal(state.settings.opacity, 55)
     assert.equal(field('overlayOpacity').classList.contains('saved'), true)
     assert.equal(field('showVideo').classList.contains('saved'), false, 'only what changed is marked')

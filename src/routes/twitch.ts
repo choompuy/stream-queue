@@ -7,6 +7,7 @@ import { startDeviceAuthorization, disconnect, refreshConnection, getClient, get
 import { getTwitchConfig, updateTwitchConfig } from '../integrations/twitch/config.js'
 import { localOnly } from '../local-only.js'
 import { getPublicSecretsView } from '../secrets.js'
+import { isLocalAddress } from '../local-only.js'
 
 function toUserResponse(user: { displayName: string; login: string }) {
   return {
@@ -25,8 +26,10 @@ function requireClient() {
 
 export const router = express.Router()
 
-router.get('/', (_req, res) => {
-  ok<TwitchConnectionResponse>(res, { ...getPublicSecretsView().twitch, health: getTwitchHealth() })
+// open on purpose (the panel on a phone or from a QR code reads it), so what only this computer may see is left out for the rest
+router.get('/', (req, res) => {
+  const twitch = getPublicSecretsView({ includeAuthorization: isLocalAddress(req.socket.remoteAddress) }).twitch
+  ok<TwitchConnectionResponse>(res, { ...twitch, health: getTwitchHealth() })
 })
 
 router.get('/config', (_req, res) => {
