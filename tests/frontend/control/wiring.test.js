@@ -56,6 +56,16 @@ test('the control panel and its events', async (t) => {
     for (const call of Object.values(READ)) assert.equal(panel.count(call) >= 1, true, call)
   })
 
+  await t.test('a notice that the server tells is shown as a toast, and reads nothing', async () => {
+    panel.calls.length = 0
+
+    source().emit('notice', { type: 'viewerRequest', user: 'amy', title: 'Song' })
+    await elapse(100)
+
+    assert.ok(panel.toasts().includes('\u{1F3B5} amy added: Song'))
+    assert.deepEqual(panel.calls, [])
+  })
+
   await t.test('a change of one topic reads only that topic', async () => {
     panel.calls.length = 0
 

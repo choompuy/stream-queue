@@ -287,7 +287,6 @@
     "nowPlaying": "Сейчас играет: {{title}}",
     "addedToQueue": "Добавлено в очередь: {{title}} [#{{position}}]",
     "viewerRequest": "🎵 {{user}} добавил(а): {{title}}",
-    "viewerRequestsMany": "🎵 Добавлено {{count}} новых треков от зрителей",
     "twitchSettingsSaved": "Настройки Twitch сохранены",
     "twitchChatCommandsSaved": "Команды чата сохранены",
     "twitchRewardCreated": "Награда успешно создана",

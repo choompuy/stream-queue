@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { on, emit } from '../../src/state-events.js'
+import { on, emit, onNotice, notify } from '../../src/state-events.js'
 
 test('change listeners', async (t) => {
   await t.test('every listener is called on each notification', () => {
@@ -80,5 +80,53 @@ test('change listeners', async (t) => {
     offOther()
 
     assert.deepEqual(calls, ['self', 'other', 'other'])
+  })
+})
+
+test('notices', async (t) => {
+  const notice = { type: 'viewerRequest', user: 'amy', title: 'Song' } as const
+
+  await t.test('every listener gets the notice itself', () => {
+    const heard: unknown[] = []
+    const off1 = onNotice((n) => heard.push(['a', n]))
+    const off2 = onNotice((n) => heard.push(['b', n]))
+
+    notify(notice)
+    off1()
+    off2()
+
+    assert.deepEqual(heard, [
+      ['a', notice],
+      ['b', notice]
+    ])
+  })
+
+  await t.test('a throwing listener neither stops the others nor throws into the caller', (t) => {
+    const errors = t.mock.method(console, 'error', () => {})
+    const calls: string[] = []
+    const off = [
+      onNotice(() => calls.push('before')),
+      onNotice(() => {
+        throw new Error('boom')
+      }),
+      onNotice(() => calls.push('after'))
+    ]
+
+    assert.doesNotThrow(() => notify(notice))
+    off.forEach((fn) => fn())
+
+    assert.deepEqual(calls, ['before', 'after'])
+    assert.equal(errors.mock.callCount(), 1)
+  })
+
+  await t.test('unsubscribing stops them, and a notice nobody listens to is not kept', () => {
+    let count = 0
+    const off = onNotice(() => count++)
+
+    notify(notice)
+    off()
+    notify(notice)
+
+    assert.equal(count, 1)
   })
 })

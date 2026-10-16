@@ -11,8 +11,10 @@ const CLOSED = 2
  * onChange(topic)  at most once per 100 ms per topic. Called for every topic on each (re)connect too: what changed while
  *                  the connection was down was never announced, so the page has to compare
  * onStatus(status) 'open', or 'down' when there is no EventSource or no connection for 10 s (the page polls meanwhile)
+ * onNotice(notice) something that happened and is shown as it is told (see src/state-events.ts). Told once: what is missed while the
+ *                  connection is down is not told afterwards, and it is not a change to read again
  */
-export function connectEvents({ topics, onChange, onStatus, EventSourceImpl = globalThis.EventSource }) {
+export function connectEvents({ topics, onChange, onStatus, onNotice, EventSourceImpl = globalThis.EventSource }) {
   if (!EventSourceImpl) {
     onStatus('down')
     return { close() {} }
@@ -105,6 +107,19 @@ export function connectEvents({ topics, onChange, onStatus, EventSourceImpl = gl
       } catch {
         // a frame that is not ours says nothing
       }
+    })
+
+    listen('notice', (event) => {
+      armWatchdog()
+
+      let notice
+      try {
+        notice = JSON.parse(event.data)
+      } catch {
+        return
+      }
+
+      onNotice?.(notice)
     })
 
     listen('ping', armWatchdog)

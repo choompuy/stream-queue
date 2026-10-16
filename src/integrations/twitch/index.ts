@@ -27,7 +27,7 @@ import { registerRedemptionHandler, type RedemptionOutcome } from '../../finish.
 import { AppError } from '../../types.js'
 import type { FailureReason, QueueItem } from '../../types.js'
 import { createLogger, describeError } from '../../logger.js'
-import { emit } from '../../state-events.js'
+import { emit, notify } from '../../state-events.js'
 
 const log = createLogger('TWITCH')
 const chatLog = createLogger('TWITCH CHAT')
@@ -144,6 +144,8 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
     await cancelRedemption(tracked, twitchClient, reason)
     return
   }
+
+  notify({ type: 'viewerRequest', user: event.user_name, title: result.added.song.title })
 
   // The account can be disconnected while the song is being looked up. The track is queued by now, but there is
   // no login left to close the redemption with, so it is left for the streamer like the others

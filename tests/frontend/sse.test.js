@@ -35,6 +35,10 @@ class FakeEventSource {
   change(topic) {
     this.emit('changed', { topic, seq: 1 })
   }
+
+  notice(payload) {
+    this.emit('notice', payload)
+  }
 }
 
 function connect(t, topics = ['state', 'activity']) {
@@ -43,14 +47,16 @@ function connect(t, topics = ['state', 'activity']) {
 
   const changes = []
   const statuses = []
+  const notices = []
   const connection = connectEvents({
     topics,
     onChange: (topic) => changes.push(topic),
     onStatus: (status) => statuses.push(status),
+    onNotice: (notice) => notices.push(notice),
     EventSourceImpl: FakeEventSource
   })
 
-  return { changes, statuses, connection, source: () => FakeEventSource.instances.at(-1) }
+  return { changes, statuses, notices, connection, source: () => FakeEventSource.instances.at(-1) }
 }
 
 test('connectEvents()', async (t) => {
@@ -102,6 +108,49 @@ test('connectEvents()', async (t) => {
     t.mock.timers.tick(100)
 
     assert.deepEqual(changes, [])
+  })
+
+  await t.test('a notice is passed on as it was told, each one, not coalesced like a change', (t) => {
+    const { source, notices } = connect(t)
+    const first = source()
+    first.open()
+
+    first.notice({ type: 'viewerRequest', user: 'amy', title: 'One' })
+    first.notice({ type: 'viewerRequest', user: 'bob', title: 'Two' })
+
+    assert.deepEqual(notices, [
+      { type: 'viewerRequest', user: 'amy', title: 'One' },
+      { type: 'viewerRequest', user: 'bob', title: 'Two' }
+    ])
+  })
+
+  await t.test('a notice that cannot be read is dropped without a sound', (t) => {
+    const { source, notices } = connect(t)
+    const first = source()
+    first.open()
+
+    assert.doesNotThrow(() => first.listeners.notice[0]({ data: '{oops' }))
+    assert.deepEqual(notices, [])
+  })
+
+  await t.test('a notice counts as a frame for the watchdog, like a ping', (t) => {
+    const { source } = connect(t)
+    const first = source()
+    first.open()
+
+    t.mock.timers.tick(59000)
+    first.notice({ type: 'viewerRequest', user: 'amy', title: 'x' })
+    t.mock.timers.tick(59000)
+
+    assert.equal(FakeEventSource.instances.length, 1)
+  })
+
+  await t.test('a page that does not ask for notices can still be told one', (t) => {
+    FakeEventSource.instances = []
+    t.mock.timers.enable({ apis: ['setTimeout'] })
+    connectEvents({ topics: ['state'], onChange() {}, onStatus() {}, EventSourceImpl: FakeEventSource })
+
+    assert.doesNotThrow(() => FakeEventSource.instances[0].notice({ type: 'viewerRequest', user: 'amy', title: 'x' }))
   })
 
   await t.test('after a drop the browser reconnects by itself and the page reads everything again', (t) => {
@@ -174,16 +223,18 @@ test('connectEvents()', async (t) => {
   })
 
   await t.test('close() stops everything, and nothing is called afterwards', (t) => {
-    const { source, connection, changes } = connect(t)
+    const { source, connection, changes, notices } = connect(t)
     const first = source()
     first.open()
 
     connection.close()
     first.change('state')
+    first.notice({ type: 'viewerRequest', user: 'amy', title: 'x' })
     t.mock.timers.tick(120000)
 
     assert.equal(first.closed, true)
     assert.deepEqual(changes, [])
+    assert.deepEqual(notices, [])
     assert.equal(FakeEventSource.instances.length, 1)
   })
 })

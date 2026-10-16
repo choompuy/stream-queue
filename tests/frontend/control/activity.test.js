@@ -6,57 +6,41 @@ const panel = setupPanel()
 
 const { initI18n } = await import('../../../public/js/i18n.js')
 await initI18n('en')
+const { state } = await import('../../../public/js/control/state.js')
 const { loadActivity } = await import('../../../public/js/control/activity.js')
 
 let at = 1_000
 const entry = (char, extra = {}) => ({ at: ++at, videoId: V(char), title: `Song ${char}`, query: 'q', status: 'accepted', requestedBy: 'amy', reasonCode: null, ...extra })
 
-let entries = []
-panel.route('GET /api/activity', () => ({ entries }))
+test('loadActivity()', async (t) => {
+  await t.test('shows the entries and their count on the tab, and never a toast about them: that is for the notices of the server', async () => {
+    panel.route('GET /api/activity', { entries: [entry('a'), entry('b', { status: 'rejected', reasonCode: 'DUPLICATE' })] })
+    const before = panel.toasts().join('|')
 
-const load = async () => {
-  await loadActivity(true)
-  return panel.toasts().join('|')
-}
+    await loadActivity()
 
-test('requests from viewers', async (t) => {
-  const seen = entry('a')
-
-  await t.test('what is already there when the panel opens is not announced', async () => {
-    entries = [seen]
-
-    assert.equal(await load(), '')
+    assert.equal(state.activity.length, 2)
+    assert.equal(panel.$('#tabActivityCount').textContent, '2')
+    assert.equal(panel.$$('#activityListWrapper .row-item').length, 2)
+    assert.equal(panel.toasts().join('|'), before)
   })
 
-  await t.test('one new accepted request is announced with its viewer and title', async () => {
-    entries = [entry('b'), seen]
-    await load()
+  await t.test('a new entry is shown without a toast, even from a viewer', async () => {
+    panel.route('GET /api/activity', { entries: [entry('c'), entry('a')] })
+    const before = panel.toasts().join('|')
 
-    assert.ok(panel.toasts().includes('🎵 amy added: Song b'))
+    await loadActivity(true)
+
+    assert.equal(panel.toasts().join('|'), before)
   })
 
-  await t.test('several at once are announced as a count', async () => {
-    entries = [entry('c'), entry('d', { requestedBy: 'bob' }), ...entries]
-    await load()
+  await t.test('a silent read that fails says nothing and leaves the list as it was', async () => {
+    panel.route('GET /api/activity', [500, { error: 'raw', code: 'SERVER_ERROR' }])
+    const before = panel.toasts().join('|')
 
-    assert.ok(panel.toasts().includes('🎵 2 new tracks added by viewers'))
-  })
+    await loadActivity(true)
 
-  await t.test('the same entries are not announced again', async () => {
-    const before = await load()
-
-    assert.equal(await load(), before)
-  })
-
-  await t.test('requests made in the panel, refused ones and failed playbacks are not announced', async () => {
-    const before = await load()
-    entries = [
-      entry('e', { requestedBy: 'ControlPanel' }),
-      entry('f', { status: 'rejected', reasonCode: 'DUPLICATE' }),
-      entry('g', { status: 'failed', reasonCode: 'PLAYBACK_FAILED' }),
-      ...entries
-    ]
-
-    assert.equal(await load(), before)
+    assert.equal(panel.toasts().join('|'), before)
+    assert.equal(state.activity.length, 2)
   })
 })

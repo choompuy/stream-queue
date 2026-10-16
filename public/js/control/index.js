@@ -15,6 +15,7 @@ import { loadPlaylists } from './playlists.js'
 import { loadSecrets, loadConfig, loadOverlaySettings, loadNetworkInfo } from './settings.js'
 import { loadTwitchSettings, loadTwitchConfig, loadTwitchSecrets, refreshTwitchStatus } from './twitch/index.js'
 import { isDashboardActive, isPlaylistsActive } from './tabs.js'
+import { showNotice } from './notices.js'
 import { setError } from '../shared.js'
 
 // What each topic reads again. Only what the person looks at is read: the rest is read when it is shown again
@@ -64,6 +65,7 @@ export async function startControlPanel() {
   const events = connectEvents({
     topics: Object.keys(TOPICS),
     onChange: refreshTopic,
+    onNotice: showNotice,
     onStatus: (status) => {
       eventsOpen = status === 'open'
       if (status === 'down') safetyNet.start()

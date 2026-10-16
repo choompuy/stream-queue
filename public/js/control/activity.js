@@ -3,33 +3,6 @@ import { state } from './state.js'
 import { renderStats } from './stats.js'
 import { views } from './views/index.js'
 import { run } from './run.js'
-import { t } from '../i18n.js'
-import { toastInfo } from './toast.js'
-
-let knownActivityKeys = null
-
-function activityKey(entry) {
-  return `${entry.at}:${entry.videoId}:${entry.requestedBy}`
-}
-
-function notifyNewViewerRequests(entries) {
-  if (!knownActivityKeys) {
-    knownActivityKeys = new Set(entries.map(activityKey))
-    return
-  }
-
-  const newOnes = entries.filter(
-    (entry) => entry.status === 'accepted' && entry.requestedBy !== 'ControlPanel' && !knownActivityKeys.has(activityKey(entry))
-  )
-
-  knownActivityKeys = new Set(entries.map(activityKey))
-
-  if (newOnes.length === 1) {
-    toastInfo(t('toast.viewerRequest', { title: newOnes[0].title, user: newOnes[0].requestedBy }))
-  } else if (newOnes.length > 1) {
-    toastInfo(t('toast.viewerRequestsMany', { count: newOnes.length }))
-  }
-}
 
 function renderActivity() {
   const filter = state.activityFilter
@@ -42,9 +15,7 @@ export function loadActivity(silent = false) {
     'loading activity',
     async () => {
       const data = await api.getActivity()
-      const { entries } = data
-      notifyNewViewerRequests(entries)
-      state.activity = entries
+      state.activity = data.entries
       renderActivity()
       renderStats()
     },

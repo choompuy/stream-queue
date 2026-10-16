@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express'
 import { fail } from './http.js'
 import { createLogger, describeError } from './logger.js'
-import { on, TOPICS, type Topic } from './state-events.js'
+import { on, onNotice, TOPICS, type Notice, type Topic } from './state-events.js'
 
 const log = createLogger('SSE')
 
@@ -53,6 +53,15 @@ export function createEventStreams({ maxClients = 20, pingEveryMs = 25_000, coal
     }
   }
 
+  // a notice is told once, at once, to the panels (the clients that follow the activity), and is not kept for those that connect later
+  function broadcastNotice(notice: Notice): void {
+    const frame = `event: notice\ndata: ${JSON.stringify(notice)}\n\n`
+
+    for (const client of [...clients]) {
+      if (client.topics.has('activity')) send(client, frame)
+    }
+  }
+
   function schedule(topic: Topic): void {
     if (timers.has(topic)) return
 
@@ -66,7 +75,7 @@ export function createEventStreams({ maxClients = 20, pingEveryMs = 25_000, coal
 
   // listening costs nothing while nobody is connected
   function subscribe(): void {
-    const offs = TOPICS.map((topic) => on(topic, () => schedule(topic)))
+    const offs = [...TOPICS.map((topic) => on(topic, () => schedule(topic))), onNotice(broadcastNotice)]
     unsubscribe = () => offs.forEach((off) => off())
   }
 

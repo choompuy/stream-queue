@@ -18,6 +18,29 @@ export function on(topic: Topic, listener: Listener): () => void {
   }
 }
 
+// A notice is something that happened and is worth telling to whoever watches the panel, with what it is about.
+// Unlike a change it is not read again from anywhere: it exists only as long as it is being told
+export type Notice = { type: 'viewerRequest'; user: string; title: string }
+
+const noticeListeners = new Set<(notice: Notice) => void>()
+
+export function onNotice(listener: (notice: Notice) => void): () => void {
+  noticeListeners.add(listener)
+  return () => {
+    noticeListeners.delete(listener)
+  }
+}
+
+export function notify(notice: Notice): void {
+  for (const listener of [...noticeListeners]) {
+    try {
+      listener(notice)
+    } catch (error) {
+      log.error(`Listener of the notice "${notice.type}" failed: ${describeError(error)}`)
+    }
+  }
+}
+
 /**
  * Calls every listener of the topic. A listener that throws is logged and skipped: it must not stop the other listeners
  * or turn a change that already happened into an error for whoever caused it

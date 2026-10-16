@@ -10,7 +10,7 @@ import express from 'express'
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
 const { createEventStreams } = await import('../../src/sse.js')
-const { emit } = await import('../../src/state-events.js')
+const { emit, notify } = await import('../../src/state-events.js')
 
 type Stream = { status: number; headers: http.IncomingHttpHeaders; text: () => string; close: () => void; closed: Promise<void> }
 
@@ -186,5 +186,51 @@ test('GET /api/events', async (t) => {
     } finally {
       await server.stop()
     }
+  })
+})
+
+test('notices on the stream', async (t) => {
+  const notice = { type: 'viewerRequest', user: 'amy', title: 'Song' } as const
+
+  await t.test('a notice goes at once, as a frame of its own, to the clients that follow the activity and to nobody else', async () => {
+    const server = await startServer({ coalesceMs: 5 })
+    const panel = await server.open('?topics=activity')
+    const everything = await server.open()
+    const overlay = await server.open('?topics=state')
+
+    notify(notice)
+    notify({ ...notice, user: 'bob' })
+    await until(() => frames(panel, 'notice').length === 2 && frames(everything, 'notice').length === 2, 'both notices')
+
+    assert.deepEqual(
+      frames(panel, 'notice').map((frame) => JSON.parse(frame.split('data: ')[1])),
+      [notice, { ...notice, user: 'bob' }]
+    )
+    assert.equal(frames(overlay, 'notice').length, 0, 'an overlay only follows the state')
+    await server.stop()
+  })
+
+  await t.test('is not coalesced like a change: every notice is a frame', async () => {
+    const server = await startServer({ coalesceMs: 200 })
+    const panel = await server.open('?topics=activity')
+
+    for (let i = 0; i < 3; i++) notify({ ...notice, title: `Song ${i}` })
+    await until(() => frames(panel, 'notice').length === 3, 'three notices')
+    await server.stop()
+  })
+
+  await t.test('is not kept for a client that connects later, and listening stops with the last client', async () => {
+    const server = await startServer({})
+    const early = await server.open('?topics=activity')
+    early.close()
+    await early.closed
+    await until(() => server.streams.clientCount() === 0, 'the last client to go')
+
+    notify(notice)
+    const late = await server.open('?topics=activity')
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    assert.equal(frames(late, 'notice').length, 0)
+    await server.stop()
   })
 })
