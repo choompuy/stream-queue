@@ -1,7 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { getAppRoot } from './runtime.js'
-import { getSettings } from './settings.js'
 import { createLogger, describeError } from './logger.js'
 
 // resolved when used, not when the module is imported
@@ -34,7 +33,7 @@ function loadLocale(locale: string): Dict {
   }
 }
 
-export function t(locale: string, key: string, params: Record<string, string | number> = {}): string | null {
+export function t(locale: string, key: string, params: Record<string, string | number> = {}): string {
   let value: unknown = loadLocale(locale)
 
   for (const part of key.split('.')) {
@@ -48,14 +47,10 @@ export function t(locale: string, key: string, params: Record<string, string | n
 
   if (typeof value !== 'string') {
     if (locale !== DEFAULT_LOCALE) return t(DEFAULT_LOCALE, key, params)
-    return null
+    return key // Fallback to key if not found in default locale
   }
 
   return Object.entries(params).reduce((acc, [param, replacement]) => acc.replaceAll(`{{${param}}}`, () => String(replacement)), value)
-}
-
-export function translateWithFallback(key: string, params: Record<string, string | number> | undefined, fallback: string): string {
-  return t(getSettings().locale, key, params) ?? fallback
 }
 
 function codeToI18nKey(code: string): string {
@@ -63,6 +58,6 @@ function codeToI18nKey(code: string): string {
   return `api.errors.${camel}`
 }
 
-export function translateErrorCode(locale: string, code: string, params?: Record<string, string | number>): string | null {
+export function translateErrorCode(locale: string, code: string, params?: Record<string, string | number>): string {
   return t(locale, codeToI18nKey(code), params)
 }

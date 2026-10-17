@@ -2,10 +2,11 @@ import express from 'express'
 import { PlayerActionResponse } from '../types.js'
 import { ok, fail } from '../http.js'
 import { isValidVideoId } from '../youtube/url.js'
-import { translateWithFallback } from '../i18n.js'
+import { t } from '../i18n.js'
 import { buildSkipMessage } from '../chat-replies.js'
 import { setPaused } from '../queue.js'
 import { getState, endCurrent, skipCurrent, reportPlaybackFailure } from '../player.js'
+import { getSettings } from '../settings.js'
 
 export const router = express.Router()
 
@@ -27,17 +28,20 @@ router.post('/ended', (req, res) => {
 router.post('/skip', (_req, res) => {
   skipCurrent()
   const state = getState()
-  ok<PlayerActionResponse>(res, { ...state, message: buildSkipMessage(state) })
+  const locale = getSettings().locale
+  ok<PlayerActionResponse>(res, { ...state, message: buildSkipMessage(state, locale) })
 })
 
 router.post('/pause', (_req, res) => {
   setPaused(true)
-  ok<PlayerActionResponse>(res, { ...getState(), message: translateWithFallback('chat.paused', undefined, 'Player paused') })
+  const locale = getSettings().locale
+  ok<PlayerActionResponse>(res, { ...getState(), message: t(locale, 'chat.paused') })
 })
 
 router.post('/resume', (_req, res) => {
   setPaused(false)
-  ok<PlayerActionResponse>(res, { ...getState(), message: translateWithFallback('chat.resumed', undefined, 'Playback resumed') })
+  const locale = getSettings().locale
+  ok<PlayerActionResponse>(res, { ...getState(), message: t(locale, 'chat.resumed') })
 })
 
 router.post('/report-failure', (req, res) => {
@@ -47,7 +51,8 @@ router.post('/report-failure', (req, res) => {
   const errorCode = typeof req.body?.errorCode === 'number' ? req.body.errorCode : undefined
   const applied = reportPlaybackFailure(errorCode, videoId)
   const state = getState()
+  const locale = getSettings().locale
 
   if (!applied) return ok(res, { ...state, ignored: true })
-  ok<PlayerActionResponse>(res, { ...state, message: buildSkipMessage(state) })
+  ok<PlayerActionResponse>(res, { ...state, message: buildSkipMessage(state, locale) })
 })

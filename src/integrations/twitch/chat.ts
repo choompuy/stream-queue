@@ -85,8 +85,7 @@ export class TwitchChat extends ReconnectingSocket {
 
   async sendMessage(text: string): Promise<void> {
     if (!this.isConnected() || !this.socket) {
-      log.warn(`Cannot send message, not connected: ${text}`)
-      return
+      throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch chat is not connected')
     }
 
     // a line break would end the IRC command and let the rest be read as a new one; Twitch drops anything over 500 characters

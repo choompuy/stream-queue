@@ -2,10 +2,11 @@ import express from 'express'
 import { StateResponse, QueueRemoveResponse, QueueRequestResponse } from '../types.js'
 import { ok, fail, failFromReason } from '../http.js'
 import { isLocalAddress } from '../local-only.js'
-import { translateWithFallback } from '../i18n.js'
+import { t } from '../i18n.js'
 import { requestSong, removeByVideoId, clearQueue } from '../queue.js'
 import { isValidVideoId } from '../youtube/url.js'
 import { getState } from '../player.js'
+import { getSettings } from '../settings.js'
 
 export const router = express.Router()
 
@@ -33,12 +34,8 @@ router.post('/request', async (req, res) => {
     case 'added': {
       const { added } = result
       const message = added.started
-        ? translateWithFallback('toast.nowPlaying', { title: added.song.title }, `Now playing: ${added.song.title}`)
-        : translateWithFallback(
-            'toast.addedToQueue',
-            { title: added.song.title, position: added.position },
-            `Added to queue: ${added.song.title} [#${added.position}]`
-          )
+        ? t(getSettings().locale, 'toast.nowPlaying', { title: added.song.title })
+        : t(getSettings().locale, 'toast.addedToQueue', { title: added.song.title, position: added.position })
       return ok<QueueRequestResponse>(res, { ...added, state: getState(), message }, 201)
     }
   }

@@ -20,7 +20,6 @@ import {
   buildRedemptionRejectionMessage,
   buildRedemptionRefundFailedMessage
 } from '../../chat-replies.js'
-import { translateWithFallback } from '../../i18n.js'
 import { getTwitchConfig, CHAT_COMMAND_KEYS } from './config.js'
 import { getState, skipCurrent } from '../../player.js'
 import { registerRedemptionHandler, type RedemptionOutcome } from '../../finish.js'
@@ -29,6 +28,8 @@ import type { FailureReason, QueueItem } from '../../types.js'
 import { createLogger, describeError } from '../../logger.js'
 import { emit, notify } from '../../state-events.js'
 import { normalizeTwitchError } from './error.js'
+import { getSettings } from '../../settings.js'
+import { t } from '../../i18n.js'
 
 const log = createLogger('TWITCH')
 const chatLog = createLogger('TWITCH CHAT')
@@ -162,7 +163,8 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
   }
 
   log.log(`Redemption ${event.id} added to queue`)
-  await replyInChat(buildRedemptionAcceptedMessage(event.user_name, result.added))
+  const locale = getSettings().locale
+  await replyInChat(buildRedemptionAcceptedMessage(event.user_name, result.added, locale))
 }
 
 let eventSubStart: Promise<void> | null = null
@@ -232,10 +234,23 @@ function matchesCommand(text: string, command: string): boolean {
 }
 
 const CHAT_START_WAIT_MS = 5000
+const CHAT_RECONNECT_WAIT_MS = 60000
 
 async function replyInChat(message: string): Promise<void> {
-  if (!chat?.isConnected() && chatStart) await Promise.race([chatStart, wait(CHAT_START_WAIT_MS)])
   if (!chat) return
+
+  // Wait for initial connection (5s) or reconnection (up to 60s)
+  if (!chat.isConnected()) {
+    const waitPromise = chatStart ? Promise.race([chatStart, wait(CHAT_START_WAIT_MS)]) : wait(CHAT_RECONNECT_WAIT_MS)
+    await waitPromise
+  }
+
+  // Try to send, if still not connected after wait, just log and return
+  if (!chat.isConnected()) {
+    chatLog.warn(`Chat not connected, skipping reply: ${message}`)
+    return
+  }
+
   await chat.sendMessage(message).catch((error) => {
     chatLog.error(`Failed to send chat reply: ${describeError(error)}`)
   })
@@ -255,27 +270,33 @@ async function runCommand(message: TwitchChatMessage, cooldown: keyof typeof las
 }
 
 const COMMANDS: Record<(typeof CHAT_COMMAND_KEYS)[number], { cooldown: keyof typeof lastRun; run: () => string }> = {
-  now: { cooldown: 'plainCooldownSeconds', run: buildNowPlayingMessage },
-  queue: { cooldown: 'plainCooldownSeconds', run: buildQueueMessage },
+  now: {
+    cooldown: 'plainCooldownSeconds',
+    run: () => buildNowPlayingMessage(getState(), getSettings().locale)
+  },
+  queue: {
+    cooldown: 'plainCooldownSeconds',
+    run: () => buildQueueMessage(getState(), getSettings().locale)
+  },
   skip: {
     cooldown: 'controlCooldownSeconds',
     run: () => {
       skipCurrent()
-      return buildSkipMessage(getState())
+      return buildSkipMessage(getState(), getSettings().locale)
     }
   },
   pause: {
     cooldown: 'controlCooldownSeconds',
     run: () => {
       setPaused(true)
-      return translateWithFallback('chat.paused', undefined, 'Player paused')
+      return t(getSettings().locale, 'chat.paused')
     }
   },
   resume: {
     cooldown: 'controlCooldownSeconds',
     run: () => {
       setPaused(false)
-      return translateWithFallback('chat.resumed', undefined, 'Playback resumed')
+      return t(getSettings().locale, 'chat.resumed')
     }
   }
 }
@@ -495,7 +516,8 @@ async function cancelRedemption(redemption: TrackedRedemption, twitchClient: Twi
   // "points refunded" goes to chat only when Twitch confirmed it: the points stay held otherwise
   if (result === 'done') {
     log.log(`Channel Points redemption canceled (points refunded): ${redemption.id}`)
-    await replyInChat(buildRedemptionRejectionMessage(redemption.userName, reason))
+    const locale = getSettings().locale
+    await replyInChat(buildRedemptionRejectionMessage(redemption.userName, reason, locale))
     return
   }
 
@@ -503,7 +525,8 @@ async function cancelRedemption(redemption: TrackedRedemption, twitchClient: Twi
   // message here ("refunded" or "could not be refunded") could be wrong. Nothing is said in chat
   if (result === 'no-longer-open') return
 
-  await replyInChat(buildRedemptionRefundFailedMessage(redemption.userName))
+  const locale = getSettings().locale
+  await replyInChat(buildRedemptionRefundFailedMessage(redemption.userName, locale))
 }
 
 export type TwitchHealth = {
