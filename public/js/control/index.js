@@ -5,8 +5,7 @@ import { initI18n } from '../i18n.js'
 import './player.js'
 import { run } from './run.js'
 import { bindEvents } from './events.js'
-import { createPoller } from './polling.js'
-import { connectEvents, serialized } from '../sse.js'
+import { watch } from '../sse.js'
 import { refreshState } from './queue.js'
 import { refreshFallbackState } from './fallback.js'
 import { loadActivity } from './activity.js'
@@ -28,12 +27,7 @@ const TOPICS = {
   twitch: { read: () => refreshTwitchStatus(), isShown: () => document.visibilityState === 'visible' }
 }
 
-// one at a time per topic: a late answer must not overwrite a newer one
-for (const topic of Object.values(TOPICS)) topic.read = serialized(topic.read)
-
-const refreshTopic = (name) => (TOPICS[name].isShown() ? TOPICS[name].read() : undefined)
-
-// the net under the events: while they are down the panel polls, slowly, as it used to
+// the net under the events: while they are down the panel reads everything, slowly, as it used to
 const SAFETY_POLL_MS = 10000
 
 /**
@@ -58,35 +52,21 @@ export async function startControlPanel() {
   await loadTwitchConfig()
   await Promise.allSettled([loadActivity(), loadBlocklist(), loadPlaylists(), refreshState(), refreshFallbackState()])
 
-  const safetyNet = createPoller(Object.keys(TOPICS).map((name) => ({ run: () => refreshTopic(name), every: SAFETY_POLL_MS })))
-
-  let eventsOpen = false
-
-  const events = connectEvents({
-    topics: Object.keys(TOPICS),
-    onChange: refreshTopic,
-    onNotice: showNotice,
-    onStatus: (status) => {
-      eventsOpen = status === 'open'
-      if (status === 'down') safetyNet.start()
-      else safetyNet.stop()
-    }
-  })
+  const watcher = watch(TOPICS, { onNotice: showNotice, safetyMs: SAFETY_POLL_MS })
 
   // with the events open the server announces what a request changed; without them the panel reads at once
   onServerChange(() => {
-    if (!eventsOpen) Object.keys(TOPICS).forEach(refreshTopic)
+    if (!watcher.isOpen()) watcher.refreshAll()
   })
 
   // a tab hidden for a while heard nothing (the browser may even have paused it): read the status again when it is back
   const onVisibilityChange = () => {
-    if (document.visibilityState === 'visible') refreshTopic('twitch')
+    if (document.visibilityState === 'visible') watcher.refresh('twitch')
   }
   document.addEventListener('visibilitychange', onVisibilityChange)
 
   const stop = () => {
-    events.close()
-    safetyNet.stop()
+    watcher.close()
     onServerChange(() => {})
     document.removeEventListener('visibilitychange', onVisibilityChange)
     window.removeEventListener('pagehide', stop)

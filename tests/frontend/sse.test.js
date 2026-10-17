@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { connectEvents, serialized } from '../../public/js/sse.js'
+import { connectEvents, serialized, watch } from '../../public/js/sse.js'
 
 // What a browser gives the page: named events only (a ": comment" never reaches it), a readyState, and close()
 class FakeEventSource {
@@ -271,5 +271,166 @@ test('serialized()', async (t) => {
     await task()
 
     assert.equal(calls, 2)
+  })
+})
+
+test('watch()', async (t) => {
+  const flush = () => new Promise((resolve) => setImmediate(resolve))
+
+  // a page with three topics: what each one reads is recorded, `shown` says what anyone looks at
+  function page(t, { safetyMs = 1000, shown = {}, noEvents = false } = {}) {
+    FakeEventSource.instances = []
+    t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+    const reads = []
+    const topics = Object.fromEntries(
+      ['a', 'b', 'c'].map((name) => [name, { read: async () => void reads.push(name), isShown: () => shown[name] ?? true }])
+    )
+    const notices = []
+    const watcher = watch(topics, { safetyMs, onNotice: (notice) => notices.push(notice), EventSourceImpl: noEvents ? undefined : FakeEventSource })
+    t.after(() => {
+      watcher.close()
+      t.mock.timers.reset()
+    })
+
+    return { watcher, reads, notices, source: () => FakeEventSource.instances.at(-1) }
+  }
+
+  await t.test('follows the topics it was given, over one connection', (t) => {
+    const { source } = page(t)
+
+    assert.equal(FakeEventSource.instances.length, 1)
+    assert.match(source().url, /topics=a,b,c/)
+  })
+
+  await t.test('reads the topic that the server announces, and only that one', async (t) => {
+    const { source, reads } = page(t)
+    source().open()
+    t.mock.timers.tick(100)
+    await flush()
+    reads.length = 0
+
+    source().change('b')
+    t.mock.timers.tick(100)
+    await flush()
+
+    assert.deepEqual(reads, ['b'])
+  })
+
+  await t.test('reads everything each time the connection comes up: what changed while it was down was never announced', async (t) => {
+    const { source, reads } = page(t)
+
+    source().open()
+    t.mock.timers.tick(100)
+    await flush()
+
+    assert.deepEqual(reads.sort(), ['a', 'b', 'c'])
+  })
+
+  await t.test('does not read a topic that nobody looks at, and refresh() of it does nothing either', async (t) => {
+    const { watcher, source, reads } = page(t, { shown: { b: false } })
+    source().open()
+    t.mock.timers.tick(100)
+    await flush()
+    reads.length = 0
+
+    source().change('b')
+    watcher.refresh('b')
+    t.mock.timers.tick(100)
+    await flush()
+
+    assert.deepEqual(reads, [])
+  })
+
+  await t.test('reads one topic at a time, and a change that comes while it is read makes one more read after it', async (t) => {
+    FakeEventSource.instances = []
+    t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+    let running = 0
+    let peak = 0
+    let started = 0
+    let release = null
+    const watcher = watch(
+      {
+        a: {
+          read: async () => {
+            started++
+            running++
+            peak = Math.max(peak, running)
+            if (started === 1) await new Promise((resolve) => (release = resolve))
+            running--
+          }
+        }
+      },
+      { EventSourceImpl: FakeEventSource }
+    )
+    t.after(() => {
+      watcher.close()
+      t.mock.timers.reset()
+    })
+
+    watcher.refresh('a')
+    watcher.refresh('a')
+    watcher.refresh('a')
+    release()
+    await flush()
+    await flush()
+
+    assert.equal(started, 2)
+    assert.equal(peak, 1)
+  })
+
+  await t.test('while the connection is down it reads everything every safetyMs, and stops when the connection is up', async (t) => {
+    const { source, reads } = page(t, { safetyMs: 1000 })
+
+    t.mock.timers.tick(10_000)
+    await flush()
+    reads.length = 0
+
+    for (let i = 0; i < 3; i++) {
+      t.mock.timers.tick(1000)
+      await flush()
+    }
+    assert.equal(reads.length, 9, 'three topics, three times')
+
+    source().open()
+    t.mock.timers.tick(100)
+    await flush()
+    reads.length = 0
+    t.mock.timers.tick(30_000)
+    await flush()
+    assert.deepEqual(reads, [], 'with the connection up the server says when to read')
+  })
+
+  await t.test('with no EventSource at all it reads on its own from the start', async (t) => {
+    const { reads } = page(t, { safetyMs: 1000, noEvents: true })
+
+    t.mock.timers.tick(2000)
+    await flush()
+
+    assert.equal(reads.length, 6)
+  })
+
+  await t.test('passes the notices on, and isOpen() says whether the connection is up', async (t) => {
+    const { watcher, source, notices } = page(t)
+    assert.equal(watcher.isOpen(), false)
+
+    source().open()
+    source().notice({ type: 'viewerRequest', user: 'amy', title: 'x' })
+
+    assert.equal(watcher.isOpen(), true)
+    assert.deepEqual(notices, [{ type: 'viewerRequest', user: 'amy', title: 'x' }])
+  })
+
+  await t.test('close() closes the connection and ends the reading', async (t) => {
+    const { watcher, source, reads } = page(t, { safetyMs: 1000 })
+    t.mock.timers.tick(10_000)
+    await flush()
+
+    watcher.close()
+    reads.length = 0
+    t.mock.timers.tick(10_000)
+    await flush()
+
+    assert.equal(source().closed, true)
+    assert.deepEqual(reads, [])
   })
 })
