@@ -36,8 +36,8 @@ export const getSettings = settings.getConfig
 export const validateSettingsUpdates = settings.validateConfigUpdates
 
 /** Applies the valid part of `updates` and names the fields that were refused (invalid or unknown), like every save of the panel. */
-export function updateSettings(updates: Partial<Settings>): { config: Settings; rejected: string[] } {
+export function updateSettings(updates: Partial<Settings>): { config: Settings; rejected: string[]; changed: boolean } {
   const result = settings.updateConfig(updates)
-  emit('state')
+  if (result.changed) emit('state')
   return result
 }

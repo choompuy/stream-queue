@@ -3,6 +3,7 @@ import path from 'node:path'
 
 import { getServerConfig, updateServerConfig } from './server-config.js'
 import { getAppRoot, loadEnvFile } from './runtime.js'
+import { ensureDataDirectory } from './persist.js'
 import { initState } from './state-file.js'
 import { runStartupTasks } from './startup.js'
 import { errorHandler } from './error-handler.js'
@@ -48,6 +49,8 @@ async function main() {
   loadEnvFile()
   enableFileLogging()
   installShutdownHandlers()
+
+  await ensureDataDirectory()
 
   initState()
   clearTwitchAuthorization()

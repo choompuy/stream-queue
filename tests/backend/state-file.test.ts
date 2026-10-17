@@ -7,7 +7,8 @@ import { join } from 'node:path'
 const dir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
 process.chdir(dir)
 mkdirSync(join(dir, 'cache'), { recursive: true })
-const { sanitizeState, sanitizeQueueItem, initState } = await import('../../src/state-file.js')
+mkdirSync(join(dir, 'data'), { recursive: true })
+const { sanitizeState, sanitizeQueueItem, initState, loadState } = await import('../../src/state-file.js')
 const queue = await import('../../src/queue.js')
 const { flushAllStores } = await import('../../src/persist.js')
 
@@ -186,7 +187,7 @@ test('sanitizeQueueItem()', async (t) => {
 })
 
 test('initState()', async (t) => {
-  const stateFile = join(dir, 'cache', 'queue-state.json')
+  const stateFile = join(dir, 'data', 'queue-state.json')
 
   writeFileSync(
     stateFile,
@@ -220,5 +221,19 @@ test('initState()', async (t) => {
       queue.getQueue().map((entry) => entry.videoId),
       [C]
     )
+  })
+})
+
+test('loadState() with a damaged state file', async (t) => {
+  await t.test('a null state file next to a non-empty track file does not crash the load', (t2) => {
+    t2.mock.method(console, 'warn', () => {})
+    // the queue state lives in data/, the track file in cache/
+    writeFileSync(join(dir, 'data', 'queue-state.json'), JSON.stringify(null))
+    writeFileSync(join(dir, 'cache', 'fallback-tracks.json'), JSON.stringify({ sourceTracks: [song(F1)] }))
+
+    assert.doesNotThrow(() => loadState())
+
+    assert.equal(queue.getCurrent(), null)
+    assert.deepEqual(queue.getQueue(), [])
   })
 })

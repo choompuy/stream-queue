@@ -1,4 +1,4 @@
-import { cachePath, createFileStore } from './persist.js'
+import { cachePath, createFileStore, dataPath } from './persist.js'
 import { QueueItem, Song } from './types.js'
 import { isValidPlaylistId, isValidVideoId } from './youtube/url.js'
 import { getQueue, getCurrent, hydrateQueue } from './queue.js'
@@ -146,7 +146,7 @@ export function sanitizeState(raw: unknown): SanitizedState {
   return { current, queue, fallback: sanitizeFallback(data.fallback, problems), problems }
 }
 
-const store = createFileStore<Partial<StateFile>>(() => cachePath('queue-state.json'))
+const store = createFileStore<Partial<StateFile>>(() => dataPath('queue-state.json'))
 const tracksStore = createFileStore<TracksFile>(() => cachePath('fallback-tracks.json'))
 
 const log = createLogger('STATE')
@@ -163,9 +163,7 @@ function stateSnapshot(): StateFile {
 let savedTracksVersion = -1
 
 function persistState(): void {
-  const onError = (error: unknown) => log.error(`Failed to save state: ${describeError(error)}`)
-
-  store.scheduleSave(stateSnapshot, onError)
+  store.scheduleSave(stateSnapshot)
 
   const version = getFallbackSourceVersion()
   if (version !== savedTracksVersion) {
@@ -174,7 +172,7 @@ function persistState(): void {
       () => ({ sourceTracks: getFallbackSourceTracks() }),
       (error) => {
         savedTracksVersion = -1 // not on disk: written again with the next save
-        onError(error)
+        log.error(`Failed to save the fallback tracks: ${describeError(error)}`)
       }
     )
   }

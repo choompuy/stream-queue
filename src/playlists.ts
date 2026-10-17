@@ -1,5 +1,4 @@
 import { dataPath, createFileStore, loadList } from './persist.js'
-import { createLogger, describeError } from './logger.js'
 import { emit } from './state-events.js'
 
 export type SavedPlaylist = {
@@ -10,7 +9,6 @@ export type SavedPlaylist = {
   addedAt: number
 }
 
-const log = createLogger('PLAYLISTS')
 const store = createFileStore<SavedPlaylist[]>(() => dataPath('playlists.json'))
 
 // a saved playlist as the panel gets it: with the answer whether it is the one that is played
@@ -36,10 +34,7 @@ const current = (): SavedPlaylist[] => (loaded ??= loadList(store, isSavedPlayli
 
 function save(): void {
   emit('playlists')
-  store.scheduleSave(
-    () => current(),
-    (error) => log.error(`Failed to save: ${describeError(error)}`)
-  )
+  store.scheduleSave(() => current())
 }
 
 export function getPlaylists(): SavedPlaylist[] {

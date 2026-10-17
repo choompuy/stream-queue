@@ -8,6 +8,7 @@ import { join } from 'node:path'
 const dir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
 process.chdir(dir)
 mkdirSync(join(dir, 'cache'), { recursive: true })
+mkdirSync(join(dir, 'data'), { recursive: true })
 
 const fallback = await import('../../src/fallback.js')
 const { loadState } = await import('../../src/state-file.js')
@@ -49,7 +50,7 @@ function writeSavedState({ withTrackFile }: { withTrackFile: boolean }): void {
   const playing = { ...song(ids[9]), requestedBy: 'Playlist', isFallback: true }
   const fallbackProgress = { order: ids, cursor: 9, playlistId: PLAYLIST, lastRefreshedAt: 1 }
 
-  writeFileSync(join(dir, 'cache', 'queue-state.json'), JSON.stringify({ current: playing, queue: [], fallback: fallbackProgress }))
+  writeFileSync(join(dir, 'data', 'queue-state.json'), JSON.stringify({ current: playing, queue: [], fallback: fallbackProgress }))
 
   if (withTrackFile) writeFileSync(join(dir, 'cache', 'fallback-tracks.json'), JSON.stringify({ sourceTracks: ids.map(song) }))
   else rmSync(join(dir, 'cache', 'fallback-tracks.json'), { force: true })
@@ -101,7 +102,7 @@ test('after a restart the playlist goes on from where it was', async (t) => {
   await t.test('a saved position that disagrees with the playing track follows the playing track', async () => {
     writeSavedState({ withTrackFile: true })
     writeFileSync(
-      join(dir, 'cache', 'queue-state.json'),
+      join(dir, 'data', 'queue-state.json'),
       JSON.stringify({ current: { ...song(ids[9]), requestedBy: 'Playlist', isFallback: true }, queue: [], fallback: { order: ids, cursor: 2, playlistId: PLAYLIST, lastRefreshedAt: 1 } })
     )
     stubPlaylist(ids)
@@ -114,7 +115,7 @@ test('after a restart the playlist goes on from where it was', async (t) => {
   await t.test('a track a viewer requested is playing: the playlist keeps its own position', async () => {
     writeSavedState({ withTrackFile: true })
     writeFileSync(
-      join(dir, 'cache', 'queue-state.json'),
+      join(dir, 'data', 'queue-state.json'),
       JSON.stringify({ current: { ...song('viewerreq01'), requestedBy: 'viewer' }, queue: [], fallback: { order: ids, cursor: 4, playlistId: PLAYLIST, lastRefreshedAt: 1 } })
     )
     stubPlaylist(ids)

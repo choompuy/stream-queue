@@ -1,5 +1,5 @@
 import { dataPath, createFileStore, loadList } from './persist.js'
-import { createLogger, describeError } from './logger.js'
+import { createLogger } from './logger.js'
 import { isValidVideoId } from './youtube/url.js'
 import { emit } from './state-events.js'
 import type { Blockable } from './types.js'
@@ -37,10 +37,7 @@ function ensureLoaded(): { list: BlockedTrack[]; ids: Set<string> } {
 }
 
 function save(): void {
-  store.scheduleSave(
-    () => ensureLoaded().list,
-    (error) => log.error(`Failed to save: ${describeError(error)}`)
-  )
+  store.scheduleSave(() => ensureLoaded().list)
 }
 
 export function getBlockedTracks(): BlockedTrack[] {

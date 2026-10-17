@@ -3,9 +3,6 @@ import { createConfigModule, field, type FieldRule, type Schema } from './config
 import { emit } from './state-events.js'
 import { getTwitchClientId } from './env.js'
 import { AppError, type TwitchAuthorization, type TwitchSecrets, type TwitchTokenData, type TwitchUserInfo } from './types.js'
-import { createLogger, describeError } from './logger.js'
-
-const log = createLogger('SECRETS')
 
 export type Secrets = {
   youtubeApiKey: string
@@ -87,7 +84,7 @@ export function updateTwitchOAuthState(updates: Partial<TwitchSecrets>, immediat
 
   // Save token data immediately to avoid losing it on process exit
   if (immediate && updates.tokenData) {
-    secrets.saveNow((error) => log.error(`Failed to save secrets: ${describeError(error)}`))
+    void secrets.saveNow()
   }
 }
 

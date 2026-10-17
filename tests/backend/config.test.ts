@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -8,6 +8,7 @@ import { join } from 'node:path'
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
 const { getConfig, updateConfig, validateConfigUpdates } = await import('../../src/config.js')
+const { flushAllStores } = await import('../../src/persist.js')
 
 const DEFAULTS = getConfig()
 
@@ -127,5 +128,22 @@ test('updateConfig()', async (t) => {
 
     assert.equal(getConfig().fallbackPlaylist.repeat, false)
     assert.equal(getConfig().fallbackPlaylist.shuffle, false)
+  })
+
+  await t.test('an update that changes nothing rewrites no file', async () => {
+    updateConfig({ minViews: 4242 })
+    await flushAllStores()
+    const file = join(process.cwd(), 'data', 'config.json')
+    assert.ok(existsSync(file))
+    rmSync(file)
+
+    assert.equal(updateConfig({ minViews: 4242 }).changed, false, 'the same value')
+    assert.equal(updateConfig({}).changed, false, 'an empty update')
+    assert.equal(updateConfig({ minViews: 4242, nope: 1 }).changed, false, 'a fully rejected update')
+    await flushAllStores()
+
+    assert.equal(existsSync(file), false, 'config.json was not rewritten')
+
+    assert.equal(updateConfig({ minViews: 4243 }).changed, true, 'a real change')
   })
 })

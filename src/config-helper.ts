@@ -1,5 +1,6 @@
+import { isDeepStrictEqual } from 'node:util'
 import { createFileStore, deepMerge, type DeepPartial } from './persist.js'
-import { createLogger, describeError } from './logger.js'
+import { createLogger } from './logger.js'
 
 const FIELD = Symbol('field-rule')
 
@@ -86,11 +87,7 @@ export function createConfigModule<T extends object>(options: {
   let config: T | null = null
   const current = (): T => (config ??= loadChecked())
 
-  const save = () =>
-    store.scheduleSave(
-      () => current(),
-      (error) => log.error(`Failed to save ${store.path()}: ${describeError(error)}`)
-    )
+  const save = () => store.scheduleSave(() => current())
 
   function validateConfigUpdates(updates: unknown, against: T = current()) {
     const { clean: validated, rejected } = validateUpdates(schema, updates)
@@ -101,9 +98,12 @@ export function createConfigModule<T extends object>(options: {
 
   function updateConfig(updates: DeepPartial<T>) {
     const { clean, rejected } = validateConfigUpdates(updates)
-    config = deepMerge(current(), clean)
-    save()
-    return { config: structuredClone(config), rejected }
+    const previous = current()
+    const next = deepMerge(previous, clean)
+    const changed = !isDeepStrictEqual(next, previous)
+    config = next
+    if (changed) save()
+    return { config: structuredClone(next), rejected, changed }
   }
 
   function restoreConfig(snapshot: T): void {
@@ -116,7 +116,7 @@ export function createConfigModule<T extends object>(options: {
     validateConfigUpdates,
     updateConfig,
     restoreConfig,
-    saveNow: async (onError: (error: unknown) => void) => {
+    saveNow: async (onError?: (error: unknown) => void) => {
       await store.saveNow(() => current(), onError)
     }
   }

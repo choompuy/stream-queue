@@ -1,6 +1,6 @@
 import { ActivityEntry, ActivityReasonCode, QueueItem } from './types.js'
 import { dataPath, createFileStore, loadList } from './persist.js'
-import { createLogger, describeError } from './logger.js'
+import { createLogger } from './logger.js'
 import { emit } from './state-events.js'
 
 const ACTIVITY_LIMIT = 100
@@ -32,10 +32,7 @@ const entries = (): ActivityEntry[] => (loaded ??= loadList(store, isActivityEnt
 const log = createLogger('ACTIVITY')
 
 function save(): void {
-  store.scheduleSave(
-    () => entries(),
-    (error) => log.error(`Failed to save: ${describeError(error)}`)
-  )
+  store.scheduleSave(() => entries())
 }
 
 export function logActivity(entry: Omit<ActivityEntry, 'at'>): void {
