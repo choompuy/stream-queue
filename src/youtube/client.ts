@@ -129,16 +129,11 @@ const RETRY_STATUSES = new Set([429, 500, 502, 503, 504])
 const MAX_ATTEMPTS = 3
 const RETRY_DELAY_MS = 500
 
-// The request never reached YouTube (no key, no network), so YouTube cannot have charged quota for it
-export class RequestNotSentError extends AppError {}
-
-const isTimeout = (error: unknown): boolean => error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
-
 export async function youtube<T>(path: string, params: Record<string, string>, { attempts = MAX_ATTEMPTS }: { attempts?: number } = {}): Promise<T> {
   const { youtubeApiKey } = getSecrets()
 
   if (!youtubeApiKey) {
-    throw new RequestNotSentError('NO_API_KEY', 'YouTube API key is not configured, add it in the control panel')
+    throw new AppError('NO_API_KEY', 'YouTube API key is not configured, add it in the control panel')
   }
 
   const url = new URL(`https://www.googleapis.com/youtube/v3/${path}`)
@@ -155,8 +150,7 @@ export async function youtube<T>(path: string, params: Record<string, string>, {
     } catch (error) {
       if (attempt >= attempts) {
         const message = `YouTube API is unreachable: ${describeError(error)}`
-        // a timeout may have reached YouTube, anything else (DNS, no route, refused) did not
-        throw isTimeout(error) ? new AppError('YOUTUBE_ERROR', message) : new RequestNotSentError('YOUTUBE_ERROR', message)
+        throw new AppError('YOUTUBE_ERROR', message)
       }
       await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt))
       continue
@@ -174,7 +168,7 @@ export async function youtube<T>(path: string, params: Record<string, string>, {
       const reason = data.error?.errors?.[0]?.reason
 
       if (reason === 'quotaExceeded') {
-        throw new AppError('YOUTUBE_QUOTA', 'YouTube API quota exceeded')
+        throw new AppError('YOUTUBE_QUOTA', 'YouTube API quota exceeded. Quota resets at midnight Pacific Time')
       }
 
       throw new AppError('YOUTUBE_ERROR', data.error?.message || `YouTube API error ${response.status}`)

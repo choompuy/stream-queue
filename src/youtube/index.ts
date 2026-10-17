@@ -8,12 +8,11 @@ import {
   fetchPlaylistMeta,
   PlaylistMeta,
   MUSIC_CATEGORY_ID,
-  RequestNotSentError,
   PlaylistFetchResult,
   fetchVideos
 } from './client.js'
 import { normalize } from './utils.js'
-import { getSearchCache, setSearchCache, getVideoCache, setVideoCache, reserveSearchQuota, releaseSearchQuota, CACHE_LIMITS } from './cache.js'
+import { getSearchCache, setSearchCache, getVideoCache, setVideoCache, isQuotaExhausted, markQuotaExhausted } from './cache.js'
 import { VideoItem, SearchItem, PlaylistItem } from './types.js'
 import { getConfig } from '../config.js'
 import { createLogger, describeError } from '../logger.js'
@@ -95,7 +94,8 @@ export async function searchSongs(query: string, bypassFilters = false): Promise
   const cached = bypassFilters ? undefined : getSearchCache(cacheKey)
   if (cached !== undefined) return cached
 
-  return dedupInFlight(pendingSearches, cacheKey, () => performSearch(normalizedQuery, bypassFilters))
+  const trimmedQuery = query.trim()
+  return dedupInFlight(pendingSearches, cacheKey, () => performSearch(trimmedQuery, bypassFilters))
 }
 
 function mapValidSongs(videos: VideoItem[], bypassFilters = false): Song[] {
@@ -106,10 +106,9 @@ function mapValidSongs(videos: VideoItem[], bypassFilters = false): Song[] {
 }
 
 async function performSearch(query: string, bypassFilters: boolean): Promise<Song[]> {
-  // after the cache and the in-flight check, so only a search that really goes out costs quota
-  if (!reserveSearchQuota()) {
-    log.warn(`Daily search limit reached: ${CACHE_LIMITS.MAX_DAILY_SEARCHES}`)
-    throw new AppError('YOUTUBE_QUOTA', 'daily YouTube search quota exceeded, use a direct link instead')
+  if (isQuotaExhausted()) {
+    log.warn('YouTube quota exhausted for today')
+    throw new AppError('YOUTUBE_QUOTA', 'YouTube API quota exceeded. Quota resets at midnight Pacific Time')
   }
 
   let search: { items: SearchItem[] }
@@ -131,14 +130,15 @@ async function performSearch(query: string, bypassFilters: boolean): Promise<Son
       { attempts: 1 }
     )
   } catch (error) {
-    // only a search that never left is given back: a timeout or an error answer may well have been charged, and counting
-    // one search too many is harmless while counting one too few could run the real daily quota out
-    if (error instanceof RequestNotSentError) releaseSearchQuota()
+    if (error instanceof AppError && error.code === 'YOUTUBE_QUOTA') {
+      markQuotaExhausted()
+    }
     throw error
   }
 
   const ids = (search.items ?? []).map((item) => item.id?.videoId).filter((id): id is string => Boolean(id))
-  const cacheKey = bypassFilters ? `raw:${query}` : `${filtersVersion()}|${query}`
+  const normalizedQuery = normalize(query)
+  const cacheKey = bypassFilters ? `raw:${normalizedQuery}` : `${filtersVersion()}|${normalizedQuery}`
 
   if (!ids.length) {
     if (!bypassFilters) setSearchCache(cacheKey, [])
@@ -154,8 +154,9 @@ async function performSearch(query: string, bypassFilters: boolean): Promise<Son
 }
 
 /**
- * The best match of a result list from searchSongs(). The list is ordered by YouTube's relevance rank, which is
- * only known during the search. The first available song is returned.
+ * Selects a song from a search result list. Returns the first song that passes the isAvailable check.
+ * If no song passes the check, returns the first song in the list (even if blocked or duplicate) so that
+ * addSong can throw a meaningful error. Returns null if the list is empty.
  */
 export function selectBestSong(songs: Song[], isAvailable: (song: Song) => boolean = () => true): Song | null {
   const selected = songs.find(isAvailable) ?? songs[0]

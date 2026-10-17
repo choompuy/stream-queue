@@ -1,68 +1,47 @@
+// Only the kinds the playlistItems API can read: user playlists (PL), channel
+// uploads (UU), auto-generated albums (OL). Mixes (RD), liked (LL) and
+// favourites (FL) answer with an error there.
+const PLAYLIST_ID = /^(?:PL|UU|OL)[\w-]+$/
+const VIDEO_KINDS = new Set(['shorts', 'embed', 'v', 'live'])
+const HOSTS = new Set(['youtube.com', 'youtube-nocookie.com', 'youtu.be', 'music.youtube.com'])
+// YouTube hosts written without a scheme: "youtu.be/ID", "www.youtube.com/watch?v=ID", …
+const SCHEMELESS = /^(?:www\.|m\.|music\.)?(?:youtube(?:-nocookie)?\.com|youtu\.be)\//
+
 export function isValidVideoId(value: unknown): value is string {
-  return typeof value === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(value)
+  return typeof value === 'string' && /^[\w-]{11}$/.test(value)
 }
 
-const VIDEO_PATH_KINDS = new Set(['shorts', 'embed', 'v', 'live'])
+export function isValidPlaylistId(value: unknown): value is string {
+  return typeof value === 'string' && PLAYLIST_ID.test(value)
+}
+
+/** Parses input as a URL, prepending https:// to scheme-less YouTube hosts. Null if not a URL. */
+function toUrl(input: string): URL | null {
+  const s = input.trim()
+  try {
+    return new URL(SCHEMELESS.test(s.toLowerCase()) ? `https://${s}` : s)
+  } catch {
+    return null
+  }
+}
 
 export function parseYouTubeUrl(input: string): { isYouTube: boolean; videoId: string | null } {
-  let url: URL
+  const url = toUrl(input)
+  if (!url) return { isYouTube: false, videoId: null }
 
-  try {
-    url = new URL(input)
-  } catch {
-    return { isYouTube: false, videoId: null }
-  }
+  const host = url.hostname.replace(/^(?:www\.|m\.)+/, '')
+  if (!HOSTS.has(host)) return { isYouTube: false, videoId: null }
 
-  const hostname = url.hostname
-    .toLowerCase()
-    .replace(/^www\./, '')
-    .replace(/^m\./, '')
-
-  const isYouTube = hostname === 'youtube.com' || hostname === 'youtube-nocookie.com' || hostname === 'youtu.be' || hostname === 'music.youtube.com'
-
-  if (!isYouTube) return { isYouTube: false, videoId: null }
-
-  if (hostname === 'youtu.be') {
-    const id = url.pathname.split('/').filter(Boolean)[0]
-    return { isYouTube: true, videoId: isValidVideoId(id) ? id : null }
-  }
-
-  if (url.pathname === '/watch') {
-    const id = url.searchParams.get('v')
-    return { isYouTube: true, videoId: isValidVideoId(id) ? id : null }
-  }
-
-  // /shorts/<id>, /embed/<id>, /v/<id>, /live/<id>: the whole segment has to be an id, not just its first 11 characters
+  // youtu.be/<id> · /watch?v=<id> · /shorts|embed|v|live/<id> — segment must be the whole id
   const [kind, segment] = url.pathname.split('/').filter(Boolean)
-  const id = kind && VIDEO_PATH_KINDS.has(kind) ? segment : undefined
+  const id = host === 'youtu.be' ? kind : kind === 'watch' ? url.searchParams.get('v') : VIDEO_KINDS.has(kind) ? segment : null
+
   return { isYouTube: true, videoId: isValidVideoId(id) ? id : null }
 }
 
-// Only the kinds the playlistItems API can read: user playlists (PL), channel uploads (UU), auto-generated albums (OL).
-// Mixes (RD), liked videos (LL) and favourites (FL) answer with an error there
-const PLAYLIST_ID_PATTERN = /^(PL|UU|OL)[A-Za-z0-9_-]+$/
-
-export function isValidPlaylistId(value: unknown): value is string {
-  return typeof value === 'string' && PLAYLIST_ID_PATTERN.test(value)
-}
-
 export function parsePlaylistId(input: string): string | null {
-  const trimmed = input.trim()
-
-  if (!trimmed) {
-    return null
-  }
-
-  try {
-    const url = new URL(trimmed)
-    const listParam = url.searchParams.get('list')
-    if (listParam) {
-      return PLAYLIST_ID_PATTERN.test(listParam) ? listParam : null
-    }
-    return null
-  } catch {
-    // not a URL - assume it's already a bare ID
-  }
-
-  return PLAYLIST_ID_PATTERN.test(trimmed) ? trimmed : null
+  const s = input.trim()
+  const list = toUrl(s)?.searchParams.get('list')
+  // if s was a URL, it can't match PLAYLIST_ID, so the fallback only fires for bare IDs
+  return isValidPlaylistId(list) ? list : isValidPlaylistId(s) ? s : null
 }
