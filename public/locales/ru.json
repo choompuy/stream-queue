@@ -270,7 +270,9 @@
       "twitchOAuthError": "Не удалось завершить авторизацию Twitch",
       "twitchAuthExpired": "Время авторизации Twitch истекло, попробуйте подключиться снова",
       "twitchNotConnected": "Аккаунт Twitch не подключён",
-      "twitchRefreshError": "Не удалось обновить подключение Twitch"
+      "twitchRefreshError": "Не удалось обновить подключение Twitch",
+      "twitchNetworkError": "Нет связи с Twitch",
+      "twitchUnknownError": "Неизвестная ошибка Twitch"
     }
   },
   "toast": {

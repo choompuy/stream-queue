@@ -1,5 +1,6 @@
 import { createLogger, describeError } from '../../logger.js'
 import { AppError } from '../../types.js'
+import { normalizeTwitchError } from './error.js'
 import type {
   TwitchAuthConfig,
   TwitchDeviceCodeResponse,
@@ -27,9 +28,10 @@ function postForm(url: string, params: URLSearchParams): Promise<Response> {
   })
 }
 
-async function oauthError(response: Response, fallback: string): Promise<Error> {
+async function oauthError(response: Response, fallback: string): Promise<AppError> {
   const body = (await response.json().catch(() => ({}))) as TwitchErrorResponse
-  return new Error(`${fallback}: ${body.message || `HTTP ${response.status}`}`)
+  const message = body.message || fallback
+  return new AppError('TWITCH_API_ERROR', message, { status: response.status })
 }
 
 export class TwitchOAuth {
@@ -37,10 +39,15 @@ export class TwitchOAuth {
   private tokenData: TwitchTokenData | null = null
   private refreshPromise: Promise<TwitchTokenData> | null = null
   private authFailed = false
+  private tokenGeneration = 0
   private onTokenUpdated?: (tokenData: TwitchTokenData) => void
   private onAuthStateChange?: () => void
 
   constructor(config: TwitchOAuthOptions) {
+    if (!config.clientId) {
+      throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID not configured')
+    }
+
     this.config = {
       clientId: config.clientId,
       scopes: config.scopes || DEFAULT_SCOPES
@@ -48,8 +55,6 @@ export class TwitchOAuth {
 
     this.onTokenUpdated = config.onTokenUpdated
     this.onAuthStateChange = config.onAuthStateChange
-
-    if (!this.config.clientId) log.log('Twitch client ID not configured')
   }
 
   getConfig(): TwitchAuthConfig {
@@ -60,8 +65,6 @@ export class TwitchOAuth {
   }
 
   async requestDeviceCode(): Promise<TwitchDeviceCodeResponse> {
-    if (!this.config.clientId) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID not configured')
-
     const params = new URLSearchParams({
       client_id: this.config.clientId,
       scopes: this.config.scopes.join(' ')
@@ -77,7 +80,7 @@ export class TwitchOAuth {
       return data
     } catch (error) {
       log.error(`Device code request failed: ${describeError(error)}`)
-      throw error
+      throw normalizeTwitchError(error)
     }
   }
 
@@ -85,14 +88,14 @@ export class TwitchOAuth {
   // the tokens Twitch gave it in the meantime are revoked instead of replacing those of the account that is connected
   async pollForToken(deviceCode: string, interval: number, expiresIn: number, isWanted: () => boolean = () => true): Promise<TwitchTokenData> {
     if (!deviceCode) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch device code is required')
-    if (!this.config.clientId) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID not configured')
 
     const deadline = Date.now() + expiresIn * 1000
     let pollInterval = interval * 1000
+    const currentGeneration = this.tokenGeneration
 
     while (Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, pollInterval))
-      if (!isWanted()) throw new Error('Device authorization was cancelled')
+      if (!isWanted()) throw new AppError('TWITCH_AUTH_ERROR', 'Device authorization was cancelled')
 
       const params = new URLSearchParams({
         client_id: this.config.clientId,
@@ -115,10 +118,10 @@ export class TwitchOAuth {
         if (!isWanted()) {
           // the code was entered after all, but nobody waits for it any more: the account must not change
           await this.revoke([data.access_token, data.refresh_token])
-          throw new Error('Device authorization was cancelled')
+          throw new AppError('TWITCH_AUTH_ERROR', 'Device authorization was cancelled')
         }
 
-        const tokenData = this.store(data)
+        const tokenData = this.store(data, currentGeneration)
 
         log.log('Device authorization successful')
         return tokenData
@@ -134,7 +137,7 @@ export class TwitchOAuth {
 
       if (error.message === 'access_denied') throw new AppError('TWITCH_AUTH_ERROR', 'Twitch authorization was denied')
       if (error.message === 'expired_token') throw new AppError('TWITCH_AUTH_ERROR', 'Twitch device code expired')
-      throw new Error(error.message || 'Device authorization failed')
+      throw new AppError('TWITCH_AUTH_ERROR', error.message || 'Device authorization failed')
     }
 
     throw new AppError('TWITCH_AUTH_ERROR', 'Twitch device code expired')
@@ -143,10 +146,10 @@ export class TwitchOAuth {
   async refreshAccessToken(): Promise<TwitchTokenData> {
     if (this.refreshPromise) return this.refreshPromise
     if (this.authFailed) throw new AppError('TWITCH_REFRESH_ERROR', 'Twitch no longer accepts the saved login, connect the account again')
-    if (!this.config.clientId) throw new AppError('TWITCH_REFRESH_ERROR', 'Twitch client ID not configured')
     if (!this.tokenData?.refreshToken) throw new AppError('TWITCH_REFRESH_ERROR', 'No refresh token available')
 
-    this.refreshPromise = this.performRefresh()
+    const currentGeneration = this.tokenGeneration
+    this.refreshPromise = this.performRefresh(currentGeneration)
 
     try {
       return await this.refreshPromise
@@ -189,6 +192,7 @@ export class TwitchOAuth {
   clearTokenData(): void {
     this.tokenData = null
     this.refreshPromise = null
+    this.tokenGeneration++
     this.setAuthFailed(false)
     log.log('Token data cleared')
   }
@@ -239,7 +243,7 @@ export class TwitchOAuth {
     return Date.now() >= this.tokenData.expiresAt - REFRESH_BUFFER_MS
   }
 
-  private async performRefresh(): Promise<TwitchTokenData> {
+  private async performRefresh(expectedGeneration: number): Promise<TwitchTokenData> {
     const refreshToken = this.tokenData?.refreshToken
     if (!refreshToken) throw new AppError('TWITCH_REFRESH_ERROR', 'No refresh token available')
 
@@ -259,16 +263,25 @@ export class TwitchOAuth {
         throw await oauthError(response, 'Token refresh failed')
       }
 
-      const tokenData = this.store((await response.json()) as TwitchTokenResponse)
+      const tokenData = this.store((await response.json()) as TwitchTokenResponse, expectedGeneration)
       log.log('Token refresh successful')
       return tokenData
     } catch (error) {
+      if (error instanceof AppError) {
+        log.error(describeError(error))
+        throw error
+      }
+      // Network errors become TWITCH_REFRESH_ERROR
       log.error(describeError(error))
-      throw error
+      throw new AppError('TWITCH_REFRESH_ERROR', `Token refresh failed: ${describeError(error)}`)
     }
   }
 
-  private store(data: TwitchTokenResponse): TwitchTokenData {
+  private store(data: TwitchTokenResponse, expectedGeneration: number): TwitchTokenData {
+    if (expectedGeneration !== this.tokenGeneration) {
+      throw new AppError('TWITCH_REFRESH_ERROR', 'Login was cancelled during token refresh')
+    }
+
     this.tokenData = {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,

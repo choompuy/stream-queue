@@ -270,7 +270,9 @@
       "twitchOAuthError": "Failed to complete Twitch authorization",
       "twitchAuthExpired": "Twitch authorization expired, try connecting again",
       "twitchNotConnected": "Twitch account is not connected",
-      "twitchRefreshError": "Failed to refresh Twitch connection"
+      "twitchRefreshError": "Failed to refresh Twitch connection",
+      "twitchNetworkError": "No connection to Twitch",
+      "twitchUnknownError": "Unknown Twitch error"
     }
   },
   "toast": {

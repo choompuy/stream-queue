@@ -2,6 +2,7 @@ import { CHANNEL_POINTS_REDEMPTION, type TwitchClient } from './client.js'
 import { ReconnectingSocket, closeQuietly } from './socket.js'
 import type { EventSubMessage, TwitchChannelPointsRedemption } from './types.js'
 import { createLogger, describeError } from '../../logger.js'
+import { normalizeTwitchError } from './error.js'
 
 const log = createLogger('TWITCH EVENTSUB')
 
@@ -83,7 +84,7 @@ export class TwitchEventSub extends ReconnectingSocket {
       this.markReady()
       this.watchKeepalive(message)
     } catch (error) {
-      const normalized = error instanceof Error ? error : new Error(String(error))
+      const normalized = normalizeTwitchError(error)
       this.abort(normalized)
       throw normalized
     }

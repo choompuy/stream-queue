@@ -12,6 +12,7 @@ import type {
 import { TwitchOAuth } from './oauth.js'
 import { AppError } from '../../types.js'
 import { createLogger, describeError } from '../../logger.js'
+import { normalizeTwitchError } from './error.js'
 
 const log = createLogger('TWITCH CLIENT')
 
@@ -29,8 +30,6 @@ export class TwitchClient {
   }
 
   private async makeAuthenticatedRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
-    if (!this.oauth.getConfig().clientId) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID not configured')
-
     const accessToken = await this.oauth.getValidAccessToken()
     if (!accessToken) {
       throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected', this.refreshMayWorkLater() ? { transient: 1 } : undefined)
@@ -46,13 +45,13 @@ export class TwitchClient {
     try {
       refreshedToken = await this.oauth.refreshAccessToken()
     } catch (error) {
-      const reason = describeError(error)
-      log.error(`Token refresh failed: ${reason}`)
-      throw new AppError(
-        'TWITCH_REFRESH_ERROR',
-        `Authentication failed - please reconnect your Twitch account (${reason})`,
-        this.refreshMayWorkLater() ? { transient: 1 } : undefined
-      )
+      const normalized = normalizeTwitchError(error)
+      log.error(`Token refresh failed: ${describeError(normalized)}`)
+      // Preserve transient flag if already present, otherwise determine based on refreshMayWorkLater
+      if (!normalized.params?.transient && this.refreshMayWorkLater()) {
+        normalized.params = { ...normalized.params, transient: 1 }
+      }
+      throw normalized
     }
 
     // an error of the retried request itself is its own error, not a failed login
@@ -60,15 +59,19 @@ export class TwitchClient {
   }
 
   private async request(url: string, options: RequestInit, accessToken: string): Promise<Response> {
-    return fetch(url, {
-      ...options,
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      headers: {
-        ...options.headers,
-        Authorization: `Bearer ${accessToken}`,
-        'Client-Id': this.oauth.getConfig().clientId
-      }
-    })
+    try {
+      return await fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        headers: {
+          ...options.headers,
+          Authorization: `Bearer ${accessToken}`,
+          'Client-Id': this.oauth.getConfig().clientId
+        }
+      })
+    } catch (error) {
+      throw normalizeTwitchError(error)
+    }
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
@@ -83,7 +86,7 @@ export class TwitchClient {
       // Ignore invalid/non-JSON responses.
     }
 
-    throw new AppError('TWITCH_API_ERROR', `Twitch API error: ${message}`, { status: response.status })
+    throw new AppError('TWITCH_API_ERROR', message, { status: response.status })
   }
 
   // a login exists and Twitch has not refused it: a failed refresh was a passing problem

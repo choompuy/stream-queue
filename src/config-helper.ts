@@ -111,5 +111,13 @@ export function createConfigModule<T extends object>(options: {
     save()
   }
 
-  return { getConfig: (): T => structuredClone(current()), validateConfigUpdates, updateConfig, restoreConfig }
+  return {
+    getConfig: (): T => structuredClone(current()),
+    validateConfigUpdates,
+    updateConfig,
+    restoreConfig,
+    saveNow: async (onError: (error: unknown) => void) => {
+      await store.saveNow(() => current(), onError)
+    }
+  }
 }

@@ -28,6 +28,7 @@ import { AppError } from '../../types.js'
 import type { FailureReason, QueueItem } from '../../types.js'
 import { createLogger, describeError } from '../../logger.js'
 import { emit, notify } from '../../state-events.js'
+import { normalizeTwitchError } from './error.js'
 
 const log = createLogger('TWITCH')
 const chatLog = createLogger('TWITCH CHAT')
@@ -77,11 +78,16 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
     return
   }
 
+  if (!config.clientId) {
+    log.log('Twitch client ID not configured, integration will not be functional')
+    return
+  }
+
   oauth = new TwitchOAuth({
-    clientId: config.clientId || '',
+    clientId: config.clientId,
     scopes: config.scopes,
     onTokenUpdated: (tokenData) => {
-      updateTwitchOAuthState({ tokenData })
+      updateTwitchOAuthState({ tokenData }, true)
     },
     onAuthStateChange: () => emit('twitch')
   })
@@ -200,7 +206,8 @@ async function connectOrRetry(socket: TwitchEventSub | TwitchChat, name: string,
     await socket.connect()
     logger.log(`${name} connected`)
   } catch (error) {
-    logger.error(`Failed to start ${name}, will keep retrying: ${describeError(error)}`)
+    const normalized = normalizeTwitchError(error)
+    logger.error(`Failed to start ${name}, will keep retrying: ${describeError(normalized)}`)
     socket.retryInBackground()
   }
 }
@@ -359,18 +366,40 @@ export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeRespon
       }
       if (!client) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client is not initialized')
 
-      const userInfo = await client.getUserInfo()
+      let fetchedUserInfo: TwitchUserInfo | null = null
+      let lastError: Error | null = null
+
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          fetchedUserInfo = await client.getUserInfo()
+          break
+        } catch (error) {
+          lastError = error as Error
+          if (attempt < 3) {
+            log.warn(`getUserInfo attempt ${attempt} failed, retrying: ${describeError(error)}`)
+            await new Promise((resolve) => setTimeout(resolve, 1000))
+          }
+        }
+      }
+
+      if (!fetchedUserInfo) {
+        log.error(`getUserInfo failed after 3 attempts: ${describeError(lastError)}`)
+        // Rollback tokens on failure
+        await oauth?.revokeTokens()
+        oauth?.clearTokenData()
+        throw new AppError('TWITCH_AUTH_ERROR', 'Failed to fetch user info after successful login. Please try connecting again.')
+      }
 
       updateTwitchOAuthState({
-        userInfo,
+        userInfo: fetchedUserInfo,
         connectedAt: Date.now()
       })
 
       await startEventSub()
       await startChat()
 
-      log.log(`Twitch account connected: ${userInfo.displayName}`)
-      return userInfo
+      log.log(`Twitch account connected: ${fetchedUserInfo.displayName}`)
+      return fetchedUserInfo
     })
     // nobody awaits this promise: a refusal, an expired code or a cancel is logged here instead of becoming an unhandled rejection
     .catch((error) => {
@@ -540,9 +569,8 @@ export async function refreshConnection(): Promise<TwitchUserInfo> {
     log.log('Twitch connection refreshed')
     return userInfo
   } catch (error) {
-    const reason = describeError(error)
-    log.error(`Failed to refresh connection: ${reason}`)
-    throw new AppError('TWITCH_REFRESH_ERROR', reason)
+    log.error(`Failed to refresh connection: ${describeError(error)}`)
+    throw error
   }
 }
 

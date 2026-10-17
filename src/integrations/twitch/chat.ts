@@ -2,6 +2,7 @@ import type WebSocket from 'ws'
 import { TwitchOAuth } from './oauth.js'
 import { ReconnectingSocket } from './socket.js'
 import type { TwitchChatMessage } from './types.js'
+import { AppError } from '../../types.js'
 import { createLogger, describeError } from '../../logger.js'
 
 const log = createLogger('TWITCH CHAT')
@@ -104,7 +105,7 @@ export class TwitchChat extends ReconnectingSocket {
 
   protected async beforeOpen(): Promise<void> {
     const accessToken = await this.config.oauth.getValidAccessToken()
-    if (!accessToken) throw new Error('Twitch account is not connected, cannot open chat connection')
+    if (!accessToken) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected, cannot open chat connection')
     this.accessToken = accessToken
   }
 

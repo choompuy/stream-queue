@@ -61,6 +61,8 @@ const STATUS_BY_CODE: Record<AppErrorCode, number> = {
   IS_LIVE: 404,
   IS_SHORT: 404,
   INVALID_INPUT: 400,
+  TWITCH_NETWORK_ERROR: 502,
+  TWITCH_UNKNOWN_ERROR: 500
 }
 
 export type ErrorInfo = { code: string; status: number; message: string; params?: Record<string, string | number> }
