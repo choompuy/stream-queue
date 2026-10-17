@@ -14,7 +14,7 @@ router.post('/', (req, res) => {
   const { videoId, title } = req.body ?? {}
 
   if (!isValidVideoId(videoId)) {
-    return fail(res, 'a valid videoId is required', 'INVALID_VIDEO_ID', 400)
+    return fail(res, 'INVALID_VIDEO_ID', 400)
   }
 
   const entry = blockTrack(videoId, typeof title === 'string' ? title.slice(0, 200) : videoId)
@@ -24,6 +24,6 @@ router.post('/', (req, res) => {
 
 router.delete('/:videoId', (req, res) => {
   const removed = unblockTrack(req.params.videoId)
-  if (!removed) return fail(res, 'not found', 'NOT_FOUND', 404)
+  if (!removed) return fail(res, 'NOT_FOUND', 404)
   ok(res, { removed: true })
 })

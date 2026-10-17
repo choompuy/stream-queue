@@ -20,7 +20,9 @@ export function on(topic: Topic, listener: Listener): () => void {
 
 // A notice is something that happened and is worth telling to whoever watches the panel, with what it is about.
 // Unlike a change it is not read again from anywhere: it exists only as long as it is being told
-export type Notice = { type: 'viewerRequest'; user: string; title: string }
+export type Notice =
+  | { type: 'viewerRequest'; user: string; title: string }
+  | { type: 'error'; level: 'error'; code: string; params?: Record<string, string | number> }
 
 const noticeListeners = new Set<(notice: Notice) => void>()
 

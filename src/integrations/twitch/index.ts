@@ -27,7 +27,7 @@ import { AppError } from '../../types.js'
 import type { FailureReason, QueueItem } from '../../types.js'
 import { createLogger, describeError } from '../../logger.js'
 import { emit, notify } from '../../state-events.js'
-import { normalizeTwitchError } from './error.js'
+import { normalizeTwitchError, isNetworkError } from './error.js'
 import { getSettings } from '../../settings.js'
 import { t } from '../../i18n.js'
 
@@ -36,6 +36,7 @@ const chatLog = createLogger('TWITCH CHAT')
 
 const REDEMPTION_RETRY_ATTEMPTS = 3
 const REDEMPTION_RETRY_DELAY_MS = 1000
+const USER_INFO_RETRY_ATTEMPTS = 3
 let retryDelayMs = REDEMPTION_RETRY_DELAY_MS
 
 let oauth: TwitchOAuth | null = null
@@ -235,20 +236,32 @@ function matchesCommand(text: string, command: string): boolean {
 
 const CHAT_START_WAIT_MS = 5000
 const CHAT_RECONNECT_WAIT_MS = 60000
+const CHAT_CONNECT_POLL_MS = 250
+let chatStartWaitMs = CHAT_START_WAIT_MS
+let chatReconnectWaitMs = CHAT_RECONNECT_WAIT_MS
+
+async function waitForChat(limitMs: number): Promise<boolean> {
+  const deadline = Date.now() + limitMs
+
+  while (!chat?.isConnected()) {
+    if (!chat) return false
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) return false
+    await wait(Math.min(CHAT_CONNECT_POLL_MS, remaining))
+  }
+
+  return true
+}
 
 async function replyInChat(message: string): Promise<void> {
   if (!chat) return
 
-  // Wait for initial connection (5s) or reconnection (up to 60s)
   if (!chat.isConnected()) {
-    const waitPromise = chatStart ? Promise.race([chatStart, wait(CHAT_START_WAIT_MS)]) : wait(CHAT_RECONNECT_WAIT_MS)
-    await waitPromise
-  }
-
-  // Try to send, if still not connected after wait, just log and return
-  if (!chat.isConnected()) {
-    chatLog.warn(`Chat not connected, skipping reply: ${message}`)
-    return
+    const connected = await waitForChat(chatStart ? chatStartWaitMs : chatReconnectWaitMs)
+    if (!connected) {
+      chatLog.warn(`Chat not connected, skipping reply: ${message}`)
+      return
+    }
   }
 
   await chat.sendMessage(message).catch((error) => {
@@ -383,32 +396,45 @@ export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeRespon
     .pollForToken(device.device_code, device.interval, device.expires_in, () => generation === deviceAuthorizationGeneration)
     .then(async () => {
       if (generation !== deviceAuthorizationGeneration) {
-        throw new Error('Device authorization was cancelled')
+        throw new AppError('TWITCH_AUTH_ERROR', 'Device authorization was cancelled')
       }
-      if (!client) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client is not initialized')
+      if (!oauth || !client) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client is not initialized')
 
       let fetchedUserInfo: TwitchUserInfo | null = null
-      let lastError: Error | null = null
+      let lastError: unknown = null
 
-      for (let attempt = 1; attempt <= 3; attempt++) {
+      for (let attempt = 1; attempt <= USER_INFO_RETRY_ATTEMPTS; attempt++) {
+        if (generation !== deviceAuthorizationGeneration) {
+          throw new AppError('TWITCH_AUTH_ERROR', 'Device authorization was cancelled')
+        }
+
         try {
           fetchedUserInfo = await client.getUserInfo()
           break
         } catch (error) {
-          lastError = error as Error
-          if (attempt < 3) {
-            log.warn(`getUserInfo attempt ${attempt} failed, retrying: ${describeError(error)}`)
-            await new Promise((resolve) => setTimeout(resolve, 1000))
-          }
+          lastError = error
+          // a refusal (4xx) or a refused token gives the same answer every time: repeating it only delays the rollback
+          if (attempt === USER_INFO_RETRY_ATTEMPTS || !isRetryable(error)) break
+          log.warn(`getUserInfo attempt ${attempt} failed, retrying: ${describeError(error)}`)
+          await wait(retryDelayMs * 2 ** (attempt - 1))
         }
       }
 
       if (!fetchedUserInfo) {
-        log.error(`getUserInfo failed after 3 attempts: ${describeError(lastError)}`)
-        // Rollback tokens on failure
-        await oauth?.revokeTokens()
-        oauth?.clearTokenData()
-        throw new AppError('TWITCH_AUTH_ERROR', 'Failed to fetch user info after successful login. Please try connecting again.')
+        log.error(`getUserInfo failed: ${describeError(lastError)}`)
+        if (generation === deviceAuthorizationGeneration) {
+          await oauth.revokeTokens()
+          oauth.clearTokenData()
+          clearTwitchOAuthState()
+          throw lastError instanceof AppError
+            ? lastError
+            : new AppError('TWITCH_AUTH_ERROR', 'Failed to fetch user info after successful login. Please try connecting again.')
+        }
+        throw new AppError('TWITCH_AUTH_ERROR', 'Device authorization was cancelled')
+      }
+
+      if (generation !== deviceAuthorizationGeneration) {
+        throw new AppError('TWITCH_AUTH_ERROR', 'Device authorization was cancelled')
       }
 
       updateTwitchOAuthState({
@@ -424,8 +450,18 @@ export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeRespon
     })
     // nobody awaits this promise: a refusal, an expired code or a cancel is logged here instead of becoming an unhandled rejection
     .catch((error) => {
-      if (generation === deviceAuthorizationGeneration) log.error(`Twitch authorization failed: ${describeError(error)}`)
-      else log.log('Twitch authorization was cancelled')
+      if (generation !== deviceAuthorizationGeneration) {
+        log.log('Twitch authorization was cancelled')
+        return
+      }
+
+      log.error(`Twitch authorization failed: ${describeError(error)}`)
+      notify({
+        type: 'error',
+        level: 'error',
+        code: error instanceof AppError ? error.code : 'TWITCH_AUTH_ERROR',
+        params: error instanceof AppError ? { ...error.params, message: error.message } : undefined
+      })
     })
     .finally(() => {
       if (generation !== deviceAuthorizationGeneration) return
@@ -441,11 +477,12 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-// A repeat helps only when the failure can pass by itself: a lost connection or a timeout (they arrive as plain errors),
-// a 429, a 5xx, or a login that could not be refreshed right now (flagged `transient`). A refusal (4xx), a missing
-// login or a token Twitch no longer accepts gives the same answer every time
+// A repeat helps only when the failure can pass by itself: a lost connection or a timeout (they arrive as
+// plain errors where nothing normalized them on the way), a 429, a 5xx, or a login that could not be
+// refreshed right now (flagged `transient`). A refusal (4xx), a missing login or a token Twitch no longer
+// accepts gives the same answer every time, and any other error is a bug: repeating it would only repeat the bug
 export function isRetryable(error: unknown): boolean {
-  if (!(error instanceof AppError)) return true
+  if (!(error instanceof AppError)) return isNetworkError(error)
   if (error.params?.transient === 1) return true
 
   const status = error.params?.status
@@ -613,6 +650,10 @@ export const _test = {
   setChat: (mock: TwitchChat | null) => {
     chat = mock
   },
+  setChatWaitLimits: (ms: { start: number; reconnect: number }) => {
+    chatStartWaitMs = ms.start
+    chatReconnectWaitMs = ms.reconnect
+  },
   cancelRedemption,
   fulfillRedemption,
   handleChannelPointsRedemption,
@@ -635,4 +676,6 @@ export async function _resetIntegration(): Promise<void> {
   deviceAuthorizationGeneration = 0
   handledRedemptions.clear()
   lastRun.plainCooldownSeconds = lastRun.controlCooldownSeconds = 0
+  chatStartWaitMs = CHAT_START_WAIT_MS
+  chatReconnectWaitMs = CHAT_RECONNECT_WAIT_MS
 }

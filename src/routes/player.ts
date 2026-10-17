@@ -19,7 +19,7 @@ function readVideoId(body: unknown): { videoId?: string; valid: boolean } {
 
 router.post('/ended', (req, res) => {
   const { videoId, valid } = readVideoId(req.body)
-  if (!valid) return fail(res, 'a valid videoId is required', 'INVALID_VIDEO_ID', 400)
+  if (!valid) return fail(res, 'INVALID_VIDEO_ID', 400)
 
   const applied = endCurrent(videoId)
   ok(res, { ...getState(), ...(applied ? {} : { ignored: true }) })
@@ -46,7 +46,7 @@ router.post('/resume', (_req, res) => {
 
 router.post('/report-failure', (req, res) => {
   const { videoId, valid } = readVideoId(req.body)
-  if (!valid) return fail(res, 'a valid videoId is required', 'INVALID_VIDEO_ID', 400)
+  if (!valid) return fail(res, 'INVALID_VIDEO_ID', 400)
 
   const errorCode = typeof req.body?.errorCode === 'number' ? req.body.errorCode : undefined
   const applied = reportPlaybackFailure(errorCode, videoId)

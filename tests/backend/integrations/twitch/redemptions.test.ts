@@ -53,6 +53,11 @@ test('isRetryable()', async (t) => {
     assert.equal(isRetryable(new DOMException('timed out', 'TimeoutError')), true)
   })
 
+  await t.test('a plain error that is not a network failure is a bug, and is not repeated', () => {
+    assert.equal(isRetryable(new Error('a bug of ours')), false)
+    assert.equal(isRetryable('not even an error'), false)
+  })
+
   await t.test('429 and 5xx are repeated', () => {
     for (const status of [429, 500, 502, 503]) assert.equal(isRetryable(api(status)), true, String(status))
   })

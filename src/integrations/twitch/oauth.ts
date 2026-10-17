@@ -79,7 +79,8 @@ export class TwitchOAuth {
       log.log('Device code requested')
       return data
     } catch (error) {
-      log.error(`Device code request failed: ${describeError(error)}`)
+      // the error is reported where it ends (the /connect answer carries it to the panel):
+      // logging it here as well makes every failure appear twice
       throw normalizeTwitchError(error)
     }
   }
@@ -257,9 +258,14 @@ export class TwitchOAuth {
       const response = await postForm(TOKEN_URL, params)
 
       if (!response.ok) {
-        // Twitch refused the refresh token itself (expired after 30 days of a public client, revoked, password changed):
-        // retrying is pointless, the account has to be connected again. A network error or a 5xx is not that
-        if (response.status === 400 || response.status === 401) this.setAuthFailed(true)
+        // Twitch refused the refresh token itself (expired after 30 days of a public client, revoked, password
+        // changed): retrying is pointless, the account has to be connected again. A network error or a 5xx is not
+        // that, and is reported as the API error it is
+        if (response.status === 400 || response.status === 401) {
+          this.setAuthFailed(true)
+          const body = (await response.json().catch(() => ({}))) as TwitchErrorResponse
+          throw new AppError('TWITCH_REFRESH_ERROR', body.message || 'Token refresh failed')
+        }
         throw await oauthError(response, 'Token refresh failed')
       }
 

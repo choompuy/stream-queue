@@ -15,20 +15,20 @@ router.post('/request', async (req, res) => {
   const bypassFilters = admin === true && isLocalAddress(req.socket.remoteAddress)
 
   if (typeof query !== 'string' || query.trim().length < 2 || query.trim().length > 200) {
-    return fail(res, 'query must be between 2 and 200 characters', 'INVALID_QUERY', 400)
+    return fail(res, 'INVALID_QUERY', 400)
   }
 
   if (typeof requestedBy !== 'string' || requestedBy.trim().length === 0) {
-    return fail(res, 'username is required', 'USERNAME_REQUIRED', 400)
+    return fail(res, 'USERNAME_REQUIRED', 400)
   }
 
   const result = await requestSong(query.trim(), requestedBy.trim().slice(0, 50), { bypassFilters })
 
   switch (result.outcome) {
     case 'invalid-url':
-      return fail(res, 'invalid YouTube URL', 'INVALID_YOUTUBE_URL', 400)
+      return fail(res, 'INVALID_YOUTUBE_URL', 400)
     case 'not-found':
-      return fail(res, 'could not find a suitable track', 'SONG_NOT_FOUND', 404)
+      return fail(res, 'SONG_NOT_FOUND', 404)
     case 'error':
       return failFromReason(res, result.reason)
     case 'added': {
@@ -45,13 +45,13 @@ router.delete('/video/:videoId', (req, res) => {
   const { videoId } = req.params
 
   if (!isValidVideoId(videoId)) {
-    return fail(res, 'a valid videoId is required', 'INVALID_VIDEO_ID', 400)
+    return fail(res, 'INVALID_VIDEO_ID', 400)
   }
 
   const removed = removeByVideoId(videoId)
 
   if (!removed) {
-    return fail(res, 'queue item not found', 'QUEUE_ITEM_NOT_FOUND', 404)
+    return fail(res, 'QUEUE_ITEM_NOT_FOUND', 404)
   }
 
   ok<QueueRemoveResponse>(res, { removed, state: getState() })

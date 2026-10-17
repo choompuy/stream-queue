@@ -35,5 +35,5 @@ apiRouter.use('/integrations/twitch', twitchRouter)
 
 apiRouter.use((req, res) => {
   log.warn(`Unknown endpoint: ${req.method} ${req.originalUrl}`)
-  fail(res, 'API endpoint not found', 'NOT_FOUND', 404)
+  fail(res, 'NOT_FOUND', 404)
 })

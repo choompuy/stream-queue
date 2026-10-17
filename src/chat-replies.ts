@@ -1,4 +1,4 @@
-import { t } from './i18n.js'
+import { t, hasKey } from './i18n.js'
 import type { PlayerState, FailureReason } from './types.js'
 
 const truncate = (s: string, max = 40) => {
@@ -57,12 +57,10 @@ export function buildRedemptionRejectionMessage(userName: string, reason: Failur
   const title = typeof reason.params?.title === 'string' ? truncate(reason.params.title) : undefined
   const params = { user: userName, ...reason.params, ...(title && { title }) }
 
-  const specific = t(locale, `chat.redemption.${reason.code}`, params)
-  // If the specific key doesn't exist (returns the key itself), use generic
-  if (specific.startsWith('chat.redemption.')) {
-    return t(locale, 'chat.redemption.generic', params)
-  }
-  return specific
+  const key = `chat.redemption.${reason.code}`
+  // an explicit check: a template that resolves is allowed to start with the same words as the key
+  if (!hasKey(locale, key)) return t(locale, 'chat.redemption.generic', params)
+  return t(locale, key, params)
 }
 
 // Sent instead of the "points refunded" message when Twitch did not accept the cancellation: it must not promise a refund

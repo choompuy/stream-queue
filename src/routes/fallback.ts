@@ -14,7 +14,7 @@ import { getState } from '../player.js'
 
 function fallbackTrackOrNotFound(res: express.Response, item: QueueItem | null): item is QueueItem {
   if (!item) {
-    fail(res, 'track not found in fallback', 'NOT_FOUND', 404)
+    fail(res, 'NOT_FOUND', 404)
     return false
   }
   return true

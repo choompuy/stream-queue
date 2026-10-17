@@ -1,7 +1,7 @@
 import { Response } from 'express-serve-static-core'
 import { AppError, AppErrorCode, ApiOk, ApiError, ApiErrorCode, ConfigUpdateResponse } from './types.js'
 import { getSettings } from './settings.js'
-import { translateErrorCode } from './i18n.js'
+import { translateApiError } from './i18n.js'
 import { createLogger, describeError } from './logger.js'
 
 const log = createLogger('API')
@@ -11,10 +11,9 @@ export function ok<T extends object>(res: Response, data: T, status = 200): void
   res.status(status).json(body)
 }
 
-export function fail(res: Response, error: string, code: ApiErrorCode, status: number, params?: Record<string, string | number>): void {
+export function fail(res: Response, code: ApiErrorCode, status: number, params?: Record<string, string | number>): void {
   const locale = getSettings().locale
-  const localized = translateErrorCode(locale, code, params)
-  const body: ApiError = { success: false, error: localized, code, params }
+  const body: ApiError = { success: false, error: translateApiError(locale, code, params), code, params }
   res.status(status).json(body)
 }
 
@@ -27,7 +26,7 @@ export function sendConfigUpdate<T extends object>(res: Response, config: T, rej
   }
 
   const params = { fields: rejected.join(', ') }
-  const localized = translateErrorCode(getSettings().locale, 'INVALID_CONFIG', params)
+  const localized = translateApiError(getSettings().locale, 'INVALID_CONFIG', params)
   const body: ApiError & { data: ConfigUpdateResponse<T> } = {
     success: false,
     error: localized,
@@ -69,7 +68,7 @@ export type ErrorInfo = { code: string; status: number; message: string; params?
 
 export function getErrorInfo(error: unknown): ErrorInfo {
   if (error instanceof AppError) {
-    return { code: error.code, status: STATUS_BY_CODE[error.code], message: error.message, params: error.params }
+    return { code: error.code, status: STATUS_BY_CODE[error.code], message: error.message, params: { ...error.params, message: error.message } }
   }
 
   log.error(`Unexpected error: ${describeError(error, true)}`)
@@ -78,12 +77,12 @@ export function getErrorInfo(error: unknown): ErrorInfo {
 
 export function failFromError(res: Response, error: unknown): void {
   const info = getErrorInfo(error)
-  fail(res, info.message, info.code as ApiErrorCode, info.status, info.params)
+  fail(res, info.code as ApiErrorCode, info.status, info.params)
 }
 
 // same as failFromError, for callers that already have a structured { code, params } reason
 // instead of the original thrown error (e.g. RequestSongResult's 'error' outcome)
 export function failFromReason(res: Response, reason: { code: string; params?: Record<string, string | number> }): void {
   const status = STATUS_BY_CODE[reason.code as AppErrorCode] ?? 500
-  fail(res, reason.code, reason.code as ApiErrorCode, status, reason.params)
+  fail(res, reason.code as ApiErrorCode, status, reason.params)
 }

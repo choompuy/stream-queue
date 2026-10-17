@@ -14,12 +14,12 @@ export function errorHandler(err: HttpError, _req: Request, res: Response, next:
   }
 
   if (err instanceof AppError) return failFromError(res, err)
-  if (err.type === 'entity.parse.failed') return fail(res, 'request body is not valid JSON', 'INVALID_JSON', 400)
-  if (err.type === 'entity.too.large') return fail(res, 'request body is too large', 'PAYLOAD_TOO_LARGE', 413)
+  if (err.type === 'entity.parse.failed') return fail(res, 'INVALID_JSON', 400)
+  if (err.type === 'entity.too.large') return fail(res, 'PAYLOAD_TOO_LARGE', 413)
 
   const status = err.status ?? err.statusCode
-  if (typeof status === 'number' && status >= 400 && status < 500) return fail(res, 'bad request', 'INVALID_REQUEST', status)
+  if (typeof status === 'number' && status >= 400 && status < 500) return fail(res, 'INVALID_REQUEST', status)
 
   log.error(describeError(err, true))
-  fail(res, 'internal server error', 'SERVER_ERROR', 500)
+  fail(res, 'SERVER_ERROR', 500)
 }

@@ -4,6 +4,7 @@ import { getConfig } from '../config.js'
 import { Song, AppError, Config, FilterFailureReason } from '../types.js'
 import { VideoItem } from './types.js'
 import { isoDurationToSeconds } from './utils.js'
+import { isQuotaExhausted, markQuotaExhausted } from './cache.js'
 
 export type PlaylistMeta = {
   id: string
@@ -129,12 +130,13 @@ const RETRY_STATUSES = new Set([429, 500, 502, 503, 504])
 const MAX_ATTEMPTS = 3
 const RETRY_DELAY_MS = 500
 
+const QUOTA_EXHAUSTED_MESSAGE = 'YouTube API quota exceeded. Quota resets at midnight Pacific Time'
+
 export async function youtube<T>(path: string, params: Record<string, string>, { attempts = MAX_ATTEMPTS }: { attempts?: number } = {}): Promise<T> {
   const { youtubeApiKey } = getSecrets()
 
-  if (!youtubeApiKey) {
-    throw new AppError('NO_API_KEY', 'YouTube API key is not configured, add it in the control panel')
-  }
+  if (!youtubeApiKey) throw new AppError('NO_API_KEY', 'YouTube API key is not configured, add it in the control panel')
+  if (isQuotaExhausted()) throw new AppError('YOUTUBE_QUOTA', QUOTA_EXHAUSTED_MESSAGE)
 
   const url = new URL(`https://www.googleapis.com/youtube/v3/${path}`)
 
@@ -168,7 +170,8 @@ export async function youtube<T>(path: string, params: Record<string, string>, {
       const reason = data.error?.errors?.[0]?.reason
 
       if (reason === 'quotaExceeded') {
-        throw new AppError('YOUTUBE_QUOTA', 'YouTube API quota exceeded. Quota resets at midnight Pacific Time')
+        markQuotaExhausted()
+        throw new AppError('YOUTUBE_QUOTA', QUOTA_EXHAUSTED_MESSAGE)
       }
 
       throw new AppError('YOUTUBE_ERROR', data.error?.message || `YouTube API error ${response.status}`)

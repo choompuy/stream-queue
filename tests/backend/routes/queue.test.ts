@@ -1,11 +1,15 @@
 import { test, beforeEach, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync } from 'node:fs'
+import { cpSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import type { AddressInfo } from 'node:net'
 
-process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
+// the answers are localized: the real locale files are copied into the throwaway working directory
+// (copied, not symlinked: a symlink needs extra privileges on Windows)
+const workDir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
+cpSync(resolve('public/locales'), join(workDir, 'public/locales'), { recursive: true })
+process.chdir(workDir)
 
 const express = (await import('express')).default
 const { router } = await import('../../../src/routes/queue.js')

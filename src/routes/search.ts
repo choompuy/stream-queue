@@ -12,7 +12,7 @@ router.get('/', async (req, res) => {
   const bypassFilters = req.query.admin === '1' && isLocalAddress(req.socket.remoteAddress)
 
   if (query.length < 2) {
-    return fail(res, 'query must be at least 2 characters', 'INVALID_QUERY', 400)
+    return fail(res, 'INVALID_QUERY', 400)
   }
 
   const songs = await searchSongs(query, bypassFilters)

@@ -6,7 +6,7 @@ import { join } from 'node:path'
 
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
-const { youtube, RequestNotSentError } = await import('../../../src/youtube/client.js')
+const { youtube } = await import('../../../src/youtube/client.js')
 const { updateSecrets } = await import('../../../src/secrets.js')
 updateSecrets({ youtubeApiKey: 'test-key' })
 
@@ -45,23 +45,5 @@ test('youtube() requests', async (t) => {
     stub(json(403, { error: { message: 'q', errors: [{ reason: 'quotaExceeded' }] } }))
     await assert.rejects(youtube('videos', { id: 'x' }), (error: { code?: string }) => error.code === 'YOUTUBE_QUOTA')
     assert.equal(calls, 1)
-  })
-
-  await t.test('a network failure that never reached YouTube is marked as not sent', async () => {
-    stub(new TypeError('fetch failed'))
-    await assert.rejects(youtube('search', { q: 'x' }, { attempts: 1 }), (error: unknown) => error instanceof RequestNotSentError)
-  })
-
-  await t.test('a timeout is not marked as not sent: YouTube may have received the request', async () => {
-    stub(new DOMException('timed out', 'TimeoutError'))
-    await assert.rejects(youtube('search', { q: 'x' }, { attempts: 1 }), (error: unknown) => !(error instanceof RequestNotSentError))
-  })
-
-  await t.test('a missing key is marked as not sent and nothing goes out', async () => {
-    updateSecrets({ youtubeApiKey: '' })
-    stub(json(200, {}))
-    await assert.rejects(youtube('videos', { id: 'x' }), (error: unknown) => error instanceof RequestNotSentError)
-    assert.equal(calls, 0)
-    updateSecrets({ youtubeApiKey: 'test-key' })
   })
 })

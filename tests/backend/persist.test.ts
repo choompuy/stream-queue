@@ -273,6 +273,85 @@ test('debounce timing', async (t) => {
   })
 })
 
+test('saveNow()', async (t) => {
+  await t.test('writes the file at once, without waiting for the debounce', async () => {
+    const path = filePath()
+    const store = createFileStore<{ n: number }>(path)
+
+    await store.saveNow(
+      () => ({ n: 1 }),
+      () => {}
+    )
+
+    assert.deepEqual(readJson(path), { n: 1 })
+  })
+
+  await t.test('joins the chain: a save scheduled before it is waited for, not raced, and both land once each', async () => {
+    const path = filePath()
+    const store = createFileStore<{ n: number }>(path)
+    const order: string[] = []
+
+    store.scheduleSave(
+      () => {
+        order.push('scheduled')
+        return { n: 1 }
+      },
+      () => {}
+    )
+    await store.saveNow(
+      () => {
+        order.push('now')
+        return { n: 2 }
+      },
+      () => {}
+    )
+    await store.flush()
+
+    assert.deepEqual(order, ['now', 'scheduled'], 'one write at a time: the .tmp file is never shared by two saves')
+    assert.deepEqual(readJson(path), { n: 1 }, 'the debounced write ran last, with its own data')
+  })
+
+  await t.test('flush() waits for a saveNow that is still on the chain', async () => {
+    const path = filePath()
+    const store = createFileStore<{ n: number }>(path)
+
+    void store.saveNow(
+      () => ({ n: 7 }),
+      () => {}
+    )
+    await store.flush()
+
+    assert.deepEqual(readJson(path), { n: 7 }, 'the exit flush did not leave before this save was written')
+  })
+
+  await t.test('an error is reported through onError, and a later save still works', async () => {
+    const badDir = join(testDir, `not-writable-${++counter}`)
+    mkdirSync(badDir)
+    const path = join(badDir, 'sub') // a directory in place of the file makes the write fail
+    mkdirSync(path)
+
+    const store = createFileStore<{ n: number }>(path)
+    const errors: unknown[] = []
+
+    await assert.doesNotReject(
+      store.saveNow(
+        () => ({ n: 1 }),
+        (error) => errors.push(error)
+      )
+    )
+    assert.equal(errors.length, 1)
+
+    const goodPath = filePath()
+    const goodStore = createFileStore<{ n: number }>(goodPath)
+    goodStore.scheduleSave(
+      () => ({ n: 2 }),
+      () => {}
+    )
+    await goodStore.flush()
+    assert.deepEqual(readJson(goodPath), { n: 2 })
+  })
+})
+
 test('flushAllStores()', async (t) => {
   await t.test('flushes every store created so far, including ones with nothing pending', async () => {
     const pathA = filePath()

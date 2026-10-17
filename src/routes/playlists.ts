@@ -28,13 +28,13 @@ router.post('/', async (req, res) => {
   const parsedId = parsePlaylistId(raw)
 
   if (!parsedId) {
-    return fail(res, 'invalid playlist ID or URL', 'INVALID_PLAYLIST_ID', 400)
+    return fail(res, 'INVALID_PLAYLIST_ID', 400)
   }
 
   try {
     const meta = await fetchPlaylistMeta(parsedId)
     if (!meta) {
-      return fail(res, 'playlist not found', 'PLAYLIST_NOT_FOUND', 404)
+      return fail(res, 'PLAYLIST_NOT_FOUND', 404)
     }
     const saved = upsertPlaylist(meta)
     ok(res, { playlist: saved }, 201)
@@ -46,7 +46,7 @@ router.post('/', async (req, res) => {
 router.delete('/:id', (req, res) => {
   const removed = removePlaylist(req.params.id)
   if (!removed) {
-    return fail(res, 'playlist not found', 'PLAYLIST_NOT_FOUND', 404)
+    return fail(res, 'PLAYLIST_NOT_FOUND', 404)
   }
 
   const wasActive = getConfig().fallbackPlaylist.playlistId === req.params.id
@@ -63,11 +63,11 @@ router.post('/:id/activate', async (req, res) => {
   const { id } = req.params
 
   if (!isValidPlaylistId(id)) {
-    return fail(res, 'invalid playlist ID or URL', 'INVALID_PLAYLIST_ID', 400)
+    return fail(res, 'INVALID_PLAYLIST_ID', 400)
   }
 
   if (!getPlaylists().some((playlist) => playlist.id === id)) {
-    return fail(res, 'playlist not found', 'PLAYLIST_NOT_FOUND', 404)
+    return fail(res, 'PLAYLIST_NOT_FOUND', 404)
   }
 
   const previousId = getConfig().fallbackPlaylist.playlistId

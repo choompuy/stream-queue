@@ -13,7 +13,7 @@ const { getState } = await import('../../../../src/player.js')
 const { _test, _resetIntegration } = await import('../../../../src/integrations/twitch/index.js')
 const { clearTwitchOAuthState } = await import('../../../../src/secrets.js')
 
-import type { TwitchChatMessage } from '../../../../src/integrations/twitch/types.js'
+import type { TwitchChatMessage, TwitchChat } from '../../../../src/integrations/twitch/types.js'
 
 function message(overrides: Partial<TwitchChatMessage> = {}): TwitchChatMessage {
   return {
@@ -211,6 +211,72 @@ test('handleChatMessage() - control commands (skip/pause/resume)', async (t) => 
 
     // The second call should succeed since the first didn't consume cooldown
     assert.equal(getIsPaused(), true)
+  })
+})
+
+test('a chat reply that waits for a connection', async (t) => {
+  await t.test('is sent as soon as the chat reconnects, not a fixed minute later', async () => {
+    // short limits, so a lost reply does not take a minute to give up; the real ones are 5s/60s
+    _test.setChatWaitLimits({ start: 100, reconnect: 300 })
+
+    const sent: string[] = []
+    let connected = false
+    _test.setChat({
+      isConnected: () => connected,
+      sendMessage: (text: string) => {
+        sent.push(text)
+        return Promise.resolve()
+      },
+      disconnect: () => Promise.resolve()
+    } as unknown as TwitchChat)
+
+    try {
+      hydrateQueue({
+        current: { videoId: 'abc', title: 'Test Song', channelTitle: 'x', thumbnail: '', duration: 100, views: 1, url: '', requestedBy: 'someone' }
+      })
+
+      // the chat comes back shortly: the reply must go out then, not after the whole reconnect window
+      setTimeout(() => (connected = true), 50)
+
+      const startedAt = Date.now()
+      await _test.handleChatMessage(message({ text: '!sg now' }))
+      const waitedMs = Date.now() - startedAt
+
+      assert.equal(sent.length, 1, 'the reply went out once the chat was back')
+      assert.ok(waitedMs < 1000, `the reply waited ${waitedMs}ms for a reconnection that took 50ms`)
+    } finally {
+      _test.setChat(null)
+    }
+  })
+
+  await t.test('is dropped, without hanging, when the chat does not come back within its window', async () => {
+    // short limits, so the "gave up" path does not take a minute; the real ones are 5s/60s
+    _test.setChatWaitLimits({ start: 100, reconnect: 300 })
+
+    const sent: string[] = []
+    _test.setChat({
+      isConnected: () => false,
+      sendMessage: (text: string) => {
+        sent.push(text)
+        return Promise.resolve()
+      },
+      disconnect: () => Promise.resolve()
+    } as unknown as TwitchChat)
+
+    try {
+      hydrateQueue({
+        current: { videoId: 'abc', title: 'Test Song', channelTitle: 'x', thumbnail: '', duration: 100, views: 1, url: '', requestedBy: 'someone' }
+      })
+
+      const startedAt = Date.now()
+      await _test.handleChatMessage(message({ text: '!sg now' }))
+      const waitedMs = Date.now() - startedAt
+
+      assert.ok(waitedMs < 2000, `the wait ended after ${waitedMs}ms, not by hanging`)
+      assert.equal(sent.length, 0, 'no reply without a connection')
+    } finally {
+      _test.setChat(null)
+    }
   })
 })
 

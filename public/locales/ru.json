@@ -236,6 +236,7 @@
       "playlistLoadFailed": "Не удалось загрузить плейлист, проверьте ID",
       "invalidQuery": "Запрос должен содержать минимум 2 символа",
       "invalidQueryRange": "Запрос должен быть от 2 до 200 символов",
+      "invalidRequest": "Некорректный запрос",
       "invalidYoutubeUrl": "Некорректная ссылка на YouTube",
       "songNotFound": "Не удалось найти подходящий трек",
       "usernameRequired": "Имя пользователя обязательно",
@@ -271,6 +272,7 @@
       "twitchAuthExpired": "Время авторизации Twitch истекло, попробуйте подключиться снова",
       "twitchNotConnected": "Аккаунт Twitch не подключён",
       "twitchRefreshError": "Не удалось обновить подключение Twitch",
+      "twitchApiError": "Ошибка Twitch API: {{message}}",
       "twitchNetworkError": "Нет связи с Twitch",
       "twitchUnknownError": "Неизвестная ошибка Twitch"
     }

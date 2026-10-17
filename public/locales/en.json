@@ -236,6 +236,7 @@
       "playlistLoadFailed": "Failed to load playlist, check the ID",
       "invalidQuery": "Query must be at least 2 characters",
       "invalidQueryRange": "Query must be between 2 and 200 characters",
+      "invalidRequest": "Invalid request",
       "invalidYoutubeUrl": "Invalid YouTube URL",
       "songNotFound": "Could not find a suitable track",
       "usernameRequired": "Username is required",
@@ -271,6 +272,7 @@
       "twitchAuthExpired": "Twitch authorization expired, try connecting again",
       "twitchNotConnected": "Twitch account is not connected",
       "twitchRefreshError": "Failed to refresh Twitch connection",
+      "twitchApiError": "Twitch API error: {{message}}",
       "twitchNetworkError": "No connection to Twitch",
       "twitchUnknownError": "Unknown Twitch error"
     }

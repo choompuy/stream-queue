@@ -36,5 +36,5 @@ export function hostCheck(req: Request, res: Response, next: NextFunction): void
 
   if (isAllowedHost(req.headers.host) && originAllowed) return next()
 
-  fail(res, 'this host is not allowed', 'FORBIDDEN_ORIGIN', 403)
+  fail(res, 'FORBIDDEN_ORIGIN', 403)
 }

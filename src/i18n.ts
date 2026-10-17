@@ -33,7 +33,8 @@ function loadLocale(locale: string): Dict {
   }
 }
 
-export function t(locale: string, key: string, params: Record<string, string | number> = {}): string {
+// The template a key resolves to, with the default locale as the fallback: undefined when neither has it
+function template(locale: string, key: string): string | undefined {
   let value: unknown = loadLocale(locale)
 
   for (const part of key.split('.')) {
@@ -45,12 +46,21 @@ export function t(locale: string, key: string, params: Record<string, string | n
     }
   }
 
-  if (typeof value !== 'string') {
-    if (locale !== DEFAULT_LOCALE) return t(DEFAULT_LOCALE, key, params)
-    return key // Fallback to key if not found in default locale
-  }
+  if (typeof value === 'string') return value
+  return locale === DEFAULT_LOCALE ? undefined : template(DEFAULT_LOCALE, key)
+}
+
+export function t(locale: string, key: string, params: Record<string, string | number> = {}): string {
+  const value = template(locale, key)
+  if (value === undefined) return key // the key itself is the last resort; hasKey() tells it apart from a real text
 
   return Object.entries(params).reduce((acc, [param, replacement]) => acc.replaceAll(`{{${param}}}`, () => String(replacement)), value)
+}
+
+// Whether a translation exists (in the locale, or in the default one): the way to tell a missing key from
+// a text that resolved, instead of comparing the result of t() with the key
+export function hasKey(locale: string, key: string): boolean {
+  return template(locale, key) !== undefined
 }
 
 function codeToI18nKey(code: string): string {
@@ -58,6 +68,24 @@ function codeToI18nKey(code: string): string {
   return `api.errors.${camel}`
 }
 
-export function translateErrorCode(locale: string, code: string, params?: Record<string, string | number>): string {
-  return t(locale, codeToI18nKey(code), params)
+// Null for a code with no message: the caller decides what to show instead (the key itself must not reach the user)
+export function translateErrorCode(locale: string, code: string, params?: Record<string, string | number>): string | null {
+  const key = codeToI18nKey(code)
+  if (!hasKey(locale, key)) return null
+  return t(locale, key, params)
+}
+
+const reportedMissingCodes = new Set<string>()
+
+// The text shown to the user for an API error. A code with no translation is a gap in the locales: it is logged
+// (once per code, so a loop cannot fill the log) and answered with the generic failure message instead of the key
+export function translateApiError(locale: string, code: string, params?: Record<string, string | number>): string {
+  const localized = translateErrorCode(locale, code, params)
+  if (localized !== null) return localized
+
+  if (!reportedMissingCodes.has(code)) {
+    reportedMissingCodes.add(code)
+    log.warn(`No translation for error code "${code}", showing the generic failure message`)
+  }
+  return t(locale, 'api.errors.unexpectedError')
 }

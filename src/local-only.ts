@@ -36,5 +36,5 @@ export function localOnly(req: Request, res: Response, next: NextFunction): void
     return
   }
 
-  fail(res, 'this action is only available from the computer the app is running on', 'LOCAL_ONLY', 403)
+  fail(res, 'LOCAL_ONLY', 403)
 }

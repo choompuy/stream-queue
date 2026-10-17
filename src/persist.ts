@@ -75,12 +75,13 @@ export function createFileStore<T>(location: string | (() => string)) {
     await rename(tmpPath, filePath)
   }
 
-  async function saveNow(getData: () => T, onError: (error: unknown) => void): Promise<void> {
-    try {
-      await persistNow(getData)
-    } catch (error) {
-      onError(error)
-    }
+  function saveNow(getData: () => T, onError: (error: unknown) => void): Promise<void> {
+    const settled = saveChain.then(() => persistNow(getData)).catch(onError)
+    saveChain = settled.then(
+      () => {},
+      () => {}
+    )
+    return settled
   }
 
   function enqueue(job: SaveJob): void {

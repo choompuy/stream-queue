@@ -12,7 +12,7 @@ import type {
 import { TwitchOAuth } from './oauth.js'
 import { AppError } from '../../types.js'
 import { createLogger, describeError } from '../../logger.js'
-import { normalizeTwitchError } from './error.js'
+import { markTransient, normalizeTwitchError } from './error.js'
 
 const log = createLogger('TWITCH CLIENT')
 
@@ -32,7 +32,9 @@ export class TwitchClient {
   private async makeAuthenticatedRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
     const accessToken = await this.oauth.getValidAccessToken()
     if (!accessToken) {
-      throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected', this.refreshMayWorkLater() ? { transient: 1 } : undefined)
+      const notConnected = new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
+      // a login exists and Twitch has not refused it: a failed refresh was a passing problem, the request may work later
+      throw this.refreshMayWorkLater() ? markTransient(notConnected) : notConnected
     }
 
     const response = await this.request(url, options, accessToken)
@@ -47,11 +49,9 @@ export class TwitchClient {
     } catch (error) {
       const normalized = normalizeTwitchError(error)
       log.error(`Token refresh failed: ${describeError(normalized)}`)
-      // Preserve transient flag if already present, otherwise determine based on refreshMayWorkLater
-      if (!normalized.params?.transient && this.refreshMayWorkLater()) {
-        normalized.params = { ...normalized.params, transient: 1 }
-      }
-      throw normalized
+      // a login exists and Twitch has not refused it: the refresh failure was passing, a retry is worth it
+      // (an error that already carries the flag keeps it, whatever the login looks like)
+      throw this.refreshMayWorkLater() ? markTransient(normalized) : normalized
     }
 
     // an error of the retried request itself is its own error, not a failed login

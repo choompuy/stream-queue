@@ -6,16 +6,18 @@ import { join } from 'node:path'
 
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
-const { searchSongs } = await import('../../../src/youtube/index.js')
-const { getSearchesToday, releaseSearchQuota, reserveSearchQuota, setVideoCache, getVideoCache, setSearchCache, getSearchCache, CACHE_LIMITS } =
-  await import('../../../src/youtube/cache.js')
+const { searchSongs, getVideoById } = await import('../../../src/youtube/index.js')
+const { markQuotaExhausted, getSearchCache, setSearchCache, getVideoCache, setVideoCache, CACHE_LIMITS } = await import(
+  '../../../src/youtube/cache.js'
+)
 const { updateSecrets } = await import('../../../src/secrets.js')
+const { getConfig, updateConfig } = await import('../../../src/config.js')
 
 const realFetch = globalThis.fetch
 
 let requestsSent = 0
 
-function stubSearch(behavior: 'success' | 'network-error' | 'timeout' | 'youtube-error') {
+function stubSearch(behavior: 'success' | 'network-error' | 'timeout' | 'youtube-error' | 'quota-exceeded') {
   requestsSent = 0
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input instanceof Request ? input.url : input))
@@ -32,6 +34,13 @@ function stubSearch(behavior: 'success' | 'network-error' | 'timeout' | 'youtube
       })
     }
 
+    if (behavior === 'quota-exceeded') {
+      return new Response(JSON.stringify({ error: { message: 'quota', errors: [{ reason: 'quotaExceeded' }] } }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
     return new Response(JSON.stringify({ items: [] }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
@@ -43,165 +52,193 @@ beforeEach(() => {
   updateSecrets({ youtubeApiKey: 'test-key' })
 })
 
-test('search quota is only consumed by a request that actually reached YouTube', async (t) => {
-  await t.test('a network failure releases the reserved search quota', async () => {
+const video = (videoId: string, views: number) => ({
+  id: videoId,
+  snippet: {
+    title: `Song ${videoId}`,
+    channelTitle: 'Channel',
+    categoryId: '10',
+    thumbnails: { medium: { url: 'https://img/x.jpg' } }
+  },
+  contentDetails: { duration: 'PT3M' },
+  statistics: { viewCount: String(views) },
+  status: { privacyStatus: 'public', embeddable: true }
+})
+
+// a search that finds one video, and a video lookup that answers with `views` views for it
+function stubFoundVideo(videoId: string, views: number): void {
+  requestsSent = 0
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input instanceof Request ? input.url : input))
+    if (url.hostname !== 'www.googleapis.com') return realFetch(input, init)
+
+    requestsSent++
+    const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+
+    if (url.pathname.endsWith('/search')) return json({ items: [{ id: { videoId } }] })
+    return json({ items: [video(videoId, views)] })
+  }
+}
+
+test('search cache returns stored videos', async (t) => {
+  await t.test('stores and returns the raw videos under the key it was given', () => {
+    const key = `search-${Date.now()}-1`
+    const raw = [video('test-video', 5)] as never[]
+    setSearchCache(key, raw)
+    assert.deepEqual(getSearchCache(key), raw)
+  })
+
+  await t.test('returns undefined for a missing key', () => {
+    assert.equal(getSearchCache(`missing-${Date.now()}`), undefined)
+  })
+
+  await t.test('expires after its TTL', () => {
+    const key = `search-ttl-${Math.random()}`
+    setSearchCache(key, [] as never[])
+
+    const realNow = Date.now
+    Date.now = () => realNow() + CACHE_LIMITS.SEARCH_CACHE_TTL + 1
+
+    try {
+      assert.equal(getSearchCache(key), undefined)
+    } finally {
+      Date.now = realNow
+    }
+  })
+
+  await t.test('setting the same key replaces the existing entry', () => {
+    const key = `search-replace-${Date.now()}`
+    setSearchCache(key, [video('video-1', 1)] as never[])
+    setSearchCache(key, [video('video-2', 1)] as never[])
+    assert.deepEqual(getSearchCache(key), [video('video-2', 1)])
+  })
+
+  await t.test('keeps at most 200 entries', () => {
+    const prefix = `search-limit-${Date.now()}-`
+    for (let i = 0; i < 201; i++) setSearchCache(`${prefix}${i}`, [] as never[])
+
+    assert.equal(getSearchCache(`${prefix}0`), undefined)
+    assert.deepEqual(getSearchCache(`${prefix}200`), [])
+  })
+})
+
+test('video cache returns stored videos', async (t) => {
+  await t.test('stores and returns the raw video, or null for a video that does not exist', () => {
+    const found = `video-${Date.now()}-1`
+    const missing = `video-${Date.now()}-2`
+    setVideoCache(found, video(found, 1))
+    setVideoCache(missing, null)
+
+    assert.deepEqual(getVideoCache(found), video(found, 1))
+    assert.equal(getVideoCache(missing), null)
+  })
+
+  await t.test('returns undefined for a missing key', () => {
+    assert.equal(getVideoCache(`missing-${Date.now()}`), undefined)
+  })
+
+  await t.test('expires after its TTL', () => {
+    const key = `video-ttl-${Math.random()}`
+    setVideoCache(key, null)
+
+    const realNow = Date.now
+    Date.now = () => realNow() + CACHE_LIMITS.VIDEO_CACHE_TTL + 1
+
+    try {
+      assert.equal(getVideoCache(key), undefined)
+    } finally {
+      Date.now = realNow
+    }
+  })
+})
+
+test('a change of the filters does not throw away paid-for requests', async (t) => {
+  const defaults = structuredClone(getConfig())
+
+  t.after(() => updateConfig(defaults))
+
+  await t.test('a cached search is re-filtered with the new settings, without a new request', async () => {
+    const videoId = `y4search${Date.now()}`.slice(0, 11)
+    stubFoundVideo(videoId, 1000)
+    const query = `y4 search query ${Math.random()}`
+
+    updateConfig({ minViews: 0 })
+    const loose = await searchSongs(query)
+    assert.equal(loose.length, 1, 'a 1000-views video passes minViews 0')
+    assert.equal(requestsSent, 2, 'one search plus one video lookup')
+
+    updateConfig({ minViews: 100000 })
+    const strict = await searchSongs(query)
+    assert.equal(strict.length, 0, 'the same cached result is filtered with the new minViews')
+    assert.equal(requestsSent, 2, 'no new request: the filters do not invalidate the search cache')
+  })
+
+  await t.test('a cached video is re-checked against the new filters, without a new request', async () => {
+    const videoId = `y4video${Date.now()}`.slice(0, 11)
+    stubFoundVideo(videoId, 1000)
+
+    updateConfig({ minViews: 0 })
+    const song = await getVideoById(videoId)
+    assert.equal(song?.videoId, videoId)
+    assert.equal(requestsSent, 1, 'one video lookup')
+
+    updateConfig({ minViews: 100000 })
+    await assert.rejects(getVideoById(videoId), (error: { code?: string }) => error.code === 'VIEWS_TOO_LOW')
+    assert.equal(requestsSent, 1, 'no new request: the filters are applied to the cached raw video')
+  })
+
+  await t.test('a content-mode change is a different search, and is not answered from the other mode\u2019s cache', async () => {
+    const videoId = `y4mode${Date.now()}`.slice(0, 11)
+    stubFoundVideo(videoId, 100000)
+    const query = `y4 mode query ${Math.random()}`
+
+    updateConfig({ contentMode: 'any' })
+    await searchSongs(query)
+    assert.equal(requestsSent, 2, 'the first mode does its own search')
+
+    updateConfig({ contentMode: 'music' })
+    await searchSongs(query)
+    assert.equal(requestsSent, 4, 'music asks YouTube again: the search request itself is different')
+  })
+})
+
+// the last block in the file: these tests set the quota flag, and it stays set for the process
+test('the quota flag gates every request to YouTube, not only searches', async (t) => {
+  await t.test('a network failure does not exhaust the quota: the next request still goes out', async () => {
     stubSearch('network-error')
-    const before = getSearchesToday()
-    await assert.rejects(searchSongs(`network fail query ${Math.random()}`))
-    assert.equal(getSearchesToday(), before)
+    await assert.rejects(searchSongs(`network fail query ${Math.random()}`), (error: { code?: string }) => error.code === 'YOUTUBE_ERROR')
 
-    for (let i = 0; i < 5; i++) {
-      await assert.rejects(searchSongs(`network fail query ${i} ${Math.random()}`))
-    }
-    assert.equal(getSearchesToday(), before)
+    stubSearch('success')
+    await searchSongs(`still works query ${Math.random()}`)
+    assert.equal(requestsSent, 1, 'the request went out: a failure that never reached YouTube sets no flag')
   })
 
-  await t.test('a timeout stays counted: YouTube may have charged the request whose answer got lost', async () => {
-    stubSearch('timeout')
-    const before = getSearchesToday()
-    await assert.rejects(searchSongs(`timeout query ${Math.random()}`))
-    assert.equal(getSearchesToday(), before + 1)
-  })
-
-  await t.test('an error answer from YouTube stays counted, and the search is sent once, not three times', async () => {
-    stubSearch('youtube-error')
-    const before = getSearchesToday()
-    await assert.rejects(searchSongs(`api error query ${Math.random()}`))
-    assert.equal(getSearchesToday(), before + 1)
+  await t.test('quotaExceeded from any answer sets the flag, and the next request is blocked at once', async () => {
+    stubSearch('quota-exceeded')
+    await assert.rejects(getVideoById('bbbbbbbbbbb'), (error: { code?: string }) => error.code === 'YOUTUBE_QUOTA')
     assert.equal(requestsSent, 1)
-  })
 
-  await t.test('a missing API key sends nothing and costs nothing', async () => {
     stubSearch('success')
-    updateSecrets({ youtubeApiKey: '' })
-    const before = getSearchesToday()
-    await assert.rejects(searchSongs(`no key query ${Math.random()}`))
-    assert.equal(getSearchesToday(), before)
-    assert.equal(requestsSent, 0)
+    await assert.rejects(searchSongs(`blocked query ${Math.random()}`), (error: { code?: string }) => error.code === 'YOUTUBE_QUOTA')
+    assert.equal(requestsSent, 0, 'the flag blocks the request before it goes out')
+
+    await assert.rejects(getVideoById('ccccccccccc'), (error: { code?: string }) => error.code === 'YOUTUBE_QUOTA')
+    assert.equal(requestsSent, 0, 'also for a link')
   })
 
-  await t.test('a successful search consumes one search from the quota, and the daily limit then stops further searches', async () => {
+  await t.test('a link lookup is blocked while the quota is exhausted', async () => {
     stubSearch('success')
-    const before = getSearchesToday()
-    await searchSongs(`unique success query ${Math.random()}`)
-    assert.equal(getSearchesToday(), before + 1)
+    markQuotaExhausted()
 
-    let guard = 0
-    while (guard++ < 500) {
-      try {
-        await searchSongs(`unique success query ${guard} ${Math.random()}`)
-      } catch {
-        // expected after limit
-      }
-    }
-
-    assert.equal(getSearchesToday(), CACHE_LIMITS.MAX_DAILY_SEARCHES)
+    await assert.rejects(getVideoById('aaaaaaaaaaa'), (error: { code?: string }) => error.code === 'YOUTUBE_QUOTA')
+    assert.equal(requestsSent, 0, 'nothing goes out')
   })
-})
 
-test('search quota reservation increments the count', () => {
-  while (getSearchesToday() > 0) releaseSearchQuota()
-  const before = getSearchesToday()
+  await t.test('a playlist update is blocked the same way', async () => {
+    stubSearch('success')
+    const { fetchPlaylistSongs } = await import('../../../src/youtube/index.js')
 
-  assert.equal(reserveSearchQuota(), true)
-  assert.equal(getSearchesToday(), before + 1)
-
-  releaseSearchQuota()
-  assert.equal(getSearchesToday(), before)
-})
-
-test('search quota reservation stops at the daily limit', () => {
-  const before = getSearchesToday()
-
-  while (getSearchesToday() < CACHE_LIMITS.MAX_DAILY_SEARCHES) assert.equal(reserveSearchQuota(), true)
-
-  assert.equal(getSearchesToday(), CACHE_LIMITS.MAX_DAILY_SEARCHES)
-  assert.equal(reserveSearchQuota(), false)
-  assert.equal(getSearchesToday(), CACHE_LIMITS.MAX_DAILY_SEARCHES)
-
-  while (getSearchesToday() > before) releaseSearchQuota()
-})
-
-test('releasing search quota does not make the count negative', () => {
-  while (getSearchesToday() > 0) releaseSearchQuota()
-
-  releaseSearchQuota()
-
-  assert.equal(getSearchesToday(), 0)
-})
-
-test('search cache returns stored songs', async () => {
-  const { getSearchCache, setSearchCache } = await import('../../../src/youtube/cache.js')
-
-  const songs = [
-    {
-      videoId: 'test-video',
-      title: 'Test song',
-      channelTitle: 'Test channel'
-    }
-  ] as any
-
-  const key = `cache-test-${Math.random()}`
-
-  setSearchCache(key, songs)
-
-  assert.deepEqual(getSearchCache(key), songs)
-})
-
-test('search cache returns undefined for an unknown key', async () => {
-  const { getSearchCache } = await import('../../../src/youtube/cache.js')
-
-  assert.equal(getSearchCache(`missing-${Math.random()}`), undefined)
-})
-
-test('video cache returns stored result', async () => {
-  const { getVideoCache, setVideoCache } = await import('../../../src/youtube/cache.js')
-
-  const result = {
-    song: null,
-    reason: 'VIDEO_NOT_FOUND'
-  } as any
-
-  const key = `video-cache-test-${Math.random()}`
-
-  setVideoCache(key, result)
-
-  assert.deepEqual(getVideoCache(key), result)
-})
-
-test('video cache returns undefined for an unknown key', async () => {
-  const { getVideoCache } = await import('../../../src/youtube/cache.js')
-
-  assert.equal(getVideoCache(`missing-${Math.random()}`), undefined)
-})
-test('search cache expires after TTL', () => {
-  const key = `search-ttl-${Math.random()}`
-  const songs = [{ videoId: 'test-video' }] as any
-
-  setSearchCache(key, songs)
-
-  const realNow = Date.now
-  Date.now = () => realNow() + CACHE_LIMITS.SEARCH_CACHE_TTL + 1
-
-  try {
-    assert.equal(getSearchCache(key), undefined)
-  } finally {
-    Date.now = realNow
-  }
-})
-
-test('video cache expires after TTL', () => {
-  const key = `video-ttl-${Math.random()}`
-  const result = { song: null, reason: null }
-
-  setVideoCache(key, result)
-
-  const realNow = Date.now
-  Date.now = () => realNow() + CACHE_LIMITS.VIDEO_CACHE_TTL + 1
-
-  try {
-    assert.equal(getVideoCache(key), undefined)
-  } finally {
-    Date.now = realNow
-  }
+    await assert.rejects(fetchPlaylistSongs('PLtest1234567890'), (error: { code?: string }) => error.code === 'YOUTUBE_QUOTA')
+    assert.equal(requestsSent, 0, 'nothing goes out')
+  })
 })

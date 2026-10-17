@@ -12,13 +12,13 @@ import {
   fetchVideos
 } from './client.js'
 import { normalize } from './utils.js'
-import { getSearchCache, setSearchCache, getVideoCache, setVideoCache, isQuotaExhausted, markQuotaExhausted } from './cache.js'
+import { getSearchCache, setSearchCache, getVideoCache, setVideoCache } from './cache.js'
 import { VideoItem, SearchItem, PlaylistItem } from './types.js'
 import { getConfig } from '../config.js'
 import { createLogger, describeError } from '../logger.js'
 
-const pendingSearches = new Map<string, Promise<Song[]>>()
-const pendingVideos = new Map<string, Promise<Song | null>>()
+const pendingSearches = new Map<string, Promise<VideoItem[]>>()
+const pendingVideos = new Map<string, Promise<VideoItem | null>>()
 const pendingPlaylists = new Map<string, Promise<PlaylistFetchResult>>()
 const PLAYLIST_PAGE_SIZE = 50
 const MAX_PLAYLIST_PAGES = 3
@@ -44,58 +44,44 @@ function dedupInFlight<T>(pending: Map<string, Promise<T>>, key: string, run: ()
   return request.finally(() => pending.delete(key))
 }
 
-function filtersVersion(): string {
-  const c = getConfig()
-  return `${c.minViews}:${c.minDurationSeconds}:${c.maxDurationSeconds}:${c.regionCode}:${c.allowShorts}:${c.allowLiveStreams}:${c.contentMode}`
+function searchCacheKey(normalizedQuery: string): string {
+  return `${getConfig().contentMode}|${normalizedQuery}`
 }
 
 export async function getVideoById(videoId: string, bypassFilters = false): Promise<Song | null> {
-  const cacheKey = bypassFilters ? `raw:${videoId}` : `${filtersVersion()}|${videoId}`
-  const cached = bypassFilters ? undefined : getVideoCache(cacheKey)
+  // the raw video is cached without the filters: they are applied on every read, so their change keeps the entry valid
+  const cached = getVideoCache(videoId)
+  const video = cached !== undefined ? cached : await dedupInFlight(pendingVideos, videoId, () => fetchVideoById(videoId))
 
-  if (cached !== undefined) {
-    if (cached.song === null && cached.reason) {
-      throwFilterError(cached.reason, getConfig())
-    }
-    return cached.song
-  }
-
-  return dedupInFlight(pendingVideos, cacheKey, () => fetchVideoById(videoId, bypassFilters))
-}
-
-async function fetchVideoById(videoId: string, bypassFilters: boolean): Promise<Song | null> {
-  const [video] = await withYouTubeErrorHandling('YouTube API', () => fetchVideos([videoId]))
-
-  if (!video) {
-    if (!bypassFilters) setVideoCache(`${filtersVersion()}|${videoId}`, { song: null, reason: null })
-    return null
-  }
+  if (!video) return null
 
   const song = videoToSong(video)
+  if (bypassFilters) return song
 
-  if (!bypassFilters) {
-    const reason = getFilterFailureReason(song, video)
-    if (reason) {
-      setVideoCache(`${filtersVersion()}|${videoId}`, { song: null, reason })
-      throwFilterError(reason, getConfig())
-    }
-  }
-
-  if (!bypassFilters) setVideoCache(`${filtersVersion()}|${videoId}`, { song, reason: null })
+  const reason = getFilterFailureReason(song, video)
+  if (reason) throwFilterError(reason, getConfig())
 
   return song
+}
+
+async function fetchVideoById(videoId: string): Promise<VideoItem | null> {
+  const [video] = await withYouTubeErrorHandling('YouTube API', () => fetchVideos([videoId]))
+
+  setVideoCache(videoId, video ?? null)
+  return video ?? null
 }
 
 export async function searchSongs(query: string, bypassFilters = false): Promise<Song[]> {
   const normalizedQuery = normalize(query)
   if (!normalizedQuery) return []
 
-  const cacheKey = bypassFilters ? `raw:${normalizedQuery}` : `${filtersVersion()}|${normalizedQuery}`
-  const cached = bypassFilters ? undefined : getSearchCache(cacheKey)
-  if (cached !== undefined) return cached
+  const cacheKey = searchCacheKey(normalizedQuery)
+  const cached = getSearchCache(cacheKey)
+  if (cached !== undefined) return mapValidSongs(cached, bypassFilters)
 
   const trimmedQuery = query.trim()
-  return dedupInFlight(pendingSearches, cacheKey, () => performSearch(trimmedQuery, bypassFilters))
+  const videos = await dedupInFlight(pendingSearches, cacheKey, () => performSearch(trimmedQuery, cacheKey))
+  return mapValidSongs(videos, bypassFilters)
 }
 
 function mapValidSongs(videos: VideoItem[], bypassFilters = false): Song[] {
@@ -105,52 +91,34 @@ function mapValidSongs(videos: VideoItem[], bypassFilters = false): Song[] {
     .map(({ song }) => song)
 }
 
-async function performSearch(query: string, bypassFilters: boolean): Promise<Song[]> {
-  if (isQuotaExhausted()) {
-    log.warn('YouTube quota exhausted for today')
-    throw new AppError('YOUTUBE_QUOTA', 'YouTube API quota exceeded. Quota resets at midnight Pacific Time')
-  }
-
-  let search: { items: SearchItem[] }
-  try {
-    search = await youtube<{ items: SearchItem[] }>(
-      'search',
-      {
-        part: 'snippet',
-        q: query,
-        type: 'video',
-        // 'any' searches every category; clips filed outside Music are reachable by link only in 'music' mode
-        ...(getConfig().contentMode === 'music' ? { videoCategoryId: MUSIC_CATEGORY_ID } : {}),
-        videoEmbeddable: 'true',
-        videoSyndicated: 'true',
-        maxResults: '20',
-        order: 'relevance',
-        safeSearch: 'moderate'
-      },
-      { attempts: 1 }
-    )
-  } catch (error) {
-    if (error instanceof AppError && error.code === 'YOUTUBE_QUOTA') {
-      markQuotaExhausted()
-    }
-    throw error
-  }
+async function performSearch(query: string, cacheKey: string): Promise<VideoItem[]> {
+  const search = await youtube<{ items: SearchItem[] }>(
+    'search',
+    {
+      part: 'snippet',
+      q: query,
+      type: 'video',
+      ...(getConfig().contentMode === 'music' ? { videoCategoryId: MUSIC_CATEGORY_ID } : {}),
+      videoEmbeddable: 'true',
+      videoSyndicated: 'true',
+      maxResults: '20',
+      order: 'relevance',
+      safeSearch: 'moderate'
+    },
+    { attempts: 1 }
+  )
 
   const ids = (search.items ?? []).map((item) => item.id?.videoId).filter((id): id is string => Boolean(id))
-  const normalizedQuery = normalize(query)
-  const cacheKey = bypassFilters ? `raw:${normalizedQuery}` : `${filtersVersion()}|${normalizedQuery}`
 
   if (!ids.length) {
-    if (!bypassFilters) setSearchCache(cacheKey, [])
+    setSearchCache(cacheKey, [])
     return []
   }
 
   const videos = await fetchVideos(ids)
-  const songs = mapValidSongs(videos, bypassFilters)
+  setSearchCache(cacheKey, videos)
 
-  if (!bypassFilters) setSearchCache(cacheKey, songs)
-
-  return songs
+  return videos
 }
 
 /**

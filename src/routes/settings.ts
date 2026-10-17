@@ -29,7 +29,7 @@ router.put('/config', async (req, res) => {
 
   if (body.fallbackPlaylist !== undefined) {
     if (typeof body.fallbackPlaylist !== 'object' || body.fallbackPlaylist === null || Array.isArray(body.fallbackPlaylist)) {
-      fail(res, 'invalid fallbackPlaylist: must be an object', 'INVALID_CONFIG', 400, { fields: 'fallbackPlaylist' })
+      fail(res, 'INVALID_CONFIG', 400, { fields: 'fallbackPlaylist' })
       return
     }
 
@@ -39,7 +39,7 @@ router.put('/config', async (req, res) => {
       if (rawPlaylistId) {
         const parsedId = parsePlaylistId(rawPlaylistId)
         if (!parsedId) {
-          fail(res, 'invalid playlist ID or URL', 'INVALID_PLAYLIST_ID', 400)
+          fail(res, 'INVALID_PLAYLIST_ID', 400)
           return
         }
         body.fallbackPlaylist = { ...body.fallbackPlaylist, playlistId: parsedId }
