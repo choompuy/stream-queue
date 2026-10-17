@@ -2,18 +2,18 @@ import { $, formatDuration, createLogger, getErrorMessage, show, setClass, setTe
 import { initI18n, t, getCurrentLocale } from './i18n.js'
 import { loadYouTubeApi } from './youtube-api.js'
 import { claimPlayback } from './playback-lock.js'
-import { connectEvents } from './sse.js'
+import { watch } from './sse.js'
 
 let player = null
 let currentState = null
 let isPlayerReady = false
 let isTransitioning = false
-let reportedFailureVideoId = null
-let renderedVideoId = null
+// set while a broken player is being replaced and its failure is reported: what the player says meanwhile is not news
+let resetting = null
 let settings = {}
 let localeLoaded = false
-let playerGeneration = 0
-let resetCounter = 0
+// reads the state: what the server announces, and what is read while the events are down (see watch)
+let watcher = null
 
 const log = createLogger('PREVIEW')
 
@@ -21,8 +21,6 @@ const log = createLogger('PREVIEW')
 let isPlaybackSource = false
 
 const REQUEST_TIMEOUT_MS = 8000
-const STALE_POLL_MS = 15000
-let fetchStartedAt = 0
 
 // The YouTube player reports error 5 for a problem of the player itself (not of the video); a retry usually fixes it
 const TEMPORARY_PLAYER_ERROR = 5
@@ -34,19 +32,9 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 // the elements of overlay.html, found when the overlay starts
 let dom = null
 
-// a change that is announced while a read is running may not be in that read: it is read once more when this one is done
-let refetchRequested = false
-
-function requestRefresh() {
-  if (fetchStartedAt) refetchRequested = true
-  else fetchOverlayState()
-}
+const readState = () => watcher.refresh('state')
 
 async function fetchOverlayState() {
-  if (fetchStartedAt && Date.now() - fetchStartedAt < STALE_POLL_MS) return
-  const startedAt = Date.now()
-  fetchStartedAt = startedAt
-
   try {
     const response = await fetch('/api/overlay-state', { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
     if (!response.ok) throw new Error(`overlay-state request failed: ${response.status}`)
@@ -63,13 +51,6 @@ async function fetchOverlayState() {
     renderState()
   } catch (error) {
     log('Error fetching settings:', error)
-  } finally {
-    if (fetchStartedAt === startedAt) fetchStartedAt = 0
-
-    if (refetchRequested) {
-      refetchRequested = false
-      fetchOverlayState()
-    }
   }
 }
 
@@ -115,27 +96,18 @@ function renderState() {
   if (!isPlaybackSource || !isPlayerReady || !currentState || !player) return
 
   if (!currentState.current) {
-    renderedVideoId = null
-    reportedFailureVideoId = null
-
-    if (!isTransitioning) {
-      player.stopVideo()
-    }
-
+    temporaryErrorRetries.clear()
+    player.stopVideo()
     return
   }
 
   const videoId = currentState.current.videoId
-  if (renderedVideoId !== videoId) {
-    renderedVideoId = videoId
-    reportedFailureVideoId = null
-    temporaryErrorRetries.clear()
-  }
-
   const currentVideoId = player.getVideoData()?.video_id
   const playerState = player.getPlayerState()
 
   if (currentVideoId !== videoId) {
+    temporaryErrorRetries.clear()
+
     if (currentState.isPaused) {
       log(`Cueing video while paused: ${videoId}`)
       player.cueVideoById(videoId)
@@ -196,11 +168,9 @@ function updateProgress() {
 }
 
 // The server only listens to these two reports, so a lost one stalls the whole queue: they are retried until they get through.
-// Repeating is safe, the server ignores a report about a track that is no longer the current one.
-// It stops early when the server is seen to have moved on to another track, and on a refusal that a retry cannot fix.
-async function postWithRetry(url, body, videoId) {
-  const movedOn = () => currentState?.current?.videoId !== videoId
-
+// Repeating is safe: the server ignores a report about a track that is no longer the current one, and says so.
+// It stops on any answer, also on a refusal that a retry cannot fix.
+async function postWithRetry(url, body) {
   for (let attempt = 0; ; attempt++) {
     try {
       const response = await fetch(url, {
@@ -224,28 +194,25 @@ async function postWithRetry(url, body, videoId) {
       log(`${url} failed:`, error)
     }
 
-    if (movedOn()) return false
-
     await sleep(Math.min(500 * 2 ** Math.min(attempt, 6), 15000))
-    if (movedOn()) return false
   }
 }
 
 async function notifyEnded(videoId) {
-  await postWithRetry('/api/player/ended', { videoId }, videoId)
-  await fetchOverlayState()
+  await postWithRetry('/api/player/ended', { videoId })
+  await readState()
 }
 
 async function reportFailure(errorCode, videoId) {
-  if (await postWithRetry('/api/player/report-failure', { errorCode, videoId }, videoId)) {
+  if (await postWithRetry('/api/player/report-failure', { errorCode, videoId })) {
     log(`Playback failure reported for ${videoId}`)
   }
 
-  await fetchOverlayState()
+  await readState()
 }
 
 // Returns true when a retry has been scheduled, so the failure is not reported yet
-function retryTemporaryError(errorCode, videoId, generation) {
+function retryTemporaryError(errorCode, videoId, retried) {
   if (errorCode !== TEMPORARY_PLAYER_ERROR) return false
 
   const retries = temporaryErrorRetries.get(videoId) ?? 0
@@ -259,7 +226,7 @@ function retryTemporaryError(errorCode, videoId, generation) {
 
   setTimeout(
     () => {
-      const stillCurrent = generation === playerGeneration && player && currentState?.current?.videoId === videoId
+      const stillCurrent = player === retried && currentState?.current?.videoId === videoId
       if (!stillCurrent) return
 
       if (currentState.isPaused) player.cueVideoById({ videoId, startSeconds })
@@ -276,7 +243,7 @@ function onPlayerReady(event) {
   isPlayerReady = true
   event.target.setVolume(100)
   configurePlayer()
-  fetchOverlayState()
+  readState()
 }
 
 function onPlayerStateChange(event) {
@@ -303,26 +270,24 @@ function onPlayerError(event) {
     return
   }
 
-  if (reportedFailureVideoId === videoId) {
-    log(`Ignoring duplicate error for video: ${videoId}`)
+  if (resetting) {
+    log('Ignoring a player error while the player is being replaced')
     return
   }
 
-  if (retryTemporaryError(event.data, videoId, playerGeneration)) return
+  if (retryTemporaryError(event.data, videoId, event.target)) return
 
-  reportedFailureVideoId = videoId
-  resetPlayer().then((token) => {
-    if (token !== resetCounter) return
-
-    reportFailure(event.data, videoId)
-  })
+  resetting = resetPlayer()
+    .then(() => reportFailure(event.data, videoId))
+    .finally(() => {
+      resetting = null
+    })
 }
 
 function createPlayer() {
   if (!isPlaybackSource || typeof YT === 'undefined' || !YT.Player) return
 
-  playerGeneration += 1
-  const generation = playerGeneration
+  // the events of a player that was replaced come from an object that is not `player` any more, and are left alone
   player = new YT.Player('player', {
     width: '100%',
     height: '100%',
@@ -340,32 +305,27 @@ function createPlayer() {
 
     events: {
       onReady: (event) => {
-        if (generation !== playerGeneration) return
-        onPlayerReady(event)
+        if (event.target === player) onPlayerReady(event)
       },
 
       onStateChange: (event) => {
-        if (generation !== playerGeneration) return
-        onPlayerStateChange(event)
+        if (event.target === player) onPlayerStateChange(event)
       },
 
       onError: (event) => {
-        if (generation !== playerGeneration) return
-        onPlayerError(event)
+        if (event.target === player) onPlayerError(event)
       }
     }
   })
 
-  log(`YouTube player created: generation ${generation}`)
+  log('YouTube player created')
 }
 
 async function resetPlayer() {
-  const token = ++resetCounter
   const oldPlayer = player
 
   player = null
   isPlayerReady = false
-  renderedVideoId = null
 
   if (oldPlayer) {
     try {
@@ -388,10 +348,7 @@ async function resetPlayer() {
   // and the failure must not wait for it: the queue stands until the failure is reported
   await Promise.race([new Promise((resolve) => requestAnimationFrame(resolve)), sleep(100)])
 
-  if (!isPlaybackSource || typeof YT === 'undefined' || !YT.Player) return token
-
   createPlayer()
-  return token
 }
 
 function enablePlayback() {
@@ -401,9 +358,8 @@ function enablePlayback() {
   loadYouTubeApi().then(createPlayer)
 }
 
-// The events say when to read the state. What the viewer sees is this page, so a read every 15 s stays under them as a net,
-// and while the events are down the page reads every second, as it always did
-const SAFETY_POLL_TICKS = 15
+// while the events are down the page reads the state every second, as it always did
+const POLL_WHILE_EVENTS_ARE_DOWN_MS = 1000
 
 /**
  * Starts the overlay on the page that is open. Nothing runs on import, so the overlay can be started (and stopped) by a test.
@@ -434,33 +390,17 @@ export function startOverlay({ locks } = {}) {
   if (isLocalhost) claimPlayback(enablePlayback, locks)
   else log('Non-localhost origin: read-only widget, no embedded player')
 
-  fetchOverlayState()
+  watcher = watch({ state: { read: fetchOverlayState } }, { safetyMs: POLL_WHILE_EVENTS_ARE_DOWN_MS })
+  readState()
 
-  let eventsOpen = false
-  let quietTicks = 0
-
-  const events = connectEvents({
-    topics: ['state'],
-    onChange: requestRefresh,
-    onStatus: (status) => {
-      eventsOpen = status === 'open'
-    }
-  })
-
-  const timer = setInterval(() => {
-    updateProgress()
-
-    if (!eventsOpen || ++quietTicks >= SAFETY_POLL_TICKS) {
-      quietTicks = 0
-      fetchOverlayState()
-    }
-  }, 1000)
+  // the progress bar runs on the player of this page, not on the server
+  const timer = setInterval(updateProgress, 1000)
 
   return {
-    refresh: fetchOverlayState,
+    refresh: readState,
     stop() {
       clearInterval(timer)
-      events.close()
+      watcher.close()
     }
   }
 }

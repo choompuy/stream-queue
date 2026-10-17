@@ -181,18 +181,17 @@ test('a finished track', async (t) => {
     assert.equal(sent.ended.length, 1)
   })
 
-  await t.test('is not reported again once the server has moved on to another track', async (t) => {
-    const { overlay, server, player, sent, outcomes, settle, elapse } = await boot(t, { current: track('a') })
-    outcomes.ended.push(refused)
+  await t.test('stops at the first answer of the server, also when it says that it did not apply the report: the track was not the current one any more', async (t) => {
+    const { player, sent, outcomes, settle, elapse } = await boot(t, { current: track('a') })
+    outcomes.ended.push(refused, { applied: false })
 
     player().emit('onStateChange', 0)
     await settle()
+    await elapse(500)
+    assert.equal(sent.ended.length, 2)
 
-    server.current = track('b')
-    await overlay.refresh()
     await elapse(60_000)
-
-    assert.equal(sent.ended.length, 1)
+    assert.equal(sent.ended.length, 2)
   })
 })
 
@@ -228,6 +227,62 @@ test('a track that cannot be played', async (t) => {
 
     assert.deepEqual(sent.failures, [{ errorCode: 100, videoId: V('a') }])
     assert.equal(players.length, 2)
+  })
+
+  await t.test('what a replaced player says is left alone: it is not reported again', async (t) => {
+    const { players, sent, settle } = await boot(t, { current: track('a') })
+
+    players[0].emit('onError', 100)
+    await settle()
+    players[0].emit('onError', 100)
+    await settle()
+
+    assert.equal(sent.failures.length, 1)
+    assert.equal(players.length, 2)
+  })
+
+  await t.test('the new player is not believed while the failure of the old one is still being reported', async (t) => {
+    const { env, players, sent, settle } = await boot(t, { current: track('a') })
+    let answer = null
+    env.route('POST /api/player/report-failure', (body) => {
+      sent.failures.push(body)
+      return new Promise((resolve) => (answer = resolve))
+    })
+
+    players[0].emit('onError', 100)
+    await settle()
+    assert.equal(players.length, 2)
+
+    // the report is on its way and the server still plays the track, so the new player loads it and fails again
+    players[1].emit('onError', 100)
+    await settle()
+    assert.equal(sent.failures.length, 1)
+    assert.equal(players.length, 2, 'and is not replaced once more')
+
+    answer({})
+    await settle()
+  })
+
+  await t.test('a track that comes back starts again with the retries of a temporary error unused', async (t) => {
+    const { overlay, server, players, sent, settle, elapse } = await boot(t, { current: track('a') })
+    players[0].emit('onError', 5)
+    await elapse(2000)
+    players[0].emit('onError', 5)
+    await elapse(4000)
+
+    server.current = track('b')
+    await overlay.refresh()
+    await settle()
+    server.current = track('a')
+    await overlay.refresh()
+    await settle()
+
+    players[0].time = 7
+    players[0].emit('onError', 5)
+    await elapse(2000)
+
+    assert.deepEqual(sent.failures, [])
+    assert.deepEqual(players[0].calls.at(-1), ['load', { videoId: V('a'), startSeconds: 7 }])
   })
 
   await t.test('a temporary player error (5) is retried from where it was, and only the third one is reported', async (t) => {
@@ -315,16 +370,14 @@ test('reading the state', async (t) => {
     assert.equal(reads(env), before + 3)
   })
 
-  await t.test('with events it reads only as a net, every 15 s', async (t) => {
+  await t.test('with the events open it does not read on its own: the server says when', async (t) => {
     const { env, sources, elapse } = await boot(t, { current: track('a') })
     sources.at(-1).emit('open')
     await elapse(100)
     const before = reads(env)
 
-    for (let i = 0; i < 14; i++) await elapse(1000)
-    assert.equal(reads(env), before)
+    for (let i = 0; i < 45; i++) await elapse(1000)
 
-    await elapse(1000)
-    assert.equal(reads(env), before + 1)
+    assert.equal(reads(env), before)
   })
 })
