@@ -258,9 +258,22 @@ export function alignFallbackCursor(videoId: string): void {
 export function hydrateFallback(data: Partial<FallbackSnapshot> | undefined): void {
   if (!data) return
 
-  setSourceTracks(data.sourceTracks ?? [])
-  fallbackOrder = data.order ?? []
-  fallbackCursor = data.cursor ?? -1
+  const tracks = data.sourceTracks ?? []
+  setSourceTracks(tracks)
+
+  const savedOrder = data.order ?? []
+  const known = new Set(tracks.map((track) => track.videoId))
+  const kept = [...new Set(savedOrder.filter((id) => known.has(id)))]
+  const keptIds = new Set(kept)
+  const missing: string[] = []
+  for (const id of known) {
+    if (!keptIds.has(id)) missing.push(id)
+  }
+  const order = [...kept, ...missing]
+  const repaired = savedOrder.length !== order.length || order.some((id, index) => id !== savedOrder[index])
+
+  fallbackOrder = order
+  fallbackCursor = repaired ? -1 : data.cursor ?? -1
   loadedFallbackPlaylistId = data.playlistId ?? null
   lastFallbackRefreshAt = data.lastRefreshedAt ?? null
 }

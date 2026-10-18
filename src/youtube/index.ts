@@ -72,7 +72,9 @@ async function fetchVideoById(videoId: string): Promise<VideoItem | null> {
 }
 
 export async function searchSongs(query: string, bypassFilters = false): Promise<Song[]> {
-  const normalizedQuery = normalize(query)
+  // normalize() keeps letters and digits only, so a group named "!!!" would search nothing: when
+  // normalization empties the query, the trimmed lowercase text is the key, and the API still gets it as typed
+  const normalizedQuery = normalize(query) || query.trim().toLowerCase()
   if (!normalizedQuery) return []
 
   const cacheKey = searchCacheKey(normalizedQuery)

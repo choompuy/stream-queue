@@ -126,16 +126,52 @@ test('after a restart the playlist goes on from where it was', async (t) => {
   })
 })
 
+test('the rotation is reconciled with the track list it is saved next to', async (t) => {
+  // the order lives in data/, the tracks in cache/: they can drift apart when the cache is wiped
+  const trackIds = ['trk00000000', 'trk00000001', 'trk00000002']
+  const tracks = trackIds.map(song)
+
+  await t.test('a rotation with a vanished id and a duplicate becomes exactly the track list, from the start', () => {
+    fallback.hydrateFallback({
+      sourceTracks: tracks,
+      order: [trackIds[0], 'trkgone00001', trackIds[1], trackIds[0]],
+      cursor: 2,
+      playlistId: PLAYLIST,
+      lastRefreshedAt: 1
+    })
+
+    assert.deepEqual(fallback.getFallbackProgress().order, trackIds)
+    assert.equal(fallback.getFallbackProgress().cursor, -1)
+  })
+
+  await t.test('a track missing from the rotation is appended, not lost: it plays again', () => {
+    fallback.hydrateFallback({ sourceTracks: tracks, order: [trackIds[2], trackIds[1]], cursor: 1, playlistId: PLAYLIST, lastRefreshedAt: 1 })
+
+    assert.deepEqual(fallback.getFallbackProgress().order, [trackIds[2], trackIds[1], trackIds[0]])
+    assert.equal(fallback.getFallbackProgress().cursor, -1)
+  })
+
+  await t.test('a rotation that already matches the track list is left alone, cursor included', () => {
+    fallback.hydrateFallback({ sourceTracks: tracks, order: [...trackIds], cursor: 2, playlistId: PLAYLIST, lastRefreshedAt: 1 })
+
+    assert.deepEqual(fallback.getFallbackProgress().order, trackIds)
+    assert.equal(fallback.getFallbackProgress().cursor, 2)
+  })
+})
+
 test('without any track the position is not used up', async (t) => {
   // without repeat, walking an empty rotation to its end would leave the playlist "finished": that is what must not happen
   t.beforeEach(() => updateConfig({ fallbackPlaylist: { repeat: false } }))
 
-  await t.test('nothing to play: the position stays and the answer is null', () => {
+  await t.test('nothing to play: the answer is null and the position is not used up', () => {
     fallback.hydrateFallback({ sourceTracks: [], order: ids, cursor: 9, playlistId: PLAYLIST, lastRefreshedAt: 1 })
+    // the rotation without its tracks is repaired to an empty one, so the position starts over
+    assert.deepEqual(fallback.getFallbackProgress().order, [])
+    assert.equal(fallback.getFallbackProgress().cursor, -1)
 
     assert.equal(fallback.advanceFallback(), null)
     assert.equal(fallback.peekNextFallbackTrack(), null)
-    assert.equal(fallback.getFallbackProgress().cursor, 9)
+    assert.equal(fallback.getFallbackProgress().cursor, -1, 'advancing an empty rotation consumes nothing')
   })
 
   await t.test('and once the tracks are there the rotation goes on from the same place', () => {

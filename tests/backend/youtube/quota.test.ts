@@ -202,6 +202,31 @@ test('a change of the filters does not throw away paid-for requests', async (t) 
   })
 })
 
+test('a query that normalization empties still searches', async (t) => {
+  await t.test('searchSongs("!!!") sends q=!!! to the API', async () => {
+    let asked: string | null = null
+    globalThis.fetch = async (input) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (url.hostname === 'www.googleapis.com' && url.pathname.endsWith('/search')) asked = url.searchParams.get('q')
+      return new Response(JSON.stringify({ items: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+
+    assert.deepEqual(await searchSongs('!!!'), [])
+    assert.equal(asked, '!!!')
+  })
+
+  await t.test('a query of only whitespace is still nothing, and nothing is sent', async () => {
+    let sent = 0
+    globalThis.fetch = async () => {
+      sent++
+      return new Response(JSON.stringify({ items: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+
+    assert.deepEqual(await searchSongs('   '), [])
+    assert.equal(sent, 0)
+  })
+})
+
 // the last block in the file: these tests set the quota flag, and it stays set for the process
 test('the quota flag gates every request to YouTube, not only searches', async (t) => {
   await t.test('a network failure does not exhaust the quota: the next request still goes out', async () => {

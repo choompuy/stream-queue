@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express'
-import { fail, failFromAppError } from './http.js'
+import { fail, failFromAppError, statusForCode } from './http.js'
 import { AppError } from './types.js'
 import { createLogger, describeError } from './logger.js'
 
@@ -15,7 +15,10 @@ export function errorHandler(err: HttpError, _req: Request, res: Response, next:
     return
   }
 
-  if (err instanceof AppError) return failFromAppError(res, err)
+  if (err instanceof AppError) {
+    if (statusForCode(err.code) >= 500) log.error(describeError(err))
+    return failFromAppError(res, err)
+  }
   if (err.type === 'entity.parse.failed') return fail(res, 'INVALID_JSON')
   if (err.type === 'entity.too.large') return fail(res, 'PAYLOAD_TOO_LARGE')
 

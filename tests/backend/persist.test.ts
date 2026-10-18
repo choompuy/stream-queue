@@ -1,14 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 
 const testDir = mkdtempSync(join(tmpdir(), 'streamqueue-persist-'))
 process.chdir(testDir)
 
-const { createFileStore, flushAllStores, ensureDataDirectory, _test } = await import('../../src/persist.js')
+const { createFileStore, flushAllStores, ensureDataDirectory } = await import('../../src/persist.js')
 
 let counter = 0
 const filePath = () => join(testDir, `store-${++counter}.json`)
@@ -76,6 +76,19 @@ test('load()', async (t) => {
     const store = createFileStore<Array<{ id: string }>>(path)
 
     assert.deepEqual(store.load([{ id: 'x' }]), [{ id: 'x' }])
+  })
+
+  await t.test('a file of the wrong kind is set aside, like a corrupt one, instead of being silently overwritten', (t2) => {
+    t2.mock.method(console, 'warn', () => {})
+    const path = filePath()
+    writeFileSync(path, 'null')
+    const store = createFileStore<{ a: number }>(path)
+
+    assert.deepEqual(store.load({ a: 1 }), { a: 1 })
+
+    assert.equal(existsSync(path), false)
+    const kept = readdirSync(testDir).filter((name) => name.startsWith(`${basename(path)}.corrupt-`))
+    assert.equal(kept.length, 1)
   })
 })
 
@@ -302,79 +315,71 @@ test('transient write failures are retried', async (t) => {
     return error
   }
 
-  _test.setSaveRetryDelay(1)
-
   await t.test('a rename blocked once (an antivirus letting go of the file) succeeds on the second attempt', async () => {
     const path = filePath()
-    const store = createFileStore<{ n: number }>(path)
     let calls = 0
-    _test.setRename(async (from, to) => {
-      calls++
-      if (calls === 1) throw busy()
-      return realRename(from, to)
+    const store = createFileStore<{ n: number }>(path, {
+      rename: async (from, to) => {
+        calls++
+        if (calls === 1) throw busy()
+        return realRename(from, to)
+      },
+      retryDelayMs: 1
     })
 
-    try {
-      store.scheduleSave(() => ({ n: 1 }))
-      await store.flush()
+    store.scheduleSave(() => ({ n: 1 }))
+    await store.flush()
 
-      assert.equal(calls, 2)
-      assert.deepEqual(readJson(path), { n: 1 })
-    } finally {
-      _test.resetRename()
-    }
+    assert.equal(calls, 2)
+    assert.deepEqual(readJson(path), { n: 1 })
   })
 
   await t.test('a rename that keeps failing is given up after three attempts and the .tmp is cleaned up', async (t2) => {
     t2.mock.method(console, 'error', () => {})
     const path = filePath()
-    const store = createFileStore<{ n: number }>(path)
     let calls = 0
-    _test.setRename(async () => {
-      calls++
-      throw busy()
+    const store = createFileStore<{ n: number }>(path, {
+      rename: async () => {
+        calls++
+        throw busy()
+      },
+      retryDelayMs: 1
     })
     const errors: unknown[] = []
 
-    try {
-      store.scheduleSave(
-        () => ({ n: 1 }),
-        (error) => errors.push(error)
-      )
-      await store.flush()
+    store.scheduleSave(
+      () => ({ n: 1 }),
+      (error) => errors.push(error)
+    )
+    await store.flush()
 
-      assert.equal(calls, 3)
-      assert.equal(errors.length, 1)
-      assert.equal(existsSync(`${path}.tmp`), false)
-    } finally {
-      _test.resetRename()
-    }
+    assert.equal(calls, 3)
+    assert.equal(errors.length, 1)
+    assert.equal(existsSync(`${path}.tmp`), false)
   })
 
   await t.test('a non-transient failure is not retried at all', async () => {
     const path = filePath()
-    const store = createFileStore<{ n: number }>(path)
     let calls = 0
-    _test.setRename(async () => {
-      calls++
-      const error = new Error('is a directory') as Error & { code: string }
-      error.code = 'EISDIR'
-      throw error
+    const store = createFileStore<{ n: number }>(path, {
+      rename: async () => {
+        calls++
+        const error = new Error('is a directory') as Error & { code: string }
+        error.code = 'EISDIR'
+        throw error
+      },
+      retryDelayMs: 1
     })
     const errors: unknown[] = []
 
-    try {
-      store.scheduleSave(
-        () => ({ n: 1 }),
-        (error) => errors.push(error)
-      )
-      await store.flush()
+    store.scheduleSave(
+      () => ({ n: 1 }),
+      (error) => errors.push(error)
+    )
+    await store.flush()
 
-      assert.equal(calls, 1)
-      assert.equal(errors.length, 1)
-    } finally {
-      _test.resetRename()
-    }
+    assert.equal(calls, 1)
+    assert.equal(errors.length, 1)
   })
 })
 

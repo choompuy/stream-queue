@@ -23,6 +23,9 @@ app.get('/refused', () => {
 app.get('/twitch', () => {
   throw new AppError('TWITCH_API_ERROR', 'title must be unique', { status: 400 })
 })
+app.get('/twitch-network', () => {
+  throw new AppError('TWITCH_NETWORK_ERROR', 'connect ECONNREFUSED')
+})
 app.use(errorHandler)
 
 const server = app.listen(0)
@@ -89,6 +92,28 @@ test('errorHandler', async (t) => {
     assert.equal(response.status, 502)
     assert.equal(body.code, 'TWITCH_API_ERROR')
     assert.ok(body.error.includes('title must be unique'))
+  })
+
+  await t.test('a server-side AppError is logged, an expected refusal is not', async (t2) => {
+    const errors = t2.mock.method(console, 'error', () => {})
+
+    const response = await fetch(`${base}/twitch-network`)
+    assert.equal(response.status, 502)
+    assert.equal(errors.mock.callCount(), 1)
+    const reported = String(errors.mock.calls[0]?.arguments ?? '')
+    assert.ok(reported.includes('TWITCH_NETWORK_ERROR'), reported)
+    assert.ok(reported.includes('connect ECONNREFUSED'), reported)
+
+    await fetch(`${base}/refused`) // DUPLICATE, 409
+    assert.equal(errors.mock.callCount(), 1, 'a 4xx refusal leaves no error line')
+  })
+
+  await t.test('AppError.toParams() is the one shape the message travels in', () => {
+    assert.deepEqual(new AppError('TWITCH_API_ERROR', 'title must be unique', { status: 400 }).toParams(), {
+      status: 400,
+      message: 'title must be unique'
+    })
+    assert.deepEqual(new AppError('DUPLICATE', 'already queued').toParams(), { message: 'already queued' })
   })
 
   await t.test('describeError says which error it was, not only its message', () => {

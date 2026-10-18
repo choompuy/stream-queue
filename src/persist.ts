@@ -7,11 +7,9 @@ import { createLogger, describeError } from './logger.js'
 
 const SAVE_DEBOUNCE_MS = 250
 const SAVE_ATTEMPTS = 3
-let saveRetryDelayMs = 150
+const SAVE_RETRY_DELAY_MS = 150
 
 const RETRYABLE_SAVE_CODES = new Set(['EPERM', 'EBUSY', 'EACCES'])
-
-let renameFile: typeof rename = rename
 
 const log = createLogger('PERSIST')
 
@@ -56,8 +54,12 @@ function setAside(filePath: string): void {
 
 const activeStoreFlushers: Array<() => Promise<void>> = []
 
-export function createFileStore<T>(location: string | (() => string)) {
+// `options` exists for the tests: a rename that keeps failing and a short retry delay are injected per
+// store, so no test reaches into the module's own state
+export function createFileStore<T>(location: string | (() => string), options: { rename?: typeof rename; retryDelayMs?: number } = {}) {
   const resolvePath = typeof location === 'function' ? location : () => location
+  const renameFile = options.rename ?? rename
+  const retryDelayMs = options.retryDelayMs ?? SAVE_RETRY_DELAY_MS
 
   type SaveJob = { getData: () => T; onError?: (error: unknown) => void }
 
@@ -75,6 +77,8 @@ export function createFileStore<T>(location: string | (() => string)) {
       const data: unknown = JSON.parse(readFileSync(filePath, 'utf8'))
       if (kindOf(data) !== kindOf(defaults)) {
         log.warn(`${filePath} holds a ${kindOf(data)} where a ${kindOf(defaults)} belongs, using the defaults`)
+        // kept aside like a corrupt file, so the next save cannot silently erase the only copy
+        setAside(filePath)
         return defaults
       }
       return deepMerge(defaults, data as DeepPartial<T>)
@@ -106,7 +110,7 @@ export function createFileStore<T>(location: string | (() => string)) {
           await rm(tmpPath, { force: true }).catch(() => {})
           throw error
         }
-        await sleep(saveRetryDelayMs)
+        await sleep(retryDelayMs)
       }
     }
   }
@@ -174,18 +178,6 @@ export async function ensureDataDirectory(): Promise<void> {
     log.log(`Data directory: ${dir}`)
   } catch (error) {
     log.error(`The data directory ${dir} is not writable: ${describeError(error)}. Nothing the app saves will survive a restart`)
-  }
-}
-
-export const _test = {
-  setRename(next: typeof rename): void {
-    renameFile = next
-  },
-  resetRename(): void {
-    renameFile = rename
-  },
-  setSaveRetryDelay(ms: number): void {
-    saveRetryDelayMs = ms
   }
 }
 

@@ -65,13 +65,17 @@ const STATUS_BY_CODE: Partial<Record<AppErrorCode, number>> = {
   ...filterStatuses(['NOT_MUSIC', 'NOT_PUBLIC', 'NOT_EMBEDDABLE', 'AGE_RESTRICTED', 'REGION_BLOCKED', 'NOT_PLAYABLE', 'IS_LIVE', 'IS_SHORT', 'DURATION_OUT_OF_RANGE', 'VIEWS_TOO_LOW'], 404)
 }
 
+export function statusForCode(code: AppErrorCode): number {
+  return STATUS_BY_CODE[code] ?? 500
+}
+
 function filterStatuses(codes: readonly FilterFailureReason[], status: number): Partial<Record<AppErrorCode, number>> {
   return Object.fromEntries(codes.map((code) => [code, status]))
 }
 
 // The one way an error leaves the app: the errorHandler passes the thrown AppError here, the few
 // middleware that answer themselves (localOnly, hostCheck, the SSE connection limit) call it directly
-export function fail(res: Response, code: AppErrorCode, params?: Record<string, string | number>, status = STATUS_BY_CODE[code] ?? 500): void {
+export function fail(res: Response, code: AppErrorCode, params?: Record<string, string | number>, status = statusForCode(code)): void {
   const locale = getSettings().locale
   const body: ApiError = { success: false, error: translateApiError(locale, code, params), code, params }
   res.status(status).json(body)
@@ -79,5 +83,5 @@ export function fail(res: Response, code: AppErrorCode, params?: Record<string, 
 
 // AppError's message reaches the panel as the {{message}} parameter (TWITCH_API_ERROR carries Twitch's own text)
 export function failFromAppError(res: Response, error: AppError): void {
-  fail(res, error.code, { ...error.params, message: error.message })
+  fail(res, error.code, error.toParams())
 }

@@ -458,11 +458,14 @@ export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeRespon
       }
 
       log.error(`Twitch authorization failed: ${describeError(error)}`)
+
+      // a non-AppError is a bug: it stays in the log above, and the panel gets the generic auth failure
+      const failure = error instanceof AppError ? error : undefined
       notify({
         type: 'error',
         level: 'error',
-        code: error instanceof AppError ? error.code : 'TWITCH_AUTH_ERROR',
-        params: error instanceof AppError ? { ...error.params, message: error.message } : undefined
+        code: failure?.code ?? 'TWITCH_AUTH_ERROR',
+        params: failure?.toParams()
       })
     })
     .finally(() => {

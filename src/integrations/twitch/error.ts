@@ -10,9 +10,12 @@ export function markTransient(error: AppError): AppError {
 
 // fetch fails as a TypeError ("fetch failed", "terminated"), and a timeout as a DOMException named
 // TimeoutError or AbortError: those are "no connection to Twitch". Any other Error is something else (a
-// refusal, a bug of our own) and must not be reported as a missing connection
+// refusal, a bug of our own — a TypeError with another message included) and must not be reported as a
+// missing connection
+const NETWORK_TYPE_ERRORS = new Set(['fetch failed', 'terminated'])
+
 export function isNetworkError(error: unknown): boolean {
-  if (error instanceof TypeError) return true
+  if (error instanceof TypeError) return NETWORK_TYPE_ERRORS.has(error.message)
   return error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
 }
 

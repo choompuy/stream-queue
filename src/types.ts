@@ -130,6 +130,11 @@ export class AppError extends Error {
     super(message)
     this.name = 'AppError'
   }
+
+  // the one way the error's own text travels: as the {{message}} parameter next to its params
+  toParams(): Record<string, string | number> {
+    return { ...this.params, message: this.message }
+  }
 }
 
 export type Blockable<T> = T & { isBlocked: boolean }

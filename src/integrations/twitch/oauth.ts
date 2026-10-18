@@ -228,6 +228,10 @@ export class TwitchOAuth {
     this.onAuthStateChange?.()
   }
 
+  private isCurrent(generation: number): boolean {
+    return generation === this.tokenGeneration
+  }
+
   needsReauthorization(): boolean {
     return this.authFailed
   }
@@ -269,12 +273,23 @@ export class TwitchOAuth {
         throw await oauthError(response, 'Token refresh failed')
       }
 
-      const tokenData = this.store((await response.json()) as TwitchTokenResponse, expectedGeneration)
+      const data = (await response.json()) as TwitchTokenResponse
+
+      // the account can be disconnected while the request is on its way: the tokens Twitch issued are
+      // revoked instead of replacing whoever connected in the meantime (the same thing pollForToken does)
+      if (!this.isCurrent(expectedGeneration)) {
+        await this.revoke([data.access_token, data.refresh_token])
+        throw new AppError('TWITCH_REFRESH_ERROR', 'Login was cancelled during token refresh')
+      }
+
+      const tokenData = this.store(data, expectedGeneration)
       log.log('Token refresh successful')
       return tokenData
     } catch (error) {
       if (error instanceof AppError) {
-        log.error(describeError(error))
+        // a refresh dropped because the account was disconnected meanwhile is an orderly exit, not a failure
+        if (this.isCurrent(expectedGeneration)) log.error(describeError(error))
+        else log.log('Token refresh dropped: the account was disconnected meanwhile')
         throw error
       }
       // Network errors become TWITCH_REFRESH_ERROR
@@ -284,7 +299,8 @@ export class TwitchOAuth {
   }
 
   private store(data: TwitchTokenResponse, expectedGeneration: number): TwitchTokenData {
-    if (expectedGeneration !== this.tokenGeneration) {
+    // a second guard: the refresh answers one at a time, but a device login may have won the race
+    if (!this.isCurrent(expectedGeneration)) {
       throw new AppError('TWITCH_REFRESH_ERROR', 'Login was cancelled during token refresh')
     }
 

@@ -25,23 +25,28 @@ function toUrl(input: string): URL | null {
   }
 }
 
-export function parseYouTubeUrl(input: string): { isYouTube: boolean; videoId: string | null } {
-  const url = toUrl(input)
-  if (!url) return { isYouTube: false, videoId: null }
+const hostOf = (url: URL): string => url.hostname.replace(/^(?:www\.|m\.)+/, '')
 
-  const host = url.hostname.replace(/^(?:www\.|m\.)+/, '')
-  if (!HOSTS.has(host)) return { isYouTube: false, videoId: null }
+/** A URL on a YouTube host, or null: a list param on any other host belongs to that host, not to us. */
+function youtubeUrl(input: string): URL | null {
+  const url = toUrl(input)
+  return url && HOSTS.has(hostOf(url)) ? url : null
+}
+
+export function parseYouTubeUrl(input: string): { isYouTube: boolean; videoId: string | null } {
+  const url = youtubeUrl(input)
+  if (!url) return { isYouTube: false, videoId: null }
 
   // youtu.be/<id> · /watch?v=<id> · /shorts|embed|v|live/<id> — segment must be the whole id
   const [kind, segment] = url.pathname.split('/').filter(Boolean)
-  const id = host === 'youtu.be' ? kind : kind === 'watch' ? url.searchParams.get('v') : VIDEO_KINDS.has(kind) ? segment : null
+  const id = hostOf(url) === 'youtu.be' ? kind : kind === 'watch' ? url.searchParams.get('v') : VIDEO_KINDS.has(kind) ? segment : null
 
   return { isYouTube: true, videoId: isValidVideoId(id) ? id : null }
 }
 
 export function parsePlaylistId(input: string): string | null {
   const s = input.trim()
-  const list = toUrl(s)?.searchParams.get('list')
+  const list = youtubeUrl(s)?.searchParams.get('list')
   // if s was a URL, it can't match PLAYLIST_ID, so the fallback only fires for bare IDs
   return isValidPlaylistId(list) ? list : isValidPlaylistId(s) ? s : null
 }
