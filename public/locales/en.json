@@ -45,7 +45,8 @@
     "close": "Close",
     "on": "On",
     "off": "Off",
-    "more": "More actions"
+    "more": "More actions",
+    "live": "LIVE"
   },
   "nav": {
     "dashboard": "Dashboard",

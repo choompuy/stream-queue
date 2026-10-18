@@ -45,7 +45,8 @@
     "close": "Закрыть",
     "on": "Вкл",
     "off": "Выкл",
-    "more": "Ещё действия"
+    "more": "Ещё действия",
+    "live": "LIVE"
   },
   "nav": {
     "dashboard": "Панель",
@@ -283,7 +284,7 @@
     "trackUnblocked": "Трек разблокирован",
     "settingsSaved": "Настройки сохранены",
     "settingsPartiallySaved": "Сохранено {{saved}}, не сохранено {{rejected}} (некорректные значения)",
-    "apiKeyNotSaved": "Config saved, but API key was not",
+    "apiKeyNotSaved": "Настройки сохранены, а API ключ нет",
     "nowPlaying": "Сейчас играет: {{title}}",
     "addedToQueue": "Добавлено в очередь: {{title}} [#{{position}}]",
     "viewerRequest": "🎵 {{user}} добавил(а): {{title}}",

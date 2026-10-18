@@ -47,13 +47,8 @@ export function t(key, params = {}) {
 
   if (value === undefined) return key
 
-  let result = value
-
-  for (const [param, replacement] of Object.entries(params)) {
-    result = result.replaceAll(`{{${param}}}`, () => String(replacement))
-  }
-
-  return result
+  // one pass: a value that itself contains "{{other}}" (a track title is typed by a viewer) is not looked into again
+  return value.replace(/\{\{(\w+)\}\}/g, (placeholder, name) => (name in params ? String(params[name]) : placeholder))
 }
 
 export function getCurrentLocale() {

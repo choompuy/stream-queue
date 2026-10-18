@@ -1,3 +1,7 @@
+import { createLogger } from './shared.js'
+
+const log = createLogger('SSE')
+
 const COALESCE_MS = 100
 // the server pings every 25 s: a minute without any frame means the connection is dead (OBS and antivirus drop quiet ones without a word)
 const WATCHDOG_MS = 60_000
@@ -150,26 +154,41 @@ export function connectEvents({ topics, onChange, onStatus, onNotice, EventSourc
 }
 
 // Runs the task one at a time. A request that comes while it is running makes it run once more afterwards,
-// so the last thing shown is always the answer to the last request, never an older one that arrived late
+// so the last thing shown is always the answer to the last request, never an older one that arrived late.
+// Every caller gets the promise of the run that is going on. A failed run does not drop a request that came during it:
+// the task runs again, and the promise is rejected only if the last run failed
 export function serialized(task) {
-  let running = false
+  let current = null
   let again = false
 
-  return async () => {
-    if (running) {
+  return () => {
+    if (current) {
       again = true
-      return
+      return current
     }
 
-    running = true
-    try {
-      do {
-        again = false
-        await task()
-      } while (again)
-    } finally {
-      running = false
-    }
+    current = (async () => {
+      try {
+        let failure = null
+
+        do {
+          again = false
+
+          try {
+            await task()
+            failure = null
+          } catch (error) {
+            failure = { error }
+          }
+        } while (again)
+
+        if (failure) throw failure.error
+      } finally {
+        current = null
+      }
+    })()
+
+    return current
   }
 }
 
@@ -185,12 +204,22 @@ export function serialized(task) {
  */
 export function watch(topics, { onNotice, safetyMs = 10_000, EventSourceImpl } = {}) {
   const names = Object.keys(topics)
-  const reads = Object.fromEntries(names.map((name) => [name, serialized(topics[name].read)]))
+  // a read that fails is logged here: nobody awaits what an event or a timer starts, and a rejection would go unhandled
+  const guarded = (name) => async () => {
+    try {
+      await topics[name].read()
+    } catch (error) {
+      log(`Reading "${name}" failed:`, error)
+    }
+  }
+
+  const reads = Object.fromEntries(names.map((name) => [name, serialized(guarded(name))]))
   let open = false
   let safetyNet = null
 
-  const refresh = (name) => (topics[name].isShown?.() ?? true ? reads[name]() : undefined)
-  const refreshAll = () => names.forEach(refresh)
+  const isShown = (name) => topics[name].isShown?.() ?? true
+  const refresh = (name) => (isShown(name) ? reads[name]() : undefined)
+  const refreshAll = () => Promise.all(names.map((name) => refresh(name)))
 
   const events = connectEvents({
     topics: names,

@@ -14,7 +14,7 @@ globalThis.document = jsdom.window.document
 
 // what each /locales/<name>.json answers; a locale that is not listed fails to load
 const locales = {
-  en: { greeting: 'Hello', onlyEnglish: 'English only', nested: { value: 'Nested' }, price: 'Costs {{amount}}' },
+  en: { greeting: 'Hello', onlyEnglish: 'English only', nested: { value: 'Nested' }, price: 'Costs {{amount}}', pair: '{{first}} / {{second}}' },
   ru: { greeting: 'Привет' }
 }
 
@@ -41,6 +41,15 @@ test('t()', async (t_) => {
   await t_.test('puts parameters in, and replacement text is taken literally', () => {
     assert.equal(t('price', { amount: 5 }), 'Costs 5')
     assert.equal(t('price', { amount: "$& and $'" }), "Costs $& and $'")
+  })
+
+  await t_.test('a value that looks like a placeholder is not put in again, whatever the order of the parameters', () => {
+    assert.equal(t('pair', { first: '{{second}}', second: 'B' }), '{{second}} / B')
+    assert.equal(t('pair', { second: '{{first}}', first: 'A' }), 'A / {{first}}')
+  })
+
+  await t_.test('a placeholder without a parameter stays as it is', () => {
+    assert.equal(t('price'), 'Costs {{amount}}')
   })
 })
 

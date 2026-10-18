@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   escapeHtml,
   formatDuration,
+  formatTrackDuration,
   youtubeThumbnail,
   formatViews,
   getErrorMessage,
@@ -39,12 +40,28 @@ test('formatDuration', async (t) => {
     assert.equal(formatDuration(605), '10:05')
   })
 
-  await t.test('zero', () => {
-    assert.equal(formatDuration(0, true), 'LIVE')
+  await t.test('zero, and what is no length at all, is 0:00', () => {
+    assert.equal(formatDuration(0), '0:00')
+    assert.equal(formatDuration(-5), '0:00')
+    assert.equal(formatDuration(undefined), '0:00')
+    assert.equal(formatDuration(NaN), '0:00')
   })
 
-  await t.test('live', () => {
-    assert.equal(formatDuration(0), 'LIVE')
+  await t.test('shows hours from an hour on, with minutes padded', () => {
+    assert.equal(formatDuration(3600), '1:00:00')
+    assert.equal(formatDuration(3725), '1:02:05')
+    assert.equal(formatDuration(7325), '2:02:05')
+  })
+})
+
+test('formatTrackDuration', async (t) => {
+  await t.test('a track with a length shows it', () => {
+    assert.equal(formatTrackDuration(65), '1:05')
+  })
+
+  await t.test('a track without one is a live stream, and the label is translated (the key itself while no language is loaded)', () => {
+    assert.equal(formatTrackDuration(0), 'common.live')
+    assert.equal(formatTrackDuration(null), 'common.live')
   })
 })
 

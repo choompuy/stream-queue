@@ -17,7 +17,6 @@ export const state = {
   network: null,
   selectedIp: null,
   activity: [],
-  activityFilter: 'all',
   blocklist: [],
 
   twitch: {

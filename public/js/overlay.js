@@ -1,4 +1,4 @@
-import { $, formatDuration, createLogger, getErrorMessage, show, setClass, setText } from './shared.js'
+import { $, formatDuration, formatTrackDuration, createLogger, getErrorMessage, show, setClass, setText } from './shared.js'
 import { initI18n, t, getCurrentLocale } from './i18n.js'
 import { loadYouTubeApi } from './youtube-api.js'
 import { claimPlayback } from './playback-lock.js'
@@ -79,7 +79,7 @@ function renderCurrent() {
   if (currentState.nextTrack) {
     setText(dom.nextTitle, currentState.nextTrack.title)
 
-    setText(dom.nextElapsedTime, formatDuration(currentState.nextTrack.duration))
+    setText(dom.nextElapsedTime, formatTrackDuration(currentState.nextTrack.duration))
     show(dom.nextPlaying)
     setClass(dom.currentTitle, 'truncate-2line', false)
   } else {
@@ -153,10 +153,10 @@ function updateProgress() {
   const currentTime = player.getCurrentTime() || 0
   const duration = currentState.current.duration
 
-  setText(dom.elapsedTimeCurrent, formatDuration(currentTime, false))
+  setText(dom.elapsedTimeCurrent, formatDuration(currentTime))
 
   if (currentTime > 0 || duration > 0) {
-    setText(dom.elapsedTimeEnd, `${duration <= 0 || settings.showVideo ? '/ ' : ''}${formatDuration(duration)}`)
+    setText(dom.elapsedTimeEnd, `${duration <= 0 || settings.showVideo ? '/ ' : ''}${formatTrackDuration(duration)}`)
 
     dom.progressBar.style.setProperty('--progress', `${Math.floor((currentTime / duration) * 100)}%`)
     show(dom.progressBar, duration > 0)

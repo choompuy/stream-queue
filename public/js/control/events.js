@@ -5,7 +5,6 @@ import { bindMenus } from './menu.js'
 import { saveOverlaySettings, onIpChange, changeLocale } from './settings.js'
 import { onTwitchRewardChange, bindTwitchFieldTracking, bindTwitchRewardFormEvents } from './twitch/index.js'
 import { trackForm } from './form.js'
-import { setError } from '../shared.js'
 
 export function bindEvents() {
   bindMenus()
@@ -40,18 +39,6 @@ export function bindEvents() {
   dom.selectIp.addEventListener('change', onIpChange)
   dom.twitchRewardSelect.addEventListener('change', onTwitchRewardChange)
   dom.localeSelect.addEventListener('change', (event) => changeLocale(event.target.value))
-
-  const settingsInputs = [
-    dom.secYoutubeKey,
-    dom.localeSelect
-  ]
-
-  settingsInputs.forEach((input) => {
-    if (input) {
-      input.addEventListener('input', () => setError(input, false))
-      input.addEventListener('change', () => setError(input, false))
-    }
-  })
 
   trackForm(dom.botSettingsPanel)
   bindTwitchFieldTracking()

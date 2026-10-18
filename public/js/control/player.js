@@ -1,4 +1,4 @@
-import { formatDuration, formatViews, getErrorMessage, show, setText } from '../shared.js'
+import { formatTrackDuration, formatViews, getErrorMessage, show, setText } from '../shared.js'
 import { PLAY_ICON, PAUSE_ICON } from '../icons.js'
 import { state } from './state.js'
 import { dom } from './dom.js'
@@ -23,7 +23,7 @@ export function renderCurrent() {
 
   setText(dom.currentTitle, current.title)
   setText(dom.currentChannel, current.channelTitle)
-  setText(dom.currentDuration, formatDuration(current.duration))
+  setText(dom.currentDuration, formatTrackDuration(current.duration))
   setText(dom.currentViews, t('player.views', { count: formatViews(current.views, getCurrentLocale()) }))
   setText(dom.currentRequester, `@${current.requestedBy}`)
 }
@@ -34,7 +34,7 @@ export function renderNext() {
   if (!next) return
 
   setText(dom.nextTitle, next.title)
-  setText(dom.nextDuration, formatDuration(next.duration))
+  setText(dom.nextDuration, formatTrackDuration(next.duration))
 }
 
 export function renderPlayPause() {

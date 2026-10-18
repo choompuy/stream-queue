@@ -15,7 +15,6 @@ import { loadSecrets, loadConfig, loadOverlaySettings, loadNetworkInfo } from '.
 import { loadTwitchSettings, loadTwitchConfig, loadTwitchSecrets, refreshTwitchStatus } from './twitch/index.js'
 import { isDashboardActive, isPlaylistsActive } from './tabs.js'
 import { showNotice } from './notices.js'
-import { setError } from '../shared.js'
 
 // What each topic reads again. Only what the person looks at is read: the rest is read when it is shown again
 const TOPICS = {
@@ -39,7 +38,6 @@ export async function startControlPanel() {
   const locale = settings?.locale
 
   await initI18n(locale)
-  setError(dom.localeSelect, false)
   dom.localeSelect.value = locale ?? dom.localeSelect.value
 
   bindEvents()

@@ -104,12 +104,17 @@ export function trackForm(form) {
  * Returns { config, rejected, saved, refused } for toastSaveResult
  */
 export async function saveForm(form, save, { changedOnly = false } = {}) {
-  const changed = new Map(formInputs(form).map((input) => [input, isChanged(input)]))
+  const inputs = formInputs(form)
+  const changed = new Map(inputs.map((input) => [input, isChanged(input)]))
+  const sent = new Map(inputs.map((input) => [input, valueOf(input)]))
   const { config, rejected } = await save(readForm(form, { changedOnly }))
   let saved = 0
   let refused = 0
 
-  fillForm(form, config, { skip: rejected })
+  // what was typed while the request was on its way stays as typed: the answer is older than that
+  const edited = inputs.filter((input) => valueOf(input) !== sent.get(input))
+
+  fillForm(form, config, { skip: [...rejected, ...edited.map((input) => input.name)] })
 
   for (const [input, wasChanged] of changed) {
     const isRefused = rejected.includes(input.name)
@@ -119,6 +124,8 @@ export async function saveForm(form, save, { changedOnly = false } = {}) {
 
     if (isRefused || wasChanged) setFieldState(input, isRefused ? 'error' : 'saved')
   }
+
+  edited.forEach(markChanged)
 
   return { config, rejected, saved, refused }
 }

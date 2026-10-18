@@ -1,16 +1,10 @@
 import { CLOSE_ICON } from '../icons.js'
 import { setClass } from '../shared.js'
 import { t } from '../i18n.js'
+import { dom } from './dom.js'
 
 const DEFAULT_DURATION = 4000
 const MAX_TOASTS = 3
-
-let container = null
-
-function getContainer() {
-  if (!container) container = document.getElementById('toastContainer')
-  return container
-}
 
 function closeToast(toast) {
   if (!toast.isConnected || toast.classList.contains('toast-leaving')) return
@@ -42,7 +36,7 @@ function isShowing(root, message) {
 }
 
 export function showToast(message, options = {}) {
-  const root = getContainer()
+  const root = dom.toastContainer
   if (!root || !message) return () => {}
 
   const { type = 'info', duration = DEFAULT_DURATION } = options

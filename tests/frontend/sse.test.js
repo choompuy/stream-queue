@@ -272,10 +272,48 @@ test('serialized()', async (t) => {
 
     assert.equal(calls, 2)
   })
+
+  await t.test('a request that came during a failed run is not lost: the task runs again, and the promise follows the last run', async () => {
+    let calls = 0
+    let release
+    const task = serialized(async () => {
+      calls++
+      await new Promise((resolve) => (release = resolve))
+      if (calls === 1) throw new Error('boom')
+    })
+
+    const first = task()
+    await Promise.resolve()
+    const second = task()
+    release()
+    await new Promise((resolve) => setImmediate(resolve))
+    release()
+
+    assert.equal(first, second, 'every caller gets the promise of the run that is going on')
+    await first
+    assert.equal(calls, 2)
+  })
+
+  await t.test('a failure of the last run rejects the promise', async () => {
+    const task = serialized(async () => {
+      throw new Error('always')
+    })
+
+    await assert.rejects(task(), /always/)
+  })
 })
 
 test('watch()', async (t) => {
   const flush = () => new Promise((resolve) => setImmediate(resolve))
+
+  await t.test('a read that fails does not reject: nobody awaits what an event or a timer starts', async (t) => {
+    FakeEventSource.instances = []
+    const watcher = watch({ a: { read: async () => Promise.reject(new Error('read failed')) } }, { EventSourceImpl: FakeEventSource })
+    t.after(() => watcher.close())
+
+    await watcher.refresh('a')
+    await watcher.refreshAll()
+  })
 
   // a page with three topics: what each one reads is recorded, `shown` says what anyone looks at
   function page(t, { safetyMs = 1000, shown = {}, noEvents = false } = {}) {

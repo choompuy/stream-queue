@@ -10,9 +10,11 @@ export function claimPlayback(onGranted, locks = globalThis.navigator?.locks) {
     return
   }
 
-  // never settles: the lock is held until the page is closed
-  locks.request(LOCK_NAME, () => {
-    onGranted()
-    return new Promise(() => {})
-  })
+  // never settles: the lock is held until the page is closed. A page that is not allowed to ask for it plays, as without locks
+  Promise.resolve(
+    locks.request(LOCK_NAME, () => {
+      onGranted()
+      return new Promise(() => {})
+    })
+  ).catch(() => onGranted())
 }

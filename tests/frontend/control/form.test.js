@@ -250,6 +250,20 @@ test('saveForm', async (t) => {
     assert.equal(isChanged(input('views')), true)
   })
 
+  await t.test('what is typed while the request is on its way stays as typed, and still counts as a change', async () => {
+    fillForm(form, base)
+    input('views').value = '25'
+
+    await saveForm(form, async () => {
+      input('views').value = '30'
+      return { config: { ...base, minViews: 25 }, rejected: [] }
+    })
+
+    assert.equal(input('views').value, '30')
+    assert.equal(isChanged(input('views')), true)
+    assert.deepEqual(marks('views'), ['changed'])
+  })
+
   await t.test('with changedOnly sends only what was changed, and still shows what the server stores for the rest', async () => {
     fillForm(form, base)
     input('views').value = '25'

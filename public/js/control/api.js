@@ -8,6 +8,9 @@ export class ApiError extends Error {
   }
 }
 
+// a request that gets no answer for this long is a failed one: a read that never ends would also stop its topic from ever being read again
+const REQUEST_TIMEOUT_MS = 15_000
+
 // What the panel does after it changed something on the server: while the events are not open nothing else would tell it to read again
 let afterChange = () => {}
 export const onServerChange = (callback) => {
@@ -22,6 +25,7 @@ async function request(url, options = {}, { partial = false } = {}) {
   try {
     response = await fetch(url, {
       ...options,
+      signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers: {
         'Content-Type': 'application/json',
         ...options.headers

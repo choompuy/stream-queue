@@ -5,9 +5,7 @@ import { views } from './views/index.js'
 import { run } from './run.js'
 
 function renderActivity() {
-  const filter = state.activityFilter
-  const entries = filter === 'all' ? state.activity : state.activity.filter((entry) => entry.status === filter)
-  views.activity.render(entries)
+  views.activity.render(state.activity)
 }
 
 export function loadActivity(silent = false) {

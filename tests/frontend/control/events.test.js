@@ -174,18 +174,6 @@ test('the settings inputs', async (t) => {
     assert.deepEqual(panel.calls, [])
   })
 
-  await t.test('typing into a field takes the red mark off it, and so does choosing a value', () => {
-    // the API key is not a tracked bot setting: only this handler can clear its mark
-    const input = panel.$('#secYoutubeKey')
-
-    for (const type of ['input', 'change']) {
-      input.classList.add('error')
-      fire(input, type)
-
-      assert.equal(input.classList.contains('error'), false, type)
-    }
-  })
-
   await t.test('a bot setting is yellow while it differs from the stored one, and plain again when it matches', () => {
     fillForm(panel.$('#botSettingsPanel'), { minViews: 10 })
     const input = panel.$('#cfgMinViews')
