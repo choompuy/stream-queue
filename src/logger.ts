@@ -1,6 +1,7 @@
 import { appendFile, mkdir, rename, rm, stat } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { getDataDir } from './runtime.js'
+import { AppError } from './types.js'
 
 type Level = 'debug' | 'info' | 'warn' | 'error'
 
@@ -22,7 +23,18 @@ function timestamp(): string {
 }
 
 export function describeError(error: unknown, withStack = false): string {
-  if (error instanceof Error) return withStack ? (error.stack ?? error.message) : error.message
+  if (error instanceof AppError) {
+    const params = error.params && Object.keys(error.params).length > 0 ? ` ${JSON.stringify(error.params)}` : ''
+    const described = `AppError ${error.code}: ${error.message}${params}`
+    return withStack ? `${described}\n${error.stack ?? ''}` : described
+  }
+
+  if (error instanceof Error) {
+    // the class name tells a network failure from a bug; a plain Error has nothing to add
+    const described = error.name === 'Error' ? error.message : `${error.name}: ${error.message}`
+    return withStack ? (error.stack ?? described) : described
+  }
+
   return String(error)
 }
 

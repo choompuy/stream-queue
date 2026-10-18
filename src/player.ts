@@ -1,4 +1,4 @@
-import { StateResponse, QueueItem, ActivityReasonCode } from './types.js'
+import { StateResponse, QueueItem, ActivityReasonCode, AppError } from './types.js'
 import { isBlocked, markBlocked } from './blocklist.js'
 import { logRejection, logFailure } from './activity.js'
 import { getQueue, getCurrent, getIsPaused, setCurrent, shiftQueue } from './queue.js'
@@ -27,7 +27,7 @@ export function moveToNext(): QueueItem | null {
   while (next && isBlocked(next.videoId)) {
     log.log(`skipped blocked track in queue: "${next.title}"`)
     logRejection(next.requestedBy, next.title, 'BLOCKED', { title: next.title, videoId: next.videoId })
-    finishItem(next, { code: 'BLOCKED' })
+    finishItem(next, new AppError('BLOCKED', next.title))
     next = shiftQueue()
   }
 
@@ -56,7 +56,7 @@ export function skipIfCurrent(videoId: string): boolean {
   if (current?.videoId !== videoId) return false
 
   log.log(`current track was blocked, skipping: "${current.title}"`)
-  finishItem(current, { code: 'BLOCKED' })
+  finishItem(current, new AppError('BLOCKED', current.title))
   moveToNext()
   return true
 }
@@ -103,7 +103,7 @@ export function reportPlaybackFailure(errorCode?: number, videoId?: string): boo
     log.error(`playback failed: "${failed.title}" (error ${errorCode ?? 'unknown'})`)
     logFailure(failed, reasonCode, errorCode !== undefined ? { errorCode } : undefined)
 
-    finishItem(failed, { code: reasonCode })
+    finishItem(failed, new AppError(reasonCode, failed.title))
   }
 
   moveToNext()

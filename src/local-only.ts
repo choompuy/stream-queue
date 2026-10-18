@@ -36,5 +36,12 @@ export function localOnly(req: Request, res: Response, next: NextFunction): void
     return
   }
 
-  fail(res, 'LOCAL_ONLY', 403)
+  fail(res, 'LOCAL_ONLY')
+}
+
+// The panel asks for unfiltered results two ways (admin: true in a POST body, ?admin=1 in a GET query);
+// whichever way it asks, only this machine's own requests may actually skip them
+export function wantsBypassFilters(req: Request): boolean {
+  const asked = (req.body as { admin?: unknown } | undefined)?.admin === true || req.query.admin === '1'
+  return asked && isLocalAddress(req.socket.remoteAddress)
 }

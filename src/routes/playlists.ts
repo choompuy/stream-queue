@@ -1,17 +1,20 @@
 import express from 'express'
-import { ConfigResponse } from '../types.js'
-import { ok, fail, failFromError } from '../http.js'
+import { ConfigResponse, AppError } from '../types.js'
+import { ok } from '../http.js'
 import { getConfig, updateConfig } from '../config.js'
-import { parsePlaylistId, isValidPlaylistId } from '../youtube/url.js'
+import { parsePlaylistId } from '../youtube/url.js'
 import { fetchPlaylistMeta } from '../youtube/index.js'
 import { getPlaylists, upsertPlaylist, removePlaylist, type PlaylistEntry } from '../playlists.js'
 import { clearFallback, refreshFallbackOrRollback } from '../fallback.js'
 import { createLogger } from '../logger.js'
+import { checkPlaylistId, validatePlaylistIdParam } from '../validate.js'
 import { emit } from '../state-events.js'
 
 const log = createLogger('PLAYLISTS')
 
 export const router = express.Router()
+
+router.param('id', validatePlaylistIdParam)
 
 // every playlist says whether it is the active one, so the panel does not have to look it up in the config
 function playlistEntries(): PlaylistEntry[] {
@@ -28,25 +31,22 @@ router.post('/', async (req, res) => {
   const parsedId = parsePlaylistId(raw)
 
   if (!parsedId) {
-    return fail(res, 'INVALID_PLAYLIST_ID', 400)
+    throw new AppError('INVALID_PLAYLIST_ID', 'a valid playlist ID or URL is required')
   }
 
-  try {
-    const meta = await fetchPlaylistMeta(parsedId)
-    if (!meta) {
-      return fail(res, 'PLAYLIST_NOT_FOUND', 404)
-    }
-    const saved = upsertPlaylist(meta)
-    ok(res, { playlist: saved }, 201)
-  } catch (error) {
-    failFromError(res, error)
+  const meta = await fetchPlaylistMeta(parsedId)
+  if (!meta) {
+    throw new AppError('PLAYLIST_NOT_FOUND', 'no playlist has that id')
   }
+
+  const saved = upsertPlaylist(meta)
+  ok(res, { playlist: saved }, 201)
 })
 
 router.delete('/:id', (req, res) => {
   const removed = removePlaylist(req.params.id)
   if (!removed) {
-    return fail(res, 'PLAYLIST_NOT_FOUND', 404)
+    throw new AppError('PLAYLIST_NOT_FOUND', 'no saved playlist has that id')
   }
 
   const wasActive = getConfig().fallbackPlaylist.playlistId === req.params.id
@@ -62,12 +62,10 @@ router.delete('/:id', (req, res) => {
 router.post('/:id/activate', async (req, res) => {
   const { id } = req.params
 
-  if (!isValidPlaylistId(id)) {
-    return fail(res, 'INVALID_PLAYLIST_ID', 400)
-  }
+  checkPlaylistId(id)
 
   if (!getPlaylists().some((playlist) => playlist.id === id)) {
-    return fail(res, 'PLAYLIST_NOT_FOUND', 404)
+    throw new AppError('PLAYLIST_NOT_FOUND', 'no saved playlist has that id')
   }
 
   const previousId = getConfig().fallbackPlaylist.playlistId

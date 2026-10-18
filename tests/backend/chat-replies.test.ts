@@ -13,6 +13,7 @@ cpSync(locales, join(workDir, 'public/locales'), { recursive: true })
 process.chdir(workDir)
 
 const { buildRedemptionAcceptedMessage, buildRedemptionRejectionMessage } = await import('../../src/chat-replies.js')
+const { AppError } = await import('../../src/types.js')
 
 test('buildRedemptionAcceptedMessage', async (t) => {
   await t.test('names the track and its place in the queue', () => {
@@ -33,23 +34,23 @@ test('buildRedemptionAcceptedMessage', async (t) => {
 
 test('buildRedemptionRejectionMessage', async (t) => {
   await t.test('a request that was never queued gets only the reason', () => {
-    assert.equal(buildRedemptionRejectionMessage('alice', { code: 'DUPLICATE' }), '@alice, that track is already in the queue, points refunded')
+    assert.equal(buildRedemptionRejectionMessage('alice', new AppError('DUPLICATE', 'already queued')), '@alice, that track is already in the queue, points refunded')
   })
 
   await t.test('a playback failure names the track and the reason', () => {
-    const message = buildRedemptionRejectionMessage('alice', { code: 'PLAYBACK_VIDEO_UNAVAILABLE', params: { title: 'Song' } })
+    const message = buildRedemptionRejectionMessage('alice', new AppError('PLAYBACK_VIDEO_UNAVAILABLE', 'playback failed', { title: 'Song' }))
     assert.equal(message, '@alice, “Song” could not be played: the video became unavailable, points refunded')
   })
 
   await t.test('every playback failure reason names the track', () => {
     for (const code of ['PLAYBACK_VIDEO_UNAVAILABLE', 'PLAYBACK_EMBED_DISALLOWED', 'PLAYBACK_FAILED'] as const) {
-      const message = buildRedemptionRejectionMessage('alice', { code, params: { title: 'Song' } })
+      const message = buildRedemptionRejectionMessage('alice', new AppError(code, 'playback failed', { title: 'Song' }))
       assert.ok(message.includes('“Song”') && !message.includes('{{'), code)
     }
   })
 
   await t.test('a long title in a playback failure is shortened', () => {
-    const message = buildRedemptionRejectionMessage('alice', { code: 'PLAYBACK_FAILED', params: { title: 'A'.repeat(100) } })
+    const message = buildRedemptionRejectionMessage('alice', new AppError('PLAYBACK_FAILED', 'playback failed', { title: 'A'.repeat(100) }))
     assert.ok(message.includes(`“${'A'.repeat(39)}…”`))
   })
 })

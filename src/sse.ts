@@ -95,7 +95,7 @@ export function createEventStreams({ maxClients = 20, pingEveryMs = 25_000, coal
 
   function handle(req: Request, res: Response): void {
     if (clients.size >= maxClients) {
-      fail(res, 'SERVER_ERROR', 503)
+      fail(res, 'SERVER_ERROR', undefined, 503)
       return
     }
 

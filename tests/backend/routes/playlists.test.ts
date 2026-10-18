@@ -75,6 +75,13 @@ test('GET /api/playlists', async (t) => {
 })
 
 test('DELETE /api/playlists/:id', async (t) => {
+  await t.test('a malformed id is rejected by the shared param check before the route runs', async () => {
+    const response = await fetch(`${base}/oops`, { method: 'DELETE' })
+
+    assert.equal(response.status, 400)
+    assert.equal(((await response.json()) as Record<string, any>).code, 'INVALID_PLAYLIST_ID')
+  })
+
   await t.test('answers with the playlists that are left, with their active marks, and says when it cleared the active one', async () => {
     updateConfig({ fallbackPlaylist: { playlistId: 'PLsecond00000001' } })
 

@@ -1,20 +1,24 @@
 import { test, beforeEach, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync } from 'node:fs'
+import { cpSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
-process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
+const workDir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
+cpSync(resolve('public/locales'), join(workDir, 'public/locales'), { recursive: true })
+process.chdir(workDir)
 
 const { isRetryable, _test, _resetIntegration, initializeTwitchIntegration, disconnect } = await import('../../../../src/integrations/twitch/index.js')
 const { buildRedemptionRejectionMessage, buildRedemptionRefundFailedMessage } = await import('../../../../src/chat-replies.js')
 const { AppError } = await import('../../../../src/types.js')
+const { blockTrack, unblockTrack } = await import('../../../../src/blocklist.js')
+const { updateTwitchConfig } = await import('../../../../src/integrations/twitch/config.js')
 const queue = await import('../../../../src/queue.js')
 import type { TwitchChat } from '../../../../src/integrations/twitch/chat.js'
 import type { TwitchClient } from '../../../../src/integrations/twitch/client.js'
 
 const redemption = { id: 'red-1', rewardId: 'reward-1', userName: 'viewer' }
-const reason = { code: 'PLAYBACK_FAILED' } as const
+const reason = new AppError('PLAYBACK_FAILED', 'playback failed')
 const refunded = () => buildRedemptionRejectionMessage('viewer', reason)
 const refundFailed = () => buildRedemptionRefundFailedMessage('viewer')
 
@@ -150,5 +154,51 @@ test('disconnect()', async (t) => {
     assert.equal(queue.getCurrent()?.channelPointsRedemption, undefined)
     assert.equal(queue.getQueue().every((item) => item.channelPointsRedemption === undefined), true)
     assert.equal(await disconnect(), 0, 'a second disconnect finds nothing to leave')
+  })
+})
+
+test('handleChannelPointsRedemption()', async (t) => {
+  const event = (id: string, userInput: string) => ({
+    id,
+    user_name: 'viewer',
+    user_input: userInput,
+    reward: { id: 'reward-1', title: 'Song request' }
+  })
+
+  t.beforeEach(() => {
+    initializeTwitchIntegration({ clientId: 'client-1' })
+    updateTwitchConfig({ channelPointsRewardId: 'reward-1' })
+    _test.setRetryDelay(1)
+    calls = []
+  })
+
+  t.after(() => {
+    _test.setChat(null)
+  })
+
+  await t.test('a redemption of another reward is ignored at debug level and not touched', async (t2) => {
+    const debug = t2.mock.method(console, 'log', () => {})
+    const errors = t2.mock.method(console, 'error', () => {})
+
+    await _test.handleChannelPointsRedemption({ ...event('red-other', 'song'), reward: { id: 'another-reward', title: 'Other' } } as never, fakeClient('ok'))
+
+    assert.deepEqual(calls, [], 'no status update for a foreign reward')
+    assert.equal(debug.mock.callCount(), 0, 'a debug line is below the default info level and does not show')
+    assert.equal(errors.mock.callCount(), 0)
+  })
+
+  await t.test('an ordinary refusal (a blocked track) is a warning, not an error, and refunds the points', async (t2) => {
+    const warnings = t2.mock.method(console, 'warn', () => {})
+    const errors = t2.mock.method(console, 'error', () => {})
+    const A = 'aaaaaaaaaaa'
+    blockTrack(A, 'blocked')
+
+    await _test.handleChannelPointsRedemption(event('red-block', `https://www.youtube.com/watch?v=${A}`) as never, fakeClient('ok'))
+
+    assert.deepEqual(calls, ['CANCELED'])
+    assert.equal(warnings.mock.callCount(), 1)
+    assert.equal(errors.mock.callCount(), 0, 'a viewer asking for a blocked track is not an application error')
+
+    unblockTrack(A)
   })
 })

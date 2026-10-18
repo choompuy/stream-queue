@@ -2,7 +2,7 @@ import { getConfig } from './config.js'
 import { getVideoById, searchSongs, selectBestSong } from './youtube/index.js'
 import { parseYouTubeUrl } from './youtube/url.js'
 import { logRejection, logAcceptance, logSkippedWithOpenReward } from './activity.js'
-import { QueueItem, Song, AppError, AddedSong, FailureReason } from './types.js'
+import { QueueItem, Song, AppError, AddedSong } from './types.js'
 import { isBlocked } from './blocklist.js'
 import { emit } from './state-events.js'
 import { finishItem } from './finish.js'
@@ -178,7 +178,7 @@ export function removeAt(index: number): QueueItem | null {
 
   if (item) {
     log.log(`removed "${item.title}" at position ${index + 1}`)
-    finishItem(item, { code: 'TRACK_REMOVED' })
+    finishItem(item, new AppError('TRACK_REMOVED', item.title))
   }
 
   emit('state')
@@ -192,18 +192,12 @@ export function clearQueue(): QueueItem[] {
 
   log.log(`cleared ${cleared.length} songs`)
 
-  for (const item of cleared) finishItem(item, { code: 'QUEUE_CLEARED' })
+  for (const item of cleared) finishItem(item, new AppError('QUEUE_CLEARED', item.title))
 
   emit('state')
 
   return cleared
 }
-
-export type RequestSongResult =
-  | { outcome: 'invalid-url' }
-  | { outcome: 'not-found' }
-  | { outcome: 'added'; added: AddedSong }
-  | { outcome: 'error'; reason: FailureReason }
 
 type RequestOptions = {
   // an admin request (from this computer): the filters and the limits do not apply
@@ -212,7 +206,9 @@ type RequestOptions = {
   channelPointsRedemption?: QueueItem['channelPointsRedemption']
 }
 
-export async function requestSong(query: string, requestedBy: string, { bypassFilters = false, channelPointsRedemption }: RequestOptions = {}): Promise<RequestSongResult> {
+// Adds the song the query names to the queue, or throws the AppError that says why not (a duplicate,
+// a limit, a filter, a bad URL); the activity journal entry is written on the way out, in one place
+export async function requestSong(query: string, requestedBy: string, { bypassFilters = false, channelPointsRedemption }: RequestOptions = {}): Promise<AddedSong> {
   let song: Song | null = null
 
   try {
@@ -222,8 +218,7 @@ export async function requestSong(query: string, requestedBy: string, { bypassFi
     log.log(`[REQUEST] ${requestedBy} → ${videoId ? `YouTube URL: ${videoId}` : `Search: "${query}"`}`)
 
     if (isYouTube && !videoId) {
-      logRejection(requestedBy, query, 'INVALID_YOUTUBE_URL')
-      return { outcome: 'invalid-url' }
+      throw new AppError('INVALID_YOUTUBE_URL', 'the query is a YouTube link without a video id')
     }
 
     if (videoId) {
@@ -238,26 +233,23 @@ export async function requestSong(query: string, requestedBy: string, { bypassFi
       )
     }
 
-    if (!song) {
-      logRejection(requestedBy, query, 'SONG_NOT_FOUND')
-      return { outcome: 'not-found' }
-    }
+    if (!song) throw new AppError('SONG_NOT_FOUND', 'no matching track was found')
 
     const { item, started } = addSong(song, requestedBy, { bypassLimits: bypassFilters, channelPointsRedemption })
 
     log.log(`[ACCEPT] ${requestedBy} → "${song.title}" - ${started ? 'now playing' : 'queued'}`)
     logAcceptance(requestedBy, query, song.title, song.videoId)
 
-    const position = started ? 0 : queue.length
-
-    return { outcome: 'added', added: { song: item, started, position } }
+    return { song: item, started, position: started ? 0 : queue.length }
   } catch (error) {
     // an expected refusal (duplicate, limit, filter) is routine and logRejection() writes it down; anything else is a bug or an outage and keeps its details
     if (!(error instanceof AppError)) log.error(`Unexpected error while adding a song for ${requestedBy}: ${describeError(error, true)}`)
 
-    const reasonCode = error instanceof AppError ? error.code : 'SERVER_ERROR'
-    const reasonParams = error instanceof AppError ? error.params : undefined
-    logRejection(requestedBy, query, reasonCode, { title: song?.title ?? null, videoId: song?.videoId ?? null, reasonParams })
-    return { outcome: 'error', reason: { code: reasonCode, params: reasonParams } }
+    logRejection(requestedBy, query, error instanceof AppError ? error.code : 'SERVER_ERROR', {
+      title: song?.title ?? null,
+      videoId: song?.videoId ?? null,
+      reasonParams: error instanceof AppError ? error.params : undefined
+    })
+    throw error
   }
 }

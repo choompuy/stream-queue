@@ -24,7 +24,7 @@ import { getTwitchConfig, CHAT_COMMAND_KEYS } from './config.js'
 import { getState, skipCurrent } from '../../player.js'
 import { registerRedemptionHandler, type RedemptionOutcome } from '../../finish.js'
 import { AppError } from '../../types.js'
-import type { FailureReason, QueueItem } from '../../types.js'
+import type { QueueItem } from '../../types.js'
 import { createLogger, describeError } from '../../logger.js'
 import { emit, notify } from '../../state-events.js'
 import { normalizeTwitchError, isNetworkError } from './error.js'
@@ -119,7 +119,8 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
 async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemption, twitchClient: TwitchClient): Promise<void> {
   const configuredRewardId = getTwitchConfig().channelPointsRewardId
   if (!configuredRewardId || event.reward.id !== configuredRewardId) {
-    log.log(`Ignoring redemption with non-matching reward ID: ${event.reward.id} (configured: ${configuredRewardId || 'none'})`)
+    // the subscription sees every redemption of the channel, most are other rewards' business
+    log.debug(`Ignoring redemption with non-matching reward ID: ${event.reward.id} (configured: ${configuredRewardId || 'none'})`)
     return
   }
 
@@ -137,35 +138,36 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
 
   const query = event.user_input.trim()
   if (!query) {
-    log.error(`Empty song request in redemption: ${event.id}`)
-    await cancelRedemption(tracked, twitchClient, { code: 'SONG_NOT_FOUND' })
+    log.warn(`Empty song request in redemption: ${event.id}`)
+    await cancelRedemption(tracked, twitchClient, new AppError('SONG_NOT_FOUND', 'the song request was empty'))
     return
   }
 
-  const result = await requestSong(query, event.user_name, { channelPointsRedemption: tracked })
+  try {
+    const added = await requestSong(query, event.user_name, { channelPointsRedemption: tracked })
 
-  if (result.outcome !== 'added') {
-    const reason: FailureReason =
-      result.outcome === 'invalid-url' ? { code: 'INVALID_YOUTUBE_URL' } : result.outcome === 'not-found' ? { code: 'SONG_NOT_FOUND' } : result.reason
+    notify({ type: 'viewerRequest', user: event.user_name, title: added.song.title })
 
-    log.error(`Song request failed for redemption ${event.id}: ${result.outcome}`)
+    // The account can be disconnected while the song is being looked up. The track is queued by now, but there is
+    // no login left to close the redemption with, so it is left for the streamer like the others
+    if (!oauth?.isAuthenticated()) {
+      const detached = detachChannelPointsRedemptions()
+      log.warn(`Twitch was disconnected while redemption ${event.id} was being handled: ${detached} queued redemption(s) stay UNFULFILLED on Twitch`)
+      return
+    }
+
+    log.log(`Redemption ${event.id} added to queue`)
+    const locale = getSettings().locale
+    await replyInChat(buildRedemptionAcceptedMessage(event.user_name, added, locale))
+  } catch (error) {
+    // a refusal (a duplicate, a limit, a filter) is routine: the points go back and the viewer is told why;
+    // anything else is an outage, and requestSong has already logged its details
+    const say = error instanceof AppError ? log.warn : log.error
+    say(`Song request failed for redemption ${event.id}: ${describeError(error)}`)
+
+    const reason = error instanceof AppError ? error : new AppError('SERVER_ERROR', 'the request failed unexpectedly')
     await cancelRedemption(tracked, twitchClient, reason)
-    return
   }
-
-  notify({ type: 'viewerRequest', user: event.user_name, title: result.added.song.title })
-
-  // The account can be disconnected while the song is being looked up. The track is queued by now, but there is
-  // no login left to close the redemption with, so it is left for the streamer like the others
-  if (!oauth?.isAuthenticated()) {
-    const detached = detachChannelPointsRedemptions()
-    log.warn(`Twitch was disconnected while redemption ${event.id} was being handled: ${detached} queued redemption(s) stay UNFULFILLED on Twitch`)
-    return
-  }
-
-  log.log(`Redemption ${event.id} added to queue`)
-  const locale = getSettings().locale
-  await replyInChat(buildRedemptionAcceptedMessage(event.user_name, result.added, locale))
 }
 
 let eventSubStart: Promise<void> | null = null
@@ -547,7 +549,7 @@ async function fulfillRedemption(redemption: TrackedRedemption, twitchClient: Tw
   log.error(`Redemption ${redemption.id} was played but could not be fulfilled, it is left for a manual decision`)
 }
 
-async function cancelRedemption(redemption: TrackedRedemption, twitchClient: TwitchClient, reason: FailureReason): Promise<void> {
+async function cancelRedemption(redemption: TrackedRedemption, twitchClient: TwitchClient, reason: AppError): Promise<void> {
   const result = await setRedemptionStatus(redemption, twitchClient, 'CANCELED')
 
   // "points refunded" goes to chat only when Twitch confirmed it: the points stay held otherwise
@@ -637,6 +639,11 @@ export async function refreshConnection(): Promise<TwitchUserInfo> {
 // Export for internal use (routes)
 export function getClient(): TwitchClient | null {
   return client
+}
+
+// The panel is told this instead of a masked clone of the secrets: the routes only need the boolean
+export function isTwitchConnected(): boolean {
+  return oauth !== null && client !== null && oauth.isAuthenticated() && client.getCachedUserInfo() !== null
 }
 
 // Export for testing purposes only

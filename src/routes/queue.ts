@@ -1,57 +1,39 @@
 import express from 'express'
-import { StateResponse, QueueRemoveResponse, QueueRequestResponse } from '../types.js'
-import { ok, fail, failFromReason } from '../http.js'
-import { isLocalAddress } from '../local-only.js'
+import { StateResponse, QueueRemoveResponse, QueueRequestResponse, AppError } from '../types.js'
+import { ok } from '../http.js'
+import { wantsBypassFilters } from '../local-only.js'
+import { checkQuery, validateVideoIdParam } from '../validate.js'
 import { t } from '../i18n.js'
 import { requestSong, removeByVideoId, clearQueue } from '../queue.js'
-import { isValidVideoId } from '../youtube/url.js'
 import { getState } from '../player.js'
 import { getSettings } from '../settings.js'
 
 export const router = express.Router()
 
-router.post('/request', async (req, res) => {
-  const { query, requestedBy, admin } = req.body ?? {}
-  const bypassFilters = admin === true && isLocalAddress(req.socket.remoteAddress)
+router.param('videoId', validateVideoIdParam)
 
-  if (typeof query !== 'string' || query.trim().length < 2 || query.trim().length > 200) {
-    return fail(res, 'INVALID_QUERY', 400)
-  }
+router.post('/request', async (req, res) => {
+  const { query, requestedBy } = req.body ?? {}
+  const bypassFilters = wantsBypassFilters(req)
+  const checkedQuery = checkQuery(query)
 
   if (typeof requestedBy !== 'string' || requestedBy.trim().length === 0) {
-    return fail(res, 'USERNAME_REQUIRED', 400)
+    throw new AppError('USERNAME_REQUIRED', 'a username is required')
   }
 
-  const result = await requestSong(query.trim(), requestedBy.trim().slice(0, 50), { bypassFilters })
+  const added = await requestSong(checkedQuery, requestedBy.trim().slice(0, 50), { bypassFilters })
 
-  switch (result.outcome) {
-    case 'invalid-url':
-      return fail(res, 'INVALID_YOUTUBE_URL', 400)
-    case 'not-found':
-      return fail(res, 'SONG_NOT_FOUND', 404)
-    case 'error':
-      return failFromReason(res, result.reason)
-    case 'added': {
-      const { added } = result
-      const message = added.started
-        ? t(getSettings().locale, 'toast.nowPlaying', { title: added.song.title })
-        : t(getSettings().locale, 'toast.addedToQueue', { title: added.song.title, position: added.position })
-      return ok<QueueRequestResponse>(res, { ...added, state: getState(), message }, 201)
-    }
-  }
+  const message = added.started
+    ? t(getSettings().locale, 'toast.nowPlaying', { title: added.song.title })
+    : t(getSettings().locale, 'toast.addedToQueue', { title: added.song.title, position: added.position })
+  return ok<QueueRequestResponse>(res, { ...added, state: getState(), message }, 201)
 })
 
 router.delete('/video/:videoId', (req, res) => {
-  const { videoId } = req.params
-
-  if (!isValidVideoId(videoId)) {
-    return fail(res, 'INVALID_VIDEO_ID', 400)
-  }
-
-  const removed = removeByVideoId(videoId)
+  const removed = removeByVideoId(req.params.videoId)
 
   if (!removed) {
-    return fail(res, 'QUEUE_ITEM_NOT_FOUND', 404)
+    throw new AppError('QUEUE_ITEM_NOT_FOUND', 'no queued track has that id')
   }
 
   ok<QueueRemoveResponse>(res, { removed, state: getState() })

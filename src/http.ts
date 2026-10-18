@@ -1,19 +1,10 @@
 import { Response } from 'express-serve-static-core'
-import { AppError, AppErrorCode, ApiOk, ApiError, ApiErrorCode, ConfigUpdateResponse } from './types.js'
+import { AppError, AppErrorCode, ApiOk, ApiError, ConfigUpdateResponse, FilterFailureReason } from './types.js'
 import { getSettings } from './settings.js'
 import { translateApiError } from './i18n.js'
-import { createLogger, describeError } from './logger.js'
-
-const log = createLogger('API')
 
 export function ok<T extends object>(res: Response, data: T, status = 200): void {
   const body: ApiOk<T> = { success: true, data }
-  res.status(status).json(body)
-}
-
-export function fail(res: Response, code: ApiErrorCode, status: number, params?: Record<string, string | number>): void {
-  const locale = getSettings().locale
-  const body: ApiError = { success: false, error: translateApiError(locale, code, params), code, params }
   res.status(status).json(body)
 }
 
@@ -34,10 +25,12 @@ export function sendConfigUpdate<T extends object>(res: Response, config: T, rej
     params,
     data
   }
-  res.status(400).json(body)
+  res.status(STATUS_BY_CODE.INVALID_CONFIG ?? 400).json(body)
 }
 
-const STATUS_BY_CODE: Record<AppErrorCode, number> = {
+// the single place that knows which HTTP status an error code answers with;
+// the chat-only reasons (playback, track lifecycle) never appear here and fall back to 500
+const STATUS_BY_CODE: Partial<Record<AppErrorCode, number>> = {
   DUPLICATE: 409,
   QUEUE_FULL: 409,
   USER_LIMIT: 409,
@@ -49,40 +42,42 @@ const STATUS_BY_CODE: Record<AppErrorCode, number> = {
   TWITCH_REFRESH_ERROR: 401,
   TWITCH_NOT_CONNECTED: 400,
   TWITCH_API_ERROR: 502,
-  NOT_MUSIC: 404,
-  NOT_EMBEDDABLE: 404,
-  DURATION_OUT_OF_RANGE: 404,
-  VIEWS_TOO_LOW: 404,
-  REGION_BLOCKED: 404,
-  NOT_PUBLIC: 404,
-  AGE_RESTRICTED: 404,
-  NOT_PLAYABLE: 404,
-  IS_LIVE: 404,
-  IS_SHORT: 404,
-  INVALID_INPUT: 400,
   TWITCH_NETWORK_ERROR: 502,
-  TWITCH_UNKNOWN_ERROR: 500
+  TWITCH_UNKNOWN_ERROR: 500,
+  INVALID_INPUT: 400,
+  INVALID_QUERY: 400,
+  INVALID_QUERY_RANGE: 400,
+  INVALID_VIDEO_ID: 400,
+  USERNAME_REQUIRED: 400,
+  INVALID_YOUTUBE_URL: 400,
+  SONG_NOT_FOUND: 404,
+  QUEUE_ITEM_NOT_FOUND: 404,
+  NOT_FOUND: 404,
+  INVALID_PLAYLIST_ID: 400,
+  PLAYLIST_NOT_FOUND: 404,
+  INVALID_CONFIG: 400,
+  LOCAL_ONLY: 403,
+  FORBIDDEN_ORIGIN: 403,
+  INVALID_JSON: 400,
+  PAYLOAD_TOO_LARGE: 413,
+  INVALID_REQUEST: 400,
+  SERVER_ERROR: 500,
+  ...filterStatuses(['NOT_MUSIC', 'NOT_PUBLIC', 'NOT_EMBEDDABLE', 'AGE_RESTRICTED', 'REGION_BLOCKED', 'NOT_PLAYABLE', 'IS_LIVE', 'IS_SHORT', 'DURATION_OUT_OF_RANGE', 'VIEWS_TOO_LOW'], 404)
 }
 
-export type ErrorInfo = { code: string; status: number; message: string; params?: Record<string, string | number> }
-
-export function getErrorInfo(error: unknown): ErrorInfo {
-  if (error instanceof AppError) {
-    return { code: error.code, status: STATUS_BY_CODE[error.code], message: error.message, params: { ...error.params, message: error.message } }
-  }
-
-  log.error(`Unexpected error: ${describeError(error, true)}`)
-  return { code: 'SERVER_ERROR', status: 500, message: 'internal server error' }
+function filterStatuses(codes: readonly FilterFailureReason[], status: number): Partial<Record<AppErrorCode, number>> {
+  return Object.fromEntries(codes.map((code) => [code, status]))
 }
 
-export function failFromError(res: Response, error: unknown): void {
-  const info = getErrorInfo(error)
-  fail(res, info.code as ApiErrorCode, info.status, info.params)
+// The one way an error leaves the app: the errorHandler passes the thrown AppError here, the few
+// middleware that answer themselves (localOnly, hostCheck, the SSE connection limit) call it directly
+export function fail(res: Response, code: AppErrorCode, params?: Record<string, string | number>, status = STATUS_BY_CODE[code] ?? 500): void {
+  const locale = getSettings().locale
+  const body: ApiError = { success: false, error: translateApiError(locale, code, params), code, params }
+  res.status(status).json(body)
 }
 
-// same as failFromError, for callers that already have a structured { code, params } reason
-// instead of the original thrown error (e.g. RequestSongResult's 'error' outcome)
-export function failFromReason(res: Response, reason: { code: string; params?: Record<string, string | number> }): void {
-  const status = STATUS_BY_CODE[reason.code as AppErrorCode] ?? 500
-  fail(res, reason.code as ApiErrorCode, status, reason.params)
+// AppError's message reaches the panel as the {{message}} parameter (TWITCH_API_ERROR carries Twitch's own text)
+export function failFromAppError(res: Response, error: AppError): void {
+  fail(res, error.code, { ...error.params, message: error.message })
 }

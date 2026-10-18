@@ -9,6 +9,7 @@ process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
 const express = (await import('express')).default
 const { router } = await import('../../../src/routes/player.js')
+const { errorHandler } = await import('../../../src/error-handler.js')
 const queue = await import('../../../src/queue.js')
 const player = await import('../../../src/player.js')
 const { getActivity, clearActivity } = await import('../../../src/activity.js')
@@ -16,6 +17,8 @@ const { getActivity, clearActivity } = await import('../../../src/activity.js')
 const app = express()
 app.use(express.json())
 app.use('/api/player', router)
+// a malformed videoId is thrown, not answered inline
+app.use(errorHandler)
 
 const server = app.listen(0)
 const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/player`

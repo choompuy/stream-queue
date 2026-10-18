@@ -1,5 +1,5 @@
 import { t, hasKey } from './i18n.js'
-import type { PlayerState, FailureReason } from './types.js'
+import { AppError, type PlayerState } from './types.js'
 
 const truncate = (s: string, max = 40) => {
   const chars = Array.from(s)
@@ -50,9 +50,9 @@ export function buildRedemptionAcceptedMessage(
   return added.started ? t(locale, 'chat.redemption.acceptedNowPlaying', params) : t(locale, 'chat.redemption.accepted', params)
 }
 
-// "@user, <reason>, points refunded" - one message per FailureReason, shared by the Channel Points
+// "@user, <reason>, points refunded" - one message per refusal reason, shared by the Channel Points
 // redemption flow (request rejected, or a later playback failure) wherever it needs to notify chat
-export function buildRedemptionRejectionMessage(userName: string, reason: FailureReason, locale: string): string {
+export function buildRedemptionRejectionMessage(userName: string, reason: AppError, locale: string): string {
   // only a playback failure names the track (the one that could not be played); a request that was never queued has none
   const title = typeof reason.params?.title === 'string' ? truncate(reason.params.title) : undefined
   const params = { user: userName, ...reason.params, ...(title && { title }) }

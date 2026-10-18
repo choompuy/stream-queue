@@ -1,6 +1,6 @@
 import express from 'express'
-import { ConfigResponse, SettingsResponse } from '../types.js'
-import { ok, fail, sendConfigUpdate } from '../http.js'
+import { ConfigResponse, SettingsResponse, AppError } from '../types.js'
+import { ok, sendConfigUpdate } from '../http.js'
 import { isLocalAddress, localOnly } from '../local-only.js'
 import { getConfig, updateConfig } from '../config.js'
 import { getSettings, updateSettings } from '../settings.js'
@@ -29,8 +29,7 @@ router.put('/config', async (req, res) => {
 
   if (body.fallbackPlaylist !== undefined) {
     if (typeof body.fallbackPlaylist !== 'object' || body.fallbackPlaylist === null || Array.isArray(body.fallbackPlaylist)) {
-      fail(res, 'INVALID_CONFIG', 400, { fields: 'fallbackPlaylist' })
-      return
+      throw new AppError('INVALID_CONFIG', 'the fallbackPlaylist field is not an object', { fields: 'fallbackPlaylist' })
     }
 
     if (typeof body.fallbackPlaylist.playlistId === 'string') {
@@ -39,8 +38,7 @@ router.put('/config', async (req, res) => {
       if (rawPlaylistId) {
         const parsedId = parsePlaylistId(rawPlaylistId)
         if (!parsedId) {
-          fail(res, 'INVALID_PLAYLIST_ID', 400)
-          return
+          throw new AppError('INVALID_PLAYLIST_ID', 'a valid playlist ID or URL is required')
         }
         body.fallbackPlaylist = { ...body.fallbackPlaylist, playlistId: parsedId }
       } else {

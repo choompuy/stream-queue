@@ -1,6 +1,6 @@
 import express from 'express'
-import { PlayerActionResponse } from '../types.js'
-import { ok, fail } from '../http.js'
+import { PlayerActionResponse, AppError } from '../types.js'
+import { ok } from '../http.js'
 import { isValidVideoId } from '../youtube/url.js'
 import { t } from '../i18n.js'
 import { buildSkipMessage } from '../chat-replies.js'
@@ -19,7 +19,7 @@ function readVideoId(body: unknown): { videoId?: string; valid: boolean } {
 
 router.post('/ended', (req, res) => {
   const { videoId, valid } = readVideoId(req.body)
-  if (!valid) return fail(res, 'INVALID_VIDEO_ID', 400)
+  if (!valid) throw new AppError('INVALID_VIDEO_ID', 'a valid videoId is required')
 
   const applied = endCurrent(videoId)
   ok(res, { ...getState(), ...(applied ? {} : { ignored: true }) })
@@ -46,7 +46,7 @@ router.post('/resume', (_req, res) => {
 
 router.post('/report-failure', (req, res) => {
   const { videoId, valid } = readVideoId(req.body)
-  if (!valid) return fail(res, 'INVALID_VIDEO_ID', 400)
+  if (!valid) throw new AppError('INVALID_VIDEO_ID', 'a valid videoId is required')
 
   const errorCode = typeof req.body?.errorCode === 'number' ? req.body.errorCode : undefined
   const applied = reportPlaybackFailure(errorCode, videoId)
