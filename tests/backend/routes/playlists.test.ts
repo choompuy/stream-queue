@@ -56,6 +56,31 @@ test('POST /api/playlists/:id/activate', async (t) => {
 
 const list = async () => ((await (await fetch(base)).json()) as Record<string, any>).data.playlists as Array<{ id: string; isActive: boolean }>
 
+const create = (playlistId: unknown) =>
+  fetch(base, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playlistId })
+  })
+
+test('POST /api/playlists', async (t) => {
+  await t.test('a malformed playlist id is a 400 INVALID_PLAYLIST_ID from the shared ID-or-URL check', async () => {
+    for (const playlistId of ['not a playlist', 'aaaaaaaaaaa']) {
+      const response = await create(playlistId)
+
+      assert.equal(response.status, 400, String(playlistId))
+      assert.equal(((await response.json()) as Record<string, any>).code, 'INVALID_PLAYLIST_ID', String(playlistId))
+    }
+  })
+
+  await t.test('a well-formed id or URL is parsed and goes on to load it (no key here, so the load refuses)', async () => {
+    const response = await create('https://www.youtube.com/playlist?list=PLsaved00000001')
+
+    assert.equal(response.status, 400)
+    assert.equal(((await response.json()) as Record<string, any>).code, 'NO_API_KEY')
+  })
+})
+
 test('GET /api/playlists', async (t) => {
   await t.test('says for every playlist whether it is the active one', async () => {
     upsertPlaylist({ id: 'PLfirst000000001', title: 'First', thumbnail: '', itemCount: 1 })

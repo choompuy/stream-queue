@@ -2,12 +2,11 @@ import express from 'express'
 import { ConfigResponse, AppError } from '../types.js'
 import { ok } from '../http.js'
 import { getConfig, updateConfig } from '../config.js'
-import { parsePlaylistId } from '../youtube/url.js'
 import { fetchPlaylistMeta } from '../youtube/index.js'
 import { getPlaylists, upsertPlaylist, removePlaylist, type PlaylistEntry } from '../playlists.js'
 import { clearFallback, refreshFallbackOrRollback } from '../fallback.js'
 import { createLogger } from '../logger.js'
-import { checkPlaylistId, validatePlaylistIdParam } from '../validate.js'
+import { checkPlaylistIdOrUrl, validatePlaylistIdParam } from '../validate.js'
 import { emit } from '../state-events.js'
 
 const log = createLogger('PLAYLISTS')
@@ -27,16 +26,11 @@ router.get('/', (_req, res) => {
 })
 
 router.post('/', async (req, res) => {
-  const raw = typeof req.body?.playlistId === 'string' ? req.body.playlistId : ''
-  const parsedId = parsePlaylistId(raw)
-
-  if (!parsedId) {
-    throw new AppError('INVALID_PLAYLIST_ID', 'a valid playlist ID or URL is required')
-  }
+  const parsedId = checkPlaylistIdOrUrl(req.body?.playlistId)
 
   const meta = await fetchPlaylistMeta(parsedId)
   if (!meta) {
-    throw new AppError('PLAYLIST_NOT_FOUND', 'no playlist has that id')
+    throw new AppError('PLAYLIST_NOT_FOUND')
   }
 
   const saved = upsertPlaylist(meta)
@@ -46,7 +40,7 @@ router.post('/', async (req, res) => {
 router.delete('/:id', (req, res) => {
   const removed = removePlaylist(req.params.id)
   if (!removed) {
-    throw new AppError('PLAYLIST_NOT_FOUND', 'no saved playlist has that id')
+    throw new AppError('PLAYLIST_NOT_FOUND')
   }
 
   const wasActive = getConfig().fallbackPlaylist.playlistId === req.params.id
@@ -62,10 +56,9 @@ router.delete('/:id', (req, res) => {
 router.post('/:id/activate', async (req, res) => {
   const { id } = req.params
 
-  checkPlaylistId(id)
-
+  // the shape of :id was already checked by the shared router.param before the route runs
   if (!getPlaylists().some((playlist) => playlist.id === id)) {
-    throw new AppError('PLAYLIST_NOT_FOUND', 'no saved playlist has that id')
+    throw new AppError('PLAYLIST_NOT_FOUND')
   }
 
   const previousId = getConfig().fallbackPlaylist.playlistId

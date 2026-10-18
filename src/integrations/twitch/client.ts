@@ -32,7 +32,7 @@ export class TwitchClient {
   private async makeAuthenticatedRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
     const accessToken = await this.oauth.getValidAccessToken()
     if (!accessToken) {
-      const notConnected = new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
+      const notConnected = new AppError('TWITCH_NOT_CONNECTED')
       // a login exists and Twitch has not refused it: a failed refresh was a passing problem, the request may work later
       throw this.refreshMayWorkLater() ? markTransient(notConnected) : notConnected
     }
@@ -99,7 +99,7 @@ export class TwitchClient {
   }
 
   private get broadcasterId(): string {
-    if (!this.userInfo) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
+    if (!this.userInfo) throw new AppError('TWITCH_NOT_CONNECTED')
     return this.userInfo.id
   }
 

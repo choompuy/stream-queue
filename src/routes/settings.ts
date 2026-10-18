@@ -5,7 +5,7 @@ import { isLocalAddress, localOnly } from '../local-only.js'
 import { getConfig, updateConfig } from '../config.js'
 import { getSettings, updateSettings } from '../settings.js'
 import { getPublicSecretsView, SecretsResponse, updateSecrets } from '../secrets.js'
-import { parsePlaylistId } from '../youtube/url.js'
+import { checkPlaylistIdOrUrl } from '../validate.js'
 import { refreshFallbackOrRollback, reorderFallback } from '../fallback.js'
 
 export const router = express.Router()
@@ -29,18 +29,14 @@ router.put('/config', async (req, res) => {
 
   if (body.fallbackPlaylist !== undefined) {
     if (typeof body.fallbackPlaylist !== 'object' || body.fallbackPlaylist === null || Array.isArray(body.fallbackPlaylist)) {
-      throw new AppError('INVALID_CONFIG', 'the fallbackPlaylist field is not an object', { fields: 'fallbackPlaylist' })
+      throw new AppError('INVALID_CONFIG', undefined, { fields: 'fallbackPlaylist' })
     }
 
     if (typeof body.fallbackPlaylist.playlistId === 'string') {
       const rawPlaylistId = body.fallbackPlaylist.playlistId.trim()
 
       if (rawPlaylistId) {
-        const parsedId = parsePlaylistId(rawPlaylistId)
-        if (!parsedId) {
-          throw new AppError('INVALID_PLAYLIST_ID', 'a valid playlist ID or URL is required')
-        }
-        body.fallbackPlaylist = { ...body.fallbackPlaylist, playlistId: parsedId }
+        body.fallbackPlaylist = { ...body.fallbackPlaylist, playlistId: checkPlaylistIdOrUrl(rawPlaylistId) }
       } else {
         body.fallbackPlaylist = { ...body.fallbackPlaylist, playlistId: null }
       }

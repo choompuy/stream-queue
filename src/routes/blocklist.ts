@@ -26,6 +26,6 @@ router.post('/', (req, res) => {
 router.delete('/:videoId', (req, res) => {
   const removed = unblockTrack(req.params.videoId)
 
-  if (!removed) throw new AppError('NOT_FOUND', 'no blocked track has that id')
+  if (!removed) throw new AppError('NOT_FOUND')
   ok(res, { removed: true })
 })

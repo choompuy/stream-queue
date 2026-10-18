@@ -12,7 +12,7 @@ import type { TwitchClient } from '../integrations/twitch/client.js'
 function requireClient(): TwitchClient {
   const client = getClient()
   if (!client || !isTwitchConnected()) {
-    throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
+    throw new AppError('TWITCH_NOT_CONNECTED')
   }
   return client
 }

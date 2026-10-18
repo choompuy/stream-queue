@@ -11,6 +11,7 @@ process.chdir(workDir)
 const { isRetryable, _test, _resetIntegration, initializeTwitchIntegration, disconnect } = await import('../../../../src/integrations/twitch/index.js')
 const { buildRedemptionRejectionMessage, buildRedemptionRefundFailedMessage } = await import('../../../../src/chat-replies.js')
 const { AppError } = await import('../../../../src/types.js')
+const { updateTwitchOAuthState, updateSecrets } = await import('../../../../src/secrets.js')
 const { blockTrack, unblockTrack } = await import('../../../../src/blocklist.js')
 const { updateTwitchConfig } = await import('../../../../src/integrations/twitch/config.js')
 const queue = await import('../../../../src/queue.js')
@@ -18,9 +19,13 @@ import type { TwitchChat } from '../../../../src/integrations/twitch/chat.js'
 import type { TwitchClient } from '../../../../src/integrations/twitch/client.js'
 
 const redemption = { id: 'red-1', rewardId: 'reward-1', userName: 'viewer' }
-const reason = new AppError('PLAYBACK_FAILED', 'playback failed')
+// the reason a redemption is canceled travels as a plain { code, params }, not as a thrown AppError
+const reason = { code: 'PLAYBACK_FAILED' }
 const refunded = () => buildRedemptionRejectionMessage('viewer', reason)
 const refundFailed = () => buildRedemptionRefundFailedMessage('viewer')
+
+// the song requests below reach the YouTube layer, which needs a key to get past its own gate
+updateSecrets({ youtubeApiKey: 'test-key' })
 
 const api = (status: number, code = 'TWITCH_API_ERROR') => new AppError(code as 'TWITCH_API_ERROR', `Twitch answered ${status}`, { status })
 
@@ -200,5 +205,83 @@ test('handleChannelPointsRedemption()', async (t) => {
     assert.equal(errors.mock.callCount(), 0, 'a viewer asking for a blocked track is not an application error')
 
     unblockTrack(A)
+  })
+
+  // YouTube is stubbed, so a request can actually be accepted: the fetch answers fail in a way that is nobody's
+  // refusal (a broken row from the videos endpoint) and the request becomes an unexpected error
+  const realFetch = globalThis.fetch
+  const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+
+  await t.test('an unexpected request failure is logged once, and the viewer gets the generic refund message', async (t2) => {
+    const errors = t2.mock.method(console, 'error', () => {})
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (url.hostname !== 'www.googleapis.com') return realFetch(input, init)
+      return url.pathname.endsWith('/search') ? json({ items: [{ id: { videoId: 'aaaaaaaaaaa' } }] }) : json({ items: [null] })
+    }) as typeof fetch
+
+    try {
+      await _test.handleChannelPointsRedemption(event('red-broken', 'some song') as never, fakeClient('ok'))
+    } finally {
+      globalThis.fetch = realFetch
+    }
+
+    assert.equal(errors.mock.callCount(), 1, 'the handler that owns the request logs the outage, nobody else')
+    assert.deepEqual(calls, ['CANCELED'])
+    assert.deepEqual(sent, [buildRedemptionRejectionMessage('viewer', { code: 'SERVER_ERROR' })])
+  })
+
+  await t.test('a failure after the track is queued does not refund the points', async () => {
+    // a token in storage makes the account look authenticated, so the flow reaches the chat reply
+    await _resetIntegration()
+    updateTwitchOAuthState({ tokenData: { accessToken: 'token', refreshToken: 'refresh', expiresAt: Date.now() + 3600_000, scope: [] } })
+    initializeTwitchIntegration({ clientId: 'client-1' })
+    updateTwitchConfig({ channelPointsRewardId: 'reward-1' })
+
+    queue.clearQueue()
+    queue.setCurrent(null)
+
+    // the chat connection breaks while the acceptance reply is being sent: the song is already playing
+    _test.setChat({
+      isConnected: () => {
+        throw new Error('chat blew up')
+      },
+      disconnect: async () => {},
+      sendMessage: async () => {}
+    } as unknown as TwitchChat)
+
+    const A = 'aaaaaaaaaaa'
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (url.hostname !== 'www.googleapis.com') return realFetch(input, init)
+      return json({
+        items: [
+          {
+            id: A,
+            snippet: { title: `Song ${A}`, channelTitle: 'Channel', categoryId: '10', thumbnails: { medium: { url: 'https://img/x.jpg' } } },
+            contentDetails: { duration: 'PT3M' },
+            statistics: { viewCount: '1000000' }
+          }
+        ]
+      })
+    }) as typeof fetch
+
+    try {
+      // the broken chat must escape the handler instead of being mistaken for a failed request
+      await assert.rejects(
+        _test.handleChannelPointsRedemption(event('red-late', `https://www.youtube.com/watch?v=${A}`) as never, fakeClient('ok')),
+        /chat blew up/
+      )
+    } finally {
+      globalThis.fetch = realFetch
+      _test.setChat(null)
+      await _resetIntegration()
+      updateTwitchOAuthState({ tokenData: null })
+    }
+
+    // the points were spent: the redemption was not canceled, and the track keeps playing with its reward open
+    assert.deepEqual(calls, [])
+    assert.equal(queue.getCurrent()?.videoId, A)
+    assert.equal(queue.getCurrent()?.channelPointsRedemption?.id, 'red-late')
   })
 })

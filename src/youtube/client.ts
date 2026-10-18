@@ -130,13 +130,11 @@ const RETRY_STATUSES = new Set([429, 500, 502, 503, 504])
 const MAX_ATTEMPTS = 3
 const RETRY_DELAY_MS = 500
 
-const QUOTA_EXHAUSTED_MESSAGE = 'YouTube API quota exceeded. Quota resets at midnight Pacific Time'
-
 export async function youtube<T>(path: string, params: Record<string, string>, { attempts = MAX_ATTEMPTS }: { attempts?: number } = {}): Promise<T> {
   const { youtubeApiKey } = getSecrets()
 
-  if (!youtubeApiKey) throw new AppError('NO_API_KEY', 'YouTube API key is not configured, add it in the control panel')
-  if (isQuotaExhausted()) throw new AppError('YOUTUBE_QUOTA', QUOTA_EXHAUSTED_MESSAGE)
+  if (!youtubeApiKey) throw new AppError('NO_API_KEY')
+  if (isQuotaExhausted()) throw new AppError('YOUTUBE_QUOTA')
 
   const url = new URL(`https://www.googleapis.com/youtube/v3/${path}`)
 
@@ -171,7 +169,7 @@ export async function youtube<T>(path: string, params: Record<string, string>, {
 
       if (reason === 'quotaExceeded') {
         markQuotaExhausted()
-        throw new AppError('YOUTUBE_QUOTA', QUOTA_EXHAUSTED_MESSAGE)
+        throw new AppError('YOUTUBE_QUOTA')
       }
 
       throw new AppError('YOUTUBE_ERROR', data.error?.message || `YouTube API error ${response.status}`)

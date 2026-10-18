@@ -14,7 +14,7 @@ import {
 import { getState } from '../player.js'
 
 function fallbackTrackOrNotFound(item: QueueItem | null): QueueItem {
-  if (!item) throw new AppError('NOT_FOUND', 'no track with that id is in the playlist')
+  if (!item) throw new AppError('NOT_FOUND')
   return item
 }
 

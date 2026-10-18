@@ -23,7 +23,7 @@ import {
 import { getTwitchConfig, CHAT_COMMAND_KEYS } from './config.js'
 import { getState, skipCurrent } from '../../player.js'
 import { registerRedemptionHandler, type RedemptionOutcome } from '../../finish.js'
-import { AppError } from '../../types.js'
+import { AppError, type AddedSong, type FailureReason } from '../../types.js'
 import type { QueueItem } from '../../types.js'
 import { createLogger, describeError } from '../../logger.js'
 import { emit, notify } from '../../state-events.js'
@@ -139,35 +139,42 @@ async function handleChannelPointsRedemption(event: TwitchChannelPointsRedemptio
   const query = event.user_input.trim()
   if (!query) {
     log.warn(`Empty song request in redemption: ${event.id}`)
-    await cancelRedemption(tracked, twitchClient, new AppError('SONG_NOT_FOUND', 'the song request was empty'))
+    await cancelRedemption(tracked, twitchClient, { code: 'SONG_NOT_FOUND' })
     return
   }
 
+  let added: AddedSong
   try {
-    const added = await requestSong(query, event.user_name, { channelPointsRedemption: tracked })
-
-    notify({ type: 'viewerRequest', user: event.user_name, title: added.song.title })
-
-    // The account can be disconnected while the song is being looked up. The track is queued by now, but there is
-    // no login left to close the redemption with, so it is left for the streamer like the others
-    if (!oauth?.isAuthenticated()) {
-      const detached = detachChannelPointsRedemptions()
-      log.warn(`Twitch was disconnected while redemption ${event.id} was being handled: ${detached} queued redemption(s) stay UNFULFILLED on Twitch`)
-      return
+    // only the request itself: past this point the track is queued and the points are spent, so a later
+    // failure must not refund them (the track would play for free and close a refunded reward)
+    added = await requestSong(query, event.user_name, { channelPointsRedemption: tracked })
+  } catch (error) {
+    // a refusal (a duplicate, a limit, a filter) is routine: the points go back and the viewer is told why.
+    // Anything else is an outage: this catch is the only place its details are logged
+    if (error instanceof AppError) {
+      log.warn(`Song request failed for redemption ${event.id}: ${describeError(error)}`)
+    } else {
+      log.error(`Song request failed for redemption ${event.id}: ${describeError(error, true)}`)
     }
 
-    log.log(`Redemption ${event.id} added to queue`)
-    const locale = getSettings().locale
-    await replyInChat(buildRedemptionAcceptedMessage(event.user_name, added, locale))
-  } catch (error) {
-    // a refusal (a duplicate, a limit, a filter) is routine: the points go back and the viewer is told why;
-    // anything else is an outage, and requestSong has already logged its details
-    const say = error instanceof AppError ? log.warn : log.error
-    say(`Song request failed for redemption ${event.id}: ${describeError(error)}`)
-
-    const reason = error instanceof AppError ? error : new AppError('SERVER_ERROR', 'the request failed unexpectedly')
+    const reason: FailureReason = error instanceof AppError ? error : { code: 'SERVER_ERROR' }
     await cancelRedemption(tracked, twitchClient, reason)
+    return
   }
+
+  notify({ type: 'viewerRequest', user: event.user_name, title: added.song.title })
+
+  // The account can be disconnected while the song is being looked up. The track is queued by now, but there is
+  // no login left to close the redemption with, so it is left for the streamer like the others
+  if (!oauth?.isAuthenticated()) {
+    const detached = detachChannelPointsRedemptions()
+    log.warn(`Twitch was disconnected while redemption ${event.id} was being handled: ${detached} queued redemption(s) stay UNFULFILLED on Twitch`)
+    return
+  }
+
+  log.log(`Redemption ${event.id} added to queue`)
+  const locale = getSettings().locale
+  await replyInChat(buildRedemptionAcceptedMessage(event.user_name, added, locale))
 }
 
 let eventSubStart: Promise<void> | null = null
@@ -374,7 +381,7 @@ function cancelDeviceAuthorization(): void {
 
 export async function startDeviceAuthorization(): Promise<TwitchDeviceCodeResponse> {
   if (!oauth || !client) {
-    throw new AppError('TWITCH_AUTH_ERROR', 'Twitch integration not initialized')
+    throw new AppError('TWITCH_AUTH_ERROR')
   }
 
   if (getPublicSecretsView().twitch.connected) {
@@ -552,7 +559,7 @@ async function fulfillRedemption(redemption: TrackedRedemption, twitchClient: Tw
   log.error(`Redemption ${redemption.id} was played but could not be fulfilled, it is left for a manual decision`)
 }
 
-async function cancelRedemption(redemption: TrackedRedemption, twitchClient: TwitchClient, reason: AppError): Promise<void> {
+async function cancelRedemption(redemption: TrackedRedemption, twitchClient: TwitchClient, reason: FailureReason): Promise<void> {
   const result = await setRedemptionStatus(redemption, twitchClient, 'CANCELED')
 
   // "points refunded" goes to chat only when Twitch confirmed it: the points stay held otherwise
@@ -621,7 +628,7 @@ export async function disconnect(): Promise<number> {
 }
 
 export async function refreshConnection(): Promise<TwitchUserInfo> {
-  if (!oauth || !client) throw new AppError('TWITCH_REFRESH_ERROR', 'Twitch integration not initialized')
+  if (!oauth || !client) throw new AppError('TWITCH_REFRESH_ERROR')
 
   try {
     const userInfo = await client.getUserInfo()

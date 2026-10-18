@@ -85,10 +85,11 @@ test('POST /api/player/ended', async (t) => {
     assert.equal(currentId(), B)
   })
 
-  await t.test('a malformed videoId is a 400', async () => {
+  await t.test('a malformed videoId is a 400 INVALID_VIDEO_ID', async () => {
     const response = await post('ended', { videoId: 'x' })
 
     assert.equal(response.status, 400)
+    assert.equal(((await response.json()) as Record<string, any>).code, 'INVALID_VIDEO_ID')
     assert.equal(currentId(), A)
   })
 })
@@ -123,5 +124,14 @@ test('POST /api/player/report-failure', async (t) => {
     const body = (await (await post('report-failure', { videoId: A })).json()) as Record<string, any>
 
     assert.equal(body.data.ignored, true)
+  })
+
+  await t.test('a malformed videoId is a 400 INVALID_VIDEO_ID', async () => {
+    const response = await post('report-failure', { videoId: 'x' })
+
+    assert.equal(response.status, 400)
+    assert.equal(((await response.json()) as Record<string, any>).code, 'INVALID_VIDEO_ID')
+    assert.equal(currentId(), A)
+    assert.equal(getActivity().length, 0, 'no playback failure is recorded for a malformed id')
   })
 })

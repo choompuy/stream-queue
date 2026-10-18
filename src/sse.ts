@@ -6,7 +6,7 @@ import { on, onNotice, TOPICS, type Notice, type Topic } from './state-events.js
 const log = createLogger('SSE')
 
 export type EventStreamOptions = {
-  // above this the answer is 503: a few forgotten tabs must not use up every connection of the server
+  // above this the answer is 429 (a limit, not a failure): a few forgotten tabs must not use up every connection of the server
   maxClients?: number
   // a quiet connection is kept alive (proxies, antivirus and OBS drop silent ones) and the page can tell it is still there
   pingEveryMs?: number
@@ -95,7 +95,7 @@ export function createEventStreams({ maxClients = 20, pingEveryMs = 25_000, coal
 
   function handle(req: Request, res: Response): void {
     if (clients.size >= maxClients) {
-      fail(res, 'SERVER_ERROR', undefined, 503)
+      fail(res, 'TOO_MANY_CONNECTIONS')
       return
     }
 

@@ -18,7 +18,7 @@ router.post('/request', async (req, res) => {
   const checkedQuery = checkQuery(query)
 
   if (typeof requestedBy !== 'string' || requestedBy.trim().length === 0) {
-    throw new AppError('USERNAME_REQUIRED', 'a username is required')
+    throw new AppError('USERNAME_REQUIRED')
   }
 
   const added = await requestSong(checkedQuery, requestedBy.trim().slice(0, 50), { bypassFilters })
@@ -33,7 +33,7 @@ router.delete('/video/:videoId', (req, res) => {
   const removed = removeByVideoId(req.params.videoId)
 
   if (!removed) {
-    throw new AppError('QUEUE_ITEM_NOT_FOUND', 'no queued track has that id')
+    throw new AppError('QUEUE_ITEM_NOT_FOUND')
   }
 
   ok<QueueRemoveResponse>(res, { removed, state: getState() })

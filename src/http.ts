@@ -1,5 +1,5 @@
 import { Response } from 'express-serve-static-core'
-import { AppError, AppErrorCode, ApiOk, ApiError, ConfigUpdateResponse, FilterFailureReason } from './types.js'
+import { AppError, HttpErrorCode, ApiOk, ApiError, ConfigUpdateResponse, FilterFailureReason } from './types.js'
 import { getSettings } from './settings.js'
 import { translateApiError } from './i18n.js'
 
@@ -25,12 +25,12 @@ export function sendConfigUpdate<T extends object>(res: Response, config: T, rej
     params,
     data
   }
-  res.status(STATUS_BY_CODE.INVALID_CONFIG ?? 400).json(body)
+  res.status(STATUS_BY_CODE.INVALID_CONFIG).json(body)
 }
 
-// the single place that knows which HTTP status an error code answers with;
-// the chat-only reasons (playback, track lifecycle) never appear here and fall back to 500
-const STATUS_BY_CODE: Partial<Record<AppErrorCode, number>> = {
+// the single place that knows which HTTP status an error code answers with; Record makes a missing row a
+// compile error, so a new code cannot silently fall back to 500
+const STATUS_BY_CODE: Record<HttpErrorCode, number> = {
   DUPLICATE: 409,
   QUEUE_FULL: 409,
   USER_LIMIT: 409,
@@ -62,20 +62,40 @@ const STATUS_BY_CODE: Partial<Record<AppErrorCode, number>> = {
   PAYLOAD_TOO_LARGE: 413,
   INVALID_REQUEST: 400,
   SERVER_ERROR: 500,
-  ...filterStatuses(['NOT_MUSIC', 'NOT_PUBLIC', 'NOT_EMBEDDABLE', 'AGE_RESTRICTED', 'REGION_BLOCKED', 'NOT_PLAYABLE', 'IS_LIVE', 'IS_SHORT', 'DURATION_OUT_OF_RANGE', 'VIEWS_TOO_LOW'], 404)
+  TOO_MANY_CONNECTIONS: 429,
+  ...filterStatuses(
+    [
+      'NOT_MUSIC',
+      'NOT_PUBLIC',
+      'NOT_EMBEDDABLE',
+      'AGE_RESTRICTED',
+      'REGION_BLOCKED',
+      'NOT_PLAYABLE',
+      'IS_LIVE',
+      'IS_SHORT',
+      'DURATION_OUT_OF_RANGE',
+      'VIEWS_TOO_LOW'
+    ],
+    404
+  )
 }
 
-export function statusForCode(code: AppErrorCode): number {
-  return STATUS_BY_CODE[code] ?? 500
+// The single way to ask which status a code answers with; `fail` and the error logging agree through it
+export function statusForCode(code: HttpErrorCode): number {
+  return STATUS_BY_CODE[code]
 }
 
-function filterStatuses(codes: readonly FilterFailureReason[], status: number): Partial<Record<AppErrorCode, number>> {
-  return Object.fromEntries(codes.map((code) => [code, status]))
+// every code the API can answer with, taken from the table itself: the locale tests walk it
+export const HTTP_ERROR_CODES: readonly HttpErrorCode[] = Object.keys(STATUS_BY_CODE) as HttpErrorCode[]
+
+// the filter reasons all answer with the same status, so they stay one group
+function filterStatuses(codes: readonly FilterFailureReason[], status: number): Record<FilterFailureReason, number> {
+  return Object.fromEntries(codes.map((code) => [code, status])) as Record<FilterFailureReason, number>
 }
 
 // The one way an error leaves the app: the errorHandler passes the thrown AppError here, the few
 // middleware that answer themselves (localOnly, hostCheck, the SSE connection limit) call it directly
-export function fail(res: Response, code: AppErrorCode, params?: Record<string, string | number>, status = statusForCode(code)): void {
+export function fail(res: Response, code: HttpErrorCode, params?: Record<string, string | number>, status = statusForCode(code)): void {
   const locale = getSettings().locale
   const body: ApiError = { success: false, error: translateApiError(locale, code, params), code, params }
   res.status(status).json(body)

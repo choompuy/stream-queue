@@ -221,7 +221,7 @@ export function playFallbackTrackNow(videoId: string): QueueItem | null {
   if (!song) return null
 
   if (isBlocked(videoId)) {
-    throw new AppError('BLOCKED', 'this track is blocked')
+    throw new AppError('BLOCKED')
   }
 
   fallbackCursor = index

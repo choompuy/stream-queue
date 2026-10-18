@@ -244,6 +244,7 @@
       "queueItemNotFound": "Queue item not found",
       "trackNotFound": "Track not found in fallback",
       "serverError": "Internal server error",
+      "tooManyConnections": "Too many open connections, close a tab and try again",
       "unexpectedError": "Something went wrong, see the log for details",
       "notFound": "Not found",
       "duplicate": "This track is already in the queue",

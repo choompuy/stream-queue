@@ -6,7 +6,7 @@ import { QueueItem, Song, AppError, AddedSong } from './types.js'
 import { isBlocked } from './blocklist.js'
 import { emit } from './state-events.js'
 import { finishItem } from './finish.js'
-import { createLogger, describeError } from './logger.js'
+import { createLogger } from './logger.js'
 
 let currentSong: QueueItem | null = null
 const queue: QueueItem[] = []
@@ -94,28 +94,26 @@ function assertCanRequestSong(requestedBy: string, { bypassLimits = false }: Add
   const config = getConfig()
 
   if (currentSong !== null && queue.length >= config.maxQueueSize) {
-    throw new AppError('QUEUE_FULL', 'the queue is full')
+    throw new AppError('QUEUE_FULL')
   }
 
   if (bypassLimits) return
 
   const activeCount = getUserActiveCount(requestedBy)
   if (config.maxRequestsPerUser > 0 && activeCount >= config.maxRequestsPerUser) {
-    throw new AppError('USER_LIMIT', `you can only queue ${config.maxRequestsPerUser} track(s) at a time`, {
-      count: config.maxRequestsPerUser
-    })
+    throw new AppError('USER_LIMIT', undefined, { count: config.maxRequestsPerUser })
   }
 }
 
 function assertNotDuplicate(videoId: string): void {
   if (isActiveNonFallback(videoId) || isQueued(videoId)) {
-    throw new AppError('DUPLICATE', 'this track is already in the queue')
+    throw new AppError('DUPLICATE')
   }
 }
 
 function assertNotBlocked(videoId: string): void {
   if (isBlocked(videoId)) {
-    throw new AppError('BLOCKED', 'this track is blocked')
+    throw new AppError('BLOCKED')
   }
 }
 
@@ -178,7 +176,7 @@ export function removeAt(index: number): QueueItem | null {
 
   if (item) {
     log.log(`removed "${item.title}" at position ${index + 1}`)
-    finishItem(item, new AppError('TRACK_REMOVED', item.title))
+    finishItem(item, { code: 'TRACK_REMOVED' })
   }
 
   emit('state')
@@ -192,7 +190,7 @@ export function clearQueue(): QueueItem[] {
 
   log.log(`cleared ${cleared.length} songs`)
 
-  for (const item of cleared) finishItem(item, new AppError('QUEUE_CLEARED', item.title))
+  for (const item of cleared) finishItem(item, { code: 'QUEUE_CLEARED' })
 
   emit('state')
 
@@ -218,7 +216,7 @@ export async function requestSong(query: string, requestedBy: string, { bypassFi
     log.log(`[REQUEST] ${requestedBy} → ${videoId ? `YouTube URL: ${videoId}` : `Search: "${query}"`}`)
 
     if (isYouTube && !videoId) {
-      throw new AppError('INVALID_YOUTUBE_URL', 'the query is a YouTube link without a video id')
+      throw new AppError('INVALID_YOUTUBE_URL')
     }
 
     if (videoId) {
@@ -233,7 +231,7 @@ export async function requestSong(query: string, requestedBy: string, { bypassFi
       )
     }
 
-    if (!song) throw new AppError('SONG_NOT_FOUND', 'no matching track was found')
+    if (!song) throw new AppError('SONG_NOT_FOUND')
 
     const { item, started } = addSong(song, requestedBy, { bypassLimits: bypassFilters, channelPointsRedemption })
 
@@ -242,9 +240,8 @@ export async function requestSong(query: string, requestedBy: string, { bypassFi
 
     return { song: item, started, position: started ? 0 : queue.length }
   } catch (error) {
-    // an expected refusal (duplicate, limit, filter) is routine and logRejection() writes it down; anything else is a bug or an outage and keeps its details
-    if (!(error instanceof AppError)) log.error(`Unexpected error while adding a song for ${requestedBy}: ${describeError(error, true)}`)
-
+    // an expected refusal (duplicate, limit, filter) is routine and logRejection() writes it down; anything
+    // else is a bug or an outage, and the handler that owns the request logs it once with its details
     logRejection(requestedBy, query, error instanceof AppError ? error.code : 'SERVER_ERROR', {
       title: song?.title ?? null,
       videoId: song?.videoId ?? null,

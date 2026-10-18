@@ -1,6 +1,6 @@
-// The one set of error codes the app knows: what a route rejects with, what requestSong throws,
-// what the activity log and the chat replies name. Chat-only reasons (playback, track lifecycle) never reach HTTP.
-export type AppErrorCode =
+// What a route can answer with and requestSong throws: every code here has a row in STATUS_BY_CODE and a
+// key under api.errors.* in both locales
+export type HttpErrorCode =
   | FilterFailureReason
   | 'DUPLICATE'
   | 'BLOCKED'
@@ -33,12 +33,19 @@ export type AppErrorCode =
   | 'INVALID_JSON'
   | 'PAYLOAD_TOO_LARGE'
   | 'INVALID_REQUEST'
+  | 'TOO_MANY_CONNECTIONS'
+
+// Why a track ended without playing through (removed, cleared, blocked, playback failure) or an open reward
+// was left: these never answer an HTTP request, they only name activity entries and chat replies
+export type ChatReasonCode =
   | 'PLAYBACK_VIDEO_UNAVAILABLE'
   | 'PLAYBACK_EMBED_DISALLOWED'
   | 'PLAYBACK_FAILED'
   | 'TRACK_REMOVED'
   | 'QUEUE_CLEARED'
   | 'REWARD_NOT_REFUNDED'
+
+export type AppErrorCode = HttpErrorCode | ChatReasonCode
 
 export type ActivityReasonCode = AppErrorCode
 
@@ -121,10 +128,18 @@ export type FilterFailureReason =
   | 'DURATION_OUT_OF_RANGE'
   | 'VIEWS_TOO_LOW'
 
+// Why a track never played through or a request was refused, carried to finishItem and the chat reply.
+// Never thrown, so there is no message and no stack: a thrown refusal is an AppError, which fits this shape
+// wherever a plain reason is expected
+export type FailureReason = {
+  code: AppErrorCode
+  params?: Record<string, string | number>
+}
+
 export class AppError extends Error {
   constructor(
-    public code: AppErrorCode,
-    message: string,
+    public code: HttpErrorCode,
+    message: string = code,
     public params?: Record<string, string | number>
   ) {
     super(message)

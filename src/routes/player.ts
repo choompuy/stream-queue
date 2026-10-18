@@ -1,25 +1,25 @@
 import express from 'express'
-import { PlayerActionResponse, AppError } from '../types.js'
+import { PlayerActionResponse } from '../types.js'
 import { ok } from '../http.js'
-import { isValidVideoId } from '../youtube/url.js'
 import { t } from '../i18n.js'
 import { buildSkipMessage } from '../chat-replies.js'
 import { setPaused } from '../queue.js'
 import { getState, endCurrent, skipCurrent, reportPlaybackFailure } from '../player.js'
 import { getSettings } from '../settings.js'
+import { checkVideoId } from '../validate.js'
 
 export const router = express.Router()
 
 // `videoId` says which track the client is talking about; without it the report is taken to be about the current one
-function readVideoId(body: unknown): { videoId?: string; valid: boolean } {
+function readVideoId(body: unknown): string | undefined {
   const videoId = (body as { videoId?: unknown } | undefined)?.videoId
-  if (videoId === undefined) return { valid: true }
-  return isValidVideoId(videoId) ? { videoId, valid: true } : { valid: false }
+  if (videoId === undefined) return undefined
+  checkVideoId(videoId)
+  return videoId
 }
 
 router.post('/ended', (req, res) => {
-  const { videoId, valid } = readVideoId(req.body)
-  if (!valid) throw new AppError('INVALID_VIDEO_ID', 'a valid videoId is required')
+  const videoId = readVideoId(req.body)
 
   const applied = endCurrent(videoId)
   ok(res, { ...getState(), ...(applied ? {} : { ignored: true }) })
@@ -45,8 +45,7 @@ router.post('/resume', (_req, res) => {
 })
 
 router.post('/report-failure', (req, res) => {
-  const { videoId, valid } = readVideoId(req.body)
-  if (!valid) throw new AppError('INVALID_VIDEO_ID', 'a valid videoId is required')
+  const videoId = readVideoId(req.body)
 
   const errorCode = typeof req.body?.errorCode === 'number' ? req.body.errorCode : undefined
   const applied = reportPlaybackFailure(errorCode, videoId)

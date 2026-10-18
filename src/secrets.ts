@@ -62,7 +62,7 @@ const secrets = createConfigModule<Secrets>({
 // Secrets are refused as a whole: either everything in an update is valid, or nothing is applied
 function apply(updates: DeepPartial<Secrets>): void {
   const { clean, rejected } = secrets.validateConfigUpdates(updates)
-  if (rejected.length) throw new AppError('INVALID_INPUT', `invalid secrets: ${rejected.join(', ')}`, { fields: rejected.join(', ') })
+  if (rejected.length) throw new AppError('INVALID_INPUT', undefined, { fields: rejected.join(', ') })
 
   secrets.updateConfig(clean)
 }

@@ -131,6 +131,29 @@ test('POST /api/queue/request', async (t) => {
     assert.equal(((await response.json()) as Record<string, any>).code, 'INVALID_YOUTUBE_URL')
     assert.equal(getActivity().find((entry) => entry.status === 'rejected')?.reasonCode, 'INVALID_YOUTUBE_URL')
   })
+
+  // a broken row from the videos endpoint fails the request in a way that is nobody's refusal: the request
+  // becomes an unexpected error, and the errorHandler is the one place it is logged
+  await t.test('an unexpected request failure is logged once and stays a 500', async (t2) => {
+    const errors = t2.mock.method(console, 'error', () => {})
+    const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    const stubbed = globalThis.fetch
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (url.hostname !== 'www.googleapis.com') return stubbed(input, init)
+      return url.pathname.endsWith('/search') ? json({ items: [{ id: { videoId: 'zzzzzzzzzzz' } }] }) : json({ items: [null] })
+    }) as typeof fetch
+
+    try {
+      const response = await request({ query: 'some song', requestedBy: 'amy' })
+
+      assert.equal(response.status, 500)
+      assert.equal(((await response.json()) as Record<string, any>).code, 'SERVER_ERROR')
+      assert.equal(errors.mock.callCount(), 1, 'the errorHandler is the only one that logs the outage')
+    } finally {
+      globalThis.fetch = stubbed
+    }
+  })
 })
 
 test('DELETE /api/queue/video/:videoId', async (t) => {

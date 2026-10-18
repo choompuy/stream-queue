@@ -151,7 +151,7 @@ test('GET /api/events', async (t) => {
     }
   })
 
-  await t.test('a client that goes away frees its place, the one over the limit gets 503', async () => {
+  await t.test('a client that goes away frees its place, the one over the limit gets 429 TOO_MANY_CONNECTIONS', async () => {
     const server = await startServer({ maxClients: 2 })
     try {
       const first = await server.open()
@@ -159,7 +159,8 @@ test('GET /api/events', async (t) => {
       await until(() => server.streams.clientCount() === 2, 'two clients')
 
       const refused = await server.open()
-      assert.equal(refused.status, 503)
+      assert.equal(refused.status, 429)
+      assert.equal(JSON.parse(refused.text()).code, 'TOO_MANY_CONNECTIONS')
       assert.equal(server.streams.clientCount(), 2)
 
       first.close()
