@@ -4,10 +4,9 @@ import { ok } from '../http.js'
 import { getConfig, updateConfig } from '../config.js'
 import { fetchPlaylistMeta } from '../youtube/index.js'
 import { getPlaylists, upsertPlaylist, removePlaylist, type PlaylistEntry } from '../playlists.js'
-import { clearFallback, refreshFallbackOrRollback } from '../fallback.js'
+import { clearFallback, settledConfigReaction } from '../fallback.js'
 import { createLogger } from '../logger.js'
 import { checkPlaylistIdOrUrl, validatePlaylistIdParam } from '../validate.js'
-import { emit } from '../state-events.js'
 
 const log = createLogger('PLAYLISTS')
 
@@ -68,8 +67,8 @@ router.post('/:id/activate', async (req, res) => {
     return ok<ConfigResponse>(res, getConfig())
   }
 
+  // saves; the fallback module loads the playlist and the route answers with the outcome of that load
   updateConfig({ fallbackPlaylist: { playlistId: id } })
-  await refreshFallbackOrRollback(previousId)
-  emit('playlists')
+  await settledConfigReaction()
   ok<ConfigResponse>(res, getConfig())
 })

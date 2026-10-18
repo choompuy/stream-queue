@@ -59,8 +59,11 @@ function writeSavedState({ withTrackFile }: { withTrackFile: boolean }): void {
 beforeEach(async () => {
   queue.setCurrent(null)
   updateConfig({ fallbackPlaylist: { playlistId: null, enabled: true, repeat: true, shuffle: false } })
-  await fallback.refreshFallback() // the "no playlist" branch forgets the rotation of the previous test
+  // saving the id already starts the reaction, which resets the rotation through the "no playlist" branch
+  await fallback.settledConfigReaction()
+  stubPlaylist(ids)
   updateConfig({ fallbackPlaylist: { playlistId: PLAYLIST } })
+  await fallback.settledConfigReaction()
 })
 
 async function restart(options: { withTrackFile: boolean; playlist?: string[] }): Promise<void> {

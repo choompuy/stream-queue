@@ -1,9 +1,11 @@
-import { getConfig, updateConfig } from './config.js'
+import { isDeepStrictEqual } from 'node:util'
+import { getConfig, updateConfig, onConfigChange } from './config.js'
 import { fetchPlaylistSongs } from './youtube/index.js'
 import { Song, QueueItem, FallbackPlaylist, FallbackStateResponse, AppError } from './types.js'
 import { addSong, getCurrent, setCurrent } from './queue.js'
-import { emit } from './state-events.js'
+import { on, emit } from './state-events.js'
 import { isBlocked, markBlocked } from './blocklist.js'
+import { createStore } from './store.js'
 import { createLogger } from './logger.js'
 
 const log = createLogger('FALLBACK')
@@ -27,6 +29,18 @@ let lastFallbackRefreshAt: number | null = null
 // Grows every time the set of playlist tracks is replaced, so the saved copy of the (large) track list
 // is rewritten only then and not on every change of position
 let sourceVersion = 0
+
+// the rotation is part of the playing state: state-file.ts saves it when it changes
+const rotation = createStore({
+  read: () => ({
+    tracks: sourceVersion,
+    order: fallbackOrder,
+    cursor: fallbackCursor,
+    playlistId: loadedFallbackPlaylistId,
+    lastRefreshedAt: lastFallbackRefreshAt
+  }),
+  topics: ['state']
+})
 
 function setSourceTracks(tracks: Song[]): void {
   fallbackTracksById = new Map(tracks.map((track) => [track.videoId, track]))
@@ -105,22 +119,98 @@ export function peekNextFallbackTrack(): QueueItem | null {
 export function advanceFallback(): QueueItem | null {
   const next = findNext()
   if (!next) return null
-  fallbackCursor = next.index
+
+  rotation.update(() => {
+    fallbackCursor = next.index
+  })
+
   return toFallbackQueueItem(next.song)
 }
 
-// the rotation decides what plays next (state) and what the playlist view shows (fallback)
-function changed(): void {
-  emit('state')
+// the playlist view the panel reads: the answer of getFallbackState() without the blocked marks (those follow the blocklist)
+function fallbackView() {
+  const { enabled, shuffle, repeat } = getConfig().fallbackPlaylist
+  const current = getCurrent()
+
+  return {
+    playlistId: loadedFallbackPlaylistId,
+    lastRefreshedAt: lastFallbackRefreshAt,
+    enabled,
+    shuffle,
+    repeat,
+    sourceCount: fallbackTracksById.size,
+    activeVideoId: current?.isFallback ? current.videoId : null,
+    order: [...fallbackOrder],
+    blocked: fallbackOrder.map((videoId) => isBlocked(videoId))
+  }
+}
+
+let announcedView: ReturnType<typeof fallbackView> | null = null
+
+// the 'fallback' announcement is derived, not reported: the view is compared, so a change that does not
+// reach it (a viewer track replacing another, a step of the rotation) does not wake the playlist tab
+function announceFallbackView(): void {
+  const view = fallbackView()
+  if (announcedView === null) {
+    announcedView = view
+    return
+  }
+  if (isDeepStrictEqual(view, announcedView)) return
+  announcedView = view
   emit('fallback')
 }
+
+on('state', announceFallbackView)
+on('config', announceFallbackView)
+
+let pendingReaction: Promise<void> | null = null
+
+/**
+ * Resolves when the fallback reaction the last config save started has settled, so a route can answer with its
+ * outcome. Nobody has to wait: without a caller the reaction runs in the background and the rollback still happens
+ */
+export function settledConfigReaction(): Promise<void> {
+  const reaction = pendingReaction
+  pendingReaction = null
+  return reaction ?? Promise.resolve()
+}
+
+function loadPlaylist(playlistId: string | null, rollbackTo: string | null): void {
+  const load = refreshFallback().then(
+    () => {},
+    (error) => {
+      // the playlist was replaced while it was loading: the failure is stale, the newer save wins
+      if (getConfig().fallbackPlaylist.playlistId !== playlistId) return
+      log.error(`Playlist ${playlistId ?? 'none'} could not be loaded, ${rollbackTo ?? 'no playlist'} is kept instead`)
+      updateConfig({ fallbackPlaylist: { playlistId: rollbackTo } })
+      throw error
+    }
+  )
+  // a caller that awaits takes the failure; without one the rollback has already run and only the answer is dropped
+  load.catch(() => {})
+  pendingReaction = load
+}
+
+onConfigChange((previous, next) => {
+  const before = previous.fallbackPlaylist
+  const after = next.fallbackPlaylist
+
+  if (after.playlistId !== before.playlistId) {
+    // a rollback restores the id the rotation already holds: nothing to load
+    if (after.playlistId !== loadedFallbackPlaylistId) loadPlaylist(after.playlistId, before.playlistId)
+  } else if (after.shuffle !== before.shuffle) {
+    reorderFallback(after.shuffle)
+  }
+
+  // what plays next depends on these, although the rotation itself does not change
+  if (after.enabled !== before.enabled || after.repeat !== before.repeat) rotation.announce()
+})
 
 export async function refreshFallback(): Promise<FallbackStateResponse> {
   const playlistId = getConfig().fallbackPlaylist.playlistId
 
   if (!playlistId) {
-    resetRotation()
-    changed()
+    rotation.update(() => resetRotation())
     return getFallbackState()
   }
 
@@ -135,34 +225,28 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
   }
 
   const playingId = getCurrent()?.isFallback ? getCurrent()!.videoId : activeFallbackVideoId()
-  setSourceTracks(newTracks)
-  fallbackOrder = buildOrder(newTracks, config.fallbackPlaylist.shuffle, playingId)
-  fallbackCursor = playingId ? fallbackOrder.indexOf(playingId) : -1
-  loadedFallbackPlaylistId = playlistId
-  lastFallbackRefreshAt = Date.now()
+
+  rotation.update(() => {
+    setSourceTracks(newTracks)
+    fallbackOrder = buildOrder(newTracks, config.fallbackPlaylist.shuffle, playingId)
+    fallbackCursor = playingId ? fallbackOrder.indexOf(playingId) : -1
+    loadedFallbackPlaylistId = playlistId
+    lastFallbackRefreshAt = Date.now()
+  })
 
   log.log(`Loaded ${fallbackTracksById.size} tracks from playlist ${playlistId}`)
-  changed()
   return getFallbackState()
-}
-
-// The playlist id is already stored; if it cannot be loaded, only that id goes back to what it was
-export async function refreshFallbackOrRollback(previousPlaylistId: string | null): Promise<void> {
-  try {
-    await refreshFallback()
-  } catch (error) {
-    updateConfig({ fallbackPlaylist: { playlistId: previousPlaylistId } })
-    throw error
-  }
 }
 
 /** Re-orders the rotation for the given shuffle mode, keeping the playing track in place. Does not touch the config. */
 export function reorderFallback(shuffleOn: boolean): void {
   const current = getCurrent()
   const activeId = current?.isFallback ? current.videoId : activeFallbackVideoId()
-  fallbackOrder = buildOrder([...fallbackTracksById.values()], shuffleOn, activeId)
-  fallbackCursor = activeId ? fallbackOrder.indexOf(activeId) : -1
-  changed()
+
+  rotation.update(() => {
+    fallbackOrder = buildOrder([...fallbackTracksById.values()], shuffleOn, activeId)
+    fallbackCursor = activeId ? fallbackOrder.indexOf(activeId) : -1
+  })
 }
 
 type FallbackFlag = 'shuffle' | 'repeat' | 'enabled'
@@ -172,8 +256,6 @@ function toggleFallbackFlag(flag: FallbackFlag): FallbackStateResponse {
   const patch: Partial<Pick<FallbackPlaylist, FallbackFlag>> = { [flag]: next }
 
   updateConfig({ fallbackPlaylist: patch })
-  if (flag === 'shuffle') reorderFallback(next)
-  else changed()
 
   log.log(`${flag}: ${next}`)
   return getFallbackState()
@@ -184,11 +266,9 @@ export const toggleFallbackRepeat = (): FallbackStateResponse => toggleFallbackF
 export const toggleFallbackEnabled = (): FallbackStateResponse => toggleFallbackFlag('enabled')
 
 export function clearFallback(): FallbackStateResponse {
-  resetRotation()
+  rotation.update(() => resetRotation())
 
   updateConfig({ fallbackPlaylist: { playlistId: null } })
-  changed()
-  emit('playlists')
   log.log('cleared')
   return getFallbackState()
 }
@@ -224,7 +304,9 @@ export function playFallbackTrackNow(videoId: string): QueueItem | null {
     throw new AppError('BLOCKED')
   }
 
-  fallbackCursor = index
+  rotation.update(() => {
+    fallbackCursor = index
+  })
   const item = toFallbackQueueItem(song)
   setCurrent(item)
   log.log(`Play now: "${song.title}"`)
@@ -276,4 +358,7 @@ export function hydrateFallback(data: Partial<FallbackSnapshot> | undefined): vo
   fallbackCursor = repaired ? -1 : data.cursor ?? -1
   loadedFallbackPlaylistId = data.playlistId ?? null
   lastFallbackRefreshAt = data.lastRefreshedAt ?? null
+
+  // the hydrated state is what a panel that connects now would read: the view announcements start from it
+  announcedView = fallbackView()
 }

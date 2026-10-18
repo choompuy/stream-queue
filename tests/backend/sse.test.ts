@@ -82,7 +82,7 @@ test('GET /api/events', async (t) => {
     }
   })
 
-  await t.test('a change arrives as a frame with its topic and a counter that grows per topic', async () => {
+  await t.test('a change arrives as a frame that names its topic', async () => {
     const server = await startServer({ coalesceMs: 5 })
     try {
       const stream = await server.open()
@@ -96,10 +96,8 @@ test('GET /api/events', async (t) => {
       await until(() => frames(stream, 'changed').length === 3, 'a change of another topic')
 
       const data = frames(stream, 'changed').map((frame) => JSON.parse(frame.split('data: ')[1]))
-      const [first, second, third] = data
+      const [first, , third] = data
       assert.equal(first.topic, 'state')
-      assert.equal(second.topic, 'state')
-      assert.equal(second.seq, first.seq + 1)
       assert.equal(third.topic, 'activity')
     } finally {
       await server.stop()

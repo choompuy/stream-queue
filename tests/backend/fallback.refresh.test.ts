@@ -7,7 +7,7 @@ import { join } from 'node:path'
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
 const fallback = await import('../../src/fallback.js')
-const { updateConfig } = await import('../../src/config.js')
+const { getConfig, updateConfig } = await import('../../src/config.js')
 const { updateSecrets } = await import('../../src/secrets.js')
 const { setCurrent } = await import('../../src/queue.js')
 
@@ -68,7 +68,8 @@ beforeEach(async () => {
   // first start from a reconciliation against the previous subtest's leftover state instead of a clean load
   PL = `PLrefreshtest${String(++plCounter).padStart(3, '0')}`
   updateConfig({ fallbackPlaylist: { playlistId: null, enabled: true, repeat: false, shuffle: false } })
-  await fallback.refreshFallback() // actually clears loadedFallbackPlaylistId via the "no playlist" branch
+  // saving the id already starts the reaction, which resets the rotation through the "no playlist" branch
+  await fallback.settledConfigReaction()
 })
 
 // Drives the rotation forward `steps` times exactly the way player.ts does it (advanceFallback() sets the
@@ -82,7 +83,7 @@ test('refreshFallback() rebuilds rotation around the playing track', async (t) =
   await t.test('when shuffle is off, the playing track stays in place and the rest follow natural order', async () => {
     stubPlaylist([A, B, C, D, E, F])
     updateConfig({ fallbackPlaylist: { playlistId: PL, shuffle: false } })
-    await fallback.refreshFallback()
+    await fallback.settledConfigReaction()
 
     advanceTo(3)
     setCurrent({ ...song(C), requestedBy: 'Playlist', isFallback: true })
@@ -98,7 +99,7 @@ test('refreshFallback() rebuilds rotation around the playing track', async (t) =
   await t.test('when the playing track is still in the playlist, it stays in place', async () => {
     stubPlaylist([A, B, C, D])
     updateConfig({ fallbackPlaylist: { playlistId: PL, shuffle: false } })
-    await fallback.refreshFallback()
+    await fallback.settledConfigReaction()
 
     advanceTo(2)
     setCurrent({ ...song(B), requestedBy: 'Playlist', isFallback: true })
@@ -113,7 +114,7 @@ test('refreshFallback() rebuilds rotation around the playing track', async (t) =
   await t.test('when shuffle is on, the unplayed remainder is reshuffled around the playing track', async () => {
     stubPlaylist([A, B, C, D])
     updateConfig({ fallbackPlaylist: { playlistId: PL, shuffle: true } })
-    await fallback.refreshFallback()
+    await fallback.settledConfigReaction()
 
     advanceTo(2)
     setCurrent({ ...song(B), requestedBy: 'Playlist', isFallback: true })
@@ -125,5 +126,56 @@ test('refreshFallback() rebuilds rotation around the playing track', async (t) =
     const order = fallback.getFallbackProgress().order
     assert.equal(order[0], B, 'playing track stays first')
     assert.deepEqual(order.slice(1).sort(), [A, C, D, E], 'the rest are all present')
+  })
+})
+
+test('the reaction to a saved playlist id', async (t) => {
+  await t.test('a load that fails restores the id that was there before', async () => {
+    const realFetch = globalThis.fetch
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (url.hostname === 'www.googleapis.com') return new Response(JSON.stringify({ error: { message: 'refused' } }), { status: 403 })
+      return realFetch(input, init)
+    }
+
+    try {
+      updateConfig({ fallbackPlaylist: { playlistId: PL } })
+
+      await assert.rejects(fallback.settledConfigReaction())
+      assert.equal(getConfig().fallbackPlaylist.playlistId, null, 'rolled back')
+      assert.equal(fallback.getFallbackProgress().playlistId, null, 'the rotation keeps what it had')
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
+  await t.test('a load that fails after the playlist was replaced neither rolls back nor throws', async () => {
+    const other = 'PLreplacedtest1'
+    const realFetch = globalThis.fetch
+    // the first playlist answers slowly with a refusal, the one that replaces it answers at once
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (url.hostname === 'www.googleapis.com' && url.searchParams.get('playlistId') === PL) {
+        await new Promise((resolve) => setTimeout(resolve, 30))
+        return new Response(JSON.stringify({ error: { message: 'refused' } }), { status: 403 })
+      }
+      return realFetch(input, init)
+    }
+
+    try {
+      updateConfig({ fallbackPlaylist: { playlistId: PL } })
+      stubPlaylist([A, B])
+
+      updateConfig({ fallbackPlaylist: { playlistId: other } })
+      await fallback.settledConfigReaction()
+
+      // the stale failure of the first load arrives after its playlist was already replaced
+      await new Promise((resolve) => setTimeout(resolve, 60))
+
+      assert.equal(getConfig().fallbackPlaylist.playlistId, other, 'the newer save is not rolled back')
+      assert.deepEqual(fallback.getFallbackProgress().order, [A, B], 'the newer playlist is loaded')
+    } finally {
+      globalThis.fetch = realFetch
+    }
   })
 })

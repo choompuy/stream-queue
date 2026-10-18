@@ -1,7 +1,7 @@
 import { createLogger, describeError } from './logger.js'
 
 // What changed, not how: a topic only says "read it again". The data stays behind the existing GET endpoints
-export const TOPICS = ['state', 'activity', 'fallback', 'twitch', 'blocklist', 'playlists'] as const
+export const TOPICS = ['state', 'activity', 'fallback', 'twitch', 'blocklist', 'playlists', 'config'] as const
 export type Topic = (typeof TOPICS)[number]
 
 type Listener = () => void

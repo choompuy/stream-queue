@@ -1,4 +1,6 @@
 import { dataPath, createFileStore, loadList } from './persist.js'
+import { createStore } from './store.js'
+import { onConfigChange } from './config.js'
 import { emit } from './state-events.js'
 
 export type SavedPlaylist = {
@@ -32,39 +34,48 @@ function isSavedPlaylist(value: unknown): value is SavedPlaylist {
 let loaded: SavedPlaylist[] | null = null
 const current = (): SavedPlaylist[] => (loaded ??= loadList(store, isSavedPlaylist))
 
-function save(): void {
-  emit('playlists')
-  store.scheduleSave(() => current())
-}
+const changes = createStore({
+  read: current,
+  topics: ['playlists'],
+  save: () => store.scheduleSave(current)
+})
+
+// the active mark of the saved playlists is derived from the config's playlist id: it moved, the list is read again
+onConfigChange((previous, next) => {
+  if (previous.fallbackPlaylist.playlistId !== next.fallbackPlaylist.playlistId) emit('playlists')
+})
 
 export function getPlaylists(): SavedPlaylist[] {
   return [...current()]
 }
 
 export function upsertPlaylist(meta: { id: string; title: string; thumbnail: string; itemCount: number }): SavedPlaylist {
-  const existing = current().find((p) => p.id === meta.id)
+  let saved!: SavedPlaylist
 
-  if (existing) {
-    const updated: SavedPlaylist = { ...existing, title: meta.title, thumbnail: meta.thumbnail, itemCount: meta.itemCount }
-    loaded = current().map((p) => (p.id === meta.id ? updated : p))
-    save()
-    return updated
-  }
+  changes.update(() => {
+    const existing = current().find((p) => p.id === meta.id)
 
-  const created: SavedPlaylist = { ...meta, addedAt: Date.now() }
-  current().push(created)
-  save()
-  return created
+    if (existing) {
+      saved = { ...existing, title: meta.title, thumbnail: meta.thumbnail, itemCount: meta.itemCount }
+      loaded = current().map((p) => (p.id === meta.id ? saved : p))
+    } else {
+      saved = { ...meta, addedAt: Date.now() }
+      current().push(saved)
+    }
+  })
+
+  return saved
 }
 
 export function removePlaylist(id: string): boolean {
-  const before = current().length
-  loaded = current().filter((p) => p.id !== id)
+  let removed = false
 
-  if (current().length !== before) {
-    save()
-    return true
-  }
+  changes.update(() => {
+    if (current().some((p) => p.id === id)) {
+      loaded = current().filter((p) => p.id !== id)
+      removed = true
+    }
+  })
 
-  return false
+  return removed
 }

@@ -1,6 +1,5 @@
 import { createConfigModule, rules } from './config-helper.js'
 import { dataPath } from './persist.js'
-import { emit } from './state-events.js'
 import type { Settings } from './types.js'
 
 const POSITIONS = ['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const satisfies readonly Settings['position'][]
@@ -21,6 +20,8 @@ const settingsPath = () => dataPath('settings.json')
 const settings = createConfigModule<Settings>({
   filePath: settingsPath,
   defaults: defaultSettings,
+  // the overlay reads the settings through the playing state, the panel through the config topic
+  topics: ['state', 'config'],
   schema: {
     showVideo: rules.boolean,
     hideOverlayInfo: rules.boolean,
@@ -36,8 +37,4 @@ export const getSettings = settings.getConfig
 export const validateSettingsUpdates = settings.validateConfigUpdates
 
 /** Applies the valid part of `updates` and names the fields that were refused (invalid or unknown), like every save of the panel. */
-export function updateSettings(updates: Partial<Settings>): { config: Settings; rejected: string[]; changed: boolean } {
-  const result = settings.updateConfig(updates)
-  if (result.changed) emit('state')
-  return result
-}
+export const updateSettings = settings.updateConfig

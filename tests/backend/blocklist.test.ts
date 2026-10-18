@@ -8,6 +8,9 @@ process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
 const { getBlockedTracks, isBlocked, blockTrack, unblockTrack, markBlocked } = await import('../../src/blocklist.js')
 const { on } = await import('../../src/state-events.js')
+const { hydrateFallback } = await import('../../src/fallback.js')
+
+const song = (videoId: string) => ({ videoId, title: `Track ${videoId}`, channelTitle: 'Channel', thumbnail: '', duration: 120, views: 100_000, url: `https://youtu.be/${videoId}` })
 
 beforeEach(() => {
   for (const track of getBlockedTracks()) unblockTrack(track.videoId)
@@ -136,10 +139,19 @@ test('what a change of the blocklist announces', async (t) => {
     heard.length = 0
   })
 
-  await t.test('blocking a track announces the list, the queue and the playlist: all three show it', () => {
+  // the playlist view carries the blocked marks of its rotation, so a track of the rotation changes it
+  hydrateFallback({ sourceTracks: [song('aaaaaaaaaaa')], order: ['aaaaaaaaaaa'], cursor: -1, playlistId: null, lastRefreshedAt: null })
+
+  await t.test('blocking a track of the rotation announces the list, the queue and the playlist: all three show it', () => {
     blockTrack('aaaaaaaaaaa', 'First')
 
     assert.deepEqual(heard.sort(), ['blocklist', 'fallback', 'state'])
+  })
+
+  await t.test('blocking a track outside the rotation does not wake the playlist tab: its view did not change', () => {
+    blockTrack('outside00001', 'Outside')
+
+    assert.deepEqual(heard.sort(), ['blocklist', 'state'])
   })
 
   await t.test('blocking a track that is blocked already announces nothing: nothing changed', () => {

@@ -1,7 +1,7 @@
 import { dataPath, createFileStore, loadList } from './persist.js'
 import { createLogger } from './logger.js'
 import { isValidVideoId } from './youtube/url.js'
-import { emit } from './state-events.js'
+import { createStore } from './store.js'
 import type { Blockable } from './types.js'
 
 export type BlockedTrack = {
@@ -16,6 +16,13 @@ const TITLE_MAX_LENGTH = 200
 
 const log = createLogger('BLOCKLIST')
 const store = createFileStore<BlockedTrack[]>(() => dataPath('blocklist.json'))
+
+// a blocked track changes the queue view (it is skipped) and the list itself; the playlist view follows through 'state'
+const changes = createStore({
+  read: () => ensureLoaded().list,
+  topics: ['blocklist', 'state'],
+  save: () => store.scheduleSave(() => ensureLoaded().list)
+})
 
 function isBlockedTrack(value: unknown): value is BlockedTrack {
   if (typeof value !== 'object' || value === null) return false
@@ -36,10 +43,6 @@ function ensureLoaded(): { list: BlockedTrack[]; ids: Set<string> } {
   return { list: blocked, ids: blockedIds }
 }
 
-function save(): void {
-  store.scheduleSave(() => ensureLoaded().list)
-}
-
 export function getBlockedTracks(): BlockedTrack[] {
   return [...ensureLoaded().list]
 }
@@ -53,17 +56,12 @@ export function markBlocked<T extends { videoId: string }>(tracks: T[]): Blockab
   return tracks.map((track) => ({ ...track, isBlocked: isBlocked(track.videoId) }))
 }
 
-// a blocked track changes the queue (it is skipped), the playlist (it is not played) and the list of blocked tracks
-function changed(): void {
-  emit('blocklist')
-  emit('state')
-  emit('fallback')
-}
-
 export function blockTrack(videoId: string, title: string): BlockedTrack {
   const { list, ids } = ensureLoaded()
 
-  if (!ids.has(videoId)) {
+  changes.update(() => {
+    if (ids.has(videoId)) return
+
     const safeTitle = title.trim().slice(0, TITLE_MAX_LENGTH) || videoId
     list.unshift({ videoId, title: safeTitle, blockedAt: Date.now() })
     ids.add(videoId)
@@ -73,24 +71,22 @@ export function blockTrack(videoId: string, title: string): BlockedTrack {
       for (const removed of dropped) ids.delete(removed.videoId)
       log.warn(`Limit of ${BLOCKLIST_LIMIT} reached, ${dropped.length} oldest block(s) dropped`)
     }
+  })
 
-    save()
-    changed()
-  }
   return list.find((t) => t.videoId === videoId)!
 }
 
 export function unblockTrack(videoId: string): boolean {
-  const { list, ids } = ensureLoaded()
-  const before = list.length
-  blocked = list.filter((t) => t.videoId !== videoId)
-  ids.delete(videoId)
+  let removed = false
 
-  if (blocked.length !== before) {
-    save()
-    changed()
-    return true
-  }
+  changes.update(() => {
+    const { list, ids } = ensureLoaded()
+    if (!ids.has(videoId)) return
 
-  return false
+    blocked = list.filter((t) => t.videoId !== videoId)
+    ids.delete(videoId)
+    removed = true
+  })
+
+  return removed
 }

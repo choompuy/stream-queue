@@ -9,6 +9,7 @@ process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 const queue = await import('../../src/queue.js')
 const fallback = await import('../../src/fallback.js')
 const { upsertPlaylist, removePlaylist } = await import('../../src/playlists.js')
+const { updateConfig } = await import('../../src/config.js')
 const { TOPICS, on } = await import('../../src/state-events.js')
 
 // what the panel is told after each change, topic by topic: it reads again what it is told about and nothing else
@@ -17,16 +18,40 @@ for (const topic of TOPICS) on(topic, () => heard.push(topic))
 const announced = () => [...new Set(heard)].sort()
 
 const song = (videoId: string) => ({ videoId, title: `Track ${videoId}`, channelTitle: 'Channel', thumbnail: '', duration: 120, views: 100_000, url: `https://youtu.be/${videoId}` })
+const IDS = Array.from({ length: 12 }, (_, i) => `track${String(i).padStart(2, '0')}`)
 
 beforeEach(() => {
+  queue.setCurrent(null)
+  fallback.hydrateFallback({ sourceTracks: IDS.map(song), order: IDS, cursor: -1, playlistId: 'PLannouncetest1', lastRefreshedAt: null })
+  updateConfig({ fallbackPlaylist: { shuffle: false, repeat: false, enabled: true } })
   heard.length = 0
 })
 
 test('a new current track', async (t) => {
-  await t.test('announces the state and the playlist: the playlist shows which of its tracks plays and what comes next', () => {
-    queue.setCurrent({ ...song('a'), requestedBy: 'viewer' })
+  await t.test('a viewer track announces the state: the playlist view does not depend on it', () => {
+    queue.setCurrent({ ...song('viewer000001'), requestedBy: 'viewer' })
+
+    assert.deepEqual(announced(), ['state'])
+  })
+
+  await t.test('a playlist track announces the playlist too: the view marks which of its tracks plays', () => {
+    queue.setCurrent({ ...song('track01'), requestedBy: 'Playlist', isFallback: true })
 
     assert.deepEqual(announced(), ['fallback', 'state'])
+  })
+})
+
+test('pausing', async (t) => {
+  await t.test('announces the state', () => {
+    queue.setPaused(true)
+
+    assert.deepEqual(announced(), ['state'])
+  })
+
+  await t.test('pausing to the same value announces nothing: nothing changed', () => {
+    queue.setPaused(true)
+
+    assert.deepEqual(announced(), [])
   })
 })
 
@@ -36,19 +61,19 @@ test('the switches of the playlist', async (t) => {
     ['repeat', fallback.toggleFallbackRepeat],
     ['enabled', fallback.toggleFallbackEnabled]
   ] as const) {
-    await t.test(`${name} announces the playlist and the state (what plays next depends on it)`, () => {
+    await t.test(`${name} announces the config, the playlist and the state (what plays next depends on it)`, () => {
       toggle()
 
-      assert.deepEqual(announced(), ['fallback', 'state'])
+      assert.deepEqual(announced(), ['config', 'fallback', 'state'])
     })
   }
 })
 
 test('removing the active playlist from the rotation', async (t) => {
-  await t.test('announces the playlist, the state and the list of saved playlists, whose active mark moved', () => {
+  await t.test('announces the playlist and the state: the saved list follows the config, which does not change here', () => {
     fallback.clearFallback()
 
-    assert.deepEqual(announced(), ['fallback', 'playlists', 'state'])
+    assert.deepEqual(announced(), ['fallback', 'state'])
   })
 })
 

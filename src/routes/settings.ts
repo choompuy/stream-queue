@@ -1,12 +1,11 @@
 import express from 'express'
-import { ConfigResponse, SettingsResponse, AppError } from '../types.js'
+import { ConfigResponse, SettingsResponse } from '../types.js'
 import { ok, sendConfigUpdate } from '../http.js'
 import { isLocalAddress, localOnly } from '../local-only.js'
 import { getConfig, updateConfig } from '../config.js'
 import { getSettings, updateSettings } from '../settings.js'
 import { getPublicSecretsView, SecretsResponse, updateSecrets } from '../secrets.js'
-import { checkPlaylistIdOrUrl } from '../validate.js'
-import { refreshFallbackOrRollback, reorderFallback } from '../fallback.js'
+import { settledConfigReaction } from '../fallback.js'
 
 export const router = express.Router()
 
@@ -24,33 +23,12 @@ router.get('/config', (_req, res) => {
   ok<ConfigResponse>(res, getConfig())
 })
 
+// saves; the fallback module reacts to what changed (a new playlist is loaded, the rotation re-ordered)
+// and the route waits for that outcome, so a playlist that cannot be loaded is answered with its error
 router.put('/config', async (req, res) => {
-  const body = { ...(req.body ?? {}) }
+  const { config: updated, rejected } = updateConfig(req.body ?? {})
 
-  if (body.fallbackPlaylist !== undefined) {
-    if (typeof body.fallbackPlaylist !== 'object' || body.fallbackPlaylist === null || Array.isArray(body.fallbackPlaylist)) {
-      throw new AppError('INVALID_CONFIG', undefined, { fields: 'fallbackPlaylist' })
-    }
-
-    if (typeof body.fallbackPlaylist.playlistId === 'string') {
-      const rawPlaylistId = body.fallbackPlaylist.playlistId.trim()
-
-      if (rawPlaylistId) {
-        body.fallbackPlaylist = { ...body.fallbackPlaylist, playlistId: checkPlaylistIdOrUrl(rawPlaylistId) }
-      } else {
-        body.fallbackPlaylist = { ...body.fallbackPlaylist, playlistId: null }
-      }
-    }
-  }
-
-  const previous = getConfig()
-  const { config: updated, rejected } = updateConfig(body)
-
-  if (updated.fallbackPlaylist.playlistId !== previous.fallbackPlaylist.playlistId) {
-    await refreshFallbackOrRollback(previous.fallbackPlaylist.playlistId)
-  } else if (updated.fallbackPlaylist.shuffle !== previous.fallbackPlaylist.shuffle) {
-    reorderFallback(updated.fallbackPlaylist.shuffle)
-  }
+  await settledConfigReaction()
 
   sendConfigUpdate(res, updated, rejected)
 })

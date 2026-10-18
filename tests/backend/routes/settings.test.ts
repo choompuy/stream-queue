@@ -107,12 +107,14 @@ test('PUT /api/config and the fallback playlist', async (t) => {
     assert.equal((await getConfig()).fallbackPlaylist.shuffle, false)
   })
 
-  await t.test('a malformed playlist id is a 400 INVALID_PLAYLIST_ID', async () => {
+  await t.test('a malformed playlist id is refused as a field, like every other invalid value', async () => {
     const response = await putConfig({ fallbackPlaylist: { playlistId: 'not a playlist' } })
     const body = (await response.json()) as Record<string, any>
 
     assert.equal(response.status, 400)
-    assert.equal(body.code, 'INVALID_PLAYLIST_ID')
+    assert.equal(body.code, 'INVALID_CONFIG')
+    assert.equal(body.params.fields, 'fallbackPlaylist.playlistId')
+    assert.equal((await getConfig()).fallbackPlaylist.playlistId, null)
   })
 
   await t.test('an empty playlist id clears it', async () => {

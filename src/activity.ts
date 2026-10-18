@@ -1,7 +1,7 @@
 import { ActivityEntry, ActivityReasonCode, QueueItem } from './types.js'
 import { dataPath, createFileStore, loadList } from './persist.js'
 import { createLogger } from './logger.js'
-import { emit } from './state-events.js'
+import { createStore } from './store.js'
 
 const ACTIVITY_LIMIT = 100
 
@@ -31,18 +31,20 @@ const entries = (): ActivityEntry[] => (loaded ??= loadList(store, isActivityEnt
 
 const log = createLogger('ACTIVITY')
 
-function save(): void {
-  store.scheduleSave(() => entries())
-}
+const changes = createStore({
+  read: entries,
+  topics: ['activity'],
+  save: () => store.scheduleSave(entries)
+})
 
 export function logActivity(entry: Omit<ActivityEntry, 'at'>): void {
-  const list = entries()
-  list.unshift({ ...entry, at: Date.now() })
-  if (list.length > ACTIVITY_LIMIT) {
-    list.length = ACTIVITY_LIMIT
-  }
-  save()
-  emit('activity')
+  changes.update(() => {
+    const list = entries()
+    list.unshift({ ...entry, at: Date.now() })
+    if (list.length > ACTIVITY_LIMIT) {
+      list.length = ACTIVITY_LIMIT
+    }
+  })
 }
 
 export function getActivity(): ActivityEntry[] {
@@ -50,9 +52,9 @@ export function getActivity(): ActivityEntry[] {
 }
 
 export function clearActivity(): void {
-  entries().length = 0
-  save()
-  emit('activity')
+  changes.update(() => {
+    entries().length = 0
+  })
   log.log('cleared')
 }
 

@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util'
 import { createFileStore, deepMerge, type DeepPartial } from './persist.js'
-import { createLogger } from './logger.js'
+import { createLogger, describeError } from './logger.js'
+import { emit, type Topic } from './state-events.js'
 
 const FIELD = Symbol('field-rule')
 
@@ -71,10 +72,13 @@ export function createConfigModule<T extends object>(options: {
   defaults: T
   schema: Schema
   refine?: (clean: DeepPartial<T>, current: T, reject: (path: string) => void) => void
+  // what a saved change announces; the overlay follows the playing state, the panel the config
+  topics?: readonly Topic[]
 }) {
-  const { filePath, defaults, schema, refine } = options
+  const { filePath, defaults, schema, refine, topics } = options
   const store = createFileStore<T>(filePath)
   const log = createLogger('CONFIG')
+  const changeListeners = new Set<(previous: T, next: T) => void>()
 
   // Read from disk on first use, not when the module is imported. A file edited by hand (or left by an older version)
   // may hold what the schema would refuse: those values are ignored and the defaults stay in their place
@@ -102,13 +106,39 @@ export function createConfigModule<T extends object>(options: {
     const next = deepMerge(previous, clean)
     const changed = !isDeepStrictEqual(next, previous)
     config = next
-    if (changed) save()
+    if (changed) {
+      save()
+      announce(previous, next)
+    }
     return { config: structuredClone(next), rejected, changed }
   }
 
   function restoreConfig(snapshot: T): void {
+    const previous = current()
     config = structuredClone(snapshot)
+    if (isDeepStrictEqual(config, previous)) return
+
     save()
+    announce(previous, config)
+  }
+
+  function announce(previous: T, next: T): void {
+    for (const topic of topics ?? []) emit(topic)
+    for (const listener of [...changeListeners]) {
+      try {
+        listener(previous, next)
+      } catch (error) {
+        log.error(`A listener of a config change failed: ${describeError(error)}`)
+      }
+    }
+  }
+
+  // The listener gets the config before and after a saved change, so it can react to what actually differs
+  function onConfigChange(listener: (previous: T, next: T) => void): () => void {
+    changeListeners.add(listener)
+    return () => {
+      changeListeners.delete(listener)
+    }
   }
 
   return {
@@ -116,6 +146,7 @@ export function createConfigModule<T extends object>(options: {
     validateConfigUpdates,
     updateConfig,
     restoreConfig,
+    onConfigChange,
     saveNow: async (onError?: (error: unknown) => void) => {
       await store.saveNow(() => current(), onError)
     }

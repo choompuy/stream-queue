@@ -10,7 +10,7 @@ export type EventStreamOptions = {
   maxClients?: number
   // a quiet connection is kept alive (proxies, antivirus and OBS drop silent ones) and the page can tell it is still there
   pingEveryMs?: number
-  // changes of one topic that follow each other are one event: queue.ts reports several per operation
+  // changes of one topic that follow each other are one event: a change can still be reported by more than one layer
   coalesceMs?: number
   // sent first: how long a browser waits before it reconnects on its own
   retryMs?: number
@@ -32,7 +32,6 @@ function requestedTopics(query: unknown): Set<Topic> {
  */
 export function createEventStreams({ maxClients = 20, pingEveryMs = 25_000, coalesceMs = 50, retryMs = 3000 }: EventStreamOptions = {}) {
   const clients = new Set<Client>()
-  const sequence = Object.fromEntries(TOPICS.map((topic) => [topic, 0])) as Record<Topic, number>
   const timers = new Map<Topic, ReturnType<typeof setTimeout>>()
   let unsubscribe: (() => void) | null = null
 
@@ -46,7 +45,7 @@ export function createEventStreams({ maxClients = 20, pingEveryMs = 25_000, coal
   }
 
   function broadcast(topic: Topic): void {
-    const frame = `event: changed\ndata: ${JSON.stringify({ topic, seq: ++sequence[topic] })}\n\n`
+    const frame = `event: changed\ndata: ${JSON.stringify({ topic })}\n\n`
 
     for (const client of [...clients]) {
       if (client.topics.has(topic)) send(client, frame)

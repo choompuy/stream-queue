@@ -4,7 +4,7 @@ import { parseYouTubeUrl } from './youtube/url.js'
 import { logRejection, logAcceptance, logSkippedWithOpenReward } from './activity.js'
 import { QueueItem, Song, AppError, AddedSong } from './types.js'
 import { isBlocked } from './blocklist.js'
-import { emit } from './state-events.js'
+import { createStore } from './store.js'
 import { finishItem } from './finish.js'
 import { createLogger } from './logger.js'
 
@@ -12,6 +12,12 @@ let currentSong: QueueItem | null = null
 const queue: QueueItem[] = []
 
 let isPaused = false
+
+// the playing state is persisted and announced by state-file.ts when it changes
+const playing = createStore({
+  read: () => ({ current: currentSong, queue, isPaused }),
+  topics: ['state']
+})
 
 const log = createLogger('QUEUE')
 
@@ -53,14 +59,15 @@ export function hydrateQueue(data: { current?: QueueItem | null; queue?: QueueIt
 export function detachChannelPointsRedemptions(): number {
   let detached = 0
 
-  for (const item of [currentSong, ...queue]) {
-    if (item?.channelPointsRedemption) {
-      delete item.channelPointsRedemption
-      detached++
+  playing.update(() => {
+    for (const item of [currentSong, ...queue]) {
+      if (item?.channelPointsRedemption) {
+        delete item.channelPointsRedemption
+        detached++
+      }
     }
-  }
+  })
 
-  if (detached > 0) emit('state')
   return detached
 }
 
@@ -73,8 +80,9 @@ export function getCurrent(): QueueItem | null {
 }
 
 export function setPaused(value: boolean): void {
-  isPaused = value
-  emit('state')
+  playing.update(() => {
+    isPaused = value
+  })
 }
 
 export function getIsPaused(): boolean {
@@ -136,9 +144,10 @@ export function addSong(song: Song, requestedBy: string, options: AddOptions = {
   if (started) {
     setCurrent(item)
   } else {
-    queue.push(item)
+    playing.update(() => {
+      queue.push(item)
+    })
     log.log(`added "${song.title}" at position ${queue.length}`)
-    emit('state')
   }
 
   return { item, started }
@@ -146,7 +155,6 @@ export function addSong(song: Song, requestedBy: string, options: AddOptions = {
 
 export function setCurrent(item: QueueItem | null): void {
   const previous = currentSong
-  currentSong = item
 
   // still attached = nobody closed it, so the track was skipped or replaced with its reward open
   if (previous?.channelPointsRedemption && previous !== item) {
@@ -158,9 +166,9 @@ export function setCurrent(item: QueueItem | null): void {
     log.log(item ? `now playing "${item.title}"` : 'nothing is playing')
   }
 
-  // the playlist shows which of its tracks plays and what comes next: both follow the current track
-  emit('state')
-  emit('fallback')
+  playing.update(() => {
+    currentSong = item
+  })
 }
 
 export function removeByVideoId(videoId: string): QueueItem | null {
@@ -172,27 +180,31 @@ export function removeAt(index: number): QueueItem | null {
     return null
   }
 
-  const [item] = queue.splice(index, 1)
+  let removed: QueueItem | undefined
 
-  if (item) {
-    log.log(`removed "${item.title}" at position ${index + 1}`)
-    finishItem(item, { code: 'TRACK_REMOVED' })
-  }
+  playing.update(() => {
+    const [item] = queue.splice(index, 1)
+    removed = item
 
-  emit('state')
+    if (item) {
+      log.log(`removed "${item.title}" at position ${index + 1}`)
+      finishItem(item, { code: 'TRACK_REMOVED' })
+    }
+  })
 
-  return item ?? null
+  return removed ?? null
 }
 
 export function clearQueue(): QueueItem[] {
-  const cleared = [...queue]
-  queue.length = 0
+  let cleared: QueueItem[] = []
+
+  playing.update(() => {
+    cleared = [...queue]
+    queue.length = 0
+    for (const item of cleared) finishItem(item, { code: 'QUEUE_CLEARED' })
+  })
 
   log.log(`cleared ${cleared.length} songs`)
-
-  for (const item of cleared) finishItem(item, { code: 'QUEUE_CLEARED' })
-
-  emit('state')
 
   return cleared
 }

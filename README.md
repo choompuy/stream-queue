@@ -191,14 +191,19 @@ Application state is stored as JSON next to the executable:
 ```text
 data/
   config.json
+  settings.json
+  server.json
+  twitch-config.json
   playlists.json
+  blocklist.json
+  activity.json
+  queue-state.json
   secrets.json
+  logs/
+    app.log
 
 cache/
-  queue-state.json
-  youtube-cache.json
-
-logs/
+  fallback-tracks.json
 ```
 
 Your YouTube API key and Twitch OAuth state are stored locally. The application communicates with external services only when needed for its integrations, primarily the YouTube Data API and Twitch APIs.

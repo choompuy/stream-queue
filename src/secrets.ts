@@ -1,6 +1,5 @@
 import { dataPath, type DeepPartial } from './persist.js'
 import { createConfigModule, field, type FieldRule, type Schema } from './config-helper.js'
-import { emit } from './state-events.js'
 import { getTwitchClientId } from './env.js'
 import { AppError, type TwitchAuthorization, type TwitchSecrets, type TwitchTokenData, type TwitchUserInfo } from './types.js'
 
@@ -52,6 +51,8 @@ const TWITCH_SCHEMA: Schema = {
 const secrets = createConfigModule<Secrets>({
   filePath: () => dataPath('secrets.json'),
   defaults: { youtubeApiKey: '', twitch: { tokenData: null, userInfo: null, connectedAt: null, authorization: null } },
+  // the account (or its key) changed: the panel reads the connection again
+  topics: ['twitch'],
   schema: {
     // An empty string is allowed: it clears the key
     youtubeApiKey: field({ normalize: (v) => (typeof v === 'string' ? v.trim() : v), validate: (v) => typeof v === 'string' }),
@@ -79,8 +80,6 @@ export function updateTwitchOAuthState(updates: Partial<TwitchSecrets>, immediat
   if (Object.keys(updates).length === 0) return
 
   apply({ twitch: updates })
-  // the account (or its token) changed: the panel reads the connection again
-  emit('twitch')
 
   // Save token data immediately to avoid losing it on process exit
   if (immediate && updates.tokenData) {
