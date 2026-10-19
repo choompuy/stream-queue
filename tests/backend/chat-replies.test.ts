@@ -12,7 +12,36 @@ const workDir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
 cpSync(locales, join(workDir, 'public/locales'), { recursive: true })
 process.chdir(workDir)
 
-const { buildRedemptionAcceptedMessage, buildRedemptionRejectionMessage } = await import('../../src/chat-replies.js')
+const { buildRedemptionAcceptedMessage, buildRedemptionRejectionMessage, buildQueueMessage } = await import('../../src/chat-replies.js')
+
+test('buildQueueMessage', async (t) => {
+  const track = (videoId: string, isBlocked = false) => ({ videoId, title: `Track ${videoId}`, requestedBy: 'viewer', isBlocked })
+
+  await t.test('lists the first titles and counts everything', () => {
+    const message = buildQueueMessage({ queue: [track('a'), track('b')] }, 'en')
+
+    assert.equal(message, 'Queue [2]: 1. Track a | 2. Track b')
+  })
+
+  await t.test('blocked tracks are not upcoming: not listed, not counted', () => {
+    const message = buildQueueMessage({ queue: [track('a', true), track('b'), track('c', true)] }, 'en')
+
+    assert.equal(message, 'Queue [1]: 1. Track b')
+  })
+
+  await t.test('a queue with nothing but blocked tracks reads as empty', () => {
+    const message = buildQueueMessage({ queue: [track('a', true)] }, 'en')
+
+    assert.equal(message, 'The queue is empty')
+  })
+
+  await t.test('the tail past the fourth title is summed up instead of listed', () => {
+    const queue = [track('a'), track('b'), track('c'), track('d'), track('e'), track('f', true)]
+    const message = buildQueueMessage({ queue }, 'en')
+
+    assert.equal(message, 'Queue [5]: 1. Track a | 2. Track b | 3. Track c | 4. Track d [+1]')
+  })
+})
 
 test('buildRedemptionAcceptedMessage', async (t) => {
   await t.test('names the track and its place in the queue', () => {

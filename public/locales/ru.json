@@ -86,7 +86,8 @@
     "info": "{{count}} треков ▪ обновлено {{datetime}}",
     "addToQueue": "Добавить в очередь",
     "playNow": "Воспроизвести сейчас",
-    "playing": "Играет"
+    "playing": "Играет",
+    "requester": "Плейлист"
   },
   "activity": {
     "title": "Активность",

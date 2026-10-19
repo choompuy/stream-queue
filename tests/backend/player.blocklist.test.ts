@@ -29,7 +29,7 @@ function setFallback(ids: string[], repeat = false) {
   fallback.hydrateFallback({ sourceTracks: ids.map(song), order: ids, cursor: -1, playlistId: 'PLtest0000001', lastRefreshedAt: null })
   updateConfig({ fallbackPlaylist: { playlistId: 'PLtest0000001', enabled: true, shuffle: false, repeat } })
 }
-const enqueue = (...ids: string[]) => ids.forEach((id) => queue.addSong(song(id), 'viewer', { bypassLimits: true }).item)
+const enqueue = (...ids: string[]) => ids.forEach((id) => queue.addSong(song(id), 'viewer', { bypassFilters: true }).item)
 const block = (...ids: string[]) => ids.forEach((id) => blocklist.blockTrack(id, `Track ${id}`))
 
 beforeEach(() => {
@@ -132,6 +132,20 @@ test('skipIfCurrent()', async (t) => {
 
     assert.equal(player.skipIfCurrent('a'), true)
     assert.equal(player.getState().current?.videoId, 'b')
+  })
+
+  await t.test('the blocked playing track is journaled, like a blocked queued one', () => {
+    enqueue('b')
+    playing('a')
+
+    player.skipIfCurrent('a')
+
+    const [entry, ...others] = getActivity().filter((e) => e.reasonCode === 'BLOCKED')
+    assert.equal(others.length, 0)
+    assert.equal(entry.status, 'rejected')
+    assert.equal(entry.requestedBy, 'viewer')
+    assert.equal(entry.videoId, 'a')
+    assert.equal(entry.title, 'Track a')
   })
 
   await t.test('does nothing for any other track', () => {

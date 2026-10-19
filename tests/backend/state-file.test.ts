@@ -184,6 +184,12 @@ test('sanitizeQueueItem()', async (t) => {
     assert.equal(sanitizeQueueItem({ videoId: A, title: '', requestedBy: 'x' }), null)
     assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: '  ' }), null)
   })
+
+  await t.test('a queue saved before the fallback flag knows its playlist tracks by the name', () => {
+    assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: 'playlist' })?.isFallback, true)
+    assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: 'Playlist' })?.isFallback, true)
+    assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: 'bob' })?.isFallback, undefined)
+  })
 })
 
 test('initState()', async (t) => {
@@ -214,7 +220,7 @@ test('initState()', async (t) => {
   })
 
   await t.test('calling it again neither reloads the file nor registers a second saver', async () => {
-    queue.removeAt(0)
+    queue.removeByVideoId(B)
     initState()
 
     assert.deepEqual(

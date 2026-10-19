@@ -8,8 +8,8 @@ process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-chat-test-')))
 
 const { getConfig, updateConfig } = await import('../../../../src/config.js')
 const { updateTwitchConfig } = await import('../../../../src/integrations/twitch/config.js')
-const { hydrateQueue, setPaused, getIsPaused } = await import('../../../../src/queue.js')
-const { getState } = await import('../../../../src/player.js')
+const { hydrateQueue } = await import('../../../../src/queue.js')
+const { getState, setPaused, getIsPaused } = await import('../../../../src/player.js')
 const { _test, _resetIntegration } = await import('../../../../src/integrations/twitch/index.js')
 const { clearTwitchOAuthState } = await import('../../../../src/secrets.js')
 

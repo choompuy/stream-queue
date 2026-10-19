@@ -1,12 +1,30 @@
 import { StateResponse, QueueItem, ActivityReasonCode } from './types.js'
 import { isBlocked, markBlocked } from './blocklist.js'
-import { logRejection, logFailure } from './activity.js'
-import { getQueue, getCurrent, getIsPaused, setCurrent, shiftQueue } from './queue.js'
+import { getQueue, getCurrent, setCurrent, takeNextPlayable } from './queue.js'
 import { peekNextFallbackTrack, advanceFallback } from './fallback.js'
 import { finishItem } from './finish.js'
+import { createStore } from './store.js'
 import { createLogger } from './logger.js'
 
 const log = createLogger('PLAYER')
+
+let isPaused = false
+
+// pausing is part of the announced state, but of nothing saved: it never survives a restart anyway
+const paused = createStore({
+  read: () => isPaused,
+  topics: ['state']
+})
+
+export function setPaused(value: boolean): void {
+  paused.update(() => {
+    isPaused = value
+  })
+}
+
+export function getIsPaused(): boolean {
+  return isPaused
+}
 
 export function getNextTrack(): QueueItem | null {
   return getQueue().find((item) => !isBlocked(item.videoId)) ?? peekNextFallbackTrack()
@@ -22,23 +40,12 @@ export function getState(): StateResponse {
 }
 
 export function moveToNext(): QueueItem | null {
-  let next = shiftQueue()
+  const next = takeNextPlayable()
+  if (next) return next
 
-  while (next && isBlocked(next.videoId)) {
-    log.log(`skipped blocked track in queue: "${next.title}"`)
-    logRejection(next.requestedBy, next.title, 'BLOCKED', { title: next.title, videoId: next.videoId })
-    finishItem(next, { code: 'BLOCKED' })
-    next = shiftQueue()
-  }
-
-  if (next) {
-    setCurrent(next)
-    log.log(`moved to next: "${next.title}"`)
-  } else {
-    const fallback = advanceFallback()
-    setCurrent(fallback)
-    if (fallback) log.log(`started fallback: "${fallback.title}"`)
-  }
+  const fallback = advanceFallback()
+  setCurrent(fallback)
+  if (fallback) log.log(`started fallback: "${fallback.title}"`)
 
   return getCurrent()
 }
@@ -48,6 +55,7 @@ export function skipCurrent(): QueueItem | null {
   if (skipped) {
     log.log(`skipped "${skipped.title}"`)
   }
+  finishItem(skipped, 'skipped')
   return moveToNext()
 }
 
@@ -61,16 +69,16 @@ export function skipIfCurrent(videoId: string): boolean {
   return true
 }
 
-export function playbackFailureReasonCode(errorCode?: number): ActivityReasonCode {
-  switch (errorCode) {
-    case 100:
-      return 'PLAYBACK_VIDEO_UNAVAILABLE'
-    case 101:
-    case 150:
-      return 'PLAYBACK_EMBED_DISALLOWED'
-    default:
-      return 'PLAYBACK_FAILED'
-  }
+// the YouTube iframe error codes that say why a track cannot be played
+const PLAYBACK_FAILURE_REASONS: Record<number, ActivityReasonCode> = {
+  100: 'PLAYBACK_VIDEO_UNAVAILABLE',
+  101: 'PLAYBACK_EMBED_DISALLOWED',
+  150: 'PLAYBACK_EMBED_DISALLOWED'
+}
+
+function playbackFailureReasonCode(errorCode?: number): ActivityReasonCode {
+  if (errorCode !== undefined) return PLAYBACK_FAILURE_REASONS[errorCode] ?? 'PLAYBACK_FAILED'
+  return 'PLAYBACK_FAILED'
 }
 
 function isAboutCurrent(videoId?: string, playId?: number): boolean {
@@ -91,20 +99,19 @@ export function endCurrent(videoId?: string, playId?: number): boolean {
   return true
 }
 
-// The player reports that a play of `videoId` failed. Returns false if that was not the current play and nothing changed
+// The player reports that a play of `videoId` failed. Returns false if nothing was playing or the report was
+// about another play: a stray report must not start the fallback on its own
 export function reportPlaybackFailure(errorCode?: number, videoId?: string, playId?: number): boolean {
-  if (!isAboutCurrent(videoId, playId)) {
-    log.log(`ignored playback failure for ${videoId}: it is not the current track`)
+  if (getCurrent() === null || !isAboutCurrent(videoId, playId)) {
+    log.log(`ignored playback failure for ${videoId ?? 'an unnamed track'}: it is not the current track`)
     return false
   }
 
   const failed = getCurrent()
-
   if (failed) {
     const reasonCode = playbackFailureReasonCode(errorCode)
-    log.error(`playback failed: "${failed.title}" (error ${errorCode ?? 'unknown'})`)
-    logFailure(failed, reasonCode, errorCode !== undefined ? { errorCode } : undefined)
-
+    // a track that cannot be played is routine (the journal and the chat reply say why): an error entry would be noise
+    log.warn(`playback failed: "${failed.title}" (error ${errorCode ?? 'unknown'})`)
     finishItem(failed, { code: reasonCode, params: errorCode !== undefined ? { errorCode } : undefined })
   }
 

@@ -13,6 +13,8 @@ const queue = await import('../../src/queue.js')
 const player = await import('../../src/player.js')
 const { blockTrack, unblockTrack } = await import('../../src/blocklist.js')
 const { sanitizeQueueItem } = await import('../../src/state-file.js')
+const fallback = await import('../../src/fallback.js')
+const B2 = 'b2b2b2b2b2b2'
 
 const song = (videoId: string) => ({
   videoId,
@@ -106,6 +108,21 @@ test('a Channel Points redemption is closed by the way its track leaves', async 
     assert.deepEqual(getActivity(), [])
   })
 
+  await t.test('playing a playlist track right away skips what is playing now the same way', () => {
+    queue.setCurrent({ ...song(A), requestedBy: 'user', channelPointsRedemption: redemption('r1') })
+    fallback.hydrateFallback({ sourceTracks: [song(B2)], order: [B2], cursor: -1, playlistId: 'PLskiptest00001', lastRefreshedAt: null })
+
+    const item = fallback.playFallbackTrackNow(B2)
+
+    assert.equal(item?.videoId, B2)
+    assert.deepEqual(outcomes, [], 'the reward is left for the streamer, like any skip')
+    const [entry, ...others] = getActivity()
+    assert.equal(others.length, 0)
+    assert.equal(entry.status, 'skipped')
+    assert.equal(entry.reasonCode, 'REWARD_NOT_REFUNDED')
+    assert.equal(entry.videoId, A)
+  })
+
   await t.test('a redemption is closed only once', () => {
     const item = { ...song(A), requestedBy: 'user', channelPointsRedemption: redemption('r1') }
     queue.setCurrent(item)
@@ -131,7 +148,7 @@ test('removeByVideoId()', async (t) => {
     add(A, 'r1')
     add(B, 'r2')
     add(C, 'r3')
-    queue.shiftQueue() // A started playing: B is now at index 0, where A was a moment ago
+    player.moveToNext() // A started playing: B is now at index 0, where A was a moment ago
 
     assert.equal(queue.removeByVideoId(C)?.videoId, C)
     assert.deepEqual(
@@ -185,7 +202,7 @@ test('detachChannelPointsRedemptions()', async (t) => {
     queue.hydrateQueue({ queue: [{ ...song(B), requestedBy: 'u2', channelPointsRedemption: redemption('d3') }] })
 
     queue.detachChannelPointsRedemptions()
-    queue.removeAt(0)
+    queue.removeByVideoId(B)
 
     assert.deepEqual(calls, [])
     registerRedemptionHandler(recordOutcome)

@@ -42,7 +42,7 @@ const song = (videoId: string) => ({
 beforeEach(() => {
   queue.clearQueue()
   queue.setCurrent({ ...song(A), requestedBy: 'viewer' })
-  for (const id of [B, C, D]) queue.addSong(song(id), 'viewer', { bypassLimits: true })
+  for (const id of [B, C, D]) queue.addSong(song(id), 'viewer', { bypassFilters: true })
   clearActivity()
 })
 
@@ -136,9 +136,19 @@ test('POST /api/player/report-failure', async (t) => {
 
   await t.test('nothing is playing: any report is ignored', async () => {
     queue.setCurrent(null)
-    const body = (await (await post('report-failure', { videoId: A })).json()) as Record<string, any>
+    const withId = (await (await post('report-failure', { videoId: A })).json()) as Record<string, any>
+
+    assert.equal(withId.data.ignored, true)
+  })
+
+  await t.test('nothing is playing: a report without a videoId is ignored too, and nothing starts', async () => {
+    queue.setCurrent(null)
+
+    const body = (await (await post('report-failure', { errorCode: 101 })).json()) as Record<string, any>
 
     assert.equal(body.data.ignored, true)
+    assert.equal(player.getState().current, null)
+    assert.equal(getActivity().length, 0)
   })
 
   await t.test('a malformed videoId is a 400 INVALID_VIDEO_ID', async () => {

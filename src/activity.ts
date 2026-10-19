@@ -1,4 +1,4 @@
-import { ActivityEntry, ActivityReasonCode, QueueItem } from './types.js'
+import { ActivityEntry, ActivityReasonCode } from './types.js'
 import { dataPath, createFileStore, loadList } from './persist.js'
 import { createLogger } from './logger.js'
 import { createStore } from './store.js'
@@ -80,31 +80,4 @@ export function logRejection(
 
 export function logAcceptance(requestedBy: string, query: string, title: string, videoId: string): void {
   logActivity({ requestedBy, query, title, videoId, status: 'accepted', reasonCode: null })
-}
-
-/**
- * A track bought with Channel Points was skipped. Skipping does not touch the reward (the streamer or a moderator decides):
- * it stays UNFULFILLED on Twitch with the points held, and this entry is where that can be seen.
- */
-export function logSkippedWithOpenReward(item: QueueItem): void {
-  logActivity({
-    requestedBy: item.requestedBy,
-    query: item.url,
-    title: item.title,
-    videoId: item.videoId,
-    status: 'skipped',
-    reasonCode: 'REWARD_NOT_REFUNDED'
-  })
-}
-
-export function logFailure(item: QueueItem, reasonCode: ActivityReasonCode, reasonParams?: ReasonParams): void {
-  logActivity({
-    requestedBy: item.requestedBy,
-    query: item.url,
-    title: item.title,
-    videoId: item.videoId,
-    status: 'failed',
-    reasonCode,
-    reasonParams
-  })
 }

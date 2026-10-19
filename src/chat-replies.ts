@@ -1,5 +1,5 @@
 import { t, hasKey } from './i18n.js'
-import { type FailureReason, type PlayerState } from './types.js'
+import { type Blockable, type FailureReason, type PlayerState, type QueueItem } from './types.js'
 
 const truncate = (s: string, max = 40) => {
   const chars = Array.from(s)
@@ -22,20 +22,23 @@ export function buildSkipMessage(state: PlayerState, locale: string): string {
   return state.current?.title ? t(locale, 'chat.skippedNowPlaying', { title: state.current.title }) : t(locale, 'chat.skipped')
 }
 
-// "Queue [N]: 1. Title | 2. Title ... [+more]" / "The queue is empty" - shared by the HTTP chat endpoint and the Twitch chat module
-export function buildQueueMessage(state: PlayerState, locale: string): string {
-  if (state.queue.length === 0) {
+// "Queue [N]: 1. Title | 2. Title ... [+more]" / "The queue is empty" - shared by the HTTP chat endpoint and the Twitch chat module.
+// Blocked tracks are not upcoming: they are closed when their turn comes, so they are neither shown nor counted
+export function buildQueueMessage(state: { queue: Blockable<QueueItem>[] }, locale: string): string {
+  const upcoming = state.queue.filter((item) => !item.isBlocked)
+
+  if (upcoming.length === 0) {
     return t(locale, 'chat.queueEmpty')
   }
 
   const maxShown = 4
 
-  const list = state.queue
+  const list = upcoming
     .slice(0, maxShown)
     .map((item, i) => `${i + 1}. ${truncate(item.title)}`)
     .join(' | ')
-  const base = t(locale, 'chat.queueList', { count: state.queue.length, list })
-  const more = state.queue.length > maxShown ? t(locale, 'chat.queueMore', { count: state.queue.length - maxShown }) : ''
+  const base = t(locale, 'chat.queueList', { count: upcoming.length, list })
+  const more = upcoming.length > maxShown ? t(locale, 'chat.queueMore', { count: upcoming.length - maxShown }) : ''
   return base + more
 }
 

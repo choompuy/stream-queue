@@ -7,6 +7,7 @@ import { join } from 'node:path'
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
 const queue = await import('../../src/queue.js')
+const player = await import('../../src/player.js')
 const fallback = await import('../../src/fallback.js')
 const { upsertPlaylist, removePlaylist } = await import('../../src/playlists.js')
 const { updateConfig } = await import('../../src/config.js')
@@ -54,15 +55,28 @@ test('a new current track', async (t) => {
 
 test('pausing', async (t) => {
   await t.test('announces the state', () => {
-    queue.setPaused(true)
+    player.setPaused(true)
 
     assert.deepEqual(announced(), ['state'])
   })
 
   await t.test('pausing to the same value announces nothing: nothing changed', () => {
-    queue.setPaused(true)
+    player.setPaused(true)
 
     assert.deepEqual(announced(), [])
+  })
+})
+
+test('moving on to the next track', async (t) => {
+  await t.test('leaving the old one and taking the next is one state change, announced once', () => {
+    queue.setCurrent({ ...song('viewer000001'), requestedBy: 'viewer' })
+    queue.addSong(song('viewer000002'), 'viewer', { bypassFilters: true })
+    heard.length = 0
+
+    player.moveToNext()
+
+    assert.deepEqual(heard, ['state'])
+    assert.equal(queue.getCurrent()?.videoId, 'viewer000002')
   })
 })
 

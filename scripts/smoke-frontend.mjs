@@ -66,20 +66,14 @@ const routes = {
   }),
   'GET /api/state': () => {
     if (failStateWith500) return [500, { error: 'boom', code: 'SERVER_ERROR' }]
-    const state = stateOverride ?? { current: track('a'), queue: [track('b'), track('c')], isPaused: false, nextTrack: null }
-    return { ...state, queue: withBlocked(state.queue) }
-  },
-  'GET /api/fallback': () => {
-    const current = stateOverride?.current ?? null
-    return {
-      upNext: withBlocked([track('e'), track('f')]),
-      activeVideoId: current?.isFallback ? current.videoId : V('f'),
-      lastRefreshedAt: Date.now(),
-      sourceCount: 2,
-      shuffle: false,
-      repeat: true,
-      enabled: true
+    // the playlist is playing: like the server, the current track says so with isFallback
+    const state = stateOverride ?? {
+      current: track('f', { isFallback: true, requestedBy: 'Playlist' }),
+      queue: [track('b'), track('c')],
+      isPaused: false,
+      nextTrack: null
     }
+    return { ...state, queue: withBlocked(state.queue) }
   },
   'GET /api/fallback': () => ({
     upNext: withBlocked([track('e'), track('f')]),

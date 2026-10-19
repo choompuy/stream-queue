@@ -70,7 +70,8 @@ export function sanitizeQueueItem(raw: unknown): QueueItem | null {
   return {
     ...song,
     requestedBy,
-    ...(isObject(raw) && raw.isFallback === true ? { isFallback: true } : {}),
+    // a queue saved before the flag existed marked its playlist tracks only by the requester name
+    ...(isObject(raw) && (raw.isFallback === true || requestedBy.toLowerCase() === 'playlist') ? { isFallback: true } : {}),
     ...(playId !== undefined ? { playId } : {}),
     ...(redemption ? { channelPointsRedemption: redemption } : {})
   }

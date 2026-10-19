@@ -86,7 +86,8 @@
     "info": "{{count}} tracks ▪ updated {{datetime}}",
     "addToQueue": "Add to queue",
     "playNow": "Play now",
-    "playing": "Playing"
+    "playing": "Playing",
+    "requester": "Playlist"
   },
   "activity": {
     "title": "Activity",

@@ -11,7 +11,7 @@ import type {
   TwitchChatPermission
 } from './types.js'
 import { clearTwitchAuthorization, clearTwitchOAuthState, getPublicSecretsView, getSecrets, updateTwitchOAuthState } from '../../secrets.js'
-import { detachChannelPointsRedemptions, requestSong, setPaused } from '../../queue.js'
+import { detachChannelPointsRedemptions, requestSong } from '../../queue.js'
 import {
   buildNowPlayingMessage,
   buildQueueMessage,
@@ -21,7 +21,7 @@ import {
   buildRedemptionRefundFailedMessage
 } from '../../chat-replies.js'
 import { getTwitchConfig, CHAT_COMMAND_KEYS } from './config.js'
-import { getState, skipCurrent } from '../../player.js'
+import { getState, skipCurrent, setPaused } from '../../player.js'
 import { registerRedemptionHandler, type RedemptionOutcome } from '../../finish.js'
 import { AppError, type AddedSong, type FailureReason } from '../../types.js'
 import type { QueueItem } from '../../types.js'

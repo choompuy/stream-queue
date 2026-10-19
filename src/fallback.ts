@@ -3,15 +3,19 @@ import { getConfig, updateConfig, onConfigChange } from './config.js'
 import { fetchPlaylistSongs } from './youtube/index.js'
 import { Song, QueueItem, FallbackPlaylist, FallbackStateResponse, AppError } from './types.js'
 import { addSong, getCurrent, setCurrent } from './queue.js'
+import { finishItem } from './finish.js'
 import { on, emit } from './state-events.js'
 import { isBlocked, markBlocked } from './blocklist.js'
+import { t } from './i18n.js'
+import { getSettings } from './settings.js'
 import { createStore } from './store.js'
 import { persistState } from './state-file.js'
 import { createLogger } from './logger.js'
 
 const log = createLogger('FALLBACK')
 
-export const FALLBACK_REQUESTER = 'Playlist'
+// the name shown wherever the playlist "requests" a track; the queue counts such tracks as nobody's
+const fallbackRequester = (): string => t(getSettings().locale, 'fallback.requester')
 
 export type FallbackSnapshot = {
   sourceTracks: Song[]
@@ -91,7 +95,7 @@ function buildOrder(tracks: Song[], shuffleOn: boolean, currentVideoId: string |
 function toFallbackQueueItem(song: Song): QueueItem {
   return {
     ...song,
-    requestedBy: FALLBACK_REQUESTER,
+    requestedBy: fallbackRequester(),
     isFallback: true
   }
 }
@@ -318,6 +322,9 @@ export function playFallbackTrackNow(videoId: string): QueueItem | null {
     throw new AppError('BLOCKED')
   }
 
+  // choosing a track to play right away skips whatever is playing now, open reward and all
+  finishItem(getCurrent(), 'skipped')
+
   rotation.update(() => {
     fallbackCursor = index
   })
@@ -331,7 +338,7 @@ export function queueFallbackTrack(videoId: string): QueueItem | null {
   const song = findTrack(videoId)
   if (!song) return null
 
-  return addSong(song, FALLBACK_REQUESTER, { bypassLimits: true }).item
+  return addSong(song, fallbackRequester(), { bypassFilters: true, isFallback: true }).item
 }
 
 export const getFallbackSourceTracks = (): Song[] => [...fallbackTracksById.values()]
