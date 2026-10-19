@@ -13,7 +13,12 @@ const { isAvailableInRegion, checkFilters, isMusicVideo } = await import('../../
 const { updateConfig, getConfig } = await import('../../../src/config.js')
 
 // the reason the filters would answer with, or null when the track passes them all
-const reasonOf = (song: Song, video: VideoItem): FilterFailureReason | null => checkFilters(song, video, getConfig())?.code ?? null
+// (checkFilters answers with an AppError whose code is typed as the broad AppErrorCode union;
+// only the filter reasons ever reach this helper, hence the narrowing cast)
+const reasonOf = (song: Song, video: VideoItem): FilterFailureReason | null => {
+  const failure = checkFilters(song, video, getConfig())
+  return failure ? (failure.code as FilterFailureReason) : null
+}
 
 function baseSong(overrides: Partial<Song> = {}): Song {
   return {
@@ -121,7 +126,12 @@ test('checkFilters', async (t) => {
   })
 
   await t.test('guardOnly: the guard rules alone say whether a track can be played at all', () => {
-    const config = { contentMode: 'music', minViews: 100_000, minDurationSeconds: 60, maxDurationSeconds: 480, allowShorts: false, regionCode: 'RU' }
+    // the fields the filters never read are filled in with the repo defaults: only the six below matter
+    const config: Config = {
+      contentMode: 'music', minViews: 100_000, minDurationSeconds: 60, maxDurationSeconds: 480, allowShorts: false, regionCode: 'RU',
+      maxQueueSize: 20, maxRequestsPerUser: 4, allowLiveStreams: false,
+      fallbackPlaylist: { playlistId: null, enabled: true, shuffle: false, repeat: false }
+    }
     const refusedByViewerRules = { ...baseSong({ duration: 120, views: 5 }) }
     const video = baseVideo({ snippet: { categoryId: '20' } })
 

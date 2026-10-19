@@ -17,12 +17,13 @@ const { updateTwitchConfig } = await import('../../../../src/integrations/twitch
 const queue = await import('../../../../src/queue.js')
 import type { TwitchChat } from '../../../../src/integrations/twitch/chat.js'
 import type { TwitchClient } from '../../../../src/integrations/twitch/client.js'
+import type { FailureReason } from '../../../../src/types.js'
 
 const redemption = { id: 'red-1', rewardId: 'reward-1', userName: 'viewer' }
 // the reason a redemption is canceled travels as a plain { code, params }, not as a thrown AppError
-const reason = { code: 'PLAYBACK_FAILED' }
-const refunded = () => buildRedemptionRejectionMessage('viewer', reason)
-const refundFailed = () => buildRedemptionRefundFailedMessage('viewer')
+const reason: FailureReason = { code: 'PLAYBACK_FAILED' }
+const refunded = () => buildRedemptionRejectionMessage('viewer', reason, 'en')
+const refundFailed = () => buildRedemptionRefundFailedMessage('viewer', 'en')
 
 // the song requests below reach the YouTube layer, which needs a key to get past its own gate
 updateSecrets({ youtubeApiKey: 'test-key' })
@@ -228,7 +229,7 @@ test('handleChannelPointsRedemption()', async (t) => {
 
     assert.equal(errors.mock.callCount(), 1, 'the handler that owns the request logs the outage, nobody else')
     assert.deepEqual(calls, ['CANCELED'])
-    assert.deepEqual(sent, [buildRedemptionRejectionMessage('viewer', { code: 'SERVER_ERROR' })])
+    assert.deepEqual(sent, [buildRedemptionRejectionMessage('viewer', { code: 'SERVER_ERROR' }, 'en')])
   })
 
   await t.test('a failure after the track is queued does not refund the points', async () => {

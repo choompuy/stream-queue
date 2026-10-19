@@ -9,6 +9,8 @@ process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
 const { getConfig, updateConfig, validateConfigUpdates } = await import('../../src/config.js')
 const { flushAllStores } = await import('../../src/persist.js')
+import type { Config } from '../../src/types.js'
+import type { DeepPartial } from '../../src/persist.js'
 
 const DEFAULTS = getConfig()
 
@@ -139,7 +141,7 @@ test('updateConfig()', async (t) => {
 
     assert.equal(updateConfig({ minViews: 4242 }).changed, false, 'the same value')
     assert.equal(updateConfig({}).changed, false, 'an empty update')
-    assert.equal(updateConfig({ minViews: 4242, nope: 1 }).changed, false, 'a fully rejected update')
+    assert.equal(updateConfig({ minViews: 4242, nope: 1 } as DeepPartial<Config>).changed, false, 'a fully rejected update')
     await flushAllStores()
 
     assert.equal(existsSync(file), false, 'config.json was not rewritten')
