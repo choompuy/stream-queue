@@ -16,7 +16,10 @@ export function errorHandler(err: HttpError, _req: Request, res: Response, next:
   }
 
   if (err instanceof AppError) {
-    if (statusForCode(err.code) >= 500) log.error(describeError(err))
+    const status = statusForCode(err.code)
+    // a 503 answers a request the service cannot serve right now (the quota is spent, the API is down):
+    // the answer tells the client, the line is a note for the operator and not an alarm
+    if (status >= 500) log[status === 503 ? 'warn' : 'error'](describeError(err))
     return failFromAppError(res, err)
   }
   if (err.type === 'entity.parse.failed') return fail(res, 'INVALID_JSON')

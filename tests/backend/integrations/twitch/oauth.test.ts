@@ -1,6 +1,7 @@
 import { test, beforeEach, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { TwitchOAuth } from '../../../../src/integrations/twitch/oauth.js'
+import { on } from '../../../../src/state-events.js'
 
 const realFetch = globalThis.fetch
 after(() => {
@@ -143,4 +144,17 @@ test('a refresh answer that lands after the account was disconnected', async (t)
     const logged = logs.mock.calls.map((call) => call.arguments.join(' ')).join('\n')
     assert.ok(logged.includes('Token refresh dropped'), logged)
   })
+})
+
+test('a change of the auth state announces the twitch topic', async (t) => {
+  stub(() => json(400, { status: 400, message: 'Invalid refresh token' }))
+  const oauth = expiredLogin()
+  const states: boolean[] = []
+  const off = on('twitch', () => states.push(oauth.needsReauthorization()))
+  t.after(off)
+
+  await assert.rejects(oauth.refreshAccessToken())
+  oauth.clearTokenData()
+
+  assert.deepEqual(states, [true, false])
 })

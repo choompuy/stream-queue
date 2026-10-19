@@ -13,7 +13,7 @@ import { loadBlocklist } from './blocklist.js'
 import { loadPlaylists } from './playlists.js'
 import { loadSecrets, loadConfig, loadOverlaySettings, loadNetworkInfo } from './settings.js'
 import { loadTwitchSettings, loadTwitchConfig, loadTwitchSecrets, refreshTwitchStatus } from './twitch/index.js'
-import { isDashboardActive, isPlaylistsActive } from './tabs.js'
+import { isDashboardActive, isPlaylistsActive, isSettingsActive } from './tabs.js'
 import { showNotice } from './notices.js'
 import { setError } from '../shared.js'
 
@@ -24,6 +24,7 @@ const TOPICS = {
   fallback: { read: () => refreshFallbackState(true), isShown: isDashboardActive },
   blocklist: { read: () => loadBlocklist(true), isShown: isDashboardActive },
   playlists: { read: () => loadPlaylists(true), isShown: isPlaylistsActive },
+  config: { read: () => loadConfig(), isShown: isSettingsActive },
   twitch: { read: () => refreshTwitchStatus(), isShown: () => document.visibilityState === 'visible' }
 }
 

@@ -28,4 +28,9 @@ test('importing the player modules has no side effects', async () => {
   await flushAllStores()
 
   assert.equal(readFileSync(stateFile, 'utf8'), original, 'the state file must not be written until initState() is called')
+
+  queue.setCurrent({ videoId: 'bbbbbbbbbbb', title: 'B', channelTitle: '', thumbnail: '', duration: 1, views: 1, url: 'u', requestedBy: 'viewer' })
+  await flushAllStores()
+
+  assert.equal(readFileSync(stateFile, 'utf8'), original, 'a change before the state was loaded is not saved either')
 })

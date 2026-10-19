@@ -1,4 +1,5 @@
 import { createLogger, describeError } from '../../logger.js'
+import { emit } from '../../state-events.js'
 import { AppError } from '../../types.js'
 import { normalizeTwitchError } from './error.js'
 import type {
@@ -41,7 +42,6 @@ export class TwitchOAuth {
   private authFailed = false
   private tokenGeneration = 0
   private onTokenUpdated?: (tokenData: TwitchTokenData) => void
-  private onAuthStateChange?: () => void
 
   constructor(config: TwitchOAuthOptions) {
     if (!config.clientId) {
@@ -54,7 +54,6 @@ export class TwitchOAuth {
     }
 
     this.onTokenUpdated = config.onTokenUpdated
-    this.onAuthStateChange = config.onAuthStateChange
   }
 
   getConfig(): TwitchAuthConfig {
@@ -225,7 +224,7 @@ export class TwitchOAuth {
     if (this.authFailed === failed) return
 
     this.authFailed = failed
-    this.onAuthStateChange?.()
+    emit('twitch')
   }
 
   private isCurrent(generation: number): boolean {

@@ -1,4 +1,5 @@
 import WebSocket from 'ws'
+import { emit } from '../../state-events.js'
 import { describeError, type createLogger } from '../../logger.js'
 
 /**
@@ -32,9 +33,6 @@ export abstract class ReconnectingSocket {
   protected beforeOpen(): void | Promise<void> {}
   protected onOpen(_socket: WebSocket): void {}
   protected onClosed(): void {}
-
-  // Called when the connection goes up or down (the panel shows it); it does not carry the state, the listener reads it
-  onStatusChange: (() => void) | null = null
 
   private reportedConnected = false
   private starting: Promise<void> | null = null
@@ -108,11 +106,7 @@ export abstract class ReconnectingSocket {
     if (connected === this.reportedConnected) return
 
     this.reportedConnected = connected
-    try {
-      this.onStatusChange?.()
-    } catch (error) {
-      this.log.error(`Status listener failed: ${describeError(error)}`)
-    }
+    emit('twitch')
   }
 
   protected abort(error: Error): void {

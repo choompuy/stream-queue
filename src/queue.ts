@@ -6,17 +6,20 @@ import { QueueItem, Song, AppError, AddedSong } from './types.js'
 import { isBlocked } from './blocklist.js'
 import { createStore } from './store.js'
 import { finishItem } from './finish.js'
+import { persistState } from './state-file.js'
 import { createLogger } from './logger.js'
 
 let currentSong: QueueItem | null = null
 const queue: QueueItem[] = []
 
 let isPaused = false
+let playCounter = 0
 
-// the playing state is persisted and announced by state-file.ts when it changes
+// the playing state is saved and announced by the store when it changes
 const playing = createStore({
   read: () => ({ current: currentSong, queue, isPaused }),
-  topics: ['state']
+  topics: ['state'],
+  save: persistState
 })
 
 const log = createLogger('QUEUE')
@@ -38,6 +41,7 @@ function isActiveNonFallback(videoId: string): boolean {
 
 export function hydrateQueue(data: { current?: QueueItem | null; queue?: QueueItem[] }): void {
   if (data.current !== undefined) currentSong = data.current
+  playCounter = Math.max(playCounter, data.current?.playId ?? 0)
 
   if (Array.isArray(data.queue)) {
     queue.length = 0
@@ -167,7 +171,12 @@ export function setCurrent(item: QueueItem | null): void {
   }
 
   playing.update(() => {
-    currentSong = item
+    if (item === null) {
+      currentSong = null
+    } else {
+      item.playId = ++playCounter
+      currentSong = item
+    }
   })
 }
 

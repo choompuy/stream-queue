@@ -60,10 +60,10 @@ beforeEach(async () => {
   queue.setCurrent(null)
   updateConfig({ fallbackPlaylist: { playlistId: null, enabled: true, repeat: true, shuffle: false } })
   // saving the id already starts the reaction, which resets the rotation through the "no playlist" branch
-  await fallback.settledConfigReaction()
+  await fallback.settledConfigReaction(null)
   stubPlaylist(ids)
   updateConfig({ fallbackPlaylist: { playlistId: PLAYLIST } })
-  await fallback.settledConfigReaction()
+  await fallback.settledConfigReaction(PLAYLIST)
 })
 
 async function restart(options: { withTrackFile: boolean; playlist?: string[] }): Promise<void> {

@@ -79,6 +79,21 @@ test('POST /api/player/ended', async (t) => {
     assert.equal(currentId(), B)
   })
 
+  await t.test('an "ended" with the play id of an older play of the same track is ignored', async () => {
+    const stalePlayId = queue.getCurrent()!.playId
+    queue.setCurrent({ ...song(A), requestedBy: 'viewer' })
+    const currentPlayId = queue.getCurrent()!.playId
+    assert.notEqual(stalePlayId, currentPlayId)
+
+    const stale = await post('ended', { videoId: A, playId: stalePlayId })
+
+    assert.equal(((await stale.json()) as Record<string, any>).data.ignored, true)
+    assert.equal(currentId(), A)
+
+    await post('ended', { videoId: A, playId: currentPlayId })
+    assert.equal(currentId(), B)
+  })
+
   await t.test('without a videoId it still means the current track (older overlays)', async () => {
     await post('ended')
 

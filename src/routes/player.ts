@@ -18,10 +18,17 @@ function readVideoId(body: unknown): string | undefined {
   return videoId
 }
 
+// `playId` says which play of that track the report is about; a number that is not one is ignored, not refused
+function readPlayId(body: unknown): number | undefined {
+  const playId = (body as { playId?: unknown } | undefined)?.playId
+  return typeof playId === 'number' && Number.isInteger(playId) && playId > 0 ? playId : undefined
+}
+
 router.post('/ended', (req, res) => {
   const videoId = readVideoId(req.body)
+  const playId = readPlayId(req.body)
 
-  const applied = endCurrent(videoId)
+  const applied = endCurrent(videoId, playId)
   ok(res, { ...getState(), ...(applied ? {} : { ignored: true }) })
 })
 
@@ -46,9 +53,10 @@ router.post('/resume', (_req, res) => {
 
 router.post('/report-failure', (req, res) => {
   const videoId = readVideoId(req.body)
+  const playId = readPlayId(req.body)
 
   const errorCode = typeof req.body?.errorCode === 'number' ? req.body.errorCode : undefined
-  const applied = reportPlaybackFailure(errorCode, videoId)
+  const applied = reportPlaybackFailure(errorCode, videoId, playId)
   const state = getState()
   const locale = getSettings().locale
 

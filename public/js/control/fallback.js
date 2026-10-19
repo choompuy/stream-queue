@@ -22,7 +22,6 @@ export function refreshFallbackState(silent = false) {
 export function renderFallback() {
   const data = state.fallback
   const tracks = data?.upNext ?? []
-  const activeVideoId = data?.activeVideoId ?? ''
 
   toggleActive(dom.fallbackShuffleBtn, data?.shuffle)
   toggleActive(dom.fallbackRepeatBtn, data?.repeat)
@@ -43,13 +42,27 @@ export function renderFallback() {
       datetime: formatDateTime(data.lastRefreshedAt)
     })
   )
-  views.fallback.render(tracks.map((track) => ({ ...track, isActive: track.videoId === activeVideoId })))
-  scrollToActiveFallback()
+  renderFallbackTracks()
   renderStats()
 }
 
+let renderedActiveVideoId
+
+// the active row follows the playing state, so a step of the rotation moves the highlight without reading the playlist
+export function renderFallbackTracks() {
+  if (!state.fallback) return
+
+  const activeVideoId = state.current?.isFallback ? state.current.videoId : ''
+  views.fallback.render((state.fallback.upNext ?? []).map((track) => ({ ...track, isActive: track.videoId === activeVideoId })))
+
+  if (activeVideoId !== renderedActiveVideoId) {
+    renderedActiveVideoId = activeVideoId
+    scrollToActiveFallback()
+  }
+}
+
 export function scrollToActiveFallback() {
-  const activeVideoId = state.fallback?.activeVideoId
+  const activeVideoId = state.current?.isFallback ? state.current.videoId : null
   const container = dom.fallbackListWrapper
   const list = container?.querySelector('.row-list')
   if (!activeVideoId || !container || !list) return

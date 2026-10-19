@@ -15,7 +15,7 @@ import { normalize } from './utils.js'
 import { getSearchCache, setSearchCache, getVideoCache, setVideoCache } from './cache.js'
 import { VideoItem, SearchItem, PlaylistItem } from './types.js'
 import { getConfig } from '../config.js'
-import { createLogger, describeError } from '../logger.js'
+import { createLogger } from '../logger.js'
 
 const pendingSearches = new Map<string, Promise<VideoItem[]>>()
 const pendingVideos = new Map<string, Promise<VideoItem | null>>()
@@ -29,7 +29,6 @@ async function withYouTubeErrorHandling<T>(label: string, fn: () => Promise<T>):
   try {
     return await fn()
   } catch (error) {
-    log.error(`${label}: ${describeError(error)}`)
     if (error instanceof AppError) throw error
     throw new AppError('YOUTUBE_ERROR', `${label} failed`)
   }

@@ -26,9 +26,12 @@ router.get('/config', (_req, res) => {
 // saves; the fallback module reacts to what changed (a new playlist is loaded, the rotation re-ordered)
 // and the route waits for that outcome, so a playlist that cannot be loaded is answered with its error
 router.put('/config', async (req, res) => {
+  const previous = getConfig()
   const { config: updated, rejected } = updateConfig(req.body ?? {})
 
-  await settledConfigReaction()
+  if (updated.fallbackPlaylist.playlistId !== previous.fallbackPlaylist.playlistId) {
+    await settledConfigReaction(updated.fallbackPlaylist.playlistId)
+  }
 
   sendConfigUpdate(res, updated, rejected)
 })

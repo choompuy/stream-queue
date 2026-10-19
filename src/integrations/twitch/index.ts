@@ -26,7 +26,7 @@ import { registerRedemptionHandler, type RedemptionOutcome } from '../../finish.
 import { AppError, type AddedSong, type FailureReason } from '../../types.js'
 import type { QueueItem } from '../../types.js'
 import { createLogger, describeError } from '../../logger.js'
-import { emit, notify } from '../../state-events.js'
+import { notify } from '../../state-events.js'
 import { normalizeTwitchError, isNetworkError } from './error.js'
 import { getSettings } from '../../settings.js'
 import { t } from '../../i18n.js'
@@ -90,8 +90,7 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
     scopes: config.scopes,
     onTokenUpdated: (tokenData) => {
       updateTwitchOAuthState({ tokenData }, true)
-    },
-    onAuthStateChange: () => emit('twitch')
+    }
   })
   const twitchClient = new TwitchClient(oauth)
   client = twitchClient
@@ -206,7 +205,6 @@ async function connectEventSub(): Promise<void> {
       client: twitchClient,
       onChannelPointsRedemption: (event) => handleChannelPointsRedemption(event, twitchClient)
     })
-    eventSub.onStatusChange = () => emit('twitch')
   }
 
   if (!eventSub.isConnected()) await connectOrRetry(eventSub, 'Twitch EventSub', log)
@@ -364,7 +362,6 @@ async function connectChat(): Promise<void> {
       botLogin: userInfo.login,
       onMessage: handleChatMessage
     })
-    chat.onStatusChange = () => emit('twitch')
   }
 
   if (!chat.isConnected()) await connectOrRetry(chat, 'Twitch chat', chatLog)

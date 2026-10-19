@@ -120,6 +120,19 @@ test('the player follows the server', async (t) => {
     assert.deepEqual(player().calls.at(-1), ['load', V('b')])
   })
 
+  await t.test('the same track played again (a new play id) is loaded again', async (t) => {
+    const { overlay, server, player, settle } = await boot(t, { current: track('a', { playId: 1 }) })
+
+    server.current = track('a', { playId: 2 })
+    await overlay.refresh()
+    await settle()
+
+    assert.deepEqual(player().calls, [
+      ['load', V('a')],
+      ['load', V('a')]
+    ])
+  })
+
   await t.test('pause and resume of the server reach the player, and an empty queue stops it', async (t) => {
     const { overlay, server, player, settle } = await boot(t, { current: track('a') })
     const step = async (change) => {
@@ -149,6 +162,15 @@ test('a finished track', async (t) => {
     await settle()
 
     assert.deepEqual(sent.ended, [{ videoId: V('a') }])
+  })
+
+  await t.test('is reported with the play id of the play that ended', async (t) => {
+    const { player, sent, settle } = await boot(t, { current: track('a', { playId: 7 }) })
+
+    player().emit('onStateChange', 0)
+    await settle()
+
+    assert.deepEqual(sent.ended, [{ videoId: V('a'), playId: 7 }])
   })
 
   await t.test('is reported again, with growing pauses, until the server has heard it', async (t) => {

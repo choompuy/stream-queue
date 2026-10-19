@@ -5,6 +5,7 @@ import { renderStats } from './stats.js'
 import { views } from './views/index.js'
 import { run } from './run.js'
 import { renderCurrent, renderNext, renderPlayPause, syncPlayer } from './player.js'
+import { renderFallbackTracks } from './fallback.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 import { setText } from '../shared.js'
@@ -35,6 +36,7 @@ export function renderState() {
   renderNext()
   renderQueue()
   renderPlayPause()
+  renderFallbackTracks()
   renderStats()
   syncPlayer()
 }

@@ -69,6 +69,6 @@ router.post('/:id/activate', async (req, res) => {
 
   // saves; the fallback module loads the playlist and the route answers with the outcome of that load
   updateConfig({ fallbackPlaylist: { playlistId: id } })
-  await settledConfigReaction()
+  await settledConfigReaction(id)
   ok<ConfigResponse>(res, getConfig())
 })

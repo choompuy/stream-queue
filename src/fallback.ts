@@ -6,6 +6,7 @@ import { addSong, getCurrent, setCurrent } from './queue.js'
 import { on, emit } from './state-events.js'
 import { isBlocked, markBlocked } from './blocklist.js'
 import { createStore } from './store.js'
+import { persistState } from './state-file.js'
 import { createLogger } from './logger.js'
 
 const log = createLogger('FALLBACK')
@@ -30,7 +31,7 @@ let lastFallbackRefreshAt: number | null = null
 // is rewritten only then and not on every change of position
 let sourceVersion = 0
 
-// the rotation is part of the playing state: state-file.ts saves it when it changes
+// the rotation is part of the playing state: the store saves and announces it when it changes
 const rotation = createStore({
   read: () => ({
     tracks: sourceVersion,
@@ -39,7 +40,8 @@ const rotation = createStore({
     playlistId: loadedFallbackPlaylistId,
     lastRefreshedAt: lastFallbackRefreshAt
   }),
-  topics: ['state']
+  topics: ['state'],
+  save: persistState
 })
 
 function setSourceTracks(tracks: Song[]): void {
@@ -127,10 +129,10 @@ export function advanceFallback(): QueueItem | null {
   return toFallbackQueueItem(next.song)
 }
 
-// the playlist view the panel reads: the answer of getFallbackState() without the blocked marks (those follow the blocklist)
+// the playlist view the panel reads: the answer of getFallbackState() without the blocked marks (those follow the
+// blocklist) and without the playing position (that follows the state the playing store announces)
 function fallbackView() {
   const { enabled, shuffle, repeat } = getConfig().fallbackPlaylist
-  const current = getCurrent()
 
   return {
     playlistId: loadedFallbackPlaylistId,
@@ -139,7 +141,6 @@ function fallbackView() {
     shuffle,
     repeat,
     sourceCount: fallbackTracksById.size,
-    activeVideoId: current?.isFallback ? current.videoId : null,
     order: [...fallbackOrder],
     blocked: fallbackOrder.map((videoId) => isBlocked(videoId))
   }
@@ -163,16 +164,19 @@ function announceFallbackView(): void {
 on('state', announceFallbackView)
 on('config', announceFallbackView)
 
-let pendingReaction: Promise<void> | null = null
+// true while a failed load rolls the config back: the playlist it restores must not be loaded again, or two
+// playlists that both fail would keep replacing each other forever
+let rollingBack = false
+
+const pendingReactions = new Map<string | null, Promise<void>>()
 
 /**
- * Resolves when the fallback reaction the last config save started has settled, so a route can answer with its
- * outcome. Nobody has to wait: without a caller the reaction runs in the background and the rollback still happens
+ * Resolves when the reaction the last save of `playlistId` started has settled, so a route that changed the playlist
+ * can answer with its outcome. Nobody has to wait: without a caller the reaction runs in the background and the
+ * rollback still happens
  */
-export function settledConfigReaction(): Promise<void> {
-  const reaction = pendingReaction
-  pendingReaction = null
-  return reaction ?? Promise.resolve()
+export function settledConfigReaction(playlistId: string | null): Promise<void> {
+  return pendingReactions.get(playlistId) ?? Promise.resolve()
 }
 
 function loadPlaylist(playlistId: string | null, rollbackTo: string | null): void {
@@ -182,13 +186,23 @@ function loadPlaylist(playlistId: string | null, rollbackTo: string | null): voi
       // the playlist was replaced while it was loading: the failure is stale, the newer save wins
       if (getConfig().fallbackPlaylist.playlistId !== playlistId) return
       log.error(`Playlist ${playlistId ?? 'none'} could not be loaded, ${rollbackTo ?? 'no playlist'} is kept instead`)
-      updateConfig({ fallbackPlaylist: { playlistId: rollbackTo } })
+      rollingBack = true
+      try {
+        updateConfig({ fallbackPlaylist: { playlistId: rollbackTo } })
+      } finally {
+        rollingBack = false
+      }
       throw error
     }
   )
   // a caller that awaits takes the failure; without one the rollback has already run and only the answer is dropped
   load.catch(() => {})
-  pendingReaction = load
+  pendingReactions.set(playlistId, load)
+  load
+    .finally(() => {
+      if (pendingReactions.get(playlistId) === load) pendingReactions.delete(playlistId)
+    })
+    .catch(() => {})
 }
 
 onConfigChange((previous, next) => {
@@ -196,8 +210,8 @@ onConfigChange((previous, next) => {
   const after = next.fallbackPlaylist
 
   if (after.playlistId !== before.playlistId) {
-    // a rollback restores the id the rotation already holds: nothing to load
-    if (after.playlistId !== loadedFallbackPlaylistId) loadPlaylist(after.playlistId, before.playlistId)
+    // a rollback restores the id the rotation already holds, and one that was never loaded stays unloaded
+    if (!rollingBack && after.playlistId !== loadedFallbackPlaylistId) loadPlaylist(after.playlistId, before.playlistId)
   } else if (after.shuffle !== before.shuffle) {
     reorderFallback(after.shuffle)
   }

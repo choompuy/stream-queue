@@ -25,7 +25,9 @@ function timestamp(): string {
 export function describeError(error: unknown, withStack = false): string {
   if (error instanceof AppError) {
     const params = error.params && Object.keys(error.params).length > 0 ? ` ${JSON.stringify(error.params)}` : ''
-    const described = `AppError ${error.code}: ${error.message}${params}`
+    // the default message repeats the code: printing both says the same thing twice
+    const detail = error.message === error.code ? '' : `: ${error.message}`
+    const described = `AppError ${error.code}${detail}${params}`
     return withStack ? `${described}\n${error.stack ?? ''}` : described
   }
 

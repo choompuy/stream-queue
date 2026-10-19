@@ -26,6 +26,9 @@ app.get('/twitch', () => {
 app.get('/twitch-network', () => {
   throw new AppError('TWITCH_NETWORK_ERROR', 'connect ECONNREFUSED')
 })
+app.get('/quota', () => {
+  throw new AppError('YOUTUBE_QUOTA')
+})
 app.use(errorHandler)
 
 const server = app.listen(0)
@@ -94,6 +97,20 @@ test('errorHandler', async (t) => {
     assert.ok(body.error.includes('title must be unique'))
   })
 
+  await t.test('a 503 refusal is one warning, not an error: a day without quota would fill the log with them', async (t2) => {
+    const errors = t2.mock.method(console, 'error', () => {})
+    const warnings = t2.mock.method(console, 'warn', () => {})
+
+    const response = await fetch(`${base}/quota`)
+    const body = (await response.json()) as Record<string, any>
+
+    assert.equal(response.status, 503)
+    assert.equal(body.code, 'YOUTUBE_QUOTA')
+    assert.equal(errors.mock.callCount(), 0)
+    assert.equal(warnings.mock.callCount(), 1)
+    assert.ok(String(warnings.mock.calls[0]?.arguments ?? '').includes('YOUTUBE_QUOTA'))
+  })
+
   await t.test('a server-side AppError is logged, an expected refusal is not', async (t2) => {
     const errors = t2.mock.method(console, 'error', () => {})
 
@@ -118,6 +135,7 @@ test('errorHandler', async (t) => {
 
   await t.test('describeError says which error it was, not only its message', () => {
     assert.equal(describeError(new AppError('USER_LIMIT', 'you can only queue 2 track(s) at a time', { count: 2 })), 'AppError USER_LIMIT: you can only queue 2 track(s) at a time {"count":2}')
+    assert.equal(describeError(new AppError('DUPLICATE')), 'AppError DUPLICATE')
     assert.equal(describeError(new TypeError('fetch failed')), 'TypeError: fetch failed')
     assert.equal(describeError(new Error('a plain one')), 'a plain one')
     assert.equal(describeError('not even an error'), 'not even an error')

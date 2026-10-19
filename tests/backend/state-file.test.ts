@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -221,6 +221,30 @@ test('initState()', async (t) => {
       queue.getQueue().map((entry) => entry.videoId),
       [C]
     )
+  })
+
+  await t.test('a change of the overlay settings does not rewrite the queue state', async () => {
+    const { updateSettings } = await import('../../src/settings.js')
+    await flushAllStores()
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    const before = statSync(stateFile).mtimeMs
+
+    updateSettings({ opacity: 37 })
+    await flushAllStores()
+
+    assert.equal(statSync(stateFile).mtimeMs, before)
+  })
+
+  await t.test('a state announcement alone does not rewrite the queue state', async () => {
+    const { emit } = await import('../../src/state-events.js')
+    await flushAllStores()
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    const before = statSync(stateFile).mtimeMs
+
+    emit('state')
+    await flushAllStores()
+
+    assert.equal(statSync(stateFile).mtimeMs, before)
   })
 })
 

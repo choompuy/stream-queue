@@ -10,7 +10,7 @@ process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 const express = (await import('express')).default
 const { router } = await import('../../../src/routes/settings.js')
 const { errorHandler } = await import('../../../src/error-handler.js')
-const { updateTwitchOAuthState } = await import('../../../src/secrets.js')
+const { updateTwitchOAuthState, updateSecrets } = await import('../../../src/secrets.js')
 
 const app = express()
 app.use(express.json())
@@ -210,4 +210,34 @@ test('GET /api/secrets and a login that waits for its code', async (t) => {
   })
 
   updateTwitchOAuthState({ authorization: null })
+})
+
+test('PUT /api/config while a playlist is still loading', async (t) => {
+  updateSecrets({ youtubeApiKey: 'test-key' })
+  const realFetch = globalThis.fetch
+  after(() => {
+    globalThis.fetch = realFetch
+  })
+
+  await t.test('a save that does not touch the playlist is answered at once, and with its own result', async () => {
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (url.hostname === 'www.googleapis.com') {
+        await new Promise((resolve) => setTimeout(resolve, 30))
+        return new Response(JSON.stringify({ error: { message: 'refused' } }), { status: 403 })
+      }
+      return realFetch(input, init)
+    }
+
+    const playlistSave = putConfig({ fallbackPlaylist: { playlistId: 'PLraceslower01' } })
+    await new Promise((resolve) => setTimeout(resolve, 5))
+
+    const response = await putConfig({ minViews: 777 })
+
+    assert.equal(response.status, 200)
+    assert.equal((await getConfig()).minViews, 777)
+
+    assert.equal((await playlistSave).status, 503)
+    assert.equal((await getConfig()).fallbackPlaylist.playlistId, null, 'the failed playlist save was rolled back')
+  })
 })

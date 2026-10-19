@@ -34,10 +34,21 @@ test('a new current track', async (t) => {
     assert.deepEqual(announced(), ['state'])
   })
 
-  await t.test('a playlist track announces the playlist too: the view marks which of its tracks plays', () => {
+  await t.test('a playlist track announces the state: the active row follows it, the playlist is not read again', () => {
     queue.setCurrent({ ...song('track01'), requestedBy: 'Playlist', isFallback: true })
 
-    assert.deepEqual(announced(), ['fallback', 'state'])
+    assert.deepEqual(announced(), ['state'])
+  })
+
+  await t.test('the same track played again is a new play, announced like one', () => {
+    queue.setCurrent({ ...song('track01'), requestedBy: 'Playlist', isFallback: true })
+    const firstPlayId = queue.getCurrent()?.playId
+    heard.length = 0
+
+    queue.setCurrent({ ...song('track01'), requestedBy: 'Playlist', isFallback: true })
+
+    assert.deepEqual(announced(), ['state'], 'a repeat is a change: the overlay reloads the video')
+    assert.notEqual(queue.getCurrent()?.playId, firstPlayId)
   })
 })
 

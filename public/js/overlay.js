@@ -8,6 +8,8 @@ let player = null
 let currentState = null
 let isPlayerReady = false
 let isTransitioning = false
+// the play the player was last loaded for: a new value means the same track is played again
+let loadedPlayId = null
 // set while a broken player is being replaced and its failure is reported: what the player says meanwhile is not news
 let resetting = null
 let settings = {}
@@ -97,15 +99,17 @@ function renderState() {
 
   if (!currentState.current) {
     temporaryErrorRetries.clear()
+    loadedPlayId = null
     player.stopVideo()
     return
   }
 
   const videoId = currentState.current.videoId
+  const playId = currentState.current.playId ?? null
   const currentVideoId = player.getVideoData()?.video_id
   const playerState = player.getPlayerState()
 
-  if (currentVideoId !== videoId) {
+  if (currentVideoId !== videoId || playId !== loadedPlayId) {
     temporaryErrorRetries.clear()
 
     if (currentState.isPaused) {
@@ -116,6 +120,7 @@ function renderState() {
       player.loadVideoById(videoId)
     }
 
+    loadedPlayId = playId
     configurePlayer()
     return
   }
@@ -198,13 +203,13 @@ async function postWithRetry(url, body) {
   }
 }
 
-async function notifyEnded(videoId) {
-  await postWithRetry('/api/player/ended', { videoId })
+async function notifyEnded(videoId, playId) {
+  await postWithRetry('/api/player/ended', { videoId, ...(playId != null ? { playId } : {}) })
   await readState()
 }
 
-async function reportFailure(errorCode, videoId) {
-  if (await postWithRetry('/api/player/report-failure', { errorCode, videoId })) {
+async function reportFailure(errorCode, videoId, playId) {
+  if (await postWithRetry('/api/player/report-failure', { errorCode, videoId, ...(playId != null ? { playId } : {}) })) {
     log(`Playback failure reported for ${videoId}`)
   }
 
@@ -254,7 +259,7 @@ function onPlayerStateChange(event) {
     isTransitioning = true
     // the track that actually finished in the player, which may differ from what the server considers current now
     const endedVideoId = event.target.getVideoData?.().video_id || currentState?.current?.videoId
-    notifyEnded(endedVideoId).finally(() => {
+    notifyEnded(endedVideoId, loadedPlayId).finally(() => {
       isTransitioning = false
     })
   }
@@ -278,7 +283,7 @@ function onPlayerError(event) {
   if (retryTemporaryError(event.data, videoId, event.target)) return
 
   resetting = resetPlayer()
-    .then(() => reportFailure(event.data, videoId))
+    .then(() => reportFailure(event.data, videoId, loadedPlayId))
     .finally(() => {
       resetting = null
     })

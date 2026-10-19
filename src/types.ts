@@ -102,6 +102,8 @@ export type Song = {
 export type QueueItem = Song & {
   requestedBy: string
   isFallback?: boolean
+  // set when a track becomes the current one: a new value is a new play, even of the same track
+  playId?: number
   // set only when the song was added via a Twitch Channel Points redemption, and removed once the redemption is closed;
   // carries what finishItem() needs to fulfill or refund the points and notify the requester in chat
   channelPointsRedemption?: { id: string; rewardId: string; userName: string }

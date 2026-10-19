@@ -73,13 +73,15 @@ export function playbackFailureReasonCode(errorCode?: number): ActivityReasonCod
   }
 }
 
-function isAboutCurrent(videoId?: string): boolean {
+function isAboutCurrent(videoId?: string, playId?: number): boolean {
+  // the play id tells an old play of the same track from the one that runs now
+  if (playId !== undefined) return getCurrent()?.playId === playId && (videoId === undefined || getCurrent()?.videoId === videoId)
   return videoId === undefined || getCurrent()?.videoId === videoId
 }
 
-// The player reports that `videoId` finished. Returns false if that was not the current track and nothing changed
-export function endCurrent(videoId?: string): boolean {
-  if (!isAboutCurrent(videoId)) {
+// The player reports that a play of `videoId` finished. Returns false if that was not the current play and nothing changed
+export function endCurrent(videoId?: string, playId?: number): boolean {
+  if (!isAboutCurrent(videoId, playId)) {
     log.log(`ignored "ended" for ${videoId}: it is not the current track`)
     return false
   }
@@ -89,9 +91,9 @@ export function endCurrent(videoId?: string): boolean {
   return true
 }
 
-// The player reports that `videoId` failed. Returns false if that was not the current track and nothing changed
-export function reportPlaybackFailure(errorCode?: number, videoId?: string): boolean {
-  if (!isAboutCurrent(videoId)) {
+// The player reports that a play of `videoId` failed. Returns false if that was not the current play and nothing changed
+export function reportPlaybackFailure(errorCode?: number, videoId?: string, playId?: number): boolean {
+  if (!isAboutCurrent(videoId, playId)) {
     log.log(`ignored playback failure for ${videoId}: it is not the current track`)
     return false
   }

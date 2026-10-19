@@ -10,7 +10,6 @@ import {
   FallbackSnapshot,
   alignFallbackCursor
 } from './fallback.js'
-import { on } from './state-events.js'
 import { createLogger, describeError } from './logger.js'
 
 export type StateFile = {
@@ -65,11 +64,14 @@ export function sanitizeQueueItem(raw: unknown): QueueItem | null {
 
   // without the redemption a restored track would play, but its Channel Points reward would never be closed
   const redemption = isObject(raw) ? sanitizeRedemption(raw.channelPointsRedemption) : undefined
+  // the play id survives a restart, so a report that arrives late still names the play it belongs to
+  const playId = isObject(raw) && Number.isInteger(raw.playId) && (raw.playId as number) > 0 ? (raw.playId as number) : undefined
 
   return {
     ...song,
     requestedBy,
     ...(isObject(raw) && raw.isFallback === true ? { isFallback: true } : {}),
+    ...(playId !== undefined ? { playId } : {}),
     ...(redemption ? { channelPointsRedemption: redemption } : {})
   }
 }
@@ -162,7 +164,11 @@ function stateSnapshot(): StateFile {
 // -1 until the track list has been saved (or read from its own file), so an older state file gets migrated
 let savedTracksVersion = -1
 
-function persistState(): void {
+// The stores that own the playing state save through this hook. Nothing is saved before the state was loaded:
+// a change made before would write the not-yet-loaded state over the file
+export function persistState(): void {
+  if (!initialized) return
+
   store.scheduleSave(stateSnapshot)
 
   const version = getFallbackSourceVersion()
@@ -213,5 +219,4 @@ export function initState(): void {
   initialized = true
 
   loadState()
-  on('state', persistState)
 }
