@@ -84,6 +84,7 @@
     "repeat": "Repeat",
     "enable": "Enable playlist",
     "info": "{{count}} tracks ▪ updated {{datetime}}",
+    "infoOf": "{{count}} of {{total}} tracks ▪ updated {{datetime}}",
     "addToQueue": "Add to queue",
     "playNow": "Play now",
     "playing": "Playing",

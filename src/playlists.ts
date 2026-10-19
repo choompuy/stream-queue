@@ -1,5 +1,4 @@
-import { dataPath, createFileStore, loadList } from './persist.js'
-import { createStore } from './store.js'
+import { dataPath, createListStore } from './persist.js'
 import { onConfigChange } from './config.js'
 import { emit } from './state-events.js'
 
@@ -10,8 +9,6 @@ export type SavedPlaylist = {
   itemCount: number
   addedAt: number
 }
-
-const store = createFileStore<SavedPlaylist[]>(() => dataPath('playlists.json'))
 
 // a saved playlist as the panel gets it: with the answer whether it is the one that is played
 export type PlaylistEntry = SavedPlaylist & { isActive: boolean }
@@ -30,14 +27,10 @@ function isSavedPlaylist(value: unknown): value is SavedPlaylist {
   )
 }
 
-// read from disk on first use, not when the module is imported
-let loaded: SavedPlaylist[] | null = null
-const current = (): SavedPlaylist[] => (loaded ??= loadList(store, isSavedPlaylist))
-
-const changes = createStore({
-  read: current,
-  topics: ['playlists'],
-  save: () => store.scheduleSave(current)
+const playlists = createListStore<SavedPlaylist>({
+  file: () => dataPath('playlists.json'),
+  guard: isSavedPlaylist,
+  topics: ['playlists']
 })
 
 // the active mark of the saved playlists is derived from the config's playlist id: it moved, the list is read again
@@ -46,22 +39,22 @@ onConfigChange((previous, next) => {
 })
 
 export function getPlaylists(): SavedPlaylist[] {
-  return [...current()]
+  return playlists.all()
 }
 
 export function upsertPlaylist(meta: { id: string; title: string; thumbnail: string; itemCount: number }): SavedPlaylist {
   let saved!: SavedPlaylist
 
-  changes.update(() => {
-    const existing = current().find((p) => p.id === meta.id)
+  playlists.update((list) => {
+    const index = list.findIndex((playlist) => playlist.id === meta.id)
 
-    if (existing) {
-      saved = { ...existing, title: meta.title, thumbnail: meta.thumbnail, itemCount: meta.itemCount }
-      loaded = current().map((p) => (p.id === meta.id ? saved : p))
-    } else {
-      saved = { ...meta, addedAt: Date.now() }
-      current().push(saved)
-    }
+    saved =
+      index >= 0
+        ? { ...list[index], title: meta.title, thumbnail: meta.thumbnail, itemCount: meta.itemCount }
+        : { ...meta, addedAt: Date.now() }
+
+    if (index >= 0) list[index] = saved
+    else list.push(saved)
   })
 
   return saved
@@ -70,11 +63,11 @@ export function upsertPlaylist(meta: { id: string; title: string; thumbnail: str
 export function removePlaylist(id: string): boolean {
   let removed = false
 
-  changes.update(() => {
-    if (current().some((p) => p.id === id)) {
-      loaded = current().filter((p) => p.id !== id)
-      removed = true
-    }
+  playlists.update((list) => {
+    const index = list.findIndex((playlist) => playlist.id === id)
+    if (index === -1) return
+    list.splice(index, 1)
+    removed = true
   })
 
   return removed

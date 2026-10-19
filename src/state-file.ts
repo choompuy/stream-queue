@@ -2,14 +2,7 @@ import { cachePath, createFileStore, dataPath } from './persist.js'
 import { QueueItem, Song } from './types.js'
 import { isValidPlaylistId, isValidVideoId } from './youtube/url.js'
 import { getQueue, getCurrent, hydrateQueue } from './queue.js'
-import {
-  getFallbackProgress,
-  getFallbackSourceTracks,
-  getFallbackSourceVersion,
-  hydrateFallback,
-  FallbackSnapshot,
-  alignFallbackCursor
-} from './fallback.js'
+import { getFallbackSnapshot, hydrateFallback, FallbackSnapshot } from './fallback.js'
 import { createLogger, describeError } from './logger.js'
 
 export type StateFile = {
@@ -102,13 +95,15 @@ function sanitizeFallback(raw: unknown, problems: string[]): FallbackSnapshot | 
   const cursor = clean && Number.isInteger(rawCursor) && (rawCursor as number) >= -1 && (rawCursor as number) < order.length ? (rawCursor as number) : -1
 
   const lastRefreshedAt = raw.lastRefreshedAt
+  const itemCount = raw.itemCount
 
   return {
     sourceTracks: [...tracks.values()],
     order,
     cursor,
     playlistId: isValidPlaylistId(raw.playlistId) ? raw.playlistId : null,
-    lastRefreshedAt: typeof lastRefreshedAt === 'number' && Number.isFinite(lastRefreshedAt) ? lastRefreshedAt : null
+    lastRefreshedAt: typeof lastRefreshedAt === 'number' && Number.isFinite(lastRefreshedAt) ? lastRefreshedAt : null,
+    itemCount: typeof itemCount === 'number' && Number.isFinite(itemCount) && itemCount >= 0 ? itemCount : null
   }
 }
 
@@ -155,10 +150,11 @@ const tracksStore = createFileStore<TracksFile>(() => cachePath('fallback-tracks
 const log = createLogger('STATE')
 
 function stateSnapshot(): StateFile {
+  const { sourceVersion: _version, sourceTracks: _tracks, ...fallback } = getFallbackSnapshot()
   return {
     current: getCurrent(),
     queue: getQueue(),
-    fallback: getFallbackProgress()
+    fallback
   }
 }
 
@@ -172,11 +168,11 @@ export function persistState(): void {
 
   store.scheduleSave(stateSnapshot)
 
-  const version = getFallbackSourceVersion()
-  if (version !== savedTracksVersion) {
-    savedTracksVersion = version
+  const { sourceVersion } = getFallbackSnapshot()
+  if (sourceVersion !== savedTracksVersion) {
+    savedTracksVersion = sourceVersion
     tracksStore.scheduleSave(
-      () => ({ sourceTracks: getFallbackSourceTracks() }),
+      () => ({ sourceTracks: getFallbackSnapshot().sourceTracks }),
       (error) => {
         savedTracksVersion = -1 // not on disk: written again with the next save
         log.error(`Failed to save the fallback tracks: ${describeError(error)}`)
@@ -204,10 +200,10 @@ export function loadState(): void {
   for (const problem of problems) log.warn(problem)
 
   attempt('queue', () => hydrateQueue({ current, queue }))
+  // hydrateFallback() also puts the position under the track that is playing, if it is one of the rotation's
   attempt('fallback', () => hydrateFallback(fallback))
 
-  if (current?.isFallback) attempt('fallback position', () => alignFallbackCursor(current.videoId))
-  savedTracksVersion = tracks.length > 0 ? getFallbackSourceVersion() : -1
+  savedTracksVersion = tracks.length > 0 ? getFallbackSnapshot().sourceVersion : -1
 
   log.log('State loaded from disk')
 }

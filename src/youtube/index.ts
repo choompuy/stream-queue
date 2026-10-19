@@ -2,9 +2,7 @@ import { Song, AppError } from '../types.js'
 import {
   youtube,
   videoToSong,
-  isValidSong,
-  getFilterFailureReason,
-  throwFilterError,
+  checkFilters,
   fetchPlaylistMeta,
   PlaylistMeta,
   MUSIC_CATEGORY_ID,
@@ -15,13 +13,13 @@ import { normalize } from './utils.js'
 import { getSearchCache, setSearchCache, getVideoCache, setVideoCache } from './cache.js'
 import { VideoItem, SearchItem, PlaylistItem } from './types.js'
 import { getConfig } from '../config.js'
-import { createLogger } from '../logger.js'
+import { createLogger, describeError } from '../logger.js'
 
 const pendingSearches = new Map<string, Promise<VideoItem[]>>()
 const pendingVideos = new Map<string, Promise<VideoItem | null>>()
 const pendingPlaylists = new Map<string, Promise<PlaylistFetchResult>>()
 const PLAYLIST_PAGE_SIZE = 50
-const MAX_PLAYLIST_PAGES = 3
+const MAX_PLAYLIST_PAGES = 5
 
 const log = createLogger('YOUTUBE')
 
@@ -30,7 +28,7 @@ async function withYouTubeErrorHandling<T>(label: string, fn: () => Promise<T>):
     return await fn()
   } catch (error) {
     if (error instanceof AppError) throw error
-    throw new AppError('YOUTUBE_ERROR', `${label} failed`)
+    throw new AppError('YOUTUBE_ERROR', `${label} failed: ${describeError(error)}`)
   }
 }
 
@@ -57,8 +55,8 @@ export async function getVideoById(videoId: string, bypassFilters = false): Prom
   const song = videoToSong(video)
   if (bypassFilters) return song
 
-  const reason = getFilterFailureReason(song, video)
-  if (reason) throwFilterError(reason, getConfig())
+  const failure = checkFilters(song, video, getConfig())
+  if (failure) throw failure
 
   return song
 }
@@ -78,17 +76,19 @@ export async function searchSongs(query: string, bypassFilters = false): Promise
 
   const cacheKey = searchCacheKey(normalizedQuery)
   const cached = getSearchCache(cacheKey)
-  if (cached !== undefined) return mapValidSongs(cached, bypassFilters)
+  if (cached !== undefined) return mapValidSongs(cached, bypassFilters ? 'bypass' : 'viewer')
 
   const trimmedQuery = query.trim()
   const videos = await dedupInFlight(pendingSearches, cacheKey, () => performSearch(trimmedQuery, cacheKey))
-  return mapValidSongs(videos, bypassFilters)
+  return mapValidSongs(videos, bypassFilters ? 'bypass' : 'viewer')
 }
 
-function mapValidSongs(videos: VideoItem[], bypassFilters = false): Song[] {
+// which rules a list of videos is held against: the viewer rules, the guard rules alone (the streamer's own
+// playlist answers to those: what the viewer rules would trim away is the streamer's own choice), or none at all
+function mapValidSongs(videos: VideoItem[], scope: 'viewer' | 'guard' | 'bypass' = 'viewer'): Song[] {
   return videos
     .map((video) => ({ video, song: videoToSong(video) }))
-    .filter(({ video, song }) => bypassFilters || isValidSong(song, video))
+    .filter(({ video, song }) => scope === 'bypass' || checkFilters(song, video, getConfig(), scope === 'guard') === null)
     .map(({ song }) => song)
 }
 
@@ -139,7 +139,7 @@ export type { PlaylistMeta, PlaylistFetchResult }
 
 export async function fetchPlaylistSongs(playlistId: string): Promise<PlaylistFetchResult> {
   if (!playlistId) {
-    return { songs: [], truncated: false }
+    return { songs: [], truncated: false, itemCount: null }
   }
 
   return dedupInFlight(pendingPlaylists, playlistId, () => performPlaylistFetch(playlistId))
@@ -174,8 +174,9 @@ async function performPlaylistFetch(playlistId: string): Promise<PlaylistFetchRe
       }
     }
 
-    const songs = mapValidSongs(await fetchVideos([...ids]))
+    const meta = await fetchPlaylistMeta(playlistId)
+    const songs = mapValidSongs(await fetchVideos([...ids]), 'guard')
     log.log(`Playlist: ${songs.length} tracks loaded`)
-    return { songs, truncated }
+    return { songs, truncated, itemCount: meta?.itemCount ?? null }
   })
 }

@@ -10,7 +10,7 @@ import { t } from './i18n.js'
 import { getSettings } from './settings.js'
 import { createStore } from './store.js'
 import { persistState } from './state-file.js'
-import { createLogger } from './logger.js'
+import { createLogger, describeError } from './logger.js'
 
 const log = createLogger('FALLBACK')
 
@@ -23,52 +23,60 @@ export type FallbackSnapshot = {
   cursor: number
   playlistId: string | null
   lastRefreshedAt: number | null
+  itemCount: number | null
 }
 
-let fallbackTracksById = new Map<string, Song>()
-let fallbackOrder: string[] = []
-let fallbackCursor = -1
-let loadedFallbackPlaylistId: string | null = null
-let lastFallbackRefreshAt: number | null = null
+type Rotation = {
+  tracksById: Map<string, Song>
+  order: string[]
+  cursor: number
+  playlistId: string | null
+  lastRefreshedAt: number | null
+  itemCount: number | null
+  version: number
+}
 
-// Grows every time the set of playlist tracks is replaced, so the saved copy of the (large) track list
-// is rewritten only then and not on every change of position
-let sourceVersion = 0
+const emptyRotation = (): Rotation => ({ tracksById: new Map(), order: [], cursor: -1, playlistId: null, lastRefreshedAt: null, itemCount: null, version: 0 })
+
+let rotation = emptyRotation()
 
 // the rotation is part of the playing state: the store saves and announces it when it changes
-const rotation = createStore({
+const rotationStore = createStore({
   read: () => ({
-    tracks: sourceVersion,
-    order: fallbackOrder,
-    cursor: fallbackCursor,
-    playlistId: loadedFallbackPlaylistId,
-    lastRefreshedAt: lastFallbackRefreshAt
+    tracks: rotation.version,
+    order: rotation.order,
+    cursor: rotation.cursor,
+    playlistId: rotation.playlistId,
+    lastRefreshedAt: rotation.lastRefreshedAt,
+    itemCount: rotation.itemCount
   }),
   topics: ['state'],
   save: persistState
 })
 
-function setSourceTracks(tracks: Song[]): void {
-  fallbackTracksById = new Map(tracks.map((track) => [track.videoId, track]))
-  sourceVersion++
+function replaceSourceTracks(tracks: Song[]): void {
+  rotation = {
+    ...rotation,
+    tracksById: new Map(tracks.map((track) => [track.videoId, track])),
+    version: rotation.version + 1
+  }
 }
 
 function resetRotation(): void {
-  setSourceTracks([])
-  fallbackOrder = []
-  fallbackCursor = -1
-  loadedFallbackPlaylistId = null
-  lastFallbackRefreshAt = null
+  rotation = { ...emptyRotation(), version: rotation.version + 1 }
 }
 
-export const getFallbackSourceVersion = (): number => sourceVersion
-
 function findTrack(videoId: string): Song | undefined {
-  return fallbackTracksById.get(videoId)
+  return rotation.tracksById.get(videoId)
 }
 
 function activeFallbackVideoId(): string | null {
-  return fallbackOrder[fallbackCursor] ?? null
+  return rotation.order[rotation.cursor] ?? null
+}
+
+function anchoredVideoId(): string | null {
+  const current = getCurrent()
+  return current?.isFallback ? current.videoId : activeFallbackVideoId()
 }
 
 function shuffle<T>(items: T[]): T[] {
@@ -102,16 +110,16 @@ function toFallbackQueueItem(song: Song): QueueItem {
 
 function findNext(): { index: number; song: Song } | null {
   const { enabled, repeat } = getConfig().fallbackPlaylist
-  const total = fallbackOrder.length
+  const total = rotation.order.length
   if (!enabled) return null
 
   for (let step = 1; step <= total; step++) {
-    let index = fallbackCursor + step
+    let index = rotation.cursor + step
     if (index >= total) {
       if (!repeat) return null
       index %= total
     }
-    const song = findTrack(fallbackOrder[index])
+    const song = findTrack(rotation.order[index])
     if (song && !isBlocked(song.videoId)) return { index, song }
   }
   return null
@@ -126,8 +134,8 @@ export function advanceFallback(): QueueItem | null {
   const next = findNext()
   if (!next) return null
 
-  rotation.update(() => {
-    fallbackCursor = next.index
+  rotationStore.update(() => {
+    rotation.cursor = next.index
   })
 
   return toFallbackQueueItem(next.song)
@@ -139,14 +147,14 @@ function fallbackView() {
   const { enabled, shuffle, repeat } = getConfig().fallbackPlaylist
 
   return {
-    playlistId: loadedFallbackPlaylistId,
-    lastRefreshedAt: lastFallbackRefreshAt,
+    playlistId: rotation.playlistId,
+    lastRefreshedAt: rotation.lastRefreshedAt,
     enabled,
     shuffle,
     repeat,
-    sourceCount: fallbackTracksById.size,
-    order: [...fallbackOrder],
-    blocked: fallbackOrder.map((videoId) => isBlocked(videoId))
+    sourceCount: rotation.tracksById.size,
+    order: [...rotation.order],
+    blocked: rotation.order.map((videoId) => isBlocked(videoId))
   }
 }
 
@@ -189,7 +197,7 @@ function loadPlaylist(playlistId: string | null, rollbackTo: string | null): voi
     (error) => {
       // the playlist was replaced while it was loading: the failure is stale, the newer save wins
       if (getConfig().fallbackPlaylist.playlistId !== playlistId) return
-      log.error(`Playlist ${playlistId ?? 'none'} could not be loaded, ${rollbackTo ?? 'no playlist'} is kept instead`)
+      log.error(`Playlist ${playlistId ?? 'none'} could not be loaded, ${rollbackTo ?? 'no playlist'} is kept instead: ${describeError(error)}`)
       rollingBack = true
       try {
         updateConfig({ fallbackPlaylist: { playlistId: rollbackTo } })
@@ -215,24 +223,24 @@ onConfigChange((previous, next) => {
 
   if (after.playlistId !== before.playlistId) {
     // a rollback restores the id the rotation already holds, and one that was never loaded stays unloaded
-    if (!rollingBack && after.playlistId !== loadedFallbackPlaylistId) loadPlaylist(after.playlistId, before.playlistId)
+    if (!rollingBack && after.playlistId !== rotation.playlistId) loadPlaylist(after.playlistId, before.playlistId)
   } else if (after.shuffle !== before.shuffle) {
     reorderFallback(after.shuffle)
   }
 
   // what plays next depends on these, although the rotation itself does not change
-  if (after.enabled !== before.enabled || after.repeat !== before.repeat) rotation.announce()
+  if (after.enabled !== before.enabled || after.repeat !== before.repeat) rotationStore.announce()
 })
 
 export async function refreshFallback(): Promise<FallbackStateResponse> {
   const playlistId = getConfig().fallbackPlaylist.playlistId
 
   if (!playlistId) {
-    rotation.update(() => resetRotation())
+    rotationStore.update(() => resetRotation())
     return getFallbackState()
   }
 
-  const { songs: newTracks, truncated } = await fetchPlaylistSongs(playlistId)
+  const { songs: newTracks, truncated, itemCount } = await fetchPlaylistSongs(playlistId)
   if (truncated) log.log(`Playlist was truncated due to page limit (${newTracks.length} tracks loaded)`)
 
   const config = getConfig()
@@ -242,28 +250,28 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
     return getFallbackState()
   }
 
-  const playingId = getCurrent()?.isFallback ? getCurrent()!.videoId : activeFallbackVideoId()
+  const playingId = anchoredVideoId()
 
-  rotation.update(() => {
-    setSourceTracks(newTracks)
-    fallbackOrder = buildOrder(newTracks, config.fallbackPlaylist.shuffle, playingId)
-    fallbackCursor = playingId ? fallbackOrder.indexOf(playingId) : -1
-    loadedFallbackPlaylistId = playlistId
-    lastFallbackRefreshAt = Date.now()
+  rotationStore.update(() => {
+    replaceSourceTracks(newTracks)
+    rotation.order = buildOrder(newTracks, config.fallbackPlaylist.shuffle, playingId)
+    rotation.cursor = playingId ? rotation.order.indexOf(playingId) : -1
+    rotation.playlistId = playlistId
+    rotation.lastRefreshedAt = Date.now()
+    rotation.itemCount = itemCount
   })
 
-  log.log(`Loaded ${fallbackTracksById.size} tracks from playlist ${playlistId}`)
+  log.log(`Loaded ${rotation.tracksById.size} tracks from playlist ${playlistId}`)
   return getFallbackState()
 }
 
 /** Re-orders the rotation for the given shuffle mode, keeping the playing track in place. Does not touch the config. */
 export function reorderFallback(shuffleOn: boolean): void {
-  const current = getCurrent()
-  const activeId = current?.isFallback ? current.videoId : activeFallbackVideoId()
+  const activeId = anchoredVideoId()
 
-  rotation.update(() => {
-    fallbackOrder = buildOrder([...fallbackTracksById.values()], shuffleOn, activeId)
-    fallbackCursor = activeId ? fallbackOrder.indexOf(activeId) : -1
+  rotationStore.update(() => {
+    rotation.order = buildOrder([...rotation.tracksById.values()], shuffleOn, activeId)
+    rotation.cursor = activeId ? rotation.order.indexOf(activeId) : -1
   })
 }
 
@@ -284,7 +292,7 @@ export const toggleFallbackRepeat = (): FallbackStateResponse => toggleFallbackF
 export const toggleFallbackEnabled = (): FallbackStateResponse => toggleFallbackFlag('enabled')
 
 export function clearFallback(): FallbackStateResponse {
-  rotation.update(() => resetRotation())
+  rotationStore.update(() => resetRotation())
 
   updateConfig({ fallbackPlaylist: { playlistId: null } })
   log.log('cleared')
@@ -296,15 +304,16 @@ export function getFallbackState(): FallbackStateResponse {
   const current = getCurrent()
 
   return {
-    playlistId: loadedFallbackPlaylistId,
-    lastRefreshedAt: lastFallbackRefreshAt,
+    playlistId: rotation.playlistId,
+    lastRefreshedAt: rotation.lastRefreshedAt,
     enabled: config.fallbackPlaylist.enabled,
     shuffle: config.fallbackPlaylist.shuffle,
     repeat: config.fallbackPlaylist.repeat,
-    sourceCount: fallbackTracksById.size,
+    sourceCount: rotation.tracksById.size,
+    itemCount: rotation.itemCount,
     activeVideoId: current?.isFallback ? current.videoId : null,
     upNext: markBlocked(
-      fallbackOrder
+      rotation.order
         .map((videoId) => findTrack(videoId))
         .filter((track): track is Song => track !== undefined && track !== null)
     )
@@ -312,7 +321,7 @@ export function getFallbackState(): FallbackStateResponse {
 }
 
 export function playFallbackTrackNow(videoId: string): QueueItem | null {
-  const index = fallbackOrder.indexOf(videoId)
+  const index = rotation.order.indexOf(videoId)
   if (index === -1) return null
 
   const song = findTrack(videoId)
@@ -325,8 +334,8 @@ export function playFallbackTrackNow(videoId: string): QueueItem | null {
   // choosing a track to play right away skips whatever is playing now, open reward and all
   finishItem(getCurrent(), 'skipped')
 
-  rotation.update(() => {
-    fallbackCursor = index
+  rotationStore.update(() => {
+    rotation.cursor = index
   })
   const item = toFallbackQueueItem(song)
   setCurrent(item)
@@ -341,29 +350,22 @@ export function queueFallbackTrack(videoId: string): QueueItem | null {
   return addSong(song, fallbackRequester(), { bypassFilters: true, isFallback: true }).item
 }
 
-export const getFallbackSourceTracks = (): Song[] => [...fallbackTracksById.values()]
-
-export function getFallbackProgress(): Omit<FallbackSnapshot, 'sourceTracks'> {
+export function getFallbackSnapshot(): FallbackSnapshot & { sourceVersion: number } {
   return {
-    order: [...fallbackOrder],
-    cursor: fallbackCursor,
-    playlistId: loadedFallbackPlaylistId,
-    lastRefreshedAt: lastFallbackRefreshAt
+    sourceTracks: [...rotation.tracksById.values()],
+    order: [...rotation.order],
+    cursor: rotation.cursor,
+    playlistId: rotation.playlistId,
+    lastRefreshedAt: rotation.lastRefreshedAt,
+    itemCount: rotation.itemCount,
+    sourceVersion: rotation.version
   }
-}
-
-// Puts the rotation position on `videoId` (the fallback track that is playing), if it is in the rotation
-export function alignFallbackCursor(videoId: string): void {
-  const index = fallbackOrder.indexOf(videoId)
-  if (index >= 0) fallbackCursor = index
 }
 
 export function hydrateFallback(data: Partial<FallbackSnapshot> | undefined): void {
   if (!data) return
 
   const tracks = data.sourceTracks ?? []
-  setSourceTracks(tracks)
-
   const savedOrder = data.order ?? []
   const known = new Set(tracks.map((track) => track.videoId))
   const kept = [...new Set(savedOrder.filter((id) => known.has(id)))]
@@ -375,10 +377,24 @@ export function hydrateFallback(data: Partial<FallbackSnapshot> | undefined): vo
   const order = [...kept, ...missing]
   const repaired = savedOrder.length !== order.length || order.some((id, index) => id !== savedOrder[index])
 
-  fallbackOrder = order
-  fallbackCursor = repaired ? -1 : data.cursor ?? -1
-  loadedFallbackPlaylistId = data.playlistId ?? null
-  lastFallbackRefreshAt = data.lastRefreshedAt ?? null
+  let cursor = repaired ? -1 : data.cursor ?? -1
+
+  // the restored position belongs under the track that is playing, if it is one of the rotation's
+  const current = getCurrent()
+  if (current?.isFallback) {
+    const index = order.indexOf(current.videoId)
+    if (index >= 0) cursor = index
+  }
+
+  rotation = {
+    tracksById: new Map(tracks.map((track) => [track.videoId, track])),
+    order,
+    cursor,
+    playlistId: data.playlistId ?? null,
+    lastRefreshedAt: data.lastRefreshedAt ?? null,
+    itemCount: data.itemCount ?? null,
+    version: rotation.version + 1
+  }
 
   // the hydrated state is what a panel that connects now would read: the view announcements start from it
   announcedView = fallbackView()

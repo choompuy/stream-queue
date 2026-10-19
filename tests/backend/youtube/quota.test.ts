@@ -60,7 +60,7 @@ const video = (videoId: string, views: number) => ({
     categoryId: '10',
     thumbnails: { medium: { url: 'https://img/x.jpg' } }
   },
-  contentDetails: { duration: 'PT3M' },
+  contentDetails: { duration: 'PT3M20S' },
   statistics: { viewCount: String(views) },
   status: { privacyStatus: 'public', embeddable: true }
 })

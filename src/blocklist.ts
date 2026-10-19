@@ -1,7 +1,6 @@
-import { dataPath, createFileStore, loadList } from './persist.js'
+import { dataPath, createListStore } from './persist.js'
 import { createLogger } from './logger.js'
 import { isValidVideoId } from './youtube/url.js'
-import { createStore } from './store.js'
 import type { Blockable } from './types.js'
 
 export type BlockedTrack = {
@@ -15,14 +14,6 @@ const BLOCKLIST_LIMIT = 1000
 const TITLE_MAX_LENGTH = 200
 
 const log = createLogger('BLOCKLIST')
-const store = createFileStore<BlockedTrack[]>(() => dataPath('blocklist.json'))
-
-// a blocked track changes the queue view (it is skipped) and the list itself; the playlist view follows through 'state'
-const changes = createStore({
-  read: () => ensureLoaded().list,
-  topics: ['blocklist', 'state'],
-  save: () => store.scheduleSave(() => ensureLoaded().list)
-})
 
 function isBlockedTrack(value: unknown): value is BlockedTrack {
   if (typeof value !== 'object' || value === null) return false
@@ -31,24 +22,27 @@ function isBlockedTrack(value: unknown): value is BlockedTrack {
   return isValidVideoId(v.videoId) && typeof v.title === 'string' && Number.isFinite(v.blockedAt)
 }
 
-// read from disk on first use, not when the module is imported
-let blocked: BlockedTrack[] | null = null
-let blockedIds: Set<string> | null = null
+const blocked = createListStore<BlockedTrack>({
+  file: () => dataPath('blocklist.json'),
+  guard: isBlockedTrack,
+  limit: BLOCKLIST_LIMIT,
+  topics: ['blocklist', 'state']
+})
 
-function ensureLoaded(): { list: BlockedTrack[]; ids: Set<string> } {
-  if (!blocked || !blockedIds) {
-    blocked = loadList(store, isBlockedTrack)
-    blockedIds = new Set(blocked.map((t) => t.videoId))
-  }
-  return { list: blocked, ids: blockedIds }
+let ids: Set<string> | null = null
+
+function refreshIds(list: BlockedTrack[]): void {
+  ids = new Set(list.map((track) => track.videoId))
 }
 
+const idSet = (): Set<string> => (ids ??= new Set(blocked.all().map((track) => track.videoId)))
+
 export function getBlockedTracks(): BlockedTrack[] {
-  return [...ensureLoaded().list]
+  return blocked.all()
 }
 
 export function isBlocked(videoId: string): boolean {
-  return ensureLoaded().ids.has(videoId)
+  return idSet().has(videoId)
 }
 
 // What the panel gets: every track says whether it is blocked, so the panel does not have to match lists
@@ -57,35 +51,31 @@ export function markBlocked<T extends { videoId: string }>(tracks: T[]): Blockab
 }
 
 export function blockTrack(videoId: string, title: string): BlockedTrack {
-  const { list, ids } = ensureLoaded()
+  blocked.update((list) => {
+    if (!list.some((track) => track.videoId === videoId)) {
+      list.unshift({ videoId, title: title.trim().slice(0, TITLE_MAX_LENGTH) || videoId, blockedAt: Date.now() })
 
-  changes.update(() => {
-    if (ids.has(videoId)) return
-
-    const safeTitle = title.trim().slice(0, TITLE_MAX_LENGTH) || videoId
-    list.unshift({ videoId, title: safeTitle, blockedAt: Date.now() })
-    ids.add(videoId)
-
-    if (list.length > BLOCKLIST_LIMIT) {
-      const dropped = list.splice(BLOCKLIST_LIMIT)
-      for (const removed of dropped) ids.delete(removed.videoId)
-      log.warn(`Limit of ${BLOCKLIST_LIMIT} reached, ${dropped.length} oldest block(s) dropped`)
+      if (list.length > BLOCKLIST_LIMIT) {
+        const dropped = list.splice(BLOCKLIST_LIMIT)
+        log.warn(`Limit of ${BLOCKLIST_LIMIT} reached, ${dropped.length} oldest block(s) dropped`)
+      }
     }
+    refreshIds(list)
   })
 
-  return list.find((t) => t.videoId === videoId)!
+  return blocked.all().find((track) => track.videoId === videoId)!
 }
 
 export function unblockTrack(videoId: string): boolean {
   let removed = false
 
-  changes.update(() => {
-    const { list, ids } = ensureLoaded()
-    if (!ids.has(videoId)) return
-
-    blocked = list.filter((t) => t.videoId !== videoId)
-    ids.delete(videoId)
-    removed = true
+  blocked.update((list) => {
+    const index = list.findIndex((track) => track.videoId === videoId)
+    if (index >= 0) {
+      list.splice(index, 1)
+      removed = true
+    }
+    refreshIds(list)
   })
 
   return removed

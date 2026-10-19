@@ -1,6 +1,5 @@
 import { getSecrets } from '../secrets.js'
 import { describeError } from '../logger.js'
-import { getConfig } from '../config.js'
 import { Song, AppError, Config, FilterFailureReason } from '../types.js'
 import { VideoItem } from './types.js'
 import { isoDurationToSeconds } from './utils.js'
@@ -13,7 +12,7 @@ export type PlaylistMeta = {
   itemCount: number
 }
 
-export type PlaylistFetchResult = { songs: Song[]; truncated: boolean }
+export type PlaylistFetchResult = { songs: Song[]; truncated: boolean; itemCount: number | null }
 
 type YouTubeErrorResponse = {
   error?: {
@@ -25,12 +24,12 @@ type YouTubeErrorResponse = {
 
 type FilterRule = {
   reason: FilterFailureReason
+  guard?: boolean
   check: (song: Song, video: VideoItem, config: Config) => boolean
-  message: string
   params?: (config: Config) => Record<string, string | number> | undefined
 }
 
-const SHORTS_MAX_DURATION_SECONDS = 60
+const SHORTS_MAX_DURATION_SECONDS = 180
 
 export const VIDEO_DETAILS_PART = 'snippet,contentDetails,statistics,status,topicDetails'
 
@@ -68,61 +67,71 @@ export function isMusicVideo(video: VideoItem): boolean {
 
 // 'live' or 'upcoming'; its duration is not known yet, so the duration rules do not apply to it
 const isUpcoming = (video: VideoItem): boolean => video.snippet?.liveBroadcastContent === 'upcoming'
-const isLiveBroadcast = (video: VideoItem): boolean => Boolean(video.snippet?.liveBroadcastContent) && video.snippet!.liveBroadcastContent !== 'none'
+
+// 'none' means the video is not a broadcast; anything else is one
+const isLiveBroadcast = (video: VideoItem): boolean => {
+  const live = video.snippet?.liveBroadcastContent
+  return live !== undefined && live !== 'none'
+}
+
+const isNotPublic = (video: VideoItem): boolean => {
+  const privacy = video.status?.privacyStatus
+  return privacy !== undefined && privacy !== 'public'
+}
+
+const isNotProcessed = (video: VideoItem): boolean => {
+  const upload = video.status?.uploadStatus
+  return upload !== undefined && upload !== 'processed'
+}
 
 const FILTER_RULES: FilterRule[] = [
   {
     reason: 'NOT_MUSIC',
-    check: (_s, v, c) => c.contentMode === 'music' && !isMusicVideo(v),
-    message: 'this video is not categorized as Music'
+    check: (_s, v, c) => c.contentMode === 'music' && !isMusicVideo(v)
   },
   {
     reason: 'NOT_PUBLIC',
-    check: (_s, v) => Boolean(v.status?.privacyStatus) && v.status!.privacyStatus !== 'public',
-    message: 'this video is not public'
+    guard: true,
+    check: (_s, v) => isNotPublic(v)
   },
   {
     reason: 'NOT_EMBEDDABLE',
-    check: (_s, v) => v.status?.embeddable === false,
-    message: 'this video cannot be embedded'
+    guard: true,
+    check: (_s, v) => v.status?.embeddable === false
   },
   {
     reason: 'REGION_BLOCKED',
-    check: (_s, v, c) => !isAvailableInRegion(v, c.regionCode),
-    message: 'this track is not available in the configured region'
+    guard: true,
+    check: (_s, v, c) => !isAvailableInRegion(v, c.regionCode)
   },
   {
     reason: 'AGE_RESTRICTED',
-    check: (_s, v) => v.contentDetails?.contentRating?.ytRating === 'ytAgeRestricted',
-    message: 'this video is age-restricted'
+    guard: true,
+    check: (_s, v) => v.contentDetails?.contentRating?.ytRating === 'ytAgeRestricted'
   },
   {
     // a scheduled stream or a premiere has nothing to play yet, whatever the setting for live streams says
     reason: 'NOT_PLAYABLE',
-    check: (_s, v) => (Boolean(v.status?.uploadStatus) && v.status!.uploadStatus !== 'processed') || isUpcoming(v),
-    message: 'this video is not playable'
+    guard: true,
+    check: (_s, v) => isNotProcessed(v) || isUpcoming(v)
   },
   {
     reason: 'IS_LIVE',
-    check: (_s, v, c) => !c.allowLiveStreams && isLiveBroadcast(v),
-    message: 'live streams are not allowed'
+    check: (_s, v, c) => !c.allowLiveStreams && isLiveBroadcast(v)
   },
   {
     reason: 'VIEWS_TOO_LOW',
     check: (s, _v, c) => s.views < c.minViews,
-    message: 'this track does not have enough views',
     params: (c) => ({ min: c.minViews })
   },
   {
     reason: 'DURATION_OUT_OF_RANGE',
     check: (s, v, c) => !isLiveBroadcast(v) && (s.duration < c.minDurationSeconds || s.duration > c.maxDurationSeconds),
-    message: "this track's duration is outside the allowed range",
     params: (c) => ({ min: c.minDurationSeconds, max: c.maxDurationSeconds })
   },
   {
     reason: 'IS_SHORT',
-    check: (s, _v, c) => !c.allowShorts && isLikelyShort(s.duration),
-    message: 'shorts are not allowed'
+    check: (s, _v, c) => !c.allowShorts && isLikelyShort(s.duration)
   }
 ]
 
@@ -223,19 +232,16 @@ function isLikelyShort(durationSeconds: number): boolean {
   return durationSeconds > 0 && durationSeconds <= SHORTS_MAX_DURATION_SECONDS
 }
 
-export function getFilterFailureReason(song: Song, video: VideoItem): FilterFailureReason | null {
-  const config = getConfig()
-  return FILTER_RULES.find((rule) => rule.check(song, video, config))?.reason ?? null
-}
-
-export function isValidSong(song: Song, video: VideoItem): boolean {
-  return getFilterFailureReason(song, video) === null
-}
-
-export function throwFilterError(reason: FilterFailureReason, config: Config): never {
-  const rule = FILTER_RULES.find((r) => r.reason === reason)
-  if (!rule) throw new AppError('YOUTUBE_ERROR', `no filter rule registered for reason: ${reason}`)
-  throw new AppError(reason, rule.message, rule.params?.(config))
+/**
+ * The one filter check: the first rule a track fails becomes the error the API and the chat answer with.
+ * `guardOnly` limits the check to the guard rules: the streamer's own playlist answers to those alone, what
+ * the viewer rules would trim away there is the streamer's own choice. A rule's user-facing text lives in
+ * the locales and is looked up by the code, so the error carries only the params a rule's translation needs
+ */
+export function checkFilters(song: Song, video: VideoItem, config: Config, guardOnly = false): AppError | null {
+  const rules = guardOnly ? FILTER_RULES.filter((rule) => rule.guard) : FILTER_RULES
+  const rule = rules.find((rule) => rule.check(song, video, config))
+  return rule ? new AppError(rule.reason, undefined, rule.params?.(config)) : null
 }
 
 const BATCH_SIZE = 50

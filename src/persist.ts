@@ -4,6 +4,8 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { dirname, join } from 'node:path'
 import { getCacheDir, getDataDir } from './runtime.js'
 import { createLogger, describeError } from './logger.js'
+import { createStore } from './store.js'
+import type { Topic } from './state-events.js'
 
 const SAVE_DEBOUNCE_MS = 250
 const SAVE_ATTEMPTS = 3
@@ -197,6 +199,28 @@ export function loadList<T>(store: { load: (defaults: T[]) => T[]; path: () => s
   if (items.length !== stored.length) log.warn(`Ignored ${stored.length - items.length} invalid entries in ${store.path()}`)
 
   return items
+}
+
+/**
+ * A file-backed list: loaded lazily, changed only through update(), which compares the list before and after,
+ * saves it once and announces the topics. `limit` caps the list as it is read from disk; what a module does
+ * about its own limit while the list grows is that module's business
+ */
+export function createListStore<T>(options: { file: () => string; guard: (value: unknown) => value is T; limit?: number; topics: readonly Topic[] }) {
+  const store = createFileStore<T[]>(options.file)
+  const { guard, limit, topics } = options
+  let loaded: T[] | null = null
+
+  // read from disk on first use, not when the module is imported
+  const list = (): T[] => (loaded ??= limit === undefined ? loadList(store, guard) : loadList(store, guard).slice(0, limit))
+
+  const changes = createStore({ read: list, topics, save: () => store.scheduleSave(list) })
+
+  return {
+    all: (): T[] => [...list()],
+    // in-place mutation: update() compares, saves and announces
+    update: (mutate: (list: T[]) => void): void => changes.update(() => mutate(list()))
+  }
 }
 
 export async function flushAllStores(): Promise<void> {

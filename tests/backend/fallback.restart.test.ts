@@ -88,18 +88,18 @@ test('after a restart the playlist goes on from where it was', async (t) => {
 
     assert.equal(queue.getCurrent()?.videoId, ids[9])
     assert.equal(nextId(), ids[10])
-    assert.deepEqual(fallback.getFallbackProgress().order, ids)
-    assert.equal(fallback.getFallbackProgress().cursor, 9)
+    assert.deepEqual(fallback.getFallbackSnapshot().order, ids)
+    assert.equal(fallback.getFallbackSnapshot().cursor, 9)
   })
 
   await t.test('the playlist changed meanwhile (a track before the playing one removed, one added): the playing track stays, the next is still the next', async () => {
     const edited = [...ids.slice(0, 3), ...ids.slice(4), 'trkNEW00001']
     await restart({ withTrackFile: false, playlist: edited })
 
-    assert.equal(fallback.getFallbackProgress().order[fallback.getFallbackProgress().cursor], ids[9])
+    assert.equal(fallback.getFallbackSnapshot().order[fallback.getFallbackSnapshot().cursor], ids[9])
     assert.equal(nextId(), ids[10])
-    assert.equal(fallback.getFallbackProgress().order.at(-1), 'trkNEW00001')
-    assert.equal(new Set(fallback.getFallbackProgress().order).size, fallback.getFallbackProgress().order.length)
+    assert.equal(fallback.getFallbackSnapshot().order.at(-1), 'trkNEW00001')
+    assert.equal(new Set(fallback.getFallbackSnapshot().order).size, fallback.getFallbackSnapshot().order.length)
   })
 
   await t.test('a saved position that disagrees with the playing track follows the playing track', async () => {
@@ -111,7 +111,7 @@ test('after a restart the playlist goes on from where it was', async (t) => {
     stubPlaylist(ids)
     loadState()
 
-    assert.equal(fallback.getFallbackProgress().cursor, 9)
+    assert.equal(fallback.getFallbackSnapshot().cursor, 9)
     assert.equal(nextId(), ids[10])
   })
 
@@ -124,7 +124,7 @@ test('after a restart the playlist goes on from where it was', async (t) => {
     stubPlaylist(ids)
     loadState()
 
-    assert.equal(fallback.getFallbackProgress().cursor, 4)
+    assert.equal(fallback.getFallbackSnapshot().cursor, 4)
     assert.equal(nextId(), ids[5])
   })
 })
@@ -143,22 +143,22 @@ test('the rotation is reconciled with the track list it is saved next to', async
       lastRefreshedAt: 1
     })
 
-    assert.deepEqual(fallback.getFallbackProgress().order, trackIds)
-    assert.equal(fallback.getFallbackProgress().cursor, -1)
+    assert.deepEqual(fallback.getFallbackSnapshot().order, trackIds)
+    assert.equal(fallback.getFallbackSnapshot().cursor, -1)
   })
 
   await t.test('a track missing from the rotation is appended, not lost: it plays again', () => {
     fallback.hydrateFallback({ sourceTracks: tracks, order: [trackIds[2], trackIds[1]], cursor: 1, playlistId: PLAYLIST, lastRefreshedAt: 1 })
 
-    assert.deepEqual(fallback.getFallbackProgress().order, [trackIds[2], trackIds[1], trackIds[0]])
-    assert.equal(fallback.getFallbackProgress().cursor, -1)
+    assert.deepEqual(fallback.getFallbackSnapshot().order, [trackIds[2], trackIds[1], trackIds[0]])
+    assert.equal(fallback.getFallbackSnapshot().cursor, -1)
   })
 
   await t.test('a rotation that already matches the track list is left alone, cursor included', () => {
     fallback.hydrateFallback({ sourceTracks: tracks, order: [...trackIds], cursor: 2, playlistId: PLAYLIST, lastRefreshedAt: 1 })
 
-    assert.deepEqual(fallback.getFallbackProgress().order, trackIds)
-    assert.equal(fallback.getFallbackProgress().cursor, 2)
+    assert.deepEqual(fallback.getFallbackSnapshot().order, trackIds)
+    assert.equal(fallback.getFallbackSnapshot().cursor, 2)
   })
 })
 
@@ -169,12 +169,12 @@ test('without any track the position is not used up', async (t) => {
   await t.test('nothing to play: the answer is null and the position is not used up', () => {
     fallback.hydrateFallback({ sourceTracks: [], order: ids, cursor: 9, playlistId: PLAYLIST, lastRefreshedAt: 1 })
     // the rotation without its tracks is repaired to an empty one, so the position starts over
-    assert.deepEqual(fallback.getFallbackProgress().order, [])
-    assert.equal(fallback.getFallbackProgress().cursor, -1)
+    assert.deepEqual(fallback.getFallbackSnapshot().order, [])
+    assert.equal(fallback.getFallbackSnapshot().cursor, -1)
 
     assert.equal(fallback.advanceFallback(), null)
     assert.equal(fallback.peekNextFallbackTrack(), null)
-    assert.equal(fallback.getFallbackProgress().cursor, -1, 'advancing an empty rotation consumes nothing')
+    assert.equal(fallback.getFallbackSnapshot().cursor, -1, 'advancing an empty rotation consumes nothing')
   })
 
   await t.test('and once the tracks are there the rotation goes on from the same place', () => {

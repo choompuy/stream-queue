@@ -35,12 +35,20 @@ export function renderFallback() {
     return
   }
 
+  const itemCount = Number.isFinite(data?.itemCount) ? data.itemCount : null
+
   setText(
     dom.fallbackInfo,
-    t('fallback.info', {
-      count: tracks.length,
-      datetime: formatDateTime(data.lastRefreshedAt)
-    })
+    itemCount && itemCount > 0
+      ? t('fallback.infoOf', {
+          count: tracks.length,
+          total: itemCount,
+          datetime: formatDateTime(data.lastRefreshedAt)
+        })
+      : t('fallback.info', {
+          count: tracks.length,
+          datetime: formatDateTime(data.lastRefreshedAt)
+        })
   )
   renderFallbackTracks()
   renderStats()

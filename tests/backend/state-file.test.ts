@@ -34,7 +34,7 @@ const goodState = () => ({
   current: item(A),
   queue: [item(B), item(C)],
   settings: { showVideo: true, position: 'top-left', locale: 'ru' },
-  fallback: { sourceTracks: [song(F1), song(F2)], order: [F1, F2], cursor: 0, playlistId: 'PLstate0000001', lastRefreshedAt: 5 }
+  fallback: { sourceTracks: [song(F1), song(F2)], order: [F1, F2], cursor: 0, playlistId: 'PLstate0000001', lastRefreshedAt: 5, itemCount: 12 }
 })
 
 test('sanitizeState()', async (t) => {
@@ -60,7 +60,17 @@ test('sanitizeState()', async (t) => {
     )
     assert.equal(result.current?.videoId, A)
     assert.equal(result.fallback?.playlistId, 'PLstate0000001')
+    assert.equal(result.fallback?.itemCount, 12, 'the declared playlist size travels with the state')
     assert.ok(result.problems.some((problem) => problem.includes('dropped 4 invalid')))
+  })
+
+  await t.test('an unusable declared playlist size becomes unknown, not a lie', () => {
+    const state = goodState()
+    state.fallback.itemCount = 'many' as never
+    const result = sanitizeState(state)
+
+    assert.equal(result.fallback?.itemCount, null)
+    assert.deepEqual(result.problems, [])
   })
 
   await t.test('duplicates are dropped, including a queued copy of the track that is playing', () => {

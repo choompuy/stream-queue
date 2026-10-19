@@ -80,6 +80,7 @@ const routes = {
     activeVideoId: V('f'),
     lastRefreshedAt: Date.now(),
     sourceCount: 2,
+    itemCount: 5,
     shuffle: false,
     repeat: true,
     enabled: true

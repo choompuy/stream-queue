@@ -173,6 +173,7 @@ export type FallbackStateResponse = FallbackPlaylist & {
   lastRefreshedAt: number | null
   upNext: Blockable<Song>[]
   sourceCount: number
+  itemCount: number | null
   activeVideoId: string | null
 }
 export type QueueRemoveResponse = { removed: QueueItem; state: StateResponse }

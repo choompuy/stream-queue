@@ -259,7 +259,7 @@ test('handleChannelPointsRedemption()', async (t) => {
           {
             id: A,
             snippet: { title: `Song ${A}`, channelTitle: 'Channel', categoryId: '10', thumbnails: { medium: { url: 'https://img/x.jpg' } } },
-            contentDetails: { duration: 'PT3M' },
+            contentDetails: { duration: 'PT3M20S' },
             statistics: { viewCount: '1000000' }
           }
         ]

@@ -23,18 +23,22 @@ const song = (id: string, title = id) => ({
   url: `https://youtu.be/${id}`
 })
 
-// stubs the YouTube "playlistItems" and "videos" endpoints that fetchPlaylistSongs() calls internally
-function stubPlaylist(ids: string[]) {
+// stubs the YouTube endpoints that fetchPlaylistSongs() calls internally; itemCount is the size the
+// playlist declares about itself (often bigger than what it gives: private and deleted videos, the page limit)
+const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+
+function stubPlaylist(ids: string[], { itemCount = ids.length } = {}) {
   const realFetch = globalThis.fetch
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input instanceof Request ? input.url : input))
     if (url.hostname !== 'www.googleapis.com') return realFetch(input, init)
 
     if (url.pathname.endsWith('/playlistItems')) {
-      return new Response(JSON.stringify({ items: ids.map((id) => ({ snippet: { resourceId: { videoId: id } } })) }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      })
+      return json({ items: ids.map((id) => ({ snippet: { resourceId: { videoId: id } } })) })
+    }
+
+    if (url.pathname.endsWith('/playlists')) {
+      return json({ items: [{ id: url.searchParams.get('id'), snippet: { title: 'Stub playlist' }, contentDetails: { itemCount } }] })
     }
 
     // /videos
@@ -46,7 +50,7 @@ function stubPlaylist(ids: string[]) {
       statistics: { viewCount: '1000000' },
       status: { privacyStatus: 'public', embeddable: true, uploadStatus: 'processed' }
     }))
-    return new Response(JSON.stringify({ items }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    return json({ items })
   }
 }
 
@@ -123,14 +127,15 @@ test('refreshFallback() rebuilds rotation around the playing track', async (t) =
     await fallback.refreshFallback()
 
     // B is still in the playlist, the rest is reshuffled around it
-    const order = fallback.getFallbackProgress().order
+    const order = fallback.getFallbackSnapshot().order
     assert.equal(order[0], B, 'playing track stays first')
     assert.deepEqual(order.slice(1).sort(), [A, C, D, E], 'the rest are all present')
   })
 })
 
 test('the reaction to a saved playlist id', async (t) => {
-  await t.test('a load that fails restores the id that was there before', async () => {
+  await t.test('a load that fails restores the id that was there before and says why', async (t2) => {
+    const errors = t2.mock.method(console, 'error', () => {})
     const realFetch = globalThis.fetch
     globalThis.fetch = async (input, init) => {
       const url = new URL(String(input instanceof Request ? input.url : input))
@@ -143,7 +148,13 @@ test('the reaction to a saved playlist id', async (t) => {
 
       await assert.rejects(fallback.settledConfigReaction(PL))
       assert.equal(getConfig().fallbackPlaylist.playlistId, null, 'rolled back')
-      assert.equal(fallback.getFallbackProgress().playlistId, null, 'the rotation keeps what it had')
+      assert.equal(fallback.getFallbackSnapshot().playlistId, null, 'the rotation keeps what it had')
+
+      // exactly one line, and it carries the cause, not only the ids
+      assert.equal(errors.mock.callCount(), 1)
+      const line = String(errors.mock.calls[0]?.arguments ?? '')
+      assert.ok(line.includes('could not be loaded'), line)
+      assert.ok(line.includes('refused'), line)
     } finally {
       globalThis.fetch = realFetch
     }
@@ -228,7 +239,138 @@ test('the reaction to a saved playlist id', async (t) => {
       await new Promise((resolve) => setTimeout(resolve, 60))
 
       assert.equal(getConfig().fallbackPlaylist.playlistId, other, 'the newer save is not rolled back')
-      assert.deepEqual(fallback.getFallbackProgress().order, [A, B], 'the newer playlist is loaded')
+      assert.deepEqual(fallback.getFallbackSnapshot().order, [A, B], 'the newer playlist is loaded')
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+})
+
+test('what loading the playlist keeps and reports', async (t) => {
+  await t.test("what the viewer rules would trim away stays: the streamer's own playlist answers to the guard rules alone", async () => {
+    const realFetch = globalThis.fetch
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (url.hostname !== 'www.googleapis.com') return realFetch(input, init)
+
+      if (url.pathname.endsWith('/playlistItems')) {
+        return json({ items: [{ snippet: { resourceId: { videoId: A } } }] })
+      }
+      if (url.pathname.endsWith('/playlists')) {
+        return json({ items: [{ id: PL, snippet: { title: 'Stub playlist' }, contentDetails: { itemCount: 1 } }] })
+      }
+
+      // a track the viewer rules refuse three times over: wrong category, longer than the maximum, barely any views
+      return json({
+        items: [
+          {
+            id: A,
+            snippet: { title: 'Stub', channelTitle: 'Channel', categoryId: '20', thumbnails: { medium: { url: '' } } },
+            contentDetails: { duration: 'PT10M' },
+            statistics: { viewCount: '42' },
+            status: { privacyStatus: 'public', embeddable: true, uploadStatus: 'processed' }
+          }
+        ]
+      })
+    }
+
+    try {
+      updateConfig({ fallbackPlaylist: { playlistId: PL } })
+      await fallback.settledConfigReaction(PL)
+
+      const state = fallback.getFallbackState()
+      assert.equal(state.sourceCount, 1, 'the track is loaded')
+      assert.deepEqual(state.upNext.map((track) => track.videoId), [A])
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
+  await t.test('a track the guard rules refuse is still dropped', async () => {
+    const realFetch = globalThis.fetch
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (url.hostname !== 'www.googleapis.com') return realFetch(input, init)
+
+      if (url.pathname.endsWith('/playlistItems')) {
+        return json({ items: [{ snippet: { resourceId: { videoId: A } } }] })
+      }
+      if (url.pathname.endsWith('/playlists')) {
+        return json({ items: [{ id: PL, snippet: { title: 'Stub playlist' }, contentDetails: { itemCount: 1 } }] })
+      }
+
+      // a private track cannot be played by anyone, the streamer included
+      return json({
+        items: [
+          {
+            id: A,
+            snippet: { title: 'Stub', channelTitle: 'Channel', categoryId: '10', thumbnails: { medium: { url: '' } } },
+            contentDetails: { duration: 'PT3M20S' },
+            statistics: { viewCount: '1000000' },
+            status: { privacyStatus: 'private', embeddable: true, uploadStatus: 'processed' }
+          }
+        ]
+      })
+    }
+
+    try {
+      updateConfig({ fallbackPlaylist: { playlistId: PL } })
+      await fallback.settledConfigReaction(PL)
+
+      const state = fallback.getFallbackState()
+      assert.equal(state.sourceCount, 0, 'the private track is not loaded')
+      assert.deepEqual(state.upNext, [])
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
+  await t.test('the declared size of the playlist travels with the state: the panel can show how much is playable', async () => {
+    stubPlaylist([A, B, C], { itemCount: 10 })
+    updateConfig({ fallbackPlaylist: { playlistId: PL } })
+    await fallback.settledConfigReaction(PL)
+
+    const state = fallback.getFallbackState()
+    assert.equal(state.sourceCount, 3)
+    assert.equal(state.itemCount, 10)
+  })
+
+  await t.test('a huge playlist is capped at five pages of fifty, and says so with the declared size', async () => {
+    const realFetch = globalThis.fetch
+    let itemRequests = 0
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (url.hostname !== 'www.googleapis.com') return realFetch(input, init)
+
+      if (url.pathname.endsWith('/playlistItems')) {
+        const page = ++itemRequests
+        const ids = Array.from({ length: 50 }, (_, i) => `pg${page}id${String(i).padStart(2, '0')}`.slice(0, 11))
+        return json({ items: ids.map((id) => ({ snippet: { resourceId: { videoId: id } } })), nextPageToken: `page${page + 1}` })
+      }
+      if (url.pathname.endsWith('/playlists')) {
+        return json({ items: [{ id: PL, snippet: { title: 'Stub playlist' }, contentDetails: { itemCount: 400 } }] })
+      }
+
+      const requestedIds = (url.searchParams.get('id') ?? '').split(',').filter(Boolean)
+      return json({
+        items: requestedIds.map((id) => ({
+          id,
+          snippet: { title: `Title ${id}`, channelTitle: 'Channel', categoryId: '10', thumbnails: { medium: { url: '' } } },
+          contentDetails: { duration: 'PT3M20S' },
+          statistics: { viewCount: '1000000' },
+          status: { privacyStatus: 'public', embeddable: true, uploadStatus: 'processed' }
+        }))
+      })
+    }
+
+    try {
+      updateConfig({ fallbackPlaylist: { playlistId: PL } })
+      await fallback.settledConfigReaction(PL)
+
+      assert.equal(itemRequests, 5, 'the page limit stops the walk')
+      const state = fallback.getFallbackState()
+      assert.equal(state.sourceCount, 250, 'five pages of fifty')
+      assert.equal(state.itemCount, 400, 'the declared size still tells the truth about the rest')
     } finally {
       globalThis.fetch = realFetch
     }

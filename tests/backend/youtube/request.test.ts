@@ -7,6 +7,7 @@ import { join } from 'node:path'
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
 const { youtube } = await import('../../../src/youtube/client.js')
+const { getVideoById } = await import('../../../src/youtube/index.js')
 const { updateSecrets } = await import('../../../src/secrets.js')
 updateSecrets({ youtubeApiKey: 'test-key' })
 
@@ -41,6 +42,16 @@ test('youtube() requests', async (t) => {
     assert.equal(calls, 1)
   })
 
+  await t.test('a response of an unexpected shape keeps its cause in the thrown message', async () => {
+    // a 200 whose body is not an object breaks the mapping far from the request: the wrapper must say what broke
+    stub(json(200, null))
+    await assert.rejects(
+      getVideoById('aaaaaaaaaaa'),
+      (error: { code?: string; message?: string }) => error.code === 'YOUTUBE_ERROR' && /YouTube API failed: TypeError:/.test(error.message ?? '')
+    )
+  })
+
+  // marks the in-memory quota flag exhausted for the rest of this file: keep this subtest last
   await t.test('a quota error is not repeated and is reported as the quota error', async () => {
     stub(json(403, { error: { message: 'q', errors: [{ reason: 'quotaExceeded' }] } }))
     await assert.rejects(youtube('videos', { id: 'x' }), (error: { code?: string }) => error.code === 'YOUTUBE_QUOTA')
