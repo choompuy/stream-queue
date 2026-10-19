@@ -136,7 +136,7 @@ export class AppError extends Error {
 }
 
 export type Blockable<T> = T & { isBlocked: boolean }
-export type StateResponse = Omit<PlayerState, 'queue'> & { queue: Blockable<QueueItem>[]; nextTrack: QueueItem | null }
+export type StateResponse = Omit<PlayerState, 'queue'> & { queue: Blockable<QueueItem>[]; nextTrack: QueueItem | null; playId: number }
 export type PlayerActionResponse = StateResponse & { message: string }
 export type SettingsResponse = Settings
 export type OverlayStateResponse = { state: StateResponse; settings: Settings }

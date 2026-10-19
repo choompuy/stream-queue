@@ -1,7 +1,7 @@
 import { StateResponse, QueueItem, ActivityReasonCode } from './types.js'
 import { isBlocked, markBlocked } from './blocklist.js'
 import { logRejection, logFailure } from './activity.js'
-import { getQueue, getCurrent, getIsPaused, setCurrent, shiftQueue } from './queue.js'
+import { getQueue, getCurrent, getPlayId, getIsPaused, setCurrent, shiftQueue } from './queue.js'
 import { peekNextFallbackTrack, advanceFallback } from './fallback.js'
 import { finishItem } from './finish.js'
 import { createLogger } from './logger.js'
@@ -15,6 +15,7 @@ export function getNextTrack(): QueueItem | null {
 export function getState(): StateResponse {
   return {
     current: getCurrent(),
+    playId: getPlayId(),
     queue: markBlocked(getQueue()),
     isPaused: getIsPaused(),
     nextTrack: getNextTrack()

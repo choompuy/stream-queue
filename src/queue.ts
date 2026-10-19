@@ -9,6 +9,7 @@ import { finishItem } from './finish.js'
 import { createLogger, describeError } from './logger.js'
 
 let currentSong: QueueItem | null = null
+let playId = 0
 const queue: QueueItem[] = []
 
 let isPaused = false
@@ -70,6 +71,10 @@ export function getQueue(): QueueItem[] {
 
 export function getCurrent(): QueueItem | null {
   return currentSong
+}
+
+export function getPlayId(): number {
+  return playId
 }
 
 export function setPaused(value: boolean): void {
@@ -149,6 +154,7 @@ export function addSong(song: Song, requestedBy: string, options: AddOptions = {
 export function setCurrent(item: QueueItem | null): void {
   const previous = currentSong
   currentSong = item
+  if (item && item !== previous) playId++
 
   // still attached = nobody closed it, so the track was skipped or replaced with its reward open
   if (previous?.channelPointsRedemption && previous !== item) {

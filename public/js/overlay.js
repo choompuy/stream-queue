@@ -8,6 +8,7 @@ let player = null
 let currentState = null
 let isPlayerReady = false
 let isTransitioning = false
+let loadedPlayId = null
 // set while a broken player is being replaced and its failure is reported: what the player says meanwhile is not news
 let resetting = null
 let settings = {}
@@ -129,8 +130,9 @@ function renderState() {
   const currentVideoId = player.getVideoData()?.video_id
   const playerState = player.getPlayerState()
 
-  if (currentVideoId !== videoId) {
+  if (currentVideoId !== videoId || currentState.playId !== loadedPlayId) {
     temporaryErrorRetries.clear()
+    loadedPlayId = currentState.playId
 
     if (currentState.isPaused) {
       log(`Cueing video while paused: ${videoId}`)

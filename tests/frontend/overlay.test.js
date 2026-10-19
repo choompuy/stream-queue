@@ -11,14 +11,14 @@ let instance = 0
 const GRANTED = { request: (name, callback) => callback() }
 
 // A fresh overlay on a fresh page. `server` is what the overlay reads: change it, then call overlay.refresh().
-async function boot(t, { current = null, isPaused = false, settings = {}, locks = GRANTED, events = true } = {}) {
+async function boot(t, { current = null, isPaused = false, playId, settings = {}, locks = GRANTED, events = true } = {}) {
   mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
   const env = setupPanel({ page: 'overlay.html', url: 'http://localhost:4747/overlay' })
   const youtube = installYouTube()
   const sources = events ? installEventSource() : ((globalThis.EventSource = undefined), [])
 
-  const server = { current, isPaused, nextTrack: null }
+  const server = { current, isPaused, nextTrack: null, playId }
   const sent = { ended: [], failures: [] }
   const outcomes = { ended: [], failures: [] }
 
@@ -303,6 +303,37 @@ test('a track that cannot be played', async (t) => {
     players[0].emit('onError', 5)
     await settle()
     assert.deepEqual(sent.failures, [{ errorCode: 5, videoId: V('a') }])
+  })
+})
+
+test('the same song started twice in a row', async (t) => {
+  const loads = (player) => player.calls.filter(([name]) => name === 'load').length
+
+  await t.test('is loaded again when the server says it is a new start, and not by every refresh', async (t) => {
+    const { overlay, server, player, settle } = await boot(t, { current: track('a'), playId: 1 })
+    assert.equal(loads(player()), 1)
+
+    await overlay.refresh()
+    assert.equal(loads(player()), 1, 'the same start')
+
+    // the track ended and the playlist, which repeats, starts the same song again
+    player().state = 0
+    player().emit('onStateChange', 0)
+    server.playId = 2
+    await settle()
+
+    assert.equal(loads(player()), 2)
+  })
+
+  await t.test('is not loaded again while the answer of the server to the end of the track has not come', async (t) => {
+    const { overlay, player, settle } = await boot(t, { current: track('a'), playId: 1 })
+
+    player().state = 0
+    player().emit('onStateChange', 0)
+    await settle()
+    await overlay.refresh()
+
+    assert.equal(loads(player()), 1)
   })
 })
 
