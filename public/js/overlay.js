@@ -1,5 +1,5 @@
 import { $, formatDuration, createLogger, getErrorMessage, show, setClass, setText } from './shared.js'
-import { initI18n, t, getCurrentLocale } from './i18n.js'
+import { initI18n, t, getCurrentLocale, requesterName } from './i18n.js'
 import { loadYouTubeApi } from './youtube-api.js'
 import { claimPlayback } from './playback-lock.js'
 import { watch } from './sse.js'
@@ -76,7 +76,7 @@ function renderCurrent() {
   dom.badge.dataset.position = settings.position
   dom.currentThumbnail.src = currentState.current.thumbnail
   setText(dom.currentTitle, currentState.current.title)
-  setText(dom.currentRequester, `@${currentState.current.requestedBy}`)
+  setText(dom.currentRequester, requesterName(currentState.current))
 
   if (currentState.nextTrack) {
     setText(dom.nextTitle, currentState.nextTrack.title)

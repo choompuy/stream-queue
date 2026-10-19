@@ -6,16 +6,15 @@ import { addSong, getCurrent, setCurrent } from './queue.js'
 import { finishItem } from './finish.js'
 import { on, emit } from './state-events.js'
 import { isBlocked, markBlocked } from './blocklist.js'
-import { t } from './i18n.js'
-import { getSettings } from './settings.js'
 import { createStore } from './store.js'
 import { persistState } from './state-file.js'
 import { createLogger, describeError } from './logger.js'
 
 const log = createLogger('FALLBACK')
 
-// the name shown wherever the playlist "requests" a track; the queue counts such tracks as nobody's
-const fallbackRequester = (): string => t(getSettings().locale, 'fallback.requester')
+// The stable marker every playlist track carries in `requestedBy`. The localized name is not stored: it is
+// put in wherever the track is shown, so it follows the reader's language however long the track sits there
+const FALLBACK_REQUESTER = 'playlist'
 
 export type FallbackSnapshot = {
   sourceTracks: Song[]
@@ -103,7 +102,7 @@ function buildOrder(tracks: Song[], shuffleOn: boolean, currentVideoId: string |
 function toFallbackQueueItem(song: Song): QueueItem {
   return {
     ...song,
-    requestedBy: fallbackRequester(),
+    requestedBy: FALLBACK_REQUESTER,
     isFallback: true
   }
 }
@@ -347,7 +346,7 @@ export function queueFallbackTrack(videoId: string): QueueItem | null {
   const song = findTrack(videoId)
   if (!song) return null
 
-  return addSong(song, fallbackRequester(), { bypassFilters: true, isFallback: true }).item
+  return addSong(song, FALLBACK_REQUESTER, { bypassFilters: true, isFallback: true }).item
 }
 
 export function getFallbackSnapshot(): FallbackSnapshot & { sourceVersion: number } {

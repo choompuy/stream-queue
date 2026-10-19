@@ -66,6 +66,21 @@ test('renderQueue', async (t) => {
     assert.equal(rows[0].querySelector('.status-pill'), null)
     assert.ok(rows[1].querySelector('.status-pill'))
   })
+
+  await t.test('a playlist track goes by the localized name, and follows the panel\'s language', async () => {
+    state.config = { maxQueueSize: 5 }
+    state.queue = [track('a', { isFallback: true, requestedBy: 'playlist' })]
+
+    queue.renderQueue()
+    assert.equal(panel.$('#queueListWrapper .column-requested-by').textContent.trim(), 'Playlist')
+
+    // the track still carries the same marker: only the language changed, and the row shows it
+    await initI18n('ru')
+    queue.renderQueue()
+    assert.equal(panel.$('#queueListWrapper .column-requested-by').textContent.trim(), 'Плейлист')
+
+    await initI18n('en')
+  })
 })
 
 test('removeFromQueue', async (t) => {

@@ -60,6 +60,10 @@ export function getCurrentLocale() {
   return currentLocale
 }
 
+export function requesterName(item) {
+  return item?.isFallback ? t('fallback.requester') : item?.requestedBy ? `@${item.requestedBy}` : ''
+}
+
 export async function initI18n(locale = DEFAULT_LOCALE) {
   await loadTranslations(locale)
   document.documentElement.lang = currentLocale

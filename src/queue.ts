@@ -1,8 +1,5 @@
 import { getConfig } from './config.js'
-import { getVideoById, searchSongs, selectBestSong } from './youtube/index.js'
-import { parseYouTubeUrl } from './youtube/url.js'
-import { logRejection, logAcceptance } from './activity.js'
-import { QueueItem, Song, AppError, AddedSong } from './types.js'
+import { QueueItem, Song, AppError } from './types.js'
 import { isBlocked } from './blocklist.js'
 import { createStore } from './store.js'
 import { finishItem } from './finish.js'
@@ -26,13 +23,17 @@ const log = createLogger('QUEUE')
 // Everything below is derived from `queue` on demand, so there is no second copy that could drift apart from it
 const isQueued = (videoId: string): boolean => queue.some((item) => item.videoId === videoId)
 
+// Whether the track already has a place in the playing state: it is the current one, or it is waiting in the queue
+export function isDuplicate(videoId: string): boolean {
+  return isActiveNonFallback(videoId) || isQueued(videoId)
+}
+
 function getUserActiveCount(username: string): number {
   const key = username.toLowerCase()
-  // a blocked track never plays, so it no longer occupies the viewer's slot
-  const isTheirs = (item: QueueItem): boolean => !isBlocked(item.videoId) && item.requestedBy.toLowerCase() === key
-  const playing = currentSong !== null && !currentSong.isFallback && isTheirs(currentSong)
+  // a blocked track never plays and a playlist track is nobody's request: neither occupies the viewer's slot
+  const isTheirs = (item: QueueItem): boolean => !item.isFallback && !isBlocked(item.videoId) && item.requestedBy.toLowerCase() === key
 
-  return queue.filter(isTheirs).length + (playing ? 1 : 0)
+  return queue.filter(isTheirs).length + (currentSong !== null && isTheirs(currentSong) ? 1 : 0)
 }
 
 function isActiveNonFallback(videoId: string): boolean {
@@ -124,7 +125,9 @@ export type AddOptions = {
   isFallback?: boolean
 }
 
-function assertCanRequestSong(requestedBy: string, { bypassFilters = false }: AddOptions = {}): void {
+// The refusals a new track can meet at the door, each in its own code, so every path that adds one answers
+// the same way (the search filters out candidates by the same predicates before they are ever looked at)
+export function assertCanRequestSong(requestedBy: string, { bypassFilters = false }: AddOptions = {}): void {
   const config = getConfig()
 
   // blocked tracks do not occupy places: they are closed when their turn comes
@@ -141,13 +144,13 @@ function assertCanRequestSong(requestedBy: string, { bypassFilters = false }: Ad
   }
 }
 
-function assertNotDuplicate(videoId: string): void {
-  if (isActiveNonFallback(videoId) || isQueued(videoId)) {
+export function assertNotDuplicate(videoId: string): void {
+  if (isDuplicate(videoId)) {
     throw new AppError('DUPLICATE')
   }
 }
 
-function assertNotBlocked(videoId: string): void {
+export function assertNotBlocked(videoId: string): void {
   if (isBlocked(videoId)) {
     throw new AppError('BLOCKED')
   }
@@ -235,51 +238,4 @@ export function clearQueue(): QueueItem[] {
   log.log(`cleared ${cleared.length} songs`)
 
   return cleared
-}
-
-// Adds the song the query names to the queue, or throws the AppError that says why not (a duplicate,
-// a limit, a filter, a bad URL); the activity journal entry is written on the way out, in one place
-export async function requestSong(query: string, requestedBy: string, { bypassFilters = false, channelPointsRedemption }: AddOptions = {}): Promise<AddedSong> {
-  let song: Song | null = null
-
-  try {
-    assertCanRequestSong(requestedBy, { bypassFilters })
-
-    const { isYouTube, videoId } = parseYouTubeUrl(query)
-    log.log(`[REQUEST] ${requestedBy} → ${videoId ? `YouTube URL: ${videoId}` : `Search: "${query}"`}`)
-
-    if (isYouTube && !videoId) {
-      throw new AppError('INVALID_YOUTUBE_URL')
-    }
-
-    if (videoId) {
-      assertNotBlocked(videoId)
-      assertNotDuplicate(videoId)
-      song = await getVideoById(videoId, bypassFilters)
-    } else {
-      const songs = await searchSongs(query, bypassFilters)
-      song = selectBestSong(
-        songs,
-        (candidate) => !isBlocked(candidate.videoId) && !isQueued(candidate.videoId) && !isActiveNonFallback(candidate.videoId)
-      )
-    }
-
-    if (!song) throw new AppError('SONG_NOT_FOUND')
-
-    const { item, started } = addSong(song, requestedBy, { bypassFilters, channelPointsRedemption })
-
-    log.log(`[ACCEPT] ${requestedBy} → "${song.title}" - ${started ? 'now playing' : 'queued'}`)
-    logAcceptance(requestedBy, query, song.title, song.videoId)
-
-    return { song: item, started, position: started ? 0 : queue.length }
-  } catch (error) {
-    // an expected refusal (duplicate, limit, filter) is routine and logRejection() writes it down; anything
-    // else is a bug or an outage, and the handler that owns the request logs it once with its details
-    logRejection(requestedBy, query, error instanceof AppError ? error.code : 'SERVER_ERROR', {
-      title: song?.title ?? null,
-      videoId: song?.videoId ?? null,
-      reasonParams: error instanceof AppError ? error.params : undefined
-    })
-    throw error
-  }
 }

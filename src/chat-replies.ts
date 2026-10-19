@@ -12,7 +12,8 @@ export function buildNowPlayingMessage(state: PlayerState, locale: string): stri
     return t(locale, 'chat.nothingPlaying')
   }
 
-  const base = t(locale, 'chat.nowPlayingWithRequester', { title: state.current.title, requestedBy: state.current.requestedBy })
+  const requester = state.current.isFallback ? t(locale, 'fallback.requester') : state.current.requestedBy
+  const base = t(locale, 'chat.nowPlayingWithRequester', { title: state.current.title, requestedBy: requester })
   const pausedSuffix = state.isPaused ? t(locale, 'chat.pausedSuffix') : ''
   return base + pausedSuffix
 }

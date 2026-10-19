@@ -1,5 +1,7 @@
 import type { ActivityReasonCode, ActivityStatus, FailureReason, QueueItem } from './types.js'
 import { logActivity } from './activity.js'
+import { t } from './i18n.js'
+import { getSettings } from './settings.js'
 import { createLogger, describeError } from './logger.js'
 
 type Tracked = NonNullable<QueueItem['channelPointsRedemption']>
@@ -20,10 +22,12 @@ export function registerRedemptionHandler(next: typeof handler): void {
 type ReasonParams = Record<string, string | number>
 
 // the journal entry a track writes when it leaves without playing through: who asked for it, what it was,
-// and why it never played. `query` keeps what identifies the track (the requester typed a title, not a url)
+// and why it never played. `query` keeps what identifies the track (the requester typed a title, not a url).
+// The entry is a record of the moment: a playlist track, which carries only a marker, is named in the
+// language of that moment
 function journal(item: QueueItem, status: ActivityStatus, reasonCode: ActivityReasonCode, reasonParams?: ReasonParams): void {
   logActivity({
-    requestedBy: item.requestedBy,
+    requestedBy: item.isFallback ? t(getSettings().locale, 'fallback.requester') : item.requestedBy,
     query: item.url,
     title: item.title,
     videoId: item.videoId,

@@ -71,6 +71,13 @@ test('the badge', async (t) => {
     assert.equal(env.$('#currentRequester').textContent, '@bob')
   })
 
+  await t.test('a playlist track goes by the localized name, not the marker it carries', async (t) => {
+    const { env } = await boot(t, { current: track('f', { isFallback: true, requestedBy: 'playlist' }) })
+
+    assert.equal(env.$('#currentTitle').textContent, 'Track f')
+    assert.equal(env.$('#currentRequester').textContent, 'Playlist')
+  })
+
   await t.test('follows the display settings: video only, opacity and position', async (t) => {
     const { env } = await boot(t, { current: track('a'), settings: { hideOverlayInfo: true, opacity: 40, position: 'top-left' } })
     const badge = env.$('#badge')

@@ -12,7 +12,24 @@ const workDir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
 cpSync(locales, join(workDir, 'public/locales'), { recursive: true })
 process.chdir(workDir)
 
-const { buildRedemptionAcceptedMessage, buildRedemptionRejectionMessage, buildQueueMessage } = await import('../../src/chat-replies.js')
+const { buildNowPlayingMessage, buildRedemptionAcceptedMessage, buildRedemptionRejectionMessage, buildQueueMessage } = await import('../../src/chat-replies.js')
+
+test('buildNowPlayingMessage', async (t) => {
+  const track = (extra: Record<string, unknown> = {}) =>
+    ({ videoId: 'aaaaaaaaaaa', title: 'T', channelTitle: '', thumbnail: '', duration: 1, views: 1, url: 'u', requestedBy: 'bob', ...extra }) as never
+  const playing = (current: unknown) => ({ current, queue: [], isPaused: false })
+
+  await t.test('names the viewer who requested the track', () => {
+    assert.equal(buildNowPlayingMessage(playing(track()), 'en'), 'Now playing: T (requested by bob)')
+  })
+
+  await t.test('a playlist track goes by the localized name, whatever marker it carries', () => {
+    const playlistTrack = track({ requestedBy: 'playlist', isFallback: true })
+
+    assert.equal(buildNowPlayingMessage(playing(playlistTrack), 'en'), 'Now playing: T (requested by Playlist)')
+    assert.equal(buildNowPlayingMessage(playing(playlistTrack), 'ru'), 'Сейчас играет: T (заказал Плейлист)')
+  })
+})
 
 test('buildQueueMessage', async (t) => {
   const track = (videoId: string, isBlocked = false) => ({ videoId, title: `Track ${videoId}`, requestedBy: 'viewer', isBlocked })

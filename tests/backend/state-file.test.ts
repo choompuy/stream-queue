@@ -195,10 +195,11 @@ test('sanitizeQueueItem()', async (t) => {
     assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: '  ' }), null)
   })
 
-  await t.test('a queue saved before the fallback flag knows its playlist tracks by the name', () => {
-    assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: 'playlist' })?.isFallback, true)
-    assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: 'Playlist' })?.isFallback, true)
-    assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: 'bob' })?.isFallback, undefined)
+  await t.test('the fallback flag is restored as written, and a name alone never sets it', () => {
+    assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: 'bob', isFallback: true })?.isFallback, true)
+    assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: 'Playlist' })?.isFallback, undefined)
+    assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: 'playlist', isFallback: 'yes' })?.isFallback, undefined)
+    assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: 'bob', isFallback: 1 })?.isFallback, undefined)
   })
 })
 

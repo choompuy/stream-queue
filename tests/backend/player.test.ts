@@ -40,6 +40,21 @@ const FAILING_CODES: [number | undefined, string][] = [
   [undefined, 'PLAYBACK_FAILED']
 ]
 
+test('endCurrent() leaves no journal entry of its own: a play that ran its course is not news', async (t) => {
+  const A = 'aaaaaaaaaaa'
+  const B = 'bbbbbbbbbbb'
+
+  await t.test('a plain track is closed without a record and the queue moves on once', () => {
+    queue.setCurrent({ ...song(A), requestedBy: 'viewer' })
+    queue.addSong(song(B), 'viewer', { bypassFilters: true })
+
+    assert.equal(player.endCurrent(A), true)
+
+    assert.equal(queue.getCurrent()?.videoId, B)
+    assert.equal(getActivity().length, 0)
+  })
+})
+
 test('reportPlaybackFailure() journals why the track could not be played', async (t) => {
   const A = 'aaaaaaaaaaa'
 

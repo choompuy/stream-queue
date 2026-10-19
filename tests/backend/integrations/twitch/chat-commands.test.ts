@@ -13,7 +13,8 @@ const { getState, setPaused, getIsPaused } = await import('../../../../src/playe
 const { _test, _resetIntegration } = await import('../../../../src/integrations/twitch/index.js')
 const { clearTwitchOAuthState } = await import('../../../../src/secrets.js')
 
-import type { TwitchChatMessage, TwitchChat } from '../../../../src/integrations/twitch/types.js'
+import type { TwitchChatMessage } from '../../../../src/integrations/twitch/types.js'
+import type { TwitchChat } from '../../../../src/integrations/twitch/chat.js'
 
 function message(overrides: Partial<TwitchChatMessage> = {}): TwitchChatMessage {
   return {

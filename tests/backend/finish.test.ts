@@ -1,11 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync } from 'node:fs'
+import { cpSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
-// data/ and cache/ are read relative to the working directory: keep the test away from the real ones
-process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
+// data/ and cache/ are read relative to the working directory: keep the test away from the real ones.
+// The real locale files are copied along: the journal names the playlist through them
+// (copied, not symlinked: creating a symlink needs extra privileges on Windows)
+const workDir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
+cpSync(resolve('public/locales'), join(workDir, 'public/locales'), { recursive: true })
+process.chdir(workDir)
 
 const { registerRedemptionHandler } = await import('../../src/finish.js')
 const { getActivity, clearActivity } = await import('../../src/activity.js')
@@ -106,6 +110,18 @@ test('a Channel Points redemption is closed by the way its track leaves', async 
     queue.setCurrent({ ...song(A), requestedBy: 'chatter' })
     player.skipCurrent()
     assert.deepEqual(getActivity(), [])
+  })
+
+  await t.test('a journal entry for a playlist track names the playlist, not the marker it carries', () => {
+    queue.setCurrent({ ...song(A), requestedBy: 'playlist', isFallback: true })
+    blockTrack(A, 'Track a')
+
+    player.skipIfCurrent(A)
+
+    const [entry, ...others] = getActivity()
+    assert.equal(others.length, 0)
+    assert.equal(entry.status, 'rejected')
+    assert.equal(entry.requestedBy, 'Playlist')
   })
 
   await t.test('playing a playlist track right away skips what is playing now the same way', () => {

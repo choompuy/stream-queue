@@ -1,12 +1,12 @@
 import { escapeHtml, formatDuration } from '../../shared.js'
 import { DELETE_ICON } from '../../icons.js'
-import { t } from '../../i18n.js'
+import { t, requesterName } from '../../i18n.js'
 import { dom } from '../dom.js'
 import { blockTrackItem, createListView, row, rowMenu, statusPill, unblockTrackItem } from './primitives.js'
 
 export const queueView = createListView(dom.queueListWrapper, {
   getKey: (items) =>
-    items.map((item) => [item.videoId, item.requestedBy, item.title, item.thumbnail, item.duration, item.isBlocked].join(':')).join('|'),
+    items.map((item) => [item.videoId, requesterName(item), item.title, item.thumbnail, item.duration, item.isBlocked].join(':')).join('|'),
   renderRow: (item, index) =>
     row({
       index: index + 1,
@@ -16,7 +16,7 @@ export const queueView = createListView(dom.queueListWrapper, {
       extra: `
         ${item.isBlocked ? statusPill(t('blocklist.blockedLabel'), 'rejected') : ''}
         <span class="column-requested-by text-sm text-green truncate">
-          @${escapeHtml(item.requestedBy)}
+          ${escapeHtml(requesterName(item))}
         </span>
       `,
       meta: formatDuration(item.duration),

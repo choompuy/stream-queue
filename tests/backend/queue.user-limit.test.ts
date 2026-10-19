@@ -90,6 +90,13 @@ test('the track that is playing counts toward the per-user limit', async (t) => 
     assert.doesNotThrow(() => queue.assertCanAddSong(song('bbbbbbbbbbb'), 'Playlist', { bypassFilters: false }))
   })
 
+  await t.test('a playlist track waiting in the queue is nobody\'s request either', () => {
+    queue.setCurrent({ ...song('zzzzzzzzzzz'), requestedBy: 'someone' })
+    queue.addSong(song('aaaaaaaaaaa'), 'playlist', { bypassFilters: false, isFallback: true })
+
+    assert.doesNotThrow(() => queue.assertCanAddSong(song('bbbbbbbbbbb'), 'playlist', { bypassFilters: false }))
+  })
+
   await t.test('a track the streamer blocked frees the viewer\'s slot: it never plays', () => {
     queue.setCurrent({ ...song('zzzzzzzzzzz'), requestedBy: 'someone' })
     queue.addSong(song('aaaaaaaaaaa'), 'Bob', { bypassFilters: false })

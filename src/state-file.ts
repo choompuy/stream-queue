@@ -63,8 +63,8 @@ export function sanitizeQueueItem(raw: unknown): QueueItem | null {
   return {
     ...song,
     requestedBy,
-    // a queue saved before the flag existed marked its playlist tracks only by the requester name
-    ...(isObject(raw) && (raw.isFallback === true || requestedBy.toLowerCase() === 'playlist') ? { isFallback: true } : {}),
+    // the flag is read as written: a name alone never marks a track, for a viewer may go by it too
+    ...(isObject(raw) && raw.isFallback === true ? { isFallback: true } : {}),
     ...(playId !== undefined ? { playId } : {}),
     ...(redemption ? { channelPointsRedemption: redemption } : {})
   }

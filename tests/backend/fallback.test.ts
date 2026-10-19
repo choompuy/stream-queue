@@ -104,18 +104,18 @@ test('the tracks the playlist itself queues', async (t) => {
     const item = fallback.queueFallbackTrack('track00')
 
     assert.equal(item?.isFallback, true)
-    assert.equal(item?.requestedBy, 'Playlist')
+    assert.equal(item?.requestedBy, 'playlist')
     assert.equal(fallback.queueFallbackTrack('nosuchtrack00'), null)
   })
 
-  await t.test('the name follows the locale', async () => {
+  await t.test('the marker is stable whatever the locale: the localized name is put in where the track is shown', () => {
     updateSettings({ locale: 'ru' })
     setCurrent({ ...song('playing000001'), requestedBy: 'viewer' })
 
-    assert.equal(fallback.queueFallbackTrack('track05')?.requestedBy, 'Плейлист')
-    assert.equal(fallback.advanceFallback()?.requestedBy, 'Плейлист')
+    assert.equal(fallback.queueFallbackTrack('track05')?.requestedBy, 'playlist')
+    assert.equal(fallback.advanceFallback()?.requestedBy, 'playlist')
 
     updateSettings({ locale: 'en' })
-    assert.equal(fallback.peekNextFallbackTrack()?.requestedBy, 'Playlist')
+    assert.equal(fallback.peekNextFallbackTrack()?.requestedBy, 'playlist')
   })
 })

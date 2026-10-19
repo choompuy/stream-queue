@@ -2,7 +2,7 @@ import { StateResponse, QueueItem, ActivityReasonCode } from './types.js'
 import { isBlocked, markBlocked } from './blocklist.js'
 import { getQueue, getCurrent, setCurrent, takeNextPlayable } from './queue.js'
 import { peekNextFallbackTrack, advanceFallback } from './fallback.js'
-import { finishItem } from './finish.js'
+import { finishItem, type ItemOutcome } from './finish.js'
 import { createStore } from './store.js'
 import { createLogger } from './logger.js'
 
@@ -50,22 +50,37 @@ export function moveToNext(): QueueItem | null {
   return getCurrent()
 }
 
-export function skipCurrent(): QueueItem | null {
-  const skipped = getCurrent()
-  if (skipped) {
-    log.log(`skipped "${skipped.title}"`)
+// The one way the current track leaves the player. The outcome owns the log line, and finishItem turns it
+// into the journal entry and the reward decision; whatever plays next is decided here alone
+function leaveCurrent(outcome: ItemOutcome): QueueItem | null {
+  const leaving = getCurrent()
+
+  if (leaving) {
+    if (outcome === 'skipped') {
+      log.log(`skipped "${leaving.title}"`)
+    } else if (typeof outcome === 'object') {
+      if (outcome.code === 'BLOCKED') log.log(`current track was blocked, skipping: "${leaving.title}"`)
+      else {
+        // a track that cannot be played is routine (the journal and the chat reply say why): an error entry would be noise
+        log.warn(`playback failed: "${leaving.title}" (error ${outcome.params?.errorCode ?? 'unknown'})`)
+      }
+    }
+    // 'played' is the routine way out: the line about what plays next tells the story
   }
-  finishItem(skipped, 'skipped')
+
+  finishItem(leaving, outcome)
   return moveToNext()
+}
+
+export function skipCurrent(): QueueItem | null {
+  return leaveCurrent('skipped')
 }
 
 export function skipIfCurrent(videoId: string): boolean {
   const current = getCurrent()
   if (current?.videoId !== videoId) return false
 
-  log.log(`current track was blocked, skipping: "${current.title}"`)
-  finishItem(current, { code: 'BLOCKED' })
-  moveToNext()
+  leaveCurrent({ code: 'BLOCKED' })
   return true
 }
 
@@ -76,9 +91,9 @@ const PLAYBACK_FAILURE_REASONS: Record<number, ActivityReasonCode> = {
   150: 'PLAYBACK_EMBED_DISALLOWED'
 }
 
+// -1 is never in the table, so an unreported code falls through to the generic reason
 function playbackFailureReasonCode(errorCode?: number): ActivityReasonCode {
-  if (errorCode !== undefined) return PLAYBACK_FAILURE_REASONS[errorCode] ?? 'PLAYBACK_FAILED'
-  return 'PLAYBACK_FAILED'
+  return PLAYBACK_FAILURE_REASONS[errorCode ?? -1] ?? 'PLAYBACK_FAILED'
 }
 
 function isAboutCurrent(videoId?: string, playId?: number): boolean {
@@ -94,8 +109,7 @@ export function endCurrent(videoId?: string, playId?: number): boolean {
     return false
   }
 
-  finishItem(getCurrent(), 'played')
-  moveToNext()
+  leaveCurrent('played')
   return true
 }
 
@@ -107,14 +121,6 @@ export function reportPlaybackFailure(errorCode?: number, videoId?: string, play
     return false
   }
 
-  const failed = getCurrent()
-  if (failed) {
-    const reasonCode = playbackFailureReasonCode(errorCode)
-    // a track that cannot be played is routine (the journal and the chat reply say why): an error entry would be noise
-    log.warn(`playback failed: "${failed.title}" (error ${errorCode ?? 'unknown'})`)
-    finishItem(failed, { code: reasonCode, params: errorCode !== undefined ? { errorCode } : undefined })
-  }
-
-  moveToNext()
+  leaveCurrent({ code: playbackFailureReasonCode(errorCode), params: errorCode !== undefined ? { errorCode } : undefined })
   return true
 }

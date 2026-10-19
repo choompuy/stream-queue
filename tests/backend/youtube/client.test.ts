@@ -4,7 +4,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { VideoItem } from '../../../src/youtube/types.js'
-import { type Song, type FilterFailureReason } from '../../../src/types.js'
+import type { Song, FilterFailureReason, Config } from '../../../src/types.js'
 
 // updateConfig() saves to data/config.json under the working directory: use a throwaway one, not the real one
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))

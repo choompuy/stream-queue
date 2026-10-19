@@ -11,7 +11,8 @@ import type {
   TwitchChatPermission
 } from './types.js'
 import { clearTwitchAuthorization, clearTwitchOAuthState, getPublicSecretsView, getSecrets, updateTwitchOAuthState } from '../../secrets.js'
-import { detachChannelPointsRedemptions, requestSong } from '../../queue.js'
+import { detachChannelPointsRedemptions } from '../../queue.js'
+import { requestSong } from '../../request.js'
 import {
   buildNowPlayingMessage,
   buildQueueMessage,
