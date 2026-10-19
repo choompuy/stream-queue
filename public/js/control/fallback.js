@@ -19,6 +19,9 @@ export function refreshFallbackState(silent = false) {
   )
 }
 
+// the list follows the track that plays once per track, not at every refresh: the person may be looking at another part of it then
+let followedVideoId = null
+
 export function renderFallback() {
   const data = state.fallback
   const tracks = data?.upNext ?? []
@@ -30,6 +33,7 @@ export function renderFallback() {
   setText(dom.fallbackEnabledText, data?.enabled ? t('common.on') : t('common.off'))
 
   if (!tracks.length) {
+    followedVideoId = null
     setText(dom.fallbackInfo, '')
     views.fallback.render([])
     renderStats()
@@ -44,7 +48,10 @@ export function renderFallback() {
     })
   )
   views.fallback.render(tracks.map((track) => ({ ...track, isActive: track.videoId === activeVideoId })))
-  scrollToActiveFallback()
+  if (activeVideoId !== followedVideoId) {
+    followedVideoId = activeVideoId
+    scrollToActiveFallback()
+  }
   renderStats()
 }
 

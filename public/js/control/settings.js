@@ -7,7 +7,7 @@ import { run } from './run.js'
 import { syncPlayer } from './player.js'
 import { renderQueue } from './queue.js'
 import { t } from '../i18n.js'
-import { toastError } from './toast.js'
+import { toastError, toastSuccess } from './toast.js'
 import { fillForm, saveForm, toastSaveResult } from './form.js'
 
 let qrCodePromise
@@ -19,7 +19,12 @@ function loadQRCode() {
     const script = document.createElement('script')
     script.src = 'vendor/qrcode.min.js'
     script.onload = () => resolve(window.QRCode)
-    script.onerror = reject
+    script.onerror = () => {
+      // a script that failed must not be remembered as the answer for good: the next try loads it again
+      qrCodePromise = undefined
+      script.remove()
+      reject(new Error('The QR code script did not load'))
+    }
     document.head.appendChild(script)
   })
 
@@ -67,10 +72,28 @@ export function renderOverlayUrl() {
   dom.overlayUrl.textContent = url
 }
 
-export function copyOverlayUrl() {
-  navigator.clipboard?.writeText(dom.overlayUrl.href).catch((error) => {
+// The clipboard of the browser exists only on a page that is secure (localhost), not on the one opened by the LAN address: there the text is selected and copied
+function copyBySelection(element) {
+  const range = document.createRange()
+  range.selectNodeContents(element)
+
+  const selection = window.getSelection()
+  selection.removeAllRanges()
+  selection.addRange(range)
+
+  if (!document.execCommand('copy')) throw new Error('The copy command was refused')
+}
+
+export async function copyOverlayUrl() {
+  try {
+    if (navigator.clipboard) await navigator.clipboard.writeText(dom.overlayUrl.href)
+    else copyBySelection(dom.overlayUrl)
+
+    toastSuccess(t('toast.copied'))
+  } catch (error) {
     log('Copy failed:', error)
-  })
+    toastError(t('toast.copyFailed'))
+  }
 }
 
 export function loadNetworkInfo() {
@@ -99,7 +122,15 @@ function renderIpSelect() {
 export async function renderQrUrl() {
   if (dom.controlPanelQr.classList.contains('hidden') || !state.selectedIp) return
 
-  const QRCode = await loadQRCode()
+  let QRCode
+
+  try {
+    QRCode = await loadQRCode()
+  } catch (error) {
+    log('QR code failed to load:', error)
+    return
+  }
+
   if (typeof QRCode === 'undefined') return
 
   const { port } = state.network

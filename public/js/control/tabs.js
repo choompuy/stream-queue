@@ -44,8 +44,9 @@ export function switchSection(sectionName) {
 
   wrapper.querySelectorAll('.section-tab').forEach((el) => {
     show(el, el.dataset.section === sectionName)
-    if (el.dataset.section === 'playlist') scrollToActiveFallback()
   })
+  // the list could not be scrolled while it was hidden
+  if (sectionName === 'playlist') scrollToActiveFallback()
   wrapper.querySelectorAll('.section-tab-btn').forEach((el) => {
     setClass(el, 'active', el.dataset.sectionTarget === sectionName)
   })

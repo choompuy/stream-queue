@@ -292,6 +292,8 @@
     "twitchChatCommandsSaved": "Команды чата сохранены",
     "twitchRewardCreated": "Награда успешно создана",
     "twitchRewardUpdated": "Награда успешно обновлена",
-    "twitchDisconnectedWithOpenRewards": "Отключено. Наград, ожидающих в очереди наград Twitch (примите или верните их там): {{count}}"
+    "twitchDisconnectedWithOpenRewards": "Отключено. Наград, ожидающих в очереди наград Twitch (примите или верните их там): {{count}}",
+    "copied": "Скопировано",
+    "copyFailed": "Не удалось скопировать: выделите ссылку и скопируйте вручную"
   }
 }

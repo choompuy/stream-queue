@@ -260,6 +260,7 @@ test('saveReward()', async (t) => {
     assert.equal(state.twitch.selectedRewardId, 'new1')
     assert.equal(state.twitch.editingReward.id, 'new1')
     assert.ok(toasts().includes('toast.twitchRewardCreated'))
+    assert.equal(toasts().includes('toast.twitchSettingsSaved'), false, 'one message for the creation, not one more for the song-request setting')
   })
 
   await t.test('an existing reward is updated by its id, shows what the server stored, and marks only what really changed as saved', async () => {

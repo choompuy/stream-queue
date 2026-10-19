@@ -306,6 +306,71 @@ test('a track that cannot be played', async (t) => {
   })
 })
 
+test('a track that does not start', async (t) => {
+  const loads = (player) => player.calls.filter(([name]) => name === 'load').length
+
+  await t.test('is retried like a temporary player error, and reported when the retries are used up', async (t) => {
+    const { players, sent, settle, elapse } = await boot(t, { current: track('a') })
+    assert.equal(loads(players[0]), 1)
+
+    await elapse(25_000)
+    await elapse(2000)
+    assert.equal(loads(players[0]), 2)
+    assert.deepEqual(sent.failures, [])
+
+    await elapse(25_000)
+    await elapse(4000)
+    assert.equal(loads(players[0]), 3)
+    assert.deepEqual(sent.failures, [])
+
+    await elapse(25_000)
+    await settle()
+    assert.deepEqual(sent.failures, [{ errorCode: 5, videoId: V('a') }])
+  })
+
+  await t.test('is left alone once it plays', async (t) => {
+    const { players, sent, elapse } = await boot(t, { current: track('a') })
+
+    players[0].emit('onStateChange', 1)
+    await elapse(120_000)
+
+    assert.equal(loads(players[0]), 1)
+    assert.deepEqual(sent.failures, [])
+  })
+
+  await t.test('is not waited for while the queue is paused', async (t) => {
+    const { players, sent, elapse } = await boot(t, { current: track('a'), isPaused: true })
+
+    await elapse(120_000)
+
+    assert.equal(loads(players[0]), 0)
+    assert.deepEqual(sent.failures, [])
+  })
+})
+
+test('the progress', async (t) => {
+  const progress = (env) => env.$('#progressBar').style.getPropertyValue('--progress')
+
+  await t.test('of a live stream has no length to be counted against: nothing is written', async (t) => {
+    const { env, players, elapse } = await boot(t, { current: track('a', { duration: 0 }) })
+    players[0].time = 5
+
+    await elapse(1000)
+
+    assert.equal(progress(env), '')
+    assert.equal(env.$('#progressBar').classList.contains('hidden'), true)
+  })
+
+  await t.test('does not go past 100%', async (t) => {
+    const { env, players, elapse } = await boot(t, { current: track('a', { duration: 100 }) })
+    players[0].time = 130
+
+    await elapse(1000)
+
+    assert.equal(progress(env), '100%')
+  })
+})
+
 test('which overlay plays', async (t) => {
   await t.test('an overlay that does not hold the lock shows the badge but has no player, and gets one when the lock is granted', async (t) => {
     let grant = null
@@ -314,6 +379,7 @@ test('which overlay plays', async (t) => {
 
     assert.equal(players.length, 0)
     assert.equal(env.$('#nowPlayingVideo').classList.contains('hidden'), true)
+    assert.equal(env.$('#progressWrapper').classList.contains('hidden'), true, 'no player, no time to show')
     assert.equal(env.$('#currentTitle').textContent, 'Track a')
 
     grant()
@@ -321,6 +387,7 @@ test('which overlay plays', async (t) => {
 
     assert.equal(players.length, 1)
     assert.equal(env.$('#nowPlayingVideo').classList.contains('hidden'), false)
+    assert.equal(env.$('#progressWrapper').classList.contains('hidden'), false)
   })
 })
 

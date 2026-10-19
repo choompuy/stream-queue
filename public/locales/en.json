@@ -292,6 +292,8 @@
     "twitchChatCommandsSaved": "Chat commands saved",
     "twitchRewardCreated": "Reward created successfully",
     "twitchRewardUpdated": "Reward updated successfully",
-    "twitchDisconnectedWithOpenRewards": "Disconnected. Rewards still waiting in the Twitch rewards queue (fulfill or refund them there): {{count}}"
+    "twitchDisconnectedWithOpenRewards": "Disconnected. Rewards still waiting in the Twitch rewards queue (fulfill or refund them there): {{count}}",
+    "copied": "Copied",
+    "copyFailed": "Could not copy: select the link and copy it by hand"
   }
 }

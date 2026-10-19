@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { setupPanel, makeTrack as track, V } from './panel-env.js'
+import { setupPanel, makeTrack as track, V, deferred } from './panel-env.js'
 
 const panel = setupPanel()
 
@@ -76,6 +76,71 @@ test('adding a track', async (t) => {
     assert.deepEqual(sent, { query: 'https://youtu.be/dQw4w9WgXcQ', requestedBy: 'ControlPanel', admin: true })
     assert.deepEqual(panel.calls, ['POST /api/queue/request'])
     assert.ok(panel.toasts().includes('Added to queue: Song [#3]'))
+  })
+
+  await t.test('a link without https:// is a link too', async () => {
+    input.value = 'youtu.be/dQw4w9WgXcQ'
+    panel.calls.length = 0
+
+    await search()
+
+    assert.deepEqual(panel.calls, ['POST /api/queue/request'])
+  })
+
+  await t.test('words that only mention a link, or a link to another site, are a search', async () => {
+    for (const query of ['lofi youtube.com/ mix', 'https://evil.example/?u=youtube.com/x', 'youtube.com']) {
+      panel.route(`GET /api/search?q=${encodeURIComponent(query)}&admin=1`, { results: [] })
+      input.value = query
+      panel.calls.length = 0
+
+      await search()
+
+      assert.deepEqual(panel.calls, [`GET /api/search?q=${encodeURIComponent(query)}&admin=1`], query)
+    }
+  })
+
+  await t.test('the box is emptied once a link was queued, and what was typed meanwhile is left alone', async () => {
+    input.value = 'https://youtu.be/dQw4w9WgXcQ'
+    await search()
+    assert.equal(input.value, '')
+
+    panel.route('POST /api/queue/request', () => {
+      input.value = 'next song'
+      return { song: { title: 'Song' }, position: 1, started: false }
+    })
+    input.value = 'https://youtu.be/dQw4w9WgXcQ'
+    await search()
+    assert.equal(input.value, 'next song')
+  })
+
+  await t.test('an answer that comes after a newer search is dropped', async () => {
+    const slow = deferred()
+    panel.route('GET /api/search?q=slow&admin=1', () => slow.promise)
+    panel.route('GET /api/search?q=quick&admin=1', { results: [track('q')] })
+
+    input.value = 'slow'
+    const first = search()
+    input.value = 'quick'
+    await search()
+
+    slow.resolve({ results: [track('s1'), track('s2')] })
+    await first
+
+    assert.equal(results().length, 1)
+  })
+
+  await t.test('an answer that comes after the results were cleared does not bring them back', async () => {
+    const slow = deferred()
+    panel.route('GET /api/search?q=late&admin=1', () => slow.promise)
+    input.value = 'late'
+    const pending = search()
+
+    clearSearchResults()
+    slow.resolve({ results: [track('l')] })
+    await pending
+
+    assert.equal(results().length, 0)
+    assert.equal(wrapperHidden(), true)
   })
 
   await t.test('a track that starts playing at once is announced as playing', async () => {
