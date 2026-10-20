@@ -3,7 +3,7 @@ import { t } from '../../i18n.js'
 import { api, ApiError } from '../api.js'
 import { run } from '../run.js'
 import { toastError, toastInfo } from '../toast.js'
-import { state } from '../state.js'
+import { state, isLocalDevice } from '../state.js'
 import { dom } from '../dom.js'
 import { log } from '../log.js'
 import { loadTwitchRewards, renderTwitchRewards } from './twitch-rewards.js'
@@ -82,6 +82,7 @@ export function refreshTwitchStatus() {
     'refreshing Twitch status',
     async () => {
       if (!state.twitch.configured) return
+      if (!isLocalDevice()) return
 
       const wasConnected = Boolean(state.twitch.connected && state.twitch.user)
       const waitingFor = state.twitch.authorization
@@ -160,6 +161,8 @@ export function loadTwitchSettings() {
       renderTwitchConnection()
       return
     }
+
+    if (!isLocalDevice()) return
 
     applyStatus(await api.getTwitchStatus())
     renderTwitchConnection()

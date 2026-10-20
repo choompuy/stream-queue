@@ -4,7 +4,7 @@ import { t } from '../../i18n.js'
 
 export function createListView(wrapper, { renderRow, getKey, cache = true }) {
   if (cache && !getKey) {
-    console.warn('[UI] createListView: no getKey provided — falling back to a naive key that may not detect all changes')
+    console.warn('[UI] createListView: no getKey provided - falling back to a naive key that may not detect all changes')
   }
 
   const list = wrapper.querySelector('.row-list')

@@ -73,6 +73,8 @@
   "queue": {
     "title": "Queue",
     "empty": "Queue is empty",
+    "info": "In queue: {{count}}",
+    "infoMax": "In queue: {{count}} ▪ limit {{max}}",
     "remove": "Remove from queue",
     "clear": "Clear",
     "clearConfirm": "Clear entire queue?"
@@ -80,6 +82,7 @@
   "fallback": {
     "title": "Playlist",
     "empty": "Playlist is empty",
+    "notSet": "No active playlist - add one on the Playlists page",
     "refresh": "Refresh",
     "shuffle": "Shuffle",
     "repeat": "Repeat",
@@ -94,6 +97,7 @@
   "activity": {
     "title": "Activity",
     "empty": "No requests yet",
+    "requests": "Requests: {{count}}",
     "clear": "Clear",
     "clearConfirm": "Clear Activity?",
     "accepted": "accepted",
@@ -168,6 +172,7 @@
       "description": "Local music request manager for streamers",
       "developedBy": "Developed by"
     },
+    "remoteNote": "Opened from another device - settings that only this machine may change (the API key and the Twitch integration) are hidden. Change them on the computer running the app",
     "twitch": {
       "integration": "Twitch integration",
       "chanel": "Twitch channel",

@@ -1,6 +1,6 @@
 import { escapeHtml, show, setValue } from '../shared.js'
 import { api } from './api.js'
-import { state } from './state.js'
+import { state, isLocalDevice } from './state.js'
 import { dom } from './dom.js'
 import { log } from './log.js'
 import { run } from './run.js'
@@ -76,6 +76,7 @@ export function copyOverlayUrl() {
 export function loadNetworkInfo() {
   return run('loading network info', async () => {
     state.network = await api.getNetworkInfo()
+    applyDeviceLocality()
     const { ips } = state.network
 
     if (!ips.length) state.selectedIp = 'localhost'
@@ -84,6 +85,10 @@ export function loadNetworkInfo() {
     renderIpSelect()
     renderQrUrl()
   })
+}
+
+export function applyDeviceLocality() {
+  document.body.classList.toggle('not-local', !isLocalDevice())
 }
 
 function renderIpSelect() {

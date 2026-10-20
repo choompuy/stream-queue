@@ -29,7 +29,8 @@ export function renderFallback() {
   setText(dom.fallbackEnabledText, data?.enabled ? t('common.on') : t('common.off'))
 
   if (!tracks.length) {
-    setText(dom.fallbackInfo, '')
+    // an active playlist that has simply run out still counts as set; only a section with no playlist at all gets the hint
+    setText(dom.fallbackInfo, data?.playlistId ? '' : t('fallback.notSet'))
     views.fallback.render([])
     renderStats()
     return
@@ -39,7 +40,7 @@ export function renderFallback() {
 
   setText(
     dom.fallbackInfo,
-    itemCount && itemCount > 0
+    itemCount && itemCount > 0 && tracks.length !== itemCount
       ? t('fallback.infoOf', {
           count: tracks.length,
           total: itemCount,

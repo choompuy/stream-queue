@@ -26,7 +26,7 @@ export const { getConfig, updateConfig, validateConfigUpdates, restoreConfig, on
     minViews: rules.integer(0, MAX_MIN_VIEWS),
     minDurationSeconds: rules.integer(0, MAX_DURATION_SECONDS),
     maxDurationSeconds: rules.integer(1, MAX_DURATION_SECONDS),
-    maxQueueSize: rules.integer(1, MAX_COUNT),
+    maxQueueSize: rules.integer(0, MAX_COUNT),
     maxRequestsPerUser: rules.integer(0, MAX_COUNT),
     allowLiveStreams: rules.boolean,
     contentMode: field({

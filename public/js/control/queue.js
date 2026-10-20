@@ -41,9 +41,14 @@ export function renderState() {
   syncPlayer()
 }
 
+function queueHeaderText(length, max) {
+  if (max > 0) return t('queue.infoMax', { count: length, max })
+  return length > 0 ? t('queue.info', { count: length }) : t('queue.empty')
+}
+
 export function renderQueue() {
   const maxQueueSize = state.config?.maxQueueSize ?? 0
-  setText(dom.queueCount, `${state.queue.length}/${maxQueueSize}`)
+  setText(dom.queueCount, queueHeaderText(state.queue.length, maxQueueSize))
   setText(dom.tabQueueCount, state.queue.length)
 
   views.queue.render(state.queue)

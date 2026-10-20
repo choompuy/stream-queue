@@ -21,6 +21,7 @@ test('loadActivity()', async (t) => {
 
     assert.equal(state.activity.length, 2)
     assert.equal(panel.$('#tabActivityCount').textContent, '2')
+    assert.equal(panel.$('#activityCount').textContent, 'Requests: 2')
     assert.equal(panel.$$('#activityListWrapper .row-item').length, 2)
     assert.equal(panel.toasts().join('|'), before)
   })

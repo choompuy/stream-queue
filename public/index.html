@@ -84,10 +84,10 @@
             <div class="now-playing-top">
               <div class="now-playing-empty empty" id="noPlaying" data-i18n="nowPlaying.nothingPlaying">Nothing playing</div>
               <div class="now-playing-info hidden" id="nowPlaying">
-                <div class="text-lg text-bold" id="currentTitle"></div>
-                <div class="text-secondary text-md" id="currentChannel"></div>
+                <div class="text-lg text-bold truncate-3line" id="currentTitle"></div>
+                <div class="text-secondary text-md truncate" id="currentChannel"></div>
                 <div class="text-muted text-sm"><span id="currentDuration"></span> ▪ <span id="currentViews"></span></div>
-                <div class="text-green text-sm" id="currentRequester"></div>
+                <div class="text-green text-sm truncate" id="currentRequester"></div>
               </div>
 
               <div class="now-playing-controls">
@@ -191,26 +191,28 @@
 
           <div class="section-tab section-tab-queue" data-section="queue">
             <div class="section-tab-header">
-              <span class="text-sm text-secondary" id="queueCount">0/0</span>
-              <button
-                type="button"
-                id="clearQueueBtn"
-                class="btn btn-secondary btn-danger"
-                data-action="clear-queue"
-                data-confirm="queue.clearConfirm"
-                data-i18n-title="queue.clear"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
-                  <path
-                    stroke="currentColor"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="m18 6-.8 12.013c-.071 1.052-.106 1.578-.333 1.977a2 2 0 0 1-.866.81c-.413.2-.94.2-1.995.2H9.994c-1.055 0-1.582 0-1.995-.2a2 2 0 0 1-.866-.81c-.227-.399-.262-.925-.332-1.977L6 6M4 6h16m-4 0-.27-.812c-.263-.787-.394-1.18-.637-1.471a2 2 0 0 0-.803-.578C13.939 3 13.524 3 12.695 3h-1.388c-.829 0-1.244 0-1.596.139a2 2 0 0 0-.803.578c-.243.29-.374.684-.636 1.471L8 6m6 4v7m-4-7v7"
-                  />
-                </svg>
-                <span data-i18n="queue.clear">Clear</span>
-              </button>
+              <span class="text-sm text-secondary" id="queueCount">Queue is empty</span>
+              <div class="section-tab-actions">
+                <button
+                  type="button"
+                  id="clearQueueBtn"
+                  class="btn btn-secondary btn-danger"
+                  data-action="clear-queue"
+                  data-confirm="queue.clearConfirm"
+                  data-i18n-title="queue.clear"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
+                    <path
+                      stroke="currentColor"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="m18 6-.8 12.013c-.071 1.052-.106 1.578-.333 1.977a2 2 0 0 1-.866.81c-.413.2-.94.2-1.995.2H9.994c-1.055 0-1.582 0-1.995-.2a2 2 0 0 1-.866-.81c-.227-.399-.262-.925-.332-1.977L6 6M4 6h16m-4 0-.27-.812c-.263-.787-.394-1.18-.637-1.471a2 2 0 0 0-.803-.578C13.939 3 13.524 3 12.695 3h-1.388c-.829 0-1.244 0-1.596.139a2 2 0 0 0-.803.578c-.243.29-.374.684-.636 1.471L8 6m6 4v7m-4-7v7"
+                    />
+                  </svg>
+                  <span data-i18n="queue.clear">Clear</span>
+                </button>
+              </div>
             </div>
 
             <div class="row-list-wrapper" id="queueListWrapper" data-list="queue">
@@ -306,6 +308,7 @@
 
           <div class="section-tab section-tab-activity hidden" data-section="activity">
             <div class="section-tab-header">
+              <span id="activityCount" class="text-sm text-secondary"></span>
               <div class="section-tab-actions">
                 <button
                   type="button"
@@ -374,6 +377,10 @@
 
       <section class="container page-tab" data-page-tab="settings">
         <div class="settings-wrapper">
+          <div id="remoteSettingsNote" class="remote-only remote-note text-sm" data-i18n="settings.remoteNote">
+            Opened from another device - settings that only this machine may change (the API key and the Twitch integration) are hidden. Change them
+            on the computer running the app
+          </div>
           <div id="overlaySettingsPanel" class="section-tab panel">
             <div class="section-tab-header">
               <h2 data-i18n="settings.overlay.title">Overlay</h2>
@@ -473,7 +480,7 @@
               <h2 data-i18n="settings.bot.title">Bot Settings</h2>
             </div>
 
-            <div class="settings-section">
+            <div class="settings-section local-only">
               <label class="field">
                 <span class="field-label" data-i18n="settings.bot.apiKey">API Key</span>
                 <input
@@ -504,7 +511,7 @@
 
               <label class="field">
                 <span class="field-label" data-i18n="settings.bot.limits.maxQueue">Max queue size</span>
-                <input class="settings-input input" type="number" id="cfgMaxQueue" name="maxQueueSize" min="1" />
+                <input class="settings-input input" type="number" id="cfgMaxQueue" name="maxQueueSize" min="0" />
               </label>
               <label class="field">
                 <span class="field-label" data-i18n="settings.bot.limits.maxPerUser">Max requests per user</span>
@@ -553,7 +560,7 @@
             </div>
           </div>
 
-          <div class="section-tab panel">
+          <div class="section-tab panel local-only">
             <div class="section-tab-header">
               <h2 data-i18n="settings.twitch.integration">Twitch integration</h2>
             </div>
@@ -725,7 +732,7 @@
             </div>
           </div>
 
-          <div id="twitchChatCommandsPanel" class="section-tab panel hidden">
+          <div id="twitchChatCommandsPanel" class="section-tab panel local-only hidden">
             <div class="section-tab-header">
               <h2 data-i18n="settings.twitchChat.title">Twitch chat commands</h2>
             </div>

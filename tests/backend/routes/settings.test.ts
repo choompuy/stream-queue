@@ -61,7 +61,7 @@ test('PUT /api/config', async (t) => {
 
     const response = await putConfig({
       minViews: before.minViews + 1,
-      maxQueueSize: 0
+      maxQueueSize: -1
     })
 
     const config = await getConfig()
@@ -127,7 +127,7 @@ test('PUT /api/config and the fallback playlist', async (t) => {
 
 test('PUT /api/config with a refused field (partial save)', async (t) => {
   await t.test('stores the valid fields and returns them together with the refused ones', async () => {
-    const response = await putConfig({ minViews: 4242, maxQueueSize: 0 })
+    const response = await putConfig({ minViews: 4242, maxQueueSize: -1 })
     const body = (await response.json()) as Record<string, any>
 
     assert.equal(response.status, 400)

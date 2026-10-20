@@ -59,6 +59,12 @@ test('system routes', async (t) => {
     assert.ok(Array.isArray(body.data.ips) && body.data.ips.every((ip: unknown) => typeof ip === 'string'))
   })
 
+  await t.test('GET /network-info says whether this connection comes from the machine itself, so the panel can hide what other devices may not change', async () => {
+    const body = (await (await api('/network-info')).json()) as Record<string, any>
+
+    assert.equal(body.data.isLocal, true, 'the test asks from 127.0.0.1, which is the machine itself')
+  })
+
   await t.test('POST /shutdown from this machine answers, flushes and then exits (once)', async () => {
     const response = await api('/shutdown', { method: 'POST' })
 

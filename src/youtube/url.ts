@@ -37,7 +37,7 @@ export function parseYouTubeUrl(input: string): { isYouTube: boolean; videoId: s
   const url = youtubeUrl(input)
   if (!url) return { isYouTube: false, videoId: null }
 
-  // youtu.be/<id> · /watch?v=<id> · /shorts|embed|v|live/<id> — segment must be the whole id
+  // youtu.be/<id> · /watch?v=<id> · /shorts|embed|v|live/<id> - segment must be the whole id
   const [kind, segment] = url.pathname.split('/').filter(Boolean)
   const id = hostOf(url) === 'youtu.be' ? kind : kind === 'watch' ? url.searchParams.get('v') : VIDEO_KINDS.has(kind) ? segment : null
 

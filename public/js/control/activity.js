@@ -1,13 +1,17 @@
 import { api } from './api.js'
 import { state } from './state.js'
+import { dom } from './dom.js'
 import { renderStats } from './stats.js'
 import { views } from './views/index.js'
 import { run } from './run.js'
+import { t } from '../i18n.js'
+import { setText } from '../shared.js'
 
 function renderActivity() {
   const filter = state.activityFilter
   const entries = filter === 'all' ? state.activity : state.activity.filter((entry) => entry.status === filter)
   views.activity.render(entries)
+  setText(dom.activityCount, t('activity.requests', { count: entries.length }))
 }
 
 export function loadActivity(silent = false) {

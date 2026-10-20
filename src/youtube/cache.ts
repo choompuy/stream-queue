@@ -17,7 +17,7 @@ const videos = new Map<string, Entry<VideoItem | null>>()
 
 const log = createLogger('YOUTUBE QUOTA')
 
-// YouTube resets daily API quota at midnight Pacific Time — do not change this timezone.
+// YouTube resets daily API quota at midnight Pacific Time - do not change this timezone.
 // One formatter for the whole run: building it per call is measurable work on every request while the quota is exhausted
 const quotaDayFormat = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'America/Los_Angeles',

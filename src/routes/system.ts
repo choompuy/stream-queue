@@ -3,7 +3,7 @@ import { StateResponse, OverlayStateResponse } from '../types.js'
 import { ok } from '../http.js'
 import { getState } from '../player.js'
 import { getSettings } from '../settings.js'
-import { localOnly } from '../local-only.js'
+import { isLocal, localOnly } from '../local-only.js'
 import { lanAddresses } from '../network.js'
 import { shutdown } from '../shutdown.js'
 
@@ -19,7 +19,7 @@ export function createSystemRouter({ exit = (code: number) => process.exit(code)
   })
 
   router.get('/network-info', (req, res) => {
-    ok(res, { port: req.socket.localPort, ips: lanAddresses() })
+    ok(res, { port: req.socket.localPort, ips: lanAddresses(), isLocal: isLocal(req) })
   })
 
   router.post('/shutdown', localOnly, (_req, res) => {

@@ -132,7 +132,7 @@ export function assertCanRequestSong(requestedBy: string, { bypassFilters = fals
 
   // blocked tracks do not occupy places: they are closed when their turn comes
   const playable = queue.filter((item) => !isBlocked(item.videoId)).length
-  if (currentSong !== null && playable >= config.maxQueueSize) {
+  if (currentSong !== null && config.maxQueueSize !== 0 && playable >= config.maxQueueSize) {
     throw new AppError('QUEUE_FULL')
   }
 

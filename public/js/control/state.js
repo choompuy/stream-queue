@@ -34,3 +34,10 @@ export const state = {
     editingReward: null
   }
 }
+
+// Whether this connection comes from the machine the app runs on. The server refuses its writes from anywhere else,
+// so the panel hides them there. Unknown (the answer never arrived) counts as local: hiding working settings is worse
+// than showing refused ones.
+export function isLocalDevice() {
+  return state.network?.isLocal !== false
+}

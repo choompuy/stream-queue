@@ -81,7 +81,7 @@ test('buildRedemptionAcceptedMessage', async (t) => {
 })
 
 test('buildRedemptionRejectionMessage', async (t) => {
-  // the reason is a plain { code, params } — a thrown AppError fits the same shape when one reaches this far
+  // the reason is a plain { code, params } - a thrown AppError fits the same shape when one reaches this far
   await t.test('a request that was never queued gets only the reason', () => {
     assert.equal(buildRedemptionRejectionMessage('alice', { code: 'DUPLICATE' }, 'en'), '@alice, that track is already in the queue, points refunded')
   })
