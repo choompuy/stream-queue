@@ -5,34 +5,28 @@ import { dom } from './dom.js'
 
 const DEFAULT_DURATION = 4000
 const MAX_TOASTS = 3
+// as long as the toast-out animation of toast.css: a timer and not the end of the animation, which does not come when animations are off
+const LEAVE_MS = 200
 
 function closeToast(toast) {
   if (!toast.isConnected || toast.classList.contains('toast-leaving')) return
 
   setClass(toast, 'toast-entering', false)
   setClass(toast, 'toast-leaving')
-
-  const handleAnimationEnd = (event) => {
-    if (event.animationName === 'toast-out') toast.remove()
-  }
-
-  toast.addEventListener('animationend', handleAnimationEnd)
-  // animationend does not come when animations are off (reduced motion, a hidden tab): the toast is removed anyway
-  setTimeout(() => toast.remove(), 1000)
+  setTimeout(() => toast.remove(), LEAVE_MS)
 }
 
+// the toasts that stay on the screen: one that is leaving is not counted
+const staying = (root) => Array.from(root.querySelectorAll('.toast-wrapper:not(.toast-leaving)'))
+
 function enforceMaxToasts(root) {
-  const toasts = Array.from(root.querySelectorAll('.toast-wrapper'))
+  const toasts = staying(root)
 
-  while (toasts.length >= MAX_TOASTS) {
-    const oldestToast = toasts.shift()
-
-    if (oldestToast) closeToast(oldestToast)
-  }
+  while (toasts.length >= MAX_TOASTS) closeToast(toasts.shift())
 }
 
 function isShowing(root, message) {
-  return Array.from(root.querySelectorAll('.toast-wrapper:not(.toast-leaving) .toast-message')).some((node) => node.textContent === message)
+  return staying(root).some((toast) => toast.querySelector('.toast-message').textContent === message)
 }
 
 export function showToast(message, options = {}) {
@@ -41,7 +35,8 @@ export function showToast(message, options = {}) {
 
   const { type = 'info', duration = DEFAULT_DURATION } = options
 
-  if (type === 'error' && isShowing(root, message)) return () => {}
+  // the same message twice at once (a button pressed again, a save that is repeated) is one message
+  if (isShowing(root, message)) return () => {}
 
   enforceMaxToasts(root)
 

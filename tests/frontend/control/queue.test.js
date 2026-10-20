@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { setupPanel, deferred, makeTrack as track, V } from './panel-env.js'
+import { setupPanel, deferred, makeTrack as track, V, act } from './panel-env.js'
 
 const panel = setupPanel()
 
@@ -86,7 +86,7 @@ test('removeFromQueue', async (t) => {
     panel.route(`DELETE /api/queue/video/${V('y')}`, [404, { error: 'raw', code: 'QUEUE_ITEM_NOT_FOUND' }])
     panel.calls.length = 0
 
-    await queue.removeFromQueue(V('y'))
+    await act(queue.removeFromQueue, V('y'))
 
     assert.deepEqual(panel.calls, [`DELETE /api/queue/video/${V('y')}`])
     assert.ok(panel.toasts().includes('Queue item not found'))

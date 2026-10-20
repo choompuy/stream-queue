@@ -6,7 +6,6 @@ import {
   formatTrackDuration,
   youtubeThumbnail,
   formatViews,
-  getErrorMessage,
   translateErrorCode,
   setFieldState,
   setError,
@@ -108,31 +107,6 @@ test('formatViews', async (t) => {
     assert.equal(russian(2_500_000), '2,5 млн')
     assert.equal(russian(15_400), '15,4 тыс.')
     assert.equal(russian(999), '999')
-  })
-})
-
-test('getErrorMessage', async (t) => {
-  await t.test('known code without a translator returns the raw key', () => {
-    assert.equal(getErrorMessage(100), 'player.error.videoNotFound')
-  })
-
-  await t.test('known code with a translator calls it with the key and code param', () => {
-    const calls = []
-    const fakeT = (key, params) => {
-      calls.push([key, params])
-      return `translated:${key}`
-    }
-    assert.equal(getErrorMessage(101, fakeT), 'translated:player.error.embedNotAllowed')
-    assert.deepEqual(calls, [['player.error.embedNotAllowed', { code: 101 }]])
-  })
-
-  await t.test('unknown code without a translator falls back to a generic string', () => {
-    assert.equal(getErrorMessage(9999), 'Error code 9999')
-  })
-
-  await t.test('unknown code with a translator uses the generic key', () => {
-    const fakeT = (key) => key
-    assert.equal(getErrorMessage(9999, fakeT), 'player.error.errorCode')
   })
 })
 

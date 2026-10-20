@@ -214,14 +214,7 @@
     }
   },
   "player": {
-    "views": "{{count}} просмотров",
-    "error": {
-      "invalidParameter": "Неверный параметр",
-      "html5Error": "Ошибка HTML5 плеера",
-      "videoNotFound": "Видео не найдено",
-      "embedNotAllowed": "Встраивание не разрешено",
-      "errorCode": "Код ошибки {{code}}"
-    }
+    "views": "{{count}} просмотров"
   },
   "api": {
     "errors": {

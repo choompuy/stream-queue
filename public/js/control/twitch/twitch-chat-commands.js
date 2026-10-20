@@ -1,5 +1,4 @@
 import { api } from '../api.js'
-import { run } from '../run.js'
 import { state } from '../state.js'
 import { dom } from '../dom.js'
 import { fillForm, saveForm, toastSaveResult, trackForm } from '../form.js'
@@ -17,18 +16,16 @@ export function cancelChatCommandChanges() {
   fillForm(dom.twitchChatCommandsPanel, state.twitch.config)
 }
 
-export function saveTwitchChatCommands() {
-  return run('saving Twitch chat commands', async () => {
-    const result = await saveForm(
-      dom.twitchChatCommandsPanel,
-      async (body) => {
-        const answer = await api.updateTwitchConfig(body)
-        state.twitch.config = answer.config
-        return answer
-      },
-      { changedOnly: true }
-    )
+export async function saveTwitchChatCommands() {
+  const result = await saveForm(
+    dom.twitchChatCommandsPanel,
+    async (body) => {
+      const answer = await api.updateTwitchConfig(body)
+      state.twitch.config = answer.config
+      return answer
+    },
+    { changedOnly: true }
+  )
 
-    toastSaveResult(result, 'toast.twitchChatCommandsSaved')
-  })
+  toastSaveResult(result, 'toast.twitchChatCommandsSaved')
 }

@@ -104,3 +104,17 @@ test('every request has a timeout, so a request that gets no answer fails instea
 
   assert.ok(lastOptions.signal instanceof AbortSignal)
 })
+
+test('a request has a JSON content type only when it has a body', async () => {
+  answer(200, { data: {} })
+  await api.getSettings()
+  assert.equal(lastOptions.headers['Content-Type'], undefined)
+
+  answer(200, { data: {} })
+  await api.skip()
+  assert.equal(lastOptions.headers['Content-Type'], undefined)
+
+  answer(200, { data: {} })
+  await api.updateSettings({ locale: 'en' })
+  assert.equal(lastOptions.headers['Content-Type'], 'application/json')
+})

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { setupPanel, makeTrack as track, V } from './panel-env.js'
+import { setupPanel, makeTrack as track, V, act } from './panel-env.js'
 
 const panel = setupPanel()
 
@@ -37,7 +37,7 @@ test('the switches of the playlist', async (t) => {
     state.fallback = fallback()
     panel.route('POST /api/fallback/shuffle', [500, { error: 'raw', code: 'SERVER_ERROR' }])
 
-    await actions.toggleFallbackShuffle()
+    await act(actions.toggleFallbackShuffle)
 
     assert.equal(state.fallback.shuffle, false)
     assert.ok(panel.toasts().includes('Internal server error'))

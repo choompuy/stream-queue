@@ -1,13 +1,12 @@
 import { api } from './api.js'
 import { state } from './state.js'
-import { run } from './run.js'
 
 export function playPauseCurrent() {
-  return run('toggling resume/pause', () => (state.isPaused ? api.resume() : api.pause()))
+  return state.isPaused ? api.resume() : api.pause()
 }
 
 export function skipCurrent() {
-  return run('skipping', () => api.skip())
+  return api.skip()
 }
 
 export const playerActions = {

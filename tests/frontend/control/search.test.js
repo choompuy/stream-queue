@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { setupPanel, makeTrack as track, V, deferred } from './panel-env.js'
+import { setupPanel, makeTrack as track, V, deferred, act } from './panel-env.js'
 
 const panel = setupPanel()
 
@@ -52,8 +52,8 @@ test('search', async (t) => {
     panel.calls.length = 0
     input.value = 'broken'
 
-    await search()
-    await search()
+    await act(search)
+    await act(search)
 
     assert.equal(panel.count('GET /api/search?q=broken&admin=1'), 2)
     assert.ok(panel.toasts().includes('Internal server error'))
@@ -166,7 +166,7 @@ test('adding a track', async (t) => {
     panel.route('POST /api/queue/request', [409, { error: 'raw', code: 'DUPLICATE' }])
     panel.calls.length = 0
 
-    await searchActions['search-add']({ dataset: { videoId: V('z') } })
+    await act(searchActions['search-add'], { dataset: { videoId: V('z') } })
 
     assert.deepEqual(panel.calls, ['POST /api/queue/request'])
     assert.ok(panel.toasts().includes('This track is already in the queue'))

@@ -178,38 +178,36 @@ export function loadSecrets() {
   })
 }
 
-export function saveConfigSetting() {
+export async function saveConfigSetting() {
   const youtubeApiKey = dom.secYoutubeKey.value.trim()
 
-  return run('saving config', async () => {
-    // partial save: the server stores every valid field and lists the refused ones
-    const result = await saveForm(
-      dom.botSettingsPanel,
-      async (config) => {
-        const answer = await api.updateConfig(config)
-        state.config = answer.config
-        return answer
-      },
-      { changedOnly: true }
-    )
+  // partial save: the server stores every valid field and lists the refused ones
+  const result = await saveForm(
+    dom.botSettingsPanel,
+    async (config) => {
+      const answer = await api.updateConfig(config)
+      state.config = answer.config
+      return answer
+    },
+    { changedOnly: true }
+  )
 
-    let apiKeyFailed = false
+  let apiKeyFailed = false
 
-    if (youtubeApiKey) {
-      try {
-        await api.updateSecrets({ youtubeApiKey })
-        dom.secYoutubeKey.value = ''
-        await loadSecrets()
-      } catch (error) {
-        log('Error saving API key:', error)
-        toastError(t('toast.apiKeyNotSaved'))
-        apiKeyFailed = true
-      }
+  if (youtubeApiKey) {
+    try {
+      await api.updateSecrets({ youtubeApiKey })
+      dom.secYoutubeKey.value = ''
+      await loadSecrets()
+    } catch (error) {
+      log('Error saving API key:', error)
+      toastError(t('toast.apiKeyNotSaved'))
+      apiKeyFailed = true
     }
+  }
 
-    renderQueue()
-    toastSaveResult(result, 'toast.settingsSaved', { successToast: !apiKeyFailed })
-  })
+  renderQueue()
+  toastSaveResult(result, 'toast.settingsSaved', { successToast: !apiKeyFailed })
 }
 
 export const settingsActions = {

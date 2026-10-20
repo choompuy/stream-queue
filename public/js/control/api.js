@@ -27,7 +27,7 @@ async function request(url, options = {}, { partial = false } = {}) {
       ...options,
       signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       headers: {
-        'Content-Type': 'application/json',
+        ...(options.body !== undefined && { 'Content-Type': 'application/json' }),
         ...options.headers
       }
     })
@@ -61,10 +61,11 @@ async function request(url, options = {}, { partial = false } = {}) {
   return body?.data ?? null
 }
 
-const post = (url, body, flags) => request(url, { method: 'POST', ...(body !== undefined && { body: JSON.stringify(body) }) }, flags)
-const put = (url, body, flags) => request(url, { method: 'PUT', body: JSON.stringify(body) }, flags)
-const patch = (url, body, flags) => request(url, { method: 'PATCH', body: JSON.stringify(body) }, flags)
-const del = (url) => request(url, { method: 'DELETE' })
+const send = (method) => (url, body, flags) => request(url, { method, ...(body !== undefined && { body: JSON.stringify(body) }) }, flags)
+const post = send('POST')
+const put = send('PUT')
+const patch = send('PATCH')
+const del = send('DELETE')
 const id = encodeURIComponent
 
 export const api = {

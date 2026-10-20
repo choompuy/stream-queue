@@ -1,4 +1,4 @@
-import { formatTrackDuration, formatViews, getErrorMessage, show, setText } from '../shared.js'
+import { formatTrackDuration, formatViews, show, setText } from '../shared.js'
 import { PLAY_ICON, PAUSE_ICON } from '../icons.js'
 import { state } from './state.js'
 import { dom } from './dom.js'
@@ -64,7 +64,7 @@ function onPlayerReady() {
 }
 
 function onPlayerError(event) {
-  log(`Player error: ${getErrorMessage(event.data, t)}`)
+  log(`Player error: ${event.data}`)
 }
 
 loadYouTubeApi().then(() => {

@@ -1,7 +1,6 @@
 import { api } from './api.js'
 import { dom } from './dom.js'
 import { views } from './views/index.js'
-import { run } from './run.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 import { show } from '../shared.js'
@@ -30,26 +29,24 @@ export function clearSearchResults() {
   show(dom.searchListWrapper, false)
 }
 
-export function search() {
+export async function search() {
   const query = dom.searchInput.value.trim()
   if (!query) return
 
   const thisSearch = ++lastSearch
 
-  return run('searching', async () => {
-    if (isYouTubeLink(query)) {
-      await requestSong(query)
-      // the link is done with; what was typed meanwhile is not touched
-      if (dom.searchInput.value.trim() === query) dom.searchInput.value = ''
-      return
-    }
+  if (isYouTubeLink(query)) {
+    await requestSong(query)
+    // the link is done with; what was typed meanwhile is not touched
+    if (dom.searchInput.value.trim() === query) dom.searchInput.value = ''
+    return
+  }
 
-    const data = await api.search(query)
-    if (thisSearch !== lastSearch) return
+  const data = await api.search(query)
+  if (thisSearch !== lastSearch) return
 
-    views.search.render(data.results)
-    show(dom.searchListWrapper)
-  })
+  views.search.render(data.results)
+  show(dom.searchListWrapper)
 }
 
 async function requestSong(query) {
@@ -60,7 +57,7 @@ async function requestSong(query) {
 }
 
 export function addSong(query) {
-  return run('adding song', () => requestSong(query))
+  return requestSong(query)
 }
 
 export const searchActions = {

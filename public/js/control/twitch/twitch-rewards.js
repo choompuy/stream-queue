@@ -86,26 +86,24 @@ export function cancelRewardChanges() {
   showRewardForm(state.twitch.editingReward)
 }
 
-export function saveReward() {
+export async function saveReward() {
   const editing = state.twitch.editingReward
 
-  return run(editing ? 'updating Twitch reward' : 'creating Twitch reward', async () => {
-    const result = await saveForm(dom.twitchRewardForm, (body) => (editing ? api.updateTwitchReward(editing.id, body) : api.createTwitchReward(body)))
+  const result = await saveForm(dom.twitchRewardForm, (body) => (editing ? api.updateTwitchReward(editing.id, body) : api.createTwitchReward(body)))
 
-    if (result.refused) return toastSaveResult(result, 'toast.twitchRewardUpdated')
+  if (result.refused) return toastSaveResult(result, 'toast.twitchRewardUpdated')
 
-    await readRewards()
+  await readRewards()
 
-    if (editing) {
-      state.twitch.editingReward = result.config
-      return toastSaveResult(result, 'toast.twitchRewardUpdated')
-    }
+  if (editing) {
+    state.twitch.editingReward = result.config
+    return toastSaveResult(result, 'toast.twitchRewardUpdated')
+  }
 
-    state.twitch.selectedRewardId = result.config.id
-    renderTwitchRewards()
-    // the new reward is the one for the song requests: one message for both, not one for each
-    toastSaveResult(await persistTwitchConfig(), 'toast.twitchRewardCreated')
-  })
+  state.twitch.selectedRewardId = result.config.id
+  renderTwitchRewards()
+  // the new reward is the one for the song requests: one message for both, not one for each
+  toastSaveResult(await persistTwitchConfig(), 'toast.twitchRewardCreated')
 }
 
 export function bindTwitchRewardTracking() {

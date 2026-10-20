@@ -82,6 +82,9 @@ const { dom } = await import(new URL('js/control/dom.js', PUBLIC_DIR))
 // the five chat commands, and the id of their inputs: chatCmd<Name>Enabled / Command / Permission
 const CHAT_COMMAND_FIELDS = ['now', 'queue', 'skip', 'pause', 'resume'].map((key) => ({ key, dom: `chatCmd${key[0].toUpperCase()}${key.slice(1)}` }))
 const settings = await import(new URL('js/control/twitch/index.js', PUBLIC_DIR))
+const { run } = await import(new URL('js/control/run.js', PUBLIC_DIR))
+// the dispatcher of the panel runs every action like this: a failure is logged and shown
+const connect = () => run('connecting Twitch', () => settings.connectTwitch())
 const configSettings = await import(new URL('js/control/settings.js', PUBLIC_DIR))
 
 await loadTranslations('en')
@@ -163,7 +166,7 @@ test('connectTwitch', async (t) => {
   await t.test('shows the code and the page to enter it on, and then waits for the server instead of asking it', async () => {
     handlers = { 'POST /api/integrations/twitch/connect': () => deviceCode() }
 
-    await drain(settings.connectTwitch())
+    await drain(connect())
 
     assert.equal(state.twitch.authorization.userCode, 'ABCD-1234')
 
@@ -195,7 +198,7 @@ test('connectTwitch', async (t) => {
   await t.test('closes the popup and toasts when the device code response is incomplete', async () => {
     handlers = { 'POST /api/integrations/twitch/connect': () => ({ userCode: 'ABCD-1234' }) }
 
-    await drain(settings.connectTwitch())
+    await drain(connect())
 
     assert.equal(openedWindows[0].closed, true)
     assert.ok(document.getElementById('toastContainer').textContent.length > 0)
@@ -209,7 +212,7 @@ test('connectTwitch', async (t) => {
       }
     }
 
-    await drain(settings.connectTwitch())
+    await drain(connect())
 
     assert.equal(openedWindows[0].closed, true, 'a failed connect must not leave a blank tab behind')
     assert.equal(dom.twitchConnectBtn.disabled, false)
@@ -218,7 +221,7 @@ test('connectTwitch', async (t) => {
   await t.test('the connect button is usable again as soon as the code is shown (a new click replaces the code)', async () => {
     handlers = { 'POST /api/integrations/twitch/connect': () => deviceCode() }
 
-    await drain(settings.connectTwitch())
+    await drain(connect())
 
     assert.equal(dom.twitchConnectBtn.disabled, false)
   })

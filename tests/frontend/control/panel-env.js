@@ -178,3 +178,9 @@ export function installYouTube() {
 
   return { players, PlayerState }
 }
+
+// What the dispatcher of the panel does around an action: a failure is logged and shown, so the tests of an action call it this way
+export async function act(handler, ...args) {
+  const { run } = await import('../../../public/js/control/run.js')
+  return run('test', () => handler(...args))
+}

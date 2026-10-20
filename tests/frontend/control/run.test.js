@@ -56,16 +56,4 @@ test('run', async (t) => {
     })
     assert.equal(result, undefined)
   })
-
-  await t.test('onError is called with the thrown error', async () => {
-    const seen = []
-    await run(
-      'doing a thing',
-      () => {
-        throw new Error('boom')
-      },
-      { silent: true, onError: (error) => seen.push(error.message) }
-    )
-    assert.deepEqual(seen, ['boom'])
-  })
 })

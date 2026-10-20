@@ -214,14 +214,7 @@
     }
   },
   "player": {
-    "views": "{{count}} views",
-    "error": {
-      "invalidParameter": "Invalid parameter",
-      "html5Error": "HTML5 player error",
-      "videoNotFound": "Video not found",
-      "embedNotAllowed": "Embed not allowed",
-      "errorCode": "Error code {{code}}"
-    }
+    "views": "{{count}} views"
   },
   "api": {
     "errors": {

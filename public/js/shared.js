@@ -47,28 +47,6 @@ export function createLogger(prefix) {
   }
 }
 
-const errorMessages = {
-  2: 'player.error.invalidParameter',
-  5: 'player.error.html5Error',
-  100: 'player.error.videoNotFound',
-  101: 'player.error.embedNotAllowed',
-  150: 'player.error.embedNotAllowed'
-}
-
-export function getErrorMessage(code, t) {
-  const key = errorMessages[code]
-  if (key && t) {
-    return t(key, { code })
-  }
-  if (key) {
-    return key
-  }
-  if (t) {
-    return t('player.error.errorCode', { code })
-  }
-  return `Error code ${code}`
-}
-
 function codeToI18nKey(code) {
   const camel = code.toLowerCase().replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase())
   return `api.errors.${camel}`

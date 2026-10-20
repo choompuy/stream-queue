@@ -22,16 +22,11 @@ export function loadActivity(silent = false) {
 }
 
 export async function clearActivity() {
-  await run(
-    'clearing activity',
-    async () => {
-      const data = await api.clearActivity()
-      state.activity = data.entries
-      views.activity.invalidate()
-      renderActivity()
-      renderStats()
-    }
-  )
+  const data = await api.clearActivity()
+  state.activity = data.entries
+  views.activity.invalidate()
+  renderActivity()
+  renderStats()
 }
 
 export const activityActions = {

@@ -1,5 +1,5 @@
-import { $, formatDuration, formatTrackDuration, createLogger, getErrorMessage, show, setClass, setText } from './shared.js'
-import { initI18n, t, getCurrentLocale } from './i18n.js'
+import { $, formatDuration, formatTrackDuration, createLogger, show, setClass, setText } from './shared.js'
+import { initI18n, getCurrentLocale } from './i18n.js'
 import { loadYouTubeApi } from './youtube-api.js'
 import { claimPlayback } from './playback-lock.js'
 import { watch } from './sse.js'
@@ -303,8 +303,7 @@ function onPlayerStateChange(event) {
 function onPlayerError(event) {
   // an error answers the wait: a retry waits again, and a failure is reported
   clearStartWatchdog()
-  const message = getErrorMessage(event.data, t)
-  log(`Player error: ${message}`)
+  log(`Player error: ${event.data}`)
   const videoId = currentState?.current?.videoId
 
   if (!videoId) {

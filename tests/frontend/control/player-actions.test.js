@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { setupPanel, deferred, makeTrack as track } from './panel-env.js'
+import { setupPanel, deferred, makeTrack as track, act } from './panel-env.js'
 
 const panel = setupPanel()
 
@@ -55,7 +55,7 @@ test('play and pause', async (t) => {
     state.isPaused = false
     panel.calls.length = 0
 
-    await playPauseCurrent()
+    await act(playPauseCurrent)
 
     assert.deepEqual(panel.calls, ['POST /api/player/pause'])
     assert.ok(panel.toasts().includes('Internal server error'))
