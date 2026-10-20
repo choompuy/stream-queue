@@ -72,7 +72,6 @@ const STATUS_BY_CODE: Record<HttpErrorCode, number> = {
       'REGION_BLOCKED',
       'NOT_PLAYABLE',
       'IS_LIVE',
-      'IS_SHORT',
       'DURATION_OUT_OF_RANGE',
       'VIEWS_TOO_LOW'
     ],

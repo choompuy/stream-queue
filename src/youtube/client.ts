@@ -4,7 +4,7 @@ import { AppError } from '../types.js'
 import { VideoItem } from './types.js'
 import { isQuotaExhausted, markQuotaExhausted } from './cache.js'
 import { isPlain } from '../persist.js'
-import { VIDEO_DETAILS_PART, isMusicVideo, isAvailableInRegion, isLikelyShort } from './filters.js'
+import { VIDEO_DETAILS_PART } from './filters.js'
 import { fetchWithTimeout, retryableTransport } from '../web-fetch.js'
 
 type YouTubeErrorResponse = {
@@ -15,7 +15,6 @@ type YouTubeErrorResponse = {
   }
 }
 
-const RETRY_STATUSES = new Set([429, 500, 502, 503, 504])
 const MAX_ATTEMPTS = 3
 const RETRY_DELAY_MS = 500
 

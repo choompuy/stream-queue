@@ -375,4 +375,102 @@ test('what loading the playlist keeps and reports', async (t) => {
       globalThis.fetch = realFetch
     }
   })
+
+  await t.test('a playlists endpoint with nothing to say takes the number away, not the tracks', async (t2) => {
+    const warnings = t2.mock.method(console, 'warn', () => {})
+    const realFetch = globalThis.fetch
+    let videosReached = 0
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (url.hostname !== 'www.googleapis.com') return realFetch(input, init)
+
+      if (url.pathname.endsWith('/playlistItems')) {
+        return json({ items: [{ snippet: { resourceId: { videoId: A } } }, { snippet: { resourceId: { videoId: B } } }] })
+      }
+      // only the playlists endpoint is down, everything else answers: the size is decoration, it must not
+      // be able to sink the load the way it used to when it was asked for before the videos
+      if (url.pathname.endsWith('/playlists')) {
+        return new Response(JSON.stringify({ error: { message: 'refused' } }), { status: 500 })
+      }
+
+      videosReached++
+      const requestedIds = (url.searchParams.get('id') ?? '').split(',').filter(Boolean)
+      return json({
+        items: requestedIds.map((id) => ({
+          id,
+          snippet: { title: `Title ${id}`, channelTitle: 'Channel', categoryId: '10', thumbnails: { medium: { url: '' } } },
+          contentDetails: { duration: 'PT3M20S' },
+          statistics: { viewCount: '1000000' },
+          status: { privacyStatus: 'public', embeddable: true, uploadStatus: 'processed' }
+        }))
+      })
+    }
+
+    try {
+      updateConfig({ fallbackPlaylist: { playlistId: PL } })
+      await fallback.settledConfigReaction(PL)
+
+      const state = fallback.getFallbackState()
+      assert.equal(state.sourceCount, 2, 'the tracks are loaded anyway')
+      assert.deepEqual(state.upNext.map((track) => track.videoId), [A, B])
+      assert.equal(state.itemCount, null, 'the declared size is simply missing')
+      assert.equal(videosReached, 1, 'the load reached the videos endpoint')
+
+      assert.equal(warnings.mock.callCount(), 1, 'exactly one warning says why')
+      const line = String(warnings.mock.calls[0]?.arguments ?? '')
+      assert.ok(line.includes('declared size'), line)
+      assert.ok(line.includes('refused'), line)
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
+  await t.test('a playlists endpoint with nothing to say takes the number away, not the tracks', async (t2) => {
+    const warnings = t2.mock.method(console, 'warn', () => {})
+    const realFetch = globalThis.fetch
+    let videosReached = 0
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (url.hostname !== 'www.googleapis.com') return realFetch(input, init)
+
+      if (url.pathname.endsWith('/playlistItems')) {
+        return json({ items: [{ snippet: { resourceId: { videoId: A } } }, { snippet: { resourceId: { videoId: B } } }] })
+      }
+      // only the playlists endpoint is down, everything else answers: the size is decoration, it must not
+      // be able to sink the load the way it used to when it was asked for before the videos
+      if (url.pathname.endsWith('/playlists')) {
+        return new Response(JSON.stringify({ error: { message: 'refused' } }), { status: 500 })
+      }
+
+      videosReached++
+      const requestedIds = (url.searchParams.get('id') ?? '').split(',').filter(Boolean)
+      return json({
+        items: requestedIds.map((id) => ({
+          id,
+          snippet: { title: `Title ${id}`, channelTitle: 'Channel', categoryId: '10', thumbnails: { medium: { url: '' } } },
+          contentDetails: { duration: 'PT3M20S' },
+          statistics: { viewCount: '1000000' },
+          status: { privacyStatus: 'public', embeddable: true, uploadStatus: 'processed' }
+        }))
+      })
+    }
+
+    try {
+      updateConfig({ fallbackPlaylist: { playlistId: PL } })
+      await fallback.settledConfigReaction(PL)
+
+      const state = fallback.getFallbackState()
+      assert.equal(state.sourceCount, 2, 'the tracks are loaded anyway')
+      assert.deepEqual(state.upNext.map((track) => track.videoId), [A, B])
+      assert.equal(state.itemCount, null, 'the declared size is simply missing')
+      assert.equal(videosReached, 1, 'the load reached the videos endpoint')
+
+      assert.equal(warnings.mock.callCount(), 1, 'exactly one warning says why')
+      const line = String(warnings.mock.calls[0]?.arguments ?? '')
+      assert.ok(line.includes('declared size'), line)
+      assert.ok(line.includes('refused'), line)
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
 })

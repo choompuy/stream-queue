@@ -150,7 +150,6 @@ Most configuration is editable from the web control panel.
 | Max queue size               | 20                        |
 | Max active requests per user | 4                         |
 | Region                       | none                      |
-| Allow Shorts                 | disabled                  |
 | Allow live streams           | disabled                  |
 | Fallback playlist            | disabled until configured |
 

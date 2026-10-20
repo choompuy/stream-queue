@@ -68,7 +68,6 @@ export type Config = {
   maxDurationSeconds: number
   maxQueueSize: number
   maxRequestsPerUser: number
-  allowShorts: boolean
   allowLiveStreams: boolean
   contentMode: 'music' | 'any'
   regionCode: string
@@ -127,7 +126,6 @@ export type FilterFailureReason =
   | 'REGION_BLOCKED'
   | 'NOT_PLAYABLE'
   | 'IS_LIVE'
-  | 'IS_SHORT'
   | 'DURATION_OUT_OF_RANGE'
   | 'VIEWS_TOO_LOW'
 

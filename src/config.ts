@@ -17,7 +17,6 @@ export const { getConfig, updateConfig, validateConfigUpdates, restoreConfig, on
     maxDurationSeconds: 480,
     maxQueueSize: 20,
     maxRequestsPerUser: 4,
-    allowShorts: false,
     allowLiveStreams: false,
     contentMode: 'music',
     regionCode: '',
@@ -29,7 +28,6 @@ export const { getConfig, updateConfig, validateConfigUpdates, restoreConfig, on
     maxDurationSeconds: rules.integer(1, MAX_DURATION_SECONDS),
     maxQueueSize: rules.integer(1, MAX_COUNT),
     maxRequestsPerUser: rules.integer(0, MAX_COUNT),
-    allowShorts: rules.boolean,
     allowLiveStreams: rules.boolean,
     contentMode: field({
       normalize: (v) => (typeof v === 'string' ? v.trim().toLowerCase() : v),

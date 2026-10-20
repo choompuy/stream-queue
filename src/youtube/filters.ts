@@ -8,10 +8,6 @@ type FilterRule = {
   params?: (config: Config) => Record<string, string | number> | undefined
 }
 
-// A duration alone cannot tell a Short from a short song: only the lowest bound is safe to call a Short.
-// Anything longer is a regular track; the streamer who wants short content gone raises minDurationSeconds.
-const SHORTS_MAX_DURATION_SECONDS = 180
-
 // The parts the video fetch asks for: what the rules below read (plus what the mapper shows)
 export const VIDEO_DETAILS_PART = 'snippet,contentDetails,statistics,status,topicDetails'
 
@@ -61,9 +57,11 @@ const isNotPublic = (video: VideoItem): boolean => {
   return privacy !== undefined && privacy !== 'public'
 }
 
+// A broadcast answers to the live-stream rules, not to the upload status: while it is on, YouTube reports
+// its upload as 'uploaded', and only the recording becomes 'processed' once the stream is over
 const isNotProcessed = (video: VideoItem): boolean => {
   const upload = video.status?.uploadStatus
-  return upload !== undefined && upload !== 'processed'
+  return upload !== undefined && upload !== 'processed' && !isLiveBroadcast(video)
 }
 
 const FILTER_RULES: FilterRule[] = [
@@ -110,10 +108,6 @@ const FILTER_RULES: FilterRule[] = [
     reason: 'DURATION_OUT_OF_RANGE',
     check: (s, v, c) => !isLiveBroadcast(v) && (s.duration < c.minDurationSeconds || s.duration > c.maxDurationSeconds),
     params: (c) => ({ min: c.minDurationSeconds, max: c.maxDurationSeconds })
-  },
-  {
-    reason: 'IS_SHORT',
-    check: (s, _v, c) => !c.allowShorts && isLikelyShort(s.duration)
   }
 ]
 
@@ -127,10 +121,6 @@ export function isAvailableInRegion(video: VideoItem, regionCode: string): boole
   if (restriction.allowed && (restriction.allowed.length === 0 || !restriction.allowed.includes(regionCode))) return false
 
   return true
-}
-
-function isLikelyShort(durationSeconds: number): boolean {
-  return durationSeconds > 0 && durationSeconds <= SHORTS_MAX_DURATION_SECONDS
 }
 
 /**

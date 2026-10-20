@@ -13,7 +13,7 @@ document.body.insertAdjacentHTML(
   `<div id="demo">
     <input id="views" name="minViews" type="number" />
     <input id="region" name="region.code" type="text" />
-    <input id="shorts" name="allowShorts" type="checkbox" />
+    <input id="live" name="allowLiveStreams" type="checkbox" />
     <select id="mode" name="contentMode"><option value="music">music</option><option value="any">any</option></select>
     <input id="skipCommand" name="chatCommands.skip.command" type="text" />
     <input id="loose" type="text" />
@@ -35,14 +35,14 @@ test('readForm', async (t) => {
   await t.test('builds the body from the names: nested by their dots, typed by the kind of input, text trimmed', () => {
     input('views').value = '25'
     input('region').value = '  US '
-    input('shorts').checked = true
+    input('live').checked = true
     input('mode').value = 'any'
     input('skipCommand').value = ' !sg skip '
 
     assert.deepEqual(readForm(form), {
       minViews: 25,
       region: { code: 'US' },
-      allowShorts: true,
+      allowLiveStreams: true,
       contentMode: 'any',
       chatCommands: { skip: { command: '!sg skip' } }
     })
@@ -62,7 +62,7 @@ test('readForm', async (t) => {
 })
 
 test('readForm with changedOnly', async (t) => {
-  const base = { minViews: 10, region: { code: 'DE' }, allowShorts: false, contentMode: 'music', chatCommands: { skip: { command: '!sg skip' } } }
+  const base = { minViews: 10, region: { code: 'DE' }, allowLiveStreams: false, contentMode: 'music', chatCommands: { skip: { command: '!sg skip' } } }
 
   await t.test('takes only the inputs that differ from what the form was filled with, nested as usual', () => {
     fillForm(form, base)
@@ -94,27 +94,27 @@ test('readForm with changedOnly', async (t) => {
 })
 
 test('fillForm', async (t) => {
-  const stored = { minViews: 10, region: { code: 'DE' }, allowShorts: true, contentMode: 'any', chatCommands: { skip: { command: '!sg skip' } } }
+  const stored = { minViews: 10, region: { code: 'DE' }, allowLiveStreams: true, contentMode: 'any', chatCommands: { skip: { command: '!sg skip' } } }
 
   await t.test('puts the stored values into the inputs by name, whatever the kind of input', () => {
     fillForm(form, stored)
 
     assert.equal(input('views').value, '10')
     assert.equal(input('region').value, 'DE')
-    assert.equal(input('shorts').checked, true)
+    assert.equal(input('live').checked, true)
     assert.equal(input('mode').value, 'any')
     assert.equal(input('skipCommand').value, '!sg skip')
   })
 
   await t.test('what was put in is what "changed" is measured against, for every kind of input', () => {
-    assert.deepEqual(['views', 'region', 'shorts', 'mode', 'skipCommand'].filter((id) => isChanged(input(id))), [])
+    assert.deepEqual(['views', 'region', 'live', 'mode', 'skipCommand'].filter((id) => isChanged(input(id))), [])
 
     input('views').value = '11'
     input('region').value = 'FR '
-    input('shorts').checked = false
+    input('live').checked = false
     input('mode').value = 'music'
     input('skipCommand').value = '!other'
-    assert.deepEqual(['views', 'region', 'shorts', 'mode', 'skipCommand'].filter((id) => !isChanged(input(id))), [])
+    assert.deepEqual(['views', 'region', 'live', 'mode', 'skipCommand'].filter((id) => !isChanged(input(id))), [])
 
     input('region').value = ' DE '
     assert.equal(isChanged(input('region')), false, 'surrounding spaces are not a change: they are trimmed on save')
@@ -136,7 +136,7 @@ test('fillForm', async (t) => {
 })
 
 test('trackForm', async (t) => {
-  fillForm(form, { minViews: 10, region: { code: 'DE' }, allowShorts: false, contentMode: 'music', chatCommands: { skip: { command: '!sg skip' } } })
+  fillForm(form, { minViews: 10, region: { code: 'DE' }, allowLiveStreams: false, contentMode: 'music', chatCommands: { skip: { command: '!sg skip' } } })
   trackForm(form)
 
   await t.test('marks an input yellow while it differs, and plain again when it matches, on input and on change', () => {
@@ -217,7 +217,7 @@ test('a select', async (t) => {
 })
 
 test('saveForm', async (t) => {
-  const base = { minViews: 10, region: { code: 'DE' }, allowShorts: false, contentMode: 'music', chatCommands: { skip: { command: '!sg skip' } } }
+  const base = { minViews: 10, region: { code: 'DE' }, allowLiveStreams: false, contentMode: 'music', chatCommands: { skip: { command: '!sg skip' } } }
 
   await t.test('sends the body, shows what the server stored, and marks stored fields green, refused ones red, the rest plain', async () => {
     fillForm(form, base)
@@ -238,7 +238,7 @@ test('saveForm', async (t) => {
     assert.deepEqual(marks('views'), ['saved'])
     assert.deepEqual(marks('region'), ['error'])
     assert.deepEqual(marks('skipCommand'), ['saved'])
-    assert.deepEqual(marks('shorts'), [])
+    assert.deepEqual(marks('live'), [])
     assert.deepEqual([result.saved, result.refused], [2, 1])
     assert.deepEqual(result.rejected, ['region.code'])
   })
@@ -255,19 +255,19 @@ test('saveForm', async (t) => {
     input('views').value = '25'
     let sent = null
 
-    // another panel changed the region and the shorts since this form was filled
+    // another panel changed the region and the live-streams switch since this form was filled
     await saveForm(
       form,
       async (body) => {
         sent = body
-        return { config: { ...base, minViews: 25, region: { code: 'FR' }, allowShorts: true }, rejected: [] }
+        return { config: { ...base, minViews: 25, region: { code: 'FR' }, allowLiveStreams: true }, rejected: [] }
       },
       { changedOnly: true }
     )
 
     assert.deepEqual(sent, { minViews: 25 }, 'the old values of the other fields are not sent back over the new ones')
     assert.equal(input('region').value, 'FR', 'the form shows what is stored now')
-    assert.equal(input('shorts').checked, true)
+    assert.equal(input('live').checked, true)
     assert.deepEqual([marks('views'), marks('region')], [['saved'], []])
   })
 

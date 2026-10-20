@@ -115,20 +115,21 @@ test('checkFilters', async (t) => {
     assert.equal(reasonOf(baseSong(), video), 'REGION_BLOCKED')
   })
 
-  await t.test('a track of up to three minutes is refused as a Short when they are not allowed', () => {
-    updateConfig({ minViews: 0, minDurationSeconds: 0, maxDurationSeconds: 100_000, regionCode: '', allowShorts: false })
+  await t.test('a short song is no reason on its own: only the configured range has a say about length', () => {
+    // the maximum must stay within the schema's day-long ceiling, or the field is quietly refused
+    updateConfig({ minViews: 0, minDurationSeconds: 0, maxDurationSeconds: 3600, regionCode: '' })
 
-    assert.equal(reasonOf(baseSong({ duration: 120 }), baseVideo()), 'IS_SHORT')
-
-    updateConfig({ allowShorts: true })
-    assert.equal(reasonOf(baseSong({ duration: 120 }), baseVideo()), null)
-    updateConfig({ allowShorts: false })
+    // the Shorts rule used to refuse any track under the line; 2:30 and 3:00 songs were its victims,
+    // and a duration alone cannot tell a Short from a short song anyway - so the rule is gone for good
+    assert.equal(reasonOf(baseSong({ duration: 60 }), baseVideo()), null)
+    assert.equal(reasonOf(baseSong({ duration: 150 }), baseVideo()), null)
+    assert.equal(reasonOf(baseSong({ duration: 180 }), baseVideo()), null)
   })
 
   await t.test('guardOnly: the guard rules alone say whether a track can be played at all', () => {
-    // the fields the filters never read are filled in with the repo defaults: only the six below matter
+    // the fields the filters never read are filled in with the repo defaults: only the five below matter
     const config: Config = {
-      contentMode: 'music', minViews: 100_000, minDurationSeconds: 60, maxDurationSeconds: 480, allowShorts: false, regionCode: 'RU',
+      contentMode: 'music', minViews: 100_000, minDurationSeconds: 60, maxDurationSeconds: 480, regionCode: 'RU',
       maxQueueSize: 20, maxRequestsPerUser: 4, allowLiveStreams: false,
       fallbackPlaylist: { playlistId: null, enabled: true, shuffle: false, repeat: false }
     }
@@ -172,7 +173,9 @@ test('contentMode', async (t) => {
 })
 
 test('live streams', async (t) => {
-  const live = baseVideo({ snippet: { categoryId: '10', liveBroadcastContent: 'live' } })
+  // while the stream is on, YouTube reports its upload as 'uploaded': the not-playable guard must not read
+  // that as an unfinished upload, or no stream the toggle allows would ever pass
+  const live = baseVideo({ snippet: { categoryId: '10', liveBroadcastContent: 'live' }, status: { embeddable: true, uploadStatus: 'uploaded' } })
   const stream = baseSong({ duration: 0 })
   const open = { minViews: 0, minDurationSeconds: 60, maxDurationSeconds: 480, regionCode: '' }
 
@@ -190,18 +193,33 @@ test('live streams', async (t) => {
 
 test('scheduled streams', async (t) => {
   const open = { minViews: 0, minDurationSeconds: 60, maxDurationSeconds: 480, regionCode: '' }
-  const upcoming = baseVideo({ snippet: { categoryId: '10', liveBroadcastContent: 'upcoming' } })
-  const live = baseVideo({ snippet: { categoryId: '10', liveBroadcastContent: 'live' } })
+  // a scheduled stream reports its upload as 'uploaded' like the one that is on, a premiere as 'processed':
+  // either way the broadcast has not started, so there is nothing to play yet
+  const upcoming = baseVideo({ snippet: { categoryId: '10', liveBroadcastContent: 'upcoming' }, status: { embeddable: true, uploadStatus: 'uploaded' } })
+  const premiere = baseVideo({ snippet: { categoryId: '10', liveBroadcastContent: 'upcoming' }, status: { embeddable: true, uploadStatus: 'processed' } })
+  const live = baseVideo({ snippet: { categoryId: '10', liveBroadcastContent: 'live' }, status: { embeddable: true, uploadStatus: 'uploaded' } })
 
   await t.test('an upcoming stream or premiere is refused even when live streams are allowed: there is nothing to play yet', () => {
     updateConfig({ ...open, allowLiveStreams: true })
     assert.equal(reasonOf(baseSong({ duration: 0 }), upcoming), 'NOT_PLAYABLE')
+    assert.equal(reasonOf(baseSong({ duration: 0 }), premiere), 'NOT_PLAYABLE')
   })
 
   await t.test('a stream that is on now is still accepted when live streams are allowed', () => {
     updateConfig({ ...open, allowLiveStreams: true })
     assert.equal(reasonOf(baseSong({ duration: 0 }), live), null)
     updateConfig({ allowLiveStreams: false })
+  })
+})
+
+test('an upload that has not finished processing', async (t) => {
+  const open = { minViews: 0, minDurationSeconds: 60, maxDurationSeconds: 480, regionCode: '' }
+  // a plain upload reports 'uploaded' only while it is still processing: there is nothing to play yet
+  const processing = baseVideo({ snippet: { categoryId: '10' }, status: { embeddable: true, uploadStatus: 'uploaded' } })
+
+  await t.test('refused even with live streams allowed: the guard still has plain uploads to speak for', () => {
+    updateConfig({ ...open, allowLiveStreams: true })
+    assert.equal(reasonOf(baseSong({ duration: 0 }), processing), 'NOT_PLAYABLE')
   })
 })
 
