@@ -48,21 +48,25 @@ export function readForm(form, { changedOnly = false } = {}) {
 }
 
 // `skip`: names to leave as they are (the ones the server refused keep what was typed). A name the stored object has no value for is left alone
-export function fillForm(form, config, { skip = [] } = {}) {
+// `keepMarks`: for a fill of a form with what it already shows (the echo of a save): a field keeps its mark instead of
+// losing it, but only while the fill brings the same value it holds
+export function fillForm(form, config, { skip = [], keepMarks = false } = {}) {
   for (const input of formInputs(form)) {
     const value = get(config, input.name)
     if (skip.includes(input.name) || value === undefined) continue
 
-    if (input.type === 'checkbox') {
-      input.checked = input.defaultChecked = Boolean(value)
-    } else if (input.tagName === 'SELECT') {
-      input.value = String(value ?? '')
-      for (const option of input.options) option.defaultSelected = option.value === input.value
-    } else {
-      input.value = input.defaultValue = String(value ?? '')
-    }
+    const next = input.type === 'checkbox' ? Boolean(value) : String(value ?? '')
+    const shown = input.type === 'checkbox' ? input.checked : input.value
+    if (!(keepMarks && shown === next)) setFieldState(input, null)
 
-    setFieldState(input, null)
+    if (input.type === 'checkbox') {
+      input.checked = input.defaultChecked = next
+    } else if (input.tagName === 'SELECT') {
+      input.value = next
+      for (const option of input.options) option.defaultSelected = option.value === next
+    } else {
+      input.value = input.defaultValue = next
+    }
   }
 
   syncEnables(form)

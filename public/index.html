@@ -191,7 +191,7 @@
 
           <div class="section-tab section-tab-queue" data-section="queue">
             <div class="section-tab-header">
-              <h2><span data-i18n="queue.title">Queue</span> <span class="text-sm text-secondary" id="queueCount">0/0</span></h2>
+              <span class="text-sm text-secondary" id="queueCount">0/0</span>
               <button
                 type="button"
                 id="clearQueueBtn"
@@ -221,10 +221,7 @@
 
           <div class="section-tab section-tab-fallback hidden" data-section="playlist">
             <div class="section-tab-header">
-              <div>
-                <h2 data-i18n="fallback.title">Playlist</h2>
-                <div id="fallbackInfo" class="text-sm text-secondary"></div>
-              </div>
+              <span id="fallbackInfo" class="text-sm text-secondary"></span>
               <div class="section-tab-actions">
                 <button
                   type="button"
@@ -309,7 +306,6 @@
 
           <div class="section-tab section-tab-activity hidden" data-section="activity">
             <div class="section-tab-header">
-              <h2 data-i18n="activity.title">Activity</h2>
               <div class="section-tab-actions">
                 <button
                   type="button"
@@ -339,9 +335,6 @@
           </div>
 
           <div class="section-tab section-tab-blocklist hidden" data-section="blocklist">
-            <div class="section-tab-header">
-              <h2 data-i18n="blocklist.title">Blocklist</h2>
-            </div>
             <div class="row-list-wrapper" id="blocklistListWrapper" data-list="blocklist">
               <div class="row-list"></div>
               <div class="empty" data-i18n="blocklist.empty">No blocked tracks</div>
@@ -351,10 +344,6 @@
       </section>
 
       <section class="container page-tab" data-page-tab="playlists">
-        <div class="tab-header">
-          <h1 data-i18n="playlists.title">Playlists</h1>
-        </div>
-
         <div class="playlist-add-wrapper panel section-tab flex-1">
           <div class="row">
             <input
@@ -384,9 +373,6 @@
       </section>
 
       <section class="container page-tab" data-page-tab="settings">
-        <div class="tab-header">
-          <h1 data-i18n="settings.title">Settings</h1>
-        </div>
         <div class="settings-wrapper">
           <div id="overlaySettingsPanel" class="section-tab panel">
             <div class="section-tab-header">

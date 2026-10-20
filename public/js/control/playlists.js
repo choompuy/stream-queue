@@ -36,8 +36,10 @@ export function addPlaylist() {
 
 export function activatePlaylist(id) {
   return run('activating playlist', async () => {
+    const playlist = state.playlists.find(p => p.id === id)
+    const wasActive = playlist?.isActive
     await api.activatePlaylist(id)
-    toastSuccess(t('toast.playlistActivated'))
+    toastSuccess(wasActive ? t('toast.playlistDeactivated') : t('toast.playlistActivated'))
   })
 }
 

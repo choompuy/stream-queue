@@ -286,6 +286,7 @@
     "removedFromQueue": "Удалено из очереди",
     "playlistAdded": "Плейлист добавлен",
     "playlistActivated": "Плейлист активирован",
+    "playlistDeactivated": "Плейлист на паузе",
     "playlistDeleted": "Плейлист удалён",
     "fallbackRefreshed": "Плейлист обновлён",
     "trackBlocked": "Трек заблокирован",

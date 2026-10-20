@@ -8,7 +8,7 @@ import { syncPlayer } from './player.js'
 import { renderQueue } from './queue.js'
 import { t } from '../i18n.js'
 import { toastError } from './toast.js'
-import { fillForm, saveForm, toastSaveResult } from './form.js'
+import { fillForm, saveForm, toastSaveResult, formInputs, isChanged } from './form.js'
 
 let qrCodePromise
 
@@ -126,7 +126,10 @@ export function toggleQr() {
 export function loadConfig() {
   return run('loading config', async () => {
     state.config = await api.getConfig()
-    fillForm(dom.botSettingsPanel, state.config)
+    const editing = formInputs(dom.botSettingsPanel)
+      .filter(isChanged)
+      .map((input) => input.name)
+    fillForm(dom.botSettingsPanel, state.config, { skip: editing, keepMarks: true })
   })
 }
 

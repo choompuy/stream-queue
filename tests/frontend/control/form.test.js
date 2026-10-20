@@ -133,6 +133,30 @@ test('fillForm', async (t) => {
     assert.equal(input('region').value, 'typed')
     assert.equal(input('skipCommand').value, 'keep me', 'no stored value: left alone')
   })
+
+  await t.test('a mark tells about a save: a usual fill clears it, the echo of the save (keepMarks) keeps it while the value is the same', () => {
+    fillForm(form, stored)
+    input('views').classList.add('saved')
+    input('live').classList.add('saved')
+
+    // a usual fill (another reward in the form, a cancel) clears every mark, whatever the values
+    fillForm(form, stored)
+    assert.deepEqual(marks('views'), [])
+    assert.deepEqual(marks('live'), [])
+
+    // the echo of the save: the same values again
+    input('views').classList.add('saved')
+    input('live').classList.add('saved')
+    fillForm(form, stored, { keepMarks: true })
+    assert.deepEqual(marks('views'), ['saved'])
+    assert.deepEqual(marks('live'), ['saved'])
+
+    // another panel has changed the views since: the green would tell about a save that never happened here
+    fillForm(form, { ...stored, minViews: 11 }, { keepMarks: true })
+    assert.deepEqual(marks('views'), [])
+    assert.deepEqual(marks('live'), ['saved'])
+    assert.equal(input('views').value, '11')
+  })
 })
 
 test('trackForm', async (t) => {
