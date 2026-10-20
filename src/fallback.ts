@@ -240,12 +240,12 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
   }
 
   const { songs: newTracks, truncated, itemCount } = await fetchPlaylistSongs(playlistId)
-  if (truncated) log.log(`Playlist was truncated due to page limit (${newTracks.length} tracks loaded)`)
+  if (truncated) log.info(`Playlist was truncated due to page limit (${newTracks.length} tracks loaded)`)
 
   const config = getConfig()
 
   if (config.fallbackPlaylist.playlistId !== playlistId) {
-    log.log(`Refresh for "${playlistId}" discarded - playlist changed during load`)
+    log.info(`Refresh for "${playlistId}" discarded - playlist changed during load`)
     return getFallbackState()
   }
 
@@ -260,7 +260,7 @@ export async function refreshFallback(): Promise<FallbackStateResponse> {
     rotation.itemCount = itemCount
   })
 
-  log.log(`Loaded ${rotation.tracksById.size} tracks from playlist ${playlistId}`)
+  log.info(`Loaded ${rotation.tracksById.size} tracks from playlist ${playlistId}`)
   return getFallbackState()
 }
 
@@ -282,7 +282,7 @@ function toggleFallbackFlag(flag: FallbackFlag): FallbackStateResponse {
 
   updateConfig({ fallbackPlaylist: patch })
 
-  log.log(`${flag}: ${next}`)
+  log.info(`${flag}: ${next}`)
   return getFallbackState()
 }
 
@@ -294,7 +294,7 @@ export function clearFallback(): FallbackStateResponse {
   rotationStore.update(() => resetRotation())
 
   updateConfig({ fallbackPlaylist: { playlistId: null } })
-  log.log('cleared')
+  log.info('cleared')
   return getFallbackState()
 }
 
@@ -338,7 +338,7 @@ export function playFallbackTrackNow(videoId: string): QueueItem | null {
   })
   const item = toFallbackQueueItem(song)
   setCurrent(item)
-  log.log(`Play now: "${song.title}"`)
+  log.info(`Play now: "${song.title}"`)
   return item
 }
 

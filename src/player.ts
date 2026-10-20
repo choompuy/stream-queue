@@ -45,7 +45,7 @@ export function moveToNext(): QueueItem | null {
 
   const fallback = advanceFallback()
   setCurrent(fallback)
-  if (fallback) log.log(`started fallback: "${fallback.title}"`)
+  if (fallback) log.info(`started fallback: "${fallback.title}"`)
 
   return getCurrent()
 }
@@ -57,9 +57,9 @@ function leaveCurrent(outcome: ItemOutcome): QueueItem | null {
 
   if (leaving) {
     if (outcome === 'skipped') {
-      log.log(`skipped "${leaving.title}"`)
+      log.info(`skipped "${leaving.title}"`)
     } else if (typeof outcome === 'object') {
-      if (outcome.code === 'BLOCKED') log.log(`current track was blocked, skipping: "${leaving.title}"`)
+      if (outcome.code === 'BLOCKED') log.info(`current track was blocked, skipping: "${leaving.title}"`)
       else {
         // a track that cannot be played is routine (the journal and the chat reply say why): an error entry would be noise
         log.warn(`playback failed: "${leaving.title}" (error ${outcome.params?.errorCode ?? 'unknown'})`)
@@ -105,7 +105,7 @@ function isAboutCurrent(videoId?: string, playId?: number): boolean {
 // The player reports that a play of `videoId` finished. Returns false if that was not the current play and nothing changed
 export function endCurrent(videoId?: string, playId?: number): boolean {
   if (!isAboutCurrent(videoId, playId)) {
-    log.log(`ignored "ended" for ${videoId}: it is not the current track`)
+    log.info(`ignored "ended" for ${videoId}: it is not the current track`)
     return false
   }
 
@@ -117,7 +117,7 @@ export function endCurrent(videoId?: string, playId?: number): boolean {
 // about another play: a stray report must not start the fallback on its own
 export function reportPlaybackFailure(errorCode?: number, videoId?: string, playId?: number): boolean {
   if (getCurrent() === null || !isAboutCurrent(videoId, playId)) {
-    log.log(`ignored playback failure for ${videoId ?? 'an unnamed track'}: it is not the current track`)
+    log.info(`ignored playback failure for ${videoId ?? 'an unnamed track'}: it is not the current track`)
     return false
   }
 

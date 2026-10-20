@@ -1,31 +1,29 @@
-export type PlaylistItem = {
-  snippet?: {
-    resourceId?: {
-      videoId?: string
-    }
-    title?: string
-    channelTitle?: string
-    thumbnails?: {
-      medium?: {
-        url?: string
-      }
+// One snippet shape: YouTube sends the same object for search results, playlist items and videos.
+// Every field is optional, because a part can be missing from the response, and each consumer reads only its own.
+export type Snippet = {
+  title?: string
+  channelTitle?: string
+  thumbnails?: {
+    medium?: {
+      url?: string
     }
   }
+  categoryId?: string
+  // 'live' | 'upcoming' | 'none'
+  liveBroadcastContent?: string
+  // playlist items carry the video they point at here
+  resourceId?: {
+    videoId?: string
+  }
+}
+
+export type PlaylistItem = {
+  snippet?: Snippet
 }
 
 export type VideoItem = {
   id: string
-  snippet?: {
-    title?: string
-    channelTitle?: string
-    thumbnails?: {
-      medium?: {
-        url?: string
-      }
-    }
-    categoryId?: string
-    liveBroadcastContent?: string // 'live' | 'upcoming' | 'none'
-  }
+  snippet?: Snippet
   topicDetails?: {
     topicCategories?: string[]
   }
@@ -51,13 +49,5 @@ export type SearchItem = {
   id?: {
     videoId?: string
   }
-  snippet?: {
-    title?: string
-    channelTitle?: string
-    thumbnails?: {
-      medium?: {
-        url?: string
-      }
-    }
-  }
+  snippet?: Snippet
 }

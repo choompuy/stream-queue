@@ -152,12 +152,8 @@ test('clearTwitchOAuthState()', async (t) => {
 })
 
 test('getSecrets()', async (t) => {
-  await t.test('returns a copy: mutating the result does not change the stored secrets', () => {
-    updateSecrets({ youtubeApiKey: 'original' })
-    const secrets = getSecrets()
-    secrets.youtubeApiKey = 'tampered'
-
-    assert.equal(getSecrets().youtubeApiKey, 'original')
+  await t.test('hands out the live object: one snapshot per read, no per-read copy', () => {
+    assert.strictEqual(getSecrets(), getSecrets())
   })
 })
 

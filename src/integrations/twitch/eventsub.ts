@@ -1,7 +1,9 @@
+import type WebSocket from 'ws'
 import { CHANNEL_POINTS_REDEMPTION, type TwitchClient } from './client.js'
 import { ReconnectingSocket, closeQuietly } from './socket.js'
 import type { EventSubMessage, TwitchChannelPointsRedemption } from './types.js'
 import { createLogger, describeError } from '../../logger.js'
+import { logActivity } from '../../activity.js'
 import { normalizeTwitchError } from './error.js'
 
 const log = createLogger('TWITCH EVENTSUB')
@@ -19,6 +21,44 @@ export class TwitchEventSub extends ReconnectingSocket {
   private isReconnect = false
   private recentMessageIds: string[] = []
   private static readonly MAX_RECENT_MESSAGE_IDS = 100
+
+  // A dropped session loses whatever Twitch sent while it was down (a laptop asleep, a changed network), and
+  // the streamer can only learn it from the journal. A real outage leaves a line there; a blip (and Twitch's
+  // own seamless reconnect request) stays below the threshold and out of the journal
+  private hadReadySession = false
+  private connectionLostAt: number | null = null
+  protected journalAfterMs = 60_000
+
+  protected markReady(): void {
+    super.markReady()
+    this.hadReadySession = true
+  }
+
+  protected onOpen(_socket: WebSocket): void {
+    const lostAt = this.connectionLostAt
+    this.connectionLostAt = null
+    if (lostAt === null) return
+
+    const downMs = Date.now() - lostAt
+    if (downMs < this.journalAfterMs) return
+
+    logActivity({
+      requestedBy: 'Twitch',
+      query: 'Twitch',
+      title: null,
+      videoId: null,
+      status: 'failed',
+      reasonCode: 'TWITCH_CONNECTION_LOST',
+      reasonParams: { minutes: Math.round(downMs / 60_000) }
+    })
+  }
+
+  protected onClosed(): void {
+    // an intentional stop loses nothing (stopped is set before the teardown): no alarm afterwards
+    if (this.stopped) return
+    if (this.hadReadySession) this.connectionLostAt = Date.now()
+    this.hadReadySession = false
+  }
 
   constructor(config: TwitchEventSubOptions) {
     super()
@@ -68,10 +108,10 @@ export class TwitchEventSub extends ReconnectingSocket {
       return
     }
 
-    log.log(`Session connected: ${sessionId}`)
+    log.info(`Session connected: ${sessionId}`)
 
     if (this.isReconnect) {
-      log.log('Reconnected session: subscription carries over, not re-subscribing')
+      log.info('Reconnected session: subscription carries over, not re-subscribing')
       this.isReconnect = false
       this.markReady()
       this.watchKeepalive(message)
@@ -80,13 +120,13 @@ export class TwitchEventSub extends ReconnectingSocket {
 
     try {
       await this.config.client.subscribeToRedemptions(sessionId)
-      log.log('Subscribed to Channel Points redemptions')
+      log.info('Subscribed to Channel Points redemptions')
       this.markReady()
       this.watchKeepalive(message)
     } catch (error) {
       const normalized = normalizeTwitchError(error)
+      log.error(`EventSub subscription failed: ${describeError(normalized)}`)
       this.abort(normalized)
-      throw normalized
     }
   }
 
@@ -112,7 +152,7 @@ export class TwitchEventSub extends ReconnectingSocket {
 
     const messageId = message.metadata.message_id
     if (this.recentMessageIds.includes(messageId)) {
-      log.log(`Ignoring redelivered notification: ${messageId}`)
+      log.info(`Ignoring redelivered notification: ${messageId}`)
       return
     }
 
@@ -144,12 +184,12 @@ export class TwitchEventSub extends ReconnectingSocket {
 
     const oldSocket = this.socket
     this.isReconnect = true
-    log.log('Twitch requested reconnect')
+    log.info('Twitch requested reconnect')
 
     try {
       await this.open(reconnectUrl)
       await this.waitReady()
-      log.log('Reconnected')
+      log.info('Reconnected')
     } catch (error) {
       log.error(`Reconnect failed: ${describeError(error)}`)
       this.isReconnect = false

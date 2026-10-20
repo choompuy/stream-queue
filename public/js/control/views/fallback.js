@@ -1,4 +1,4 @@
-import { formatDuration } from '../../shared.js'
+import { displayChannel, displayTitle, formatDuration } from '../../shared.js'
 import { PLUS_ICON, PLAY_ICON } from '../../icons.js'
 import { t } from '../../i18n.js'
 import { dom } from '../dom.js'
@@ -12,8 +12,8 @@ export const fallbackView = createListView(dom.fallbackListWrapper, {
       className: track.isActive ? 'row-active' : '',
       attributes: dataAttributes({ videoId: track.videoId }).trim(),
       thumbnail: track.thumbnail,
-      title: track.title,
-      subtitle: track.channelTitle,
+      title: displayTitle(track.title),
+      subtitle: displayChannel(track.channelTitle),
       meta: formatDuration(track.duration),
       extra: track.isActive ? statusPill(t('fallback.playing'), 'info') : track.isBlocked ? statusPill(t('blocklist.blockedLabel'), 'rejected') : '',
       actions: track.isBlocked

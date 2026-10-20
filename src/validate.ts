@@ -5,6 +5,17 @@ import { isValidPlaylistId, isValidVideoId, parsePlaylistId } from './youtube/ur
 // The shared request rules, so two routes that take the same kind of input cannot drift apart:
 // every route with a `:videoId` param goes through validateVideoIdParam, every query through checkQuery
 
+// One home for the input caps, so a limit cannot drift between the routes, the chat and the rewards
+export const INPUT_LIMITS = {
+  queryMin: 2,
+  queryMax: 200,
+  requesterName: 50,
+  blocklistTitle: 200,
+  chatMessage: 500,
+  rewardTitle: 45,
+  rewardPrompt: 200
+} as const
+
 export function checkVideoId(value: unknown): asserts value is string {
   if (!isValidVideoId(value)) throw new AppError('INVALID_VIDEO_ID')
 }
@@ -23,8 +34,8 @@ export function checkPlaylistIdOrUrl(value: unknown): string {
 export function checkQuery(value: unknown): string {
   const query = typeof value === 'string' ? value.trim() : ''
 
-  if (query.length > 200) throw new AppError('INVALID_QUERY_RANGE')
-  if (query.length < 2) throw new AppError('INVALID_QUERY')
+  if (query.length > INPUT_LIMITS.queryMax) throw new AppError('INVALID_QUERY_RANGE')
+  if (query.length < INPUT_LIMITS.queryMin) throw new AppError('INVALID_QUERY')
   return query
 }
 

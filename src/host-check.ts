@@ -1,7 +1,6 @@
-import os from 'node:os'
 import type { NextFunction, Request, Response } from 'express'
 import { fail } from './http.js'
-import { ownAddresses } from './local-only.js'
+import { computerHostname, ownAddresses } from './network.js'
 
 function originHost(origin: string | undefined): string {
   try {
@@ -23,7 +22,7 @@ function isAllowedHost(hostHeader: string | undefined): boolean {
   if (!host) return false
   if (host === 'localhost' || host.endsWith('.localhost')) return true
 
-  const computer = os.hostname().toLowerCase()
+  const computer = computerHostname()
   if (host === computer || host === `${computer}.local` || host === `${computer}.lan`) return true
 
   return ownAddresses().has(host)

@@ -2,7 +2,7 @@ import express from 'express'
 import { ConfigResponse, AppError } from '../types.js'
 import { ok } from '../http.js'
 import { getConfig, updateConfig } from '../config.js'
-import { fetchPlaylistMeta } from '../youtube/index.js'
+import { fetchPlaylistMeta } from '../youtube/mapper.js'
 import { getPlaylists, upsertPlaylist, removePlaylist, type PlaylistEntry } from '../playlists.js'
 import { clearFallback, settledConfigReaction } from '../fallback.js'
 import { createLogger } from '../logger.js'
@@ -46,7 +46,7 @@ router.delete('/:id', (req, res) => {
 
   if (wasActive) {
     clearFallback()
-    log.log(`active playlist "${req.params.id}" removed - fallback cleared`)
+    log.info(`active playlist "${req.params.id}" removed - fallback cleared`)
   }
 
   ok(res, { playlists: playlistEntries(), fallbackCleared: wasActive })
@@ -63,7 +63,7 @@ router.post('/:id/activate', async (req, res) => {
   const previousId = getConfig().fallbackPlaylist.playlistId
   if (previousId === id) {
     clearFallback()
-    log.log(`deactivated playlist "${id}"`)
+    log.info(`deactivated playlist "${id}"`)
     return ok<ConfigResponse>(res, getConfig())
   }
 

@@ -1,12 +1,18 @@
 import { test, after } from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { AddressInfo } from 'node:net'
 import { WebSocketServer, type WebSocket as ServerSocket } from 'ws'
 import { TwitchEventSub } from '../../../../src/integrations/twitch/eventsub.js'
 import { CHANNEL_POINTS_REDEMPTION, type TwitchClient } from '../../../../src/integrations/twitch/client.js'
 import type { TwitchChannelPointsRedemption } from '../../../../src/integrations/twitch/types.js'
+import { getActivity, clearActivity } from '../../../../src/activity.js'
 
 // EventSub, as far as the app is concerned: a socket that says "welcome", then sends notifications. A local server plays Twitch.
+// The journal of a lost connection lives in data/activity.json: keep the test away from the real one
+process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-eventsub-test-')))
 
 let counter = 0
 const meta = (type: string, id = `m-${++counter}`) => ({ message_id: id, message_type: type, message_timestamp: new Date().toISOString() })
@@ -66,7 +72,7 @@ async function startServer({ welcomeMessage = () => welcome() }: ServerOptions =
 
 class TestEventSub extends TwitchEventSub {
   watchdogs: number[] = []
-  protected timing = { initialDelayMs: 5, maxDelayMs: 20, maxAttempts: Infinity, readyTimeoutMs: 300, stableAfterMs: 0 }
+  protected timing = { initialDelayMs: 5, maxDelayMs: 20, readyTimeoutMs: 300, stableAfterMs: 0 }
 
   constructor(url: string, client: TwitchClient, onRedemption?: (event: TwitchChannelPointsRedemption) => void) {
     super({ client, onChannelPointsRedemption: onRedemption })
@@ -140,6 +146,49 @@ test('TwitchEventSub: connecting', async (t) => {
   await t.test('a refused subscription fails the connection with the reason', async () => {
     const { sub } = await setup({ failSubscribe: new Error('subscription refused') })
     await assert.rejects(sub.connect(), /subscription refused/)
+  })
+})
+
+test('TwitchEventSub: a connection lost to the outside', async (t) => {
+  await t.test('a blip under the threshold reconnects without a line in the journal', async () => {
+    const { sub, server } = await setup()
+    clearActivity()
+    await sub.connect()
+
+    // the network drops the connection: the socket reconnects by itself (the test timing retries within milliseconds)
+    server.dropClients()
+    await until(() => server.connections() >= 2, 'the reconnection')
+    await until(() => sub.isConnected(), 'the session to be ready again')
+
+    assert.equal(getActivity().some((entry) => entry.reasonCode === 'TWITCH_CONNECTION_LOST'), false)
+  })
+
+  await t.test('an outage long enough to miss redemptions leaves one line in the journal', async () => {
+    const { sub, server } = await setup()
+    // the real threshold is a minute (a blip stays out of the journal); here only the arithmetic is tested
+    ;(sub as unknown as { journalAfterMs: number }).journalAfterMs = 0
+    clearActivity()
+    await sub.connect()
+
+    server.dropClients()
+    await until(() => getActivity().some((entry) => entry.reasonCode === 'TWITCH_CONNECTION_LOST'), 'the journal line')
+
+    const entry = getActivity().find((entry) => entry.reasonCode === 'TWITCH_CONNECTION_LOST')
+    assert.equal(entry?.status, 'failed')
+    assert.equal(entry?.requestedBy, 'Twitch')
+  })
+
+  await t.test('an intentional disconnect journals nothing', async () => {
+    const { sub } = await setup()
+    ;(sub as unknown as { journalAfterMs: number }).journalAfterMs = 0
+    clearActivity()
+    await sub.connect()
+
+    await sub.disconnect()
+    await sub.connect()
+    await until(() => sub.isConnected(), 'the session to be ready again')
+
+    assert.equal(getActivity().some((entry) => entry.reasonCode === 'TWITCH_CONNECTION_LOST'), false)
   })
 })
 

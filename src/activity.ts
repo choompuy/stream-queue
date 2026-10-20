@@ -46,7 +46,7 @@ export function clearActivity(): void {
   entries.update((list) => {
     list.length = 0
   })
-  log.log('cleared')
+  log.info('cleared')
 }
 
 type ReasonParams = Record<string, string | number>
@@ -57,7 +57,7 @@ export function logRejection(
   reasonCode: ActivityReasonCode,
   options: { title?: string | null; videoId?: string | null; reasonParams?: ReasonParams } = {}
 ): void {
-  log.log(`[REJECT] ${requestedBy} → ${reasonCode}`)
+  log.info(`[REJECT] ${requestedBy} → ${reasonCode}`)
   logActivity({
     requestedBy,
     query,

@@ -1,3 +1,5 @@
+import { t } from './i18n.js'
+
 export const $ = (id) => document.getElementById(id)
 
 export function escapeHtml(value) {
@@ -141,4 +143,12 @@ export function setChecked(element, checked) {
  */
 export function setText(element, text) {
   element.textContent = text
+}
+
+export function displayTitle(title) {
+  return title || t('common.unknownTitle')
+}
+
+export function displayChannel(channelTitle) {
+  return channelTitle || t('common.unknownChannel')
 }

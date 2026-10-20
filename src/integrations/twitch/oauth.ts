@@ -1,4 +1,6 @@
 import { createLogger, describeError } from '../../logger.js'
+import { fetchWithTimeout } from '../../web-fetch.js'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { emit } from '../../state-events.js'
 import { AppError } from '../../types.js'
 import { normalizeTwitchError } from './error.js'
@@ -21,12 +23,15 @@ const TOKEN_URL = 'https://id.twitch.tv/oauth2/token'
 const REVOKE_URL = 'https://id.twitch.tv/oauth2/revoke'
 
 function postForm(url: string, params: URLSearchParams): Promise<Response> {
-  return fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params.toString(),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
-  })
+  return fetchWithTimeout(
+    url,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    },
+    REQUEST_TIMEOUT_MS
+  )
 }
 
 async function oauthError(response: Response, fallback: string): Promise<AppError> {
@@ -75,7 +80,7 @@ export class TwitchOAuth {
       if (!response.ok) throw await oauthError(response, 'Device authorization failed')
 
       const data = (await response.json()) as TwitchDeviceCodeResponse
-      log.log('Device code requested')
+      log.info('Device code requested')
       return data
     } catch (error) {
       // the error is reported where it ends (the /connect answer carries it to the panel):
@@ -94,7 +99,7 @@ export class TwitchOAuth {
     const currentGeneration = this.tokenGeneration
 
     while (Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, pollInterval))
+      await sleep(pollInterval)
       if (!isWanted()) throw new AppError('TWITCH_AUTH_ERROR', 'Device authorization was cancelled')
 
       const params = new URLSearchParams({
@@ -123,7 +128,7 @@ export class TwitchOAuth {
 
         const tokenData = this.store(data, currentGeneration)
 
-        log.log('Device authorization successful')
+        log.info('Device authorization successful')
         return tokenData
       }
 
@@ -177,7 +182,7 @@ export class TwitchOAuth {
       scope: [...tokenData.scope]
     }
 
-    log.log('Token data set from storage')
+    log.info('Token data set from storage')
   }
 
   getTokenData(): TwitchTokenData | null {
@@ -194,7 +199,7 @@ export class TwitchOAuth {
     this.refreshPromise = null
     this.tokenGeneration++
     this.setAuthFailed(false)
-    log.log('Token data cleared')
+    log.info('Token data cleared')
   }
 
   // Tells Twitch to forget the tokens (best effort: the account is disconnected locally whatever the answer)
@@ -282,13 +287,13 @@ export class TwitchOAuth {
       }
 
       const tokenData = this.store(data, expectedGeneration)
-      log.log('Token refresh successful')
+      log.info('Token refresh successful')
       return tokenData
     } catch (error) {
       if (error instanceof AppError) {
         // a refresh dropped because the account was disconnected meanwhile is an orderly exit, not a failure
         if (this.isCurrent(expectedGeneration)) log.error(describeError(error))
-        else log.log('Token refresh dropped: the account was disconnected meanwhile')
+        else log.info('Token refresh dropped: the account was disconnected meanwhile')
         throw error
       }
       // Network errors become TWITCH_REFRESH_ERROR

@@ -2,7 +2,7 @@ import express from 'express'
 import { StateResponse, QueueRemoveResponse, QueueRequestResponse, AppError } from '../types.js'
 import { ok } from '../http.js'
 import { wantsBypassFilters } from '../local-only.js'
-import { checkQuery, validateVideoIdParam } from '../validate.js'
+import { checkQuery, INPUT_LIMITS, validateVideoIdParam } from '../validate.js'
 import { t } from '../i18n.js'
 import { requestSong } from '../request.js'
 import { removeByVideoId, clearQueue } from '../queue.js'
@@ -22,7 +22,7 @@ router.post('/request', async (req, res) => {
     throw new AppError('USERNAME_REQUIRED')
   }
 
-  const added = await requestSong(checkedQuery, requestedBy.trim().slice(0, 50), { bypassFilters })
+  const added = await requestSong(checkedQuery, requestedBy.trim().slice(0, INPUT_LIMITS.requesterName), { bypassFilters })
 
   const message = added.started
     ? t(getSettings().locale, 'toast.nowPlaying', { title: added.song.title })

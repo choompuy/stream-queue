@@ -1,4 +1,6 @@
 import type { TwitchCreateCustomReward, TwitchCustomReward, TwitchUpdateCustomReward } from './types.js'
+import { isPlain } from '../../persist.js'
+import { INPUT_LIMITS } from '../../validate.js'
 
 // What the panel sends and what it gets back is the same object, so a form can be filled with a reward and sent as it is
 // (public/js/control/form.js: the name of an input is the path of its value in this object).
@@ -17,8 +19,8 @@ export type RewardDto = {
   }
 }
 
-const TITLE_MAX_LENGTH = 45
-const PROMPT_MAX_LENGTH = 140
+const TITLE_MAX_LENGTH = INPUT_LIMITS.rewardTitle
+const PROMPT_MAX_LENGTH = INPUT_LIMITS.rewardPrompt
 
 // the name of a limit in the panel, the switch that Twitch has for it, and the number that goes with the switch
 const LIMITS = [
@@ -48,7 +50,6 @@ export function toRewardDto(reward: TwitchCustomReward): RewardDto {
   }
 }
 
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 const isPositiveInteger = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 1
 
 /**
@@ -60,7 +61,7 @@ export function parseRewardInput(
   body: unknown,
   { requireTitleAndCost }: { requireTitleAndCost: boolean }
 ): { payload: TwitchCreateCustomReward | TwitchUpdateCustomReward; rejected: string[] } {
-  const input = isObject(body) ? body : {}
+  const input = isPlain(body) ? body : {}
   const payload: Record<string, string | number | boolean> = {}
   const rejected: string[] = []
   const reject = (name: string) => rejected.push(name)
@@ -97,14 +98,14 @@ export function parseRewardInput(
     else reject('isEnabled')
   }
 
-  if (input.limits !== undefined && !isObject(input.limits)) reject('limits')
-  const limits = isObject(input.limits) ? input.limits : {}
+  if (input.limits !== undefined && !isPlain(input.limits)) reject('limits')
+  const limits = isPlain(input.limits) ? input.limits : {}
 
   for (const { name, flag, value } of LIMITS) {
     const limit = limits[name]
     if (limit === undefined) continue
 
-    if (!isObject(limit) || typeof limit.enabled !== 'boolean') {
+    if (!isPlain(limit) || typeof limit.enabled !== 'boolean') {
       reject(`limits.${name}.enabled`)
       continue
     }

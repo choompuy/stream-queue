@@ -123,13 +123,11 @@ test('updateConfig()', async (t) => {
     assert.deepEqual(getConfig().fallbackPlaylist, before)
   })
 
-  await t.test('returns copies: mutating a result does not change the stored config', () => {
-    const { config } = updateConfig({})
-    config.fallbackPlaylist.repeat = true
-    getConfig().fallbackPlaylist.shuffle = true
+  await t.test('getConfig() hands out the live object: one snapshot per read, no per-read copy', () => {
+    assert.strictEqual(getConfig(), getConfig())
 
-    assert.equal(getConfig().fallbackPlaylist.repeat, false)
-    assert.equal(getConfig().fallbackPlaylist.shuffle, false)
+    const { config } = updateConfig({})
+    assert.strictEqual(config, getConfig())
   })
 
   await t.test('an update that changes nothing rewrites no file', async () => {

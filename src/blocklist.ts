@@ -1,3 +1,4 @@
+import { INPUT_LIMITS } from './validate.js'
 import { dataPath, createListStore } from './persist.js'
 import { createLogger } from './logger.js'
 import { isValidVideoId } from './youtube/url.js'
@@ -11,7 +12,6 @@ export type BlockedTrack = {
 
 // Entries older than the limit are dropped, which makes an old blocked track requestable again, so the limit is high and the drop is logged
 const BLOCKLIST_LIMIT = 1000
-const TITLE_MAX_LENGTH = 200
 
 const log = createLogger('BLOCKLIST')
 
@@ -53,7 +53,7 @@ export function markBlocked<T extends { videoId: string }>(tracks: T[]): Blockab
 export function blockTrack(videoId: string, title: string): BlockedTrack {
   blocked.update((list) => {
     if (!list.some((track) => track.videoId === videoId)) {
-      list.unshift({ videoId, title: title.trim().slice(0, TITLE_MAX_LENGTH) || videoId, blockedAt: Date.now() })
+      list.unshift({ videoId, title: title.trim().slice(0, INPUT_LIMITS.blocklistTitle) || videoId, blockedAt: Date.now() })
 
       if (list.length > BLOCKLIST_LIMIT) {
         const dropped = list.splice(BLOCKLIST_LIMIT)

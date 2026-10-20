@@ -43,11 +43,12 @@ test('youtube() requests', async (t) => {
   })
 
   await t.test('a response of an unexpected shape keeps its cause in the thrown message', async () => {
-    // a 200 whose body is not an object breaks the mapping far from the request: the wrapper must say what broke
+    // a 200 whose body is not an object is refused by youtube() itself: the caller maps the answer right
+    // after, and the promise of an AppError must hold all the way to the API error layer
     stub(json(200, null))
     await assert.rejects(
       getVideoById('aaaaaaaaaaa'),
-      (error: { code?: string; message?: string }) => error.code === 'YOUTUBE_ERROR' && /YouTube API failed: TypeError:/.test(error.message ?? '')
+      (error: { code?: string; message?: string }) => error.code === 'YOUTUBE_ERROR' && /malformed/.test(error.message ?? '')
     )
   })
 

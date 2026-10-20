@@ -14,22 +14,31 @@ type Dict = { [key: string]: Dict | string }
 const cache = new Map<string, Dict>()
 const reported = new Set<string>()
 
-function loadLocale(locale: string): Dict {
+const LOAD_FAILURE_TTL_MS = 30_000
+const failedAt = new Map<string, number>()
+
+function loadLocale(locale: string): Dict | null {
   const cached = cache.get(locale)
   if (cached) return cached
+
+  // unreadable right now: retry at most once per interval, not on every reply
+  const failed = failedAt.get(locale)
+  if (failed !== undefined && Date.now() - failed < LOAD_FAILURE_TTL_MS) return null
 
   try {
     const raw = fs.readFileSync(path.join(localesDir(), `${locale}.json`), 'utf-8')
     const dict = JSON.parse(raw) as Dict
     cache.set(locale, dict)
+    failedAt.delete(locale)
     return dict
   } catch (error) {
-    // not cached, so a later call retries; reported once, otherwise every chat reply and API error would repeat it
+    // remembered, so a later call retries after the interval instead of on every chat reply and API error
+    failedAt.set(locale, Date.now())
     if (!reported.has(locale)) {
       reported.add(locale)
       log.error(`Failed to load locale "${locale}": ${describeError(error)}`)
     }
-    return {}
+    return null
   }
 }
 
@@ -54,7 +63,7 @@ export function t(locale: string, key: string, params: Record<string, string | n
   const value = template(locale, key)
   if (value === undefined) return key // the key itself is the last resort; hasKey() tells it apart from a real text
 
-  return Object.entries(params).reduce((acc, [param, replacement]) => acc.replaceAll(`{{${param}}}`, () => String(replacement)), value)
+  return value.replace(/\{\{(\w+)\}\}/g, (match, param: string) => (param in params ? String(params[param]) : match))
 }
 
 // Whether a translation exists (in the locale, or in the default one): the way to tell a missing key from

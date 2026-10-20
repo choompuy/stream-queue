@@ -1,7 +1,7 @@
 import express from 'express'
 import { ConfigResponse, SettingsResponse } from '../types.js'
 import { ok, sendConfigUpdate } from '../http.js'
-import { isLocalAddress, localOnly } from '../local-only.js'
+import { isLocal, localOnly } from '../local-only.js'
 import { getConfig, updateConfig } from '../config.js'
 import { getSettings, updateSettings } from '../settings.js'
 import { getPublicSecretsView, SecretsResponse, updateSecrets } from '../secrets.js'
@@ -37,7 +37,7 @@ router.put('/config', async (req, res) => {
 })
 
 router.get('/secrets', (req, res) => {
-  ok<SecretsResponse>(res, getPublicSecretsView({ includeAuthorization: isLocalAddress(req.socket.remoteAddress) }))
+  ok<SecretsResponse>(res, getPublicSecretsView({ includeAuthorization: isLocal(req) }))
 })
 
 router.put('/secrets', localOnly, (req, res) => {

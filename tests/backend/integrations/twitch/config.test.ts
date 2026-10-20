@@ -123,6 +123,28 @@ test('validateTwitchConfigUpdates()', async (t) => {
     })
   }
 
+  await t.test('refuses a command that collides with an unchanged one, and keeps the stored value', () => {
+    const { rejected } = updateTwitchConfig({ chatCommands: { skip: { command: '!sg now' } } })
+
+    assert.deepEqual(rejected, ['chatCommands.skip.command'])
+    assert.equal(getTwitchConfig().chatCommands.skip.command, DEFAULTS.chatCommands.skip.command)
+  })
+
+  await t.test('a mutual exchange of two commands lands in one update', () => {
+    const { clean, rejected } = validateTwitchConfigUpdates({
+      chatCommands: { now: { command: DEFAULTS.chatCommands.skip.command }, skip: { command: DEFAULTS.chatCommands.now.command } }
+    })
+
+    assert.deepEqual(rejected, [])
+    assert.deepEqual([clean.chatCommands?.now?.command, clean.chatCommands?.skip?.command], [DEFAULTS.chatCommands.skip.command, DEFAULTS.chatCommands.now.command])
+  })
+
+  await t.test('two commands moving to the same word are both refused', () => {
+    const { rejected } = validateTwitchConfigUpdates({ chatCommands: { now: { command: '!sg same' }, skip: { command: '!sg same' } } })
+
+    assert.deepEqual([...rejected].sort(), ['chatCommands.now.command', 'chatCommands.skip.command'])
+  })
+
   await t.test('refuses unknown fields, including prototype keys', () => {
     const { clean, rejected } = validateTwitchConfigUpdates(
       JSON.parse('{"foo":1,"__proto__":{"polluted":true},"constructor":1,"channelPointsRewardId":"reward-123"}')
@@ -183,14 +205,10 @@ test('updateTwitchConfig()', async (t) => {
     assert.deepEqual(config.chatCommands, before)
   })
 
-  await t.test('returns copies: mutating a result does not change the stored config', () => {
+  await t.test('getConfig() hands out the live object: one snapshot per read, no per-read copy', () => {
+    assert.strictEqual(getTwitchConfig(), getTwitchConfig())
+
     const { config } = updateTwitchConfig({})
-    const originalChannelPointsRewardId = config.channelPointsRewardId
-
-    // Mutate the returned config (primitive value to test top-level cloning)
-    config.channelPointsRewardId = 'modified'
-
-    // The stored config should have the original value
-    assert.equal(getTwitchConfig().channelPointsRewardId, originalChannelPointsRewardId)
+    assert.strictEqual(config, getTwitchConfig())
   })
 })

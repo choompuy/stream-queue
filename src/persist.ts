@@ -21,7 +21,7 @@ export const cachePath = (name: string): string => join(getCacheDir(), name)
 
 export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
 
-const isPlain = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+export const isPlain = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const kindOf = (value: unknown): string => {
   if (value === null) return 'null'
@@ -177,7 +177,7 @@ export async function ensureDataDirectory(): Promise<void> {
     const handle = await open(probe, 'w')
     await handle.close()
     await rm(probe, { force: true })
-    log.log(`Data directory: ${dir}`)
+    log.info(`Data directory: ${dir}`)
   } catch (error) {
     log.error(`The data directory ${dir} is not writable: ${describeError(error)}. Nothing the app saves will survive a restart`)
   }

@@ -38,6 +38,7 @@ export type HttpErrorCode =
 // Why a track ended without playing through (removed, cleared, blocked, playback failure) or an open reward
 // was left: these never answer an HTTP request, they only name activity entries and chat replies
 export type ChatReasonCode =
+  | 'TWITCH_CONNECTION_LOST'
   | 'PLAYBACK_VIDEO_UNAVAILABLE'
   | 'PLAYBACK_EMBED_DISALLOWED'
   | 'PLAYBACK_FAILED'

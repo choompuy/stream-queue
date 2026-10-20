@@ -9,7 +9,7 @@ import type { Song, FilterFailureReason, Config } from '../../../src/types.js'
 // updateConfig() saves to data/config.json under the working directory: use a throwaway one, not the real one
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
-const { isAvailableInRegion, checkFilters, isMusicVideo } = await import('../../../src/youtube/client.js')
+const { isAvailableInRegion, checkFilters, isMusicVideo } = await import('../../../src/youtube/filters.js')
 const { updateConfig, getConfig } = await import('../../../src/config.js')
 
 // the reason the filters would answer with, or null when the track passes them all

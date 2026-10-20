@@ -1,4 +1,4 @@
-import { cachePath, createFileStore, dataPath } from './persist.js'
+import { cachePath, createFileStore, dataPath, isPlain } from './persist.js'
 import { QueueItem, Song } from './types.js'
 import { isValidPlaylistId, isValidVideoId } from './youtube/url.js'
 import { getQueue, getCurrent, hydrateQueue } from './queue.js'
@@ -20,12 +20,11 @@ export type SanitizedState = {
   problems: string[]
 }
 
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 const text = (value: unknown): string => (typeof value === 'string' ? value : '')
 const amount = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0)
 
 export function sanitizeSong(raw: unknown): Song | null {
-  if (!isObject(raw) || !isValidVideoId(raw.videoId) || !text(raw.title)) return null
+  if (!isPlain(raw) || !isValidVideoId(raw.videoId) || !text(raw.title)) return null
 
   const videoId = raw.videoId
 
@@ -41,7 +40,7 @@ export function sanitizeSong(raw: unknown): Song | null {
 }
 
 function sanitizeRedemption(raw: unknown): QueueItem['channelPointsRedemption'] {
-  if (!isObject(raw)) return undefined
+  if (!isPlain(raw)) return undefined
 
   const id = text(raw.id).trim()
   const rewardId = text(raw.rewardId).trim()
@@ -52,19 +51,19 @@ function sanitizeRedemption(raw: unknown): QueueItem['channelPointsRedemption'] 
 
 export function sanitizeQueueItem(raw: unknown): QueueItem | null {
   const song = sanitizeSong(raw)
-  const requestedBy = isObject(raw) ? text(raw.requestedBy).trim() : ''
+  const requestedBy = isPlain(raw) ? text(raw.requestedBy).trim() : ''
   if (!song || !requestedBy) return null
 
   // without the redemption a restored track would play, but its Channel Points reward would never be closed
-  const redemption = isObject(raw) ? sanitizeRedemption(raw.channelPointsRedemption) : undefined
+  const redemption = isPlain(raw) ? sanitizeRedemption(raw.channelPointsRedemption) : undefined
   // the play id survives a restart, so a report that arrives late still names the play it belongs to
-  const playId = isObject(raw) && Number.isInteger(raw.playId) && (raw.playId as number) > 0 ? (raw.playId as number) : undefined
+  const playId = isPlain(raw) && Number.isInteger(raw.playId) && (raw.playId as number) > 0 ? (raw.playId as number) : undefined
 
   return {
     ...song,
     requestedBy,
     // the flag is read as written: a name alone never marks a track, for a viewer may go by it too
-    ...(isObject(raw) && raw.isFallback === true ? { isFallback: true } : {}),
+    ...(isPlain(raw) && raw.isFallback === true ? { isFallback: true } : {}),
     ...(playId !== undefined ? { playId } : {}),
     ...(redemption ? { channelPointsRedemption: redemption } : {})
   }
@@ -72,7 +71,7 @@ export function sanitizeQueueItem(raw: unknown): QueueItem | null {
 
 function sanitizeFallback(raw: unknown, problems: string[]): FallbackSnapshot | undefined {
   if (raw === undefined) return undefined
-  if (!isObject(raw)) {
+  if (!isPlain(raw)) {
     problems.push('fallback is not an object, ignored')
     return undefined
   }
@@ -89,6 +88,7 @@ function sanitizeFallback(raw: unknown, problems: string[]): FallbackSnapshot | 
   const order = [...new Set(rawOrder.filter((id): id is string => typeof id === 'string'))]
   const clean = order.length === rawOrder.length
 
+  // the saved order is kept only whole: a damaged one is dropped, and the load rebuilds it from the tracks
   if (!clean) problems.push('fallback: rotation is damaged, reset')
 
   const rawCursor = raw.cursor
@@ -99,7 +99,7 @@ function sanitizeFallback(raw: unknown, problems: string[]): FallbackSnapshot | 
 
   return {
     sourceTracks: [...tracks.values()],
-    order,
+    order: clean ? order : [],
     cursor,
     playlistId: isValidPlaylistId(raw.playlistId) ? raw.playlistId : null,
     lastRefreshedAt: typeof lastRefreshedAt === 'number' && Number.isFinite(lastRefreshedAt) ? lastRefreshedAt : null,
@@ -110,10 +110,10 @@ function sanitizeFallback(raw: unknown, problems: string[]): FallbackSnapshot | 
 // Turns whatever was read from disk into something safe to load. Every part is repaired on its own:
 // a bad queue item, a bad setting or a bad fallback entry costs only itself, never the other parts
 export function sanitizeState(raw: unknown): SanitizedState {
-  const data = isObject(raw) ? raw : {}
+  const data = isPlain(raw) ? raw : {}
   const problems: string[] = []
 
-  if (!isObject(raw)) problems.push('state file is not an object, using defaults')
+  if (!isPlain(raw)) problems.push('state file is not an object, using defaults')
 
   let current: QueueItem | null = null
   if (data.current !== undefined && data.current !== null) {
@@ -194,7 +194,7 @@ export function loadState(): void {
   const tracks = tracksStore.load({ sourceTracks: [] }).sourceTracks
 
   // an older state file still carries the tracks inside `fallback`: they are used until the track file exists
-  const raw = tracks.length > 0 && isObject(saved.fallback) ? { ...saved, fallback: { ...saved.fallback, sourceTracks: tracks } } : saved
+  const raw = tracks.length > 0 && isPlain(saved.fallback) ? { ...saved, fallback: { ...saved.fallback, sourceTracks: tracks } } : saved
   const { current, queue, fallback, problems } = sanitizeState(raw)
 
   for (const problem of problems) log.warn(problem)
@@ -205,7 +205,7 @@ export function loadState(): void {
 
   savedTracksVersion = tracks.length > 0 ? getFallbackSnapshot().sourceVersion : -1
 
-  log.log('State loaded from disk')
+  log.info('State loaded from disk')
 }
 
 let initialized = false

@@ -23,13 +23,21 @@ test('a new reward', async (t) => {
     const { rejected } = create({
       title: ' ',
       cost: 0,
-      prompt: 'x'.repeat(141),
+      prompt: 'x'.repeat(201),
       backgroundColor: 'red',
       isEnabled: 'yes',
       limits: { maxPerStream: { enabled: true, value: null }, globalCooldownSeconds: { enabled: 'on', value: 5 } }
     })
 
     assert.deepEqual(rejected, ['title', 'cost', 'prompt', 'backgroundColor', 'isEnabled', 'limits.maxPerStream.value', 'limits.globalCooldownSeconds.enabled'])
+  })
+
+  await t.test('a prompt of the documented maximum length passes', () => {
+    // the API reference caps the prompt at 200 characters - it was capped at 140 here before
+    const { payload, rejected } = create({ title: 'a', cost: 1, prompt: 'x'.repeat(200) })
+
+    assert.deepEqual(rejected, [])
+    assert.equal(payload.prompt, 'x'.repeat(200))
   })
 
   await t.test('an empty prompt and an empty colour are nothing at all', () => {

@@ -1,4 +1,4 @@
-import { escapeHtml, formatDuration } from '../../shared.js'
+import { displayChannel, displayTitle, escapeHtml, formatDuration } from '../../shared.js'
 import { PLUS_ICON } from '../../icons.js'
 import { t } from '../../i18n.js'
 import { dom } from '../dom.js'
@@ -9,8 +9,8 @@ export const searchView = createListView(dom.searchListWrapper, {
   renderRow: (song) =>
     row({
       thumbnail: song.thumbnail,
-      title: song.title,
-      subtitle: song.channelTitle,
+      title: displayTitle(song.title),
+      subtitle: displayChannel(song.channelTitle),
       extra: song.isBlocked ? statusPill(t('blocklist.blockedLabel'), 'rejected') : '',
       meta: formatDuration(song.duration),
       actions: `

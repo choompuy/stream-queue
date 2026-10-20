@@ -45,7 +45,9 @@
     "close": "Close",
     "on": "On",
     "off": "Off",
-    "more": "More actions"
+    "more": "More actions",
+    "unknownTitle": "Unknown title",
+    "unknownChannel": "Unknown channel"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -120,7 +122,8 @@
     "activate": "Play playlist",
     "pause": "Pause playlist",
     "delete": "Delete playlist",
-    "deleteConfirm": "Remove this playlist?"
+    "deleteConfirm": "Remove this playlist?",
+    "untitled": "Untitled playlist"
   },
   "settings": {
     "title": "Settings",
@@ -277,7 +280,8 @@
       "twitchRefreshError": "Failed to refresh Twitch connection",
       "twitchApiError": "Twitch API error: {{message}}",
       "twitchNetworkError": "No connection to Twitch",
-      "twitchUnknownError": "Unknown Twitch error"
+      "twitchUnknownError": "Unknown Twitch error",
+      "twitchConnectionLost": "Connection to Twitch was lost for {{minutes}} min: check the redemptions in the Twitch dashboard"
     }
   },
   "toast": {

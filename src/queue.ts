@@ -107,12 +107,12 @@ export function takeNextPlayable(): QueueItem | null {
   })
 
   for (const item of closedOnTheWay) {
-    log.log(`skipped blocked track in queue: "${item.title}"`)
+    log.info(`skipped blocked track in queue: "${item.title}"`)
     finishItem(item, { code: 'BLOCKED' })
   }
 
   const next = taken[0] ?? null
-  if (next) log.log(`moved to next: "${next.title}"`)
+  if (next) log.info(`moved to next: "${next.title}"`)
 
   return next
 }
@@ -179,7 +179,7 @@ export function addSong(song: Song, requestedBy: string, options: AddOptions = {
     playing.update(() => {
       queue.push(item)
     })
-    log.log(`added "${song.title}" at position ${queue.length}`)
+    log.info(`added "${song.title}" at position ${queue.length}`)
   }
 
   return { item, started }
@@ -189,7 +189,7 @@ export function setCurrent(item: QueueItem | null): void {
   const previous = currentSong
 
   if (item?.videoId !== previous?.videoId) {
-    log.log(item ? `now playing "${item.title}"` : 'nothing is playing')
+    log.info(item ? `now playing "${item.title}"` : 'nothing is playing')
   }
 
   playing.update(() => {
@@ -218,7 +218,7 @@ function removeAt(index: number): QueueItem | null {
     removed = item
 
     if (item) {
-      log.log(`removed "${item.title}" at position ${index + 1}`)
+      log.info(`removed "${item.title}" at position ${index + 1}`)
       finishItem(item, { code: 'TRACK_REMOVED' })
     }
   })
@@ -235,7 +235,7 @@ export function clearQueue(): QueueItem[] {
     for (const item of cleared) finishItem(item, { code: 'QUEUE_CLEARED' })
   })
 
-  log.log(`cleared ${cleared.length} songs`)
+  log.info(`cleared ${cleared.length} songs`)
 
   return cleared
 }

@@ -124,7 +124,8 @@ test('sanitizeState()', async (t) => {
     state.fallback.cursor = 1
     const result = sanitizeState(state)
 
-    assert.deepEqual(result.fallback?.order, [F1, F2])
+    // the saved order is dropped whole: the load rebuilds it from the tracks, the position starts over
+    assert.deepEqual(result.fallback?.order, [])
     assert.equal(result.fallback?.cursor, -1)
     assert.equal(
       result.problems.some((problem) => problem.includes('rotation is damaged')),

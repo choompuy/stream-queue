@@ -17,7 +17,7 @@ export async function requestSong(query: string, requestedBy: string, { bypassFi
     assertCanRequestSong(requestedBy, { bypassFilters })
 
     const { isYouTube, videoId } = parseYouTubeUrl(query)
-    log.log(`[REQUEST] ${requestedBy} → ${videoId ? `YouTube URL: ${videoId}` : `Search: "${query}"`}`)
+    log.info(`[REQUEST] ${requestedBy} → ${videoId ? `YouTube URL: ${videoId}` : `Search: "${query}"`}`)
 
     if (isYouTube && !videoId) {
       throw new AppError('INVALID_YOUTUBE_URL')
@@ -36,7 +36,7 @@ export async function requestSong(query: string, requestedBy: string, { bypassFi
 
     const { item, started } = addSong(song, requestedBy, { bypassFilters, channelPointsRedemption })
 
-    log.log(`[ACCEPT] ${requestedBy} → "${song.title}" - ${started ? 'now playing' : 'queued'}`)
+    log.info(`[ACCEPT] ${requestedBy} → "${song.title}" - ${started ? 'now playing' : 'queued'}`)
     logAcceptance(requestedBy, query, song.title, song.videoId)
 
     return { song: item, started, position: started ? 0 : getQueue().length }

@@ -45,7 +45,9 @@
     "close": "Закрыть",
     "on": "Вкл",
     "off": "Выкл",
-    "more": "Ещё действия"
+    "more": "Ещё действия",
+    "unknownTitle": "Неизвестное название",
+    "unknownChannel": "Неизвестный канал"
   },
   "nav": {
     "dashboard": "Панель",
@@ -120,7 +122,8 @@
     "activate": "Воспроизвести плейлист",
     "pause": "Пауза плейлиста",
     "delete": "Удалить плейлист",
-    "deleteConfirm": "Удалить этот плейлист?"
+    "deleteConfirm": "Удалить этот плейлист?",
+    "untitled": "Плейлист без названия"
   },
   "settings": {
     "title": "Настройки",
@@ -277,7 +280,8 @@
       "twitchRefreshError": "Не удалось обновить подключение Twitch",
       "twitchApiError": "Ошибка Twitch API: {{message}}",
       "twitchNetworkError": "Нет связи с Twitch",
-      "twitchUnknownError": "Неизвестная ошибка Twitch"
+      "twitchUnknownError": "Неизвестная ошибка Twitch",
+      "twitchConnectionLost": "Связь с Twitch пропадала на {{minutes}} мин: проверьте награды в панели Twitch"
     }
   },
   "toast": {

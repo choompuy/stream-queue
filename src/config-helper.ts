@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from 'node:util'
-import { createFileStore, deepMerge, type DeepPartial } from './persist.js'
+import { createFileStore, deepMerge, isPlain, type DeepPartial } from './persist.js'
 import { createLogger, describeError } from './logger.js'
 import { emit, type Topic } from './state-events.js'
 
@@ -30,11 +30,10 @@ export const rules = {
   oneOf: (values: readonly unknown[]): FieldRule => field({ validate: (v) => values.includes(v) })
 }
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 const isRule = (entry: FieldRule | Schema): entry is FieldRule => FIELD in entry
 
 function validateSchema(schema: Schema, raw: unknown, path: string, rejected: string[]): Record<string, unknown> | undefined {
-  if (!isPlainObject(raw)) {
+  if (!isPlain(raw)) {
     rejected.push(path || 'body')
     return undefined
   }
@@ -65,6 +64,13 @@ export function validateUpdates(schema: Schema, updates: unknown): { clean: Reco
   const rejected: string[] = []
   const clean = validateSchema(schema, updates, '', rejected) ?? {}
   return { clean, rejected }
+}
+
+// A deep readonly view of a config: getConfig() hands out the live object instead of a clone per read,
+// so every read stops paying structuredClone (every chat message, every /api/state); the type keeps hands off it.
+// A mutable config stays assignable to it, so tests and callers that build their own object keep compiling.
+export type DeepReadonly<T> = {
+  readonly [K in keyof T]: T[K] extends (...args: never[]) => unknown ? T[K] : T[K] extends object ? DeepReadonly<T[K]> : T[K]
 }
 
 export function createConfigModule<T extends object>(options: {
@@ -100,8 +106,7 @@ export function createConfigModule<T extends object>(options: {
     return { clean, rejected }
   }
 
-  function updateConfig(updates: DeepPartial<T>) {
-    const { clean, rejected } = validateConfigUpdates(updates)
+  function commit(clean: DeepPartial<T>): { config: DeepReadonly<T>; changed: boolean } {
     const previous = current()
     const next = deepMerge(previous, clean)
     const changed = !isDeepStrictEqual(next, previous)
@@ -110,7 +115,21 @@ export function createConfigModule<T extends object>(options: {
       save()
       announce(previous, next)
     }
-    return { config: structuredClone(next), rejected, changed }
+    return { config: next as DeepReadonly<T>, changed }
+  }
+
+  function updateConfig(updates: DeepPartial<T>) {
+    const { clean, rejected } = validateConfigUpdates(updates)
+    const { config, changed } = commit(clean)
+    return { config, rejected, changed }
+  }
+
+  // All-or-nothing: for updates that come from one form and must not land half-applied (the secrets:
+  // a valid API key must not be saved while a bad field of the same request is refused). Validates once.
+  function updateConfigStrict(updates: DeepPartial<T>): { rejected: string[]; changed: boolean } {
+    const { clean, rejected } = validateConfigUpdates(updates)
+    if (rejected.length) return { rejected, changed: false }
+    return { rejected, ...commit(clean) }
   }
 
   function restoreConfig(snapshot: T): void {
@@ -142,9 +161,10 @@ export function createConfigModule<T extends object>(options: {
   }
 
   return {
-    getConfig: (): T => structuredClone(current()),
+    getConfig: (): DeepReadonly<T> => current(),
     validateConfigUpdates,
     updateConfig,
+    updateConfigStrict,
     restoreConfig,
     onConfigChange,
     saveNow: async (onError?: (error: unknown) => void) => {

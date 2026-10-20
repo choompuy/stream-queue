@@ -1,18 +1,11 @@
 import express from 'express'
-import os from 'node:os'
 import { StateResponse, OverlayStateResponse } from '../types.js'
 import { ok } from '../http.js'
 import { getState } from '../player.js'
 import { getSettings } from '../settings.js'
 import { localOnly } from '../local-only.js'
+import { lanAddresses } from '../network.js'
 import { shutdown } from '../shutdown.js'
-
-export function lanAddresses(): string[] {
-  return Object.values(os.networkInterfaces())
-    .flatMap((interfaces) => interfaces ?? [])
-    .filter((iface) => iface.family === 'IPv4' && !iface.internal)
-    .map((iface) => iface.address)
-}
 
 export function createSystemRouter({ exit = (code: number) => process.exit(code) }: { exit?: (code: number) => void } = {}): express.Router {
   const router = express.Router()

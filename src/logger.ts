@@ -9,11 +9,11 @@ const WEIGHT: Record<Level, number> = { debug: 10, info: 20, warn: 30, error: 40
 const MAX_FILE_BYTES = 1024 * 1024
 const KEPT_ROTATED_FILES = 3
 
-// LOG_LEVEL=debug / info / warn / error (default info)
-function minWeight(): number {
+// LOG_LEVEL=debug / info / warn / error (default info); read once - it is a startup setting, not a per-line lookup
+const MIN_WEIGHT = (() => {
   const raw = process.env.LOG_LEVEL?.trim().toLowerCase() ?? ''
   return Object.hasOwn(WEIGHT, raw) ? WEIGHT[raw as Level] : WEIGHT.info
-}
+})()
 
 function timestamp(): string {
   const now = new Date()
@@ -54,14 +54,18 @@ export function flushLogs(): Promise<void> {
   return writeChain
 }
 
-async function rotate(file: string): Promise<void> {
+async function rotate(file: string): Promise<boolean> {
   await rm(`${file}.${KEPT_ROTATED_FILES}`, { force: true })
 
   for (let n = KEPT_ROTATED_FILES - 1; n >= 1; n--) {
     await rename(`${file}.${n}`, `${file}.${n + 1}`).catch(() => {})
   }
 
-  await rename(file, `${file}.1`).catch(() => {})
+  return rename(file, `${file}.1`).then(
+    () => true,
+    // a locked file (Windows: an antivirus, a viewer) must not silently pass for rotated
+    () => false
+  )
 }
 
 async function appendToFile(file: string, line: string): Promise<void> {
@@ -76,8 +80,12 @@ async function appendToFile(file: string, line: string): Promise<void> {
   const bytes = Buffer.byteLength(line)
 
   if (fileSize > 0 && fileSize + bytes > MAX_FILE_BYTES) {
-    await rotate(file)
-    fileSize = 0
+    // when the rotation did not happen, re-read the real size: the log keeps growing, and the next
+    // line over the limit retries the rotation instead of counting a nonexistent empty file
+    fileSize = (await rotate(file)) ? 0 : await stat(file).then(
+      (info) => info.size,
+      () => 0
+    )
   }
 
   await appendFile(file, line, 'utf8')
@@ -85,9 +93,10 @@ async function appendToFile(file: string, line: string): Promise<void> {
 }
 
 function write(level: Level, tag: string, msg: string): void {
-  if (WEIGHT[level] < minWeight()) return
+  if (WEIGHT[level] < MIN_WEIGHT) return
 
-  const line = `${timestamp()} ${level.toUpperCase().padEnd(5)} [${tag}] ${msg}`
+  // an outside string (a video title, a nickname) must not be able to forge log entries
+  const line = `${timestamp()} ${level.toUpperCase().padEnd(5)} [${tag}] ${msg.replace(/[\r\n]+/g, '\\n')}`
 
   if (level === 'error') console.error(line)
   else if (level === 'warn') console.warn(line)
@@ -104,7 +113,6 @@ export function createLogger(tag: string) {
   return {
     debug: (msg: string) => write('debug', tag, msg),
     info: (msg: string) => write('info', tag, msg),
-    log: (msg: string) => write('info', tag, msg),
     warn: (msg: string) => write('warn', tag, msg),
     error: (msg: string) => write('error', tag, msg)
   }

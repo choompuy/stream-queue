@@ -1,14 +1,7 @@
-import { Song, AppError } from '../types.js'
-import {
-  youtube,
-  videoToSong,
-  checkFilters,
-  fetchPlaylistMeta,
-  PlaylistMeta,
-  MUSIC_CATEGORY_ID,
-  PlaylistFetchResult,
-  fetchVideos
-} from './client.js'
+import { Song } from '../types.js'
+import { youtube, fetchVideos } from './client.js'
+import { checkFilters, MUSIC_CATEGORY_ID } from './filters.js'
+import { videoToSong, fetchPlaylistMeta, type PlaylistFetchResult } from './mapper.js'
 import { normalize } from './utils.js'
 import { getSearchCache, setSearchCache, getVideoCache, setVideoCache } from './cache.js'
 import { VideoItem, SearchItem, PlaylistItem } from './types.js'
@@ -22,15 +15,6 @@ const PLAYLIST_PAGE_SIZE = 50
 const MAX_PLAYLIST_PAGES = 5
 
 const log = createLogger('YOUTUBE')
-
-async function withYouTubeErrorHandling<T>(label: string, fn: () => Promise<T>): Promise<T> {
-  try {
-    return await fn()
-  } catch (error) {
-    if (error instanceof AppError) throw error
-    throw new AppError('YOUTUBE_ERROR', `${label} failed: ${describeError(error)}`)
-  }
-}
 
 function dedupInFlight<T>(pending: Map<string, Promise<T>>, key: string, run: () => Promise<T>): Promise<T> {
   const existing = pending.get(key)
@@ -62,7 +46,9 @@ export async function getVideoById(videoId: string, bypassFilters = false): Prom
 }
 
 async function fetchVideoById(videoId: string): Promise<VideoItem | null> {
-  const [video] = await withYouTubeErrorHandling('YouTube API', () => fetchVideos([videoId]))
+  // youtube() turns every failure into an AppError already, and the flow that owns the request
+  // (a song request, a playlist load) logs it at its own level - nothing to re-wrap here
+  const [video] = await fetchVideos([videoId])
 
   setVideoCache(videoId, video ?? null)
   return video ?? null
@@ -134,9 +120,6 @@ export function selectBestSong(songs: Song[], isAvailable: (song: Song) => boole
   return selected
 }
 
-export { fetchPlaylistMeta }
-export type { PlaylistMeta, PlaylistFetchResult }
-
 export async function fetchPlaylistSongs(playlistId: string): Promise<PlaylistFetchResult> {
   if (!playlistId) {
     return { songs: [], truncated: false, itemCount: null }
@@ -146,37 +129,40 @@ export async function fetchPlaylistSongs(playlistId: string): Promise<PlaylistFe
 }
 
 async function performPlaylistFetch(playlistId: string): Promise<PlaylistFetchResult> {
-  return withYouTubeErrorHandling('Playlist fetch', async () => {
-    const ids = new Set<string>()
-    let pageToken: string | undefined
-    let truncated = false
+  const ids = new Set<string>()
+  let pageToken: string | undefined
+  let truncated = false
 
-    for (let page = 1; ; page++) {
-      const playlist = await youtube<{ items?: PlaylistItem[]; nextPageToken?: string }>('playlistItems', {
-        part: 'snippet',
-        playlistId,
-        maxResults: String(PLAYLIST_PAGE_SIZE),
-        ...(pageToken ? { pageToken } : {})
-      })
+  for (let page = 1; ; page++) {
+    const playlist = await youtube<{ items?: PlaylistItem[]; nextPageToken?: string }>('playlistItems', {
+      part: 'snippet',
+      playlistId,
+      maxResults: String(PLAYLIST_PAGE_SIZE),
+      ...(pageToken ? { pageToken } : {})
+    })
 
-      for (const item of playlist.items ?? []) {
-        const id = item.snippet?.resourceId?.videoId
-        if (id) ids.add(id)
-      }
-
-      pageToken = playlist.nextPageToken
-      if (!pageToken) break
-
-      if (page >= MAX_PLAYLIST_PAGES) {
-        log.warn(`Playlist: maximum page limit reached (${MAX_PLAYLIST_PAGES}), the rest is not loaded`)
-        truncated = true
-        break
-      }
+    for (const item of playlist.items ?? []) {
+      const id = item.snippet?.resourceId?.videoId
+      if (id) ids.add(id)
     }
 
-    const meta = await fetchPlaylistMeta(playlistId)
-    const songs = mapValidSongs(await fetchVideos([...ids]), 'guard')
-    log.log(`Playlist: ${songs.length} tracks loaded`)
-    return { songs, truncated, itemCount: meta?.itemCount ?? null }
+    pageToken = playlist.nextPageToken
+    if (!pageToken) break
+
+    if (page >= MAX_PLAYLIST_PAGES) {
+      log.warn(`Playlist: maximum page limit reached (${MAX_PLAYLIST_PAGES}), the rest is not loaded`)
+      truncated = true
+      break
+    }
+  }
+
+  // the declared size only decorates the panel's "N of M": asked for alongside the videos, best-effort,
+  // so an endpoint with nothing to say takes the number away, never the loaded tracks
+  const meta = fetchPlaylistMeta(playlistId).catch((error) => {
+    log.warn(`Playlist: the declared size is unavailable: ${describeError(error)}`)
+    return null
   })
+  const songs = mapValidSongs(await fetchVideos([...ids]), 'guard')
+  log.info(`Playlist: ${songs.length} tracks loaded`)
+  return { songs, truncated, itemCount: (await meta)?.itemCount ?? null }
 }

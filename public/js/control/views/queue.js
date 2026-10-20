@@ -1,4 +1,4 @@
-import { escapeHtml, formatDuration } from '../../shared.js'
+import { displayChannel, displayTitle, escapeHtml, formatDuration } from '../../shared.js'
 import { DELETE_ICON } from '../../icons.js'
 import { t, requesterName } from '../../i18n.js'
 import { dom } from '../dom.js'
@@ -11,8 +11,8 @@ export const queueView = createListView(dom.queueListWrapper, {
     row({
       index: index + 1,
       thumbnail: item.thumbnail,
-      title: item.title,
-      subtitle: item.channelTitle,
+      title: displayTitle(item.title),
+      subtitle: displayChannel(item.channelTitle),
       extra: `
         ${item.isBlocked ? statusPill(t('blocklist.blockedLabel'), 'rejected') : ''}
         <span class="column-requested-by text-sm text-green truncate">

@@ -39,6 +39,8 @@ test('shutdown(): the safety net', async (t) => {
 
     const done = fresh(7, (code: number) => void codes.push(code))
     context.mock.timers.tick(5000) // the call has only just started: saving cannot have finished yet
+    context.mock.timers.tick(1000) // the safety net first flushes what is written, bounded by its 1s race
+    await new Promise((resolve) => setImmediate(resolve)) // the exit is a microtask off the race
 
     assert.deepEqual(codes, [7], 'the safety net ended the process')
     await done

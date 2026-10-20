@@ -5,7 +5,7 @@ import { AppError } from '../types.js'
 import { parseRewardInput, toRewardDto } from '../integrations/twitch/rewards.js'
 import { startDeviceAuthorization, disconnect, refreshConnection, getClient, isTwitchConnected, getTwitchHealth } from '../integrations/twitch/index.js'
 import { getTwitchConfig, updateTwitchConfig } from '../integrations/twitch/config.js'
-import { localOnly, isLocalAddress } from '../local-only.js'
+import { isLocal, localOnly } from '../local-only.js'
 import { getPublicSecretsView } from '../secrets.js'
 import type { TwitchClient } from '../integrations/twitch/client.js'
 
@@ -21,7 +21,7 @@ export const router = express.Router()
 
 // open on purpose (the panel on a phone or from a QR code reads it), so what only this computer may see is left out for the rest
 router.get('/', (req, res) => {
-  const twitch = getPublicSecretsView({ includeAuthorization: isLocalAddress(req.socket.remoteAddress) }).twitch
+  const twitch = getPublicSecretsView({ includeAuthorization: isLocal(req) }).twitch
   ok<TwitchConnectionResponse>(res, { ...twitch, health: getTwitchHealth() })
 })
 
