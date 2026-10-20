@@ -1,6 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { connectEvents, serialized, watch } from '../../public/js/sse.js'
+import { connectEvents } from '../../public/js/events.js'
+import { serialized } from '../../public/js/serialized.js'
+import { watch } from '../../public/js/watch.js'
 
 // What a browser gives the page: named events only (a ": comment" never reaches it), a readyState, and close()
 class FakeEventSource {

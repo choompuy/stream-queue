@@ -1,15 +1,6 @@
-export class ApiError extends Error {
-  constructor(message, { status, code, params, cause } = {}) {
-    super(message, { cause })
-    this.name = 'ApiError'
-    this.status = status
-    this.code = code
-    this.params = params
-  }
-}
+import { request as http, ApiError } from '../http.js'
 
-// a request that gets no answer for this long is a failed one: a read that never ends would also stop its topic from ever being read again
-const REQUEST_TIMEOUT_MS = 15_000
+export { ApiError }
 
 // What the panel does after it changed something on the server: while the events are not open nothing else would tell it to read again
 let afterChange = () => {}
@@ -17,48 +8,10 @@ export const onServerChange = (callback) => {
   afterChange = callback
 }
 
-// `partial`: the endpoint answers a save with some refused fields as INVALID_CONFIG plus the stored config and the list of refused fields,
-// which is a result to show and not a failure
-async function request(url, options = {}, { partial = false } = {}) {
-  let response
-
-  try {
-    response = await fetch(url, {
-      ...options,
-      signal: options.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      headers: {
-        ...(options.body !== undefined && { 'Content-Type': 'application/json' }),
-        ...options.headers
-      }
-    })
-  } catch (cause) {
-    // fetch rejects only when the server cannot be reached at all
-    throw new ApiError('Network error', { code: 'NETWORK_ERROR', cause })
-  }
-
-  let body = null
-
-  try {
-    body = await response.json()
-  } catch {
-    // Empty/non-JSON response
-  }
-
-  if (!response.ok) {
-    if (partial && body?.code === 'INVALID_CONFIG' && body?.data) {
-      if (options.method) afterChange()
-      return body.data
-    }
-
-    throw new ApiError(body?.error || `Request failed: ${response.status}`, {
-      status: response.status,
-      code: body?.code,
-      params: body?.params
-    })
-  }
-
+async function request(url, options = {}, flags) {
+  const data = await http(url, options, flags)
   if (options.method) afterChange()
-  return body?.data ?? null
+  return data
 }
 
 const send = (method) => (url, body, flags) => request(url, { method, ...(body !== undefined && { body: JSON.stringify(body) }) }, flags)

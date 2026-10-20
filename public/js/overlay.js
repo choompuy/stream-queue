@@ -2,7 +2,8 @@ import { $, formatDuration, formatTrackDuration, createLogger, show, setClass, s
 import { initI18n, getCurrentLocale } from './i18n.js'
 import { loadYouTubeApi } from './youtube-api.js'
 import { claimPlayback } from './playback-lock.js'
-import { watch } from './sse.js'
+import { watch } from './watch.js'
+import { request } from './http.js'
 
 let player = null
 let currentState = null
@@ -20,8 +21,6 @@ const log = createLogger('PREVIEW')
 
 // only one overlay on this computer plays the music: the others (and any overlay opened by another address) just show the badge
 let isPlaybackSource = false
-
-const REQUEST_TIMEOUT_MS = 8000
 
 // The YouTube player reports error 5 for a problem of the player itself (not of the video); a retry usually fixes it
 const TEMPORARY_PLAYER_ERROR = 5
@@ -59,23 +58,25 @@ function armStartWatchdog(videoId) {
 }
 
 async function fetchOverlayState() {
+  let data
+
   try {
-    const response = await fetch('/api/overlay-state', { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
-    if (!response.ok) throw new Error(`overlay-state request failed: ${response.status}`)
-
-    const body = await response.json()
-    settings = body.data.settings
-    currentState = body.data.state
-    const serverLocale = settings.locale || 'en'
-    if (!localeLoaded || serverLocale !== getCurrentLocale()) {
-      await initI18n(serverLocale)
-      localeLoaded = true
-    }
-
-    renderState()
+    data = await request('/api/overlay-state')
   } catch (error) {
-    log('Error fetching settings:', error)
+    log('Reading the state failed:', error)
+    return
   }
+
+  settings = data.settings
+  currentState = data.state
+  const serverLocale = settings.locale || 'en'
+  if (!localeLoaded || serverLocale !== getCurrentLocale()) {
+    await initI18n(serverLocale)
+    localeLoaded = true
+  }
+
+  // a fault of the drawing is not one of the network: it is not hidden behind the message of a failed read (the watcher logs it)
+  renderState()
 }
 
 function updateMediaVisibility() {
@@ -207,24 +208,15 @@ function updateProgress() {
 async function postWithRetry(url, body) {
   for (let attempt = 0; ; attempt++) {
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
-      })
-
-      if (response.ok) return true
-
-      if (response.status < 500 && response.status !== 429) {
-        log(`${url} was refused with ${response.status}, not retrying`)
+      await request(url, { method: 'POST', body: JSON.stringify(body) })
+      return true
+    } catch (error) {
+      // no status: the server could not be reached
+      if (error.status < 500 && error.status !== 429) {
+        log(`${url} was refused with ${error.status}, not retrying`)
         return false
       }
 
-      log(`${url} failed with ${response.status}`)
-    } catch (error) {
       log(`${url} failed:`, error)
     }
 
