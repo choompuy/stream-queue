@@ -8,10 +8,8 @@ import { t } from '../i18n.js'
 import { setText } from '../shared.js'
 
 function renderActivity() {
-  const filter = state.activityFilter
-  const entries = filter === 'all' ? state.activity : state.activity.filter((entry) => entry.status === filter)
-  views.activity.render(entries)
-  setText(dom.activityCount, t('activity.requests', { count: entries.length }))
+  views.activity.render(state.activity)
+  setText(dom.activityCount, t('activity.requests', { count: state.activity.length }))
 }
 
 export function loadActivity(silent = false) {
@@ -28,16 +26,11 @@ export function loadActivity(silent = false) {
 }
 
 export async function clearActivity() {
-  await run(
-    'clearing activity',
-    async () => {
-      const data = await api.clearActivity()
-      state.activity = data.entries
-      views.activity.invalidate()
-      renderActivity()
-      renderStats()
-    }
-  )
+  const data = await api.clearActivity()
+  state.activity = data.entries
+  views.activity.invalidate()
+  renderActivity()
+  renderStats()
 }
 
 export const activityActions = {

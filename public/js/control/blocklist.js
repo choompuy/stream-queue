@@ -19,18 +19,14 @@ export function loadBlocklist(silent = false) {
   )
 }
 
-export function blockTrack(videoId, title) {
-  return run('blocking track', async () => {
-    await api.blockTrack(videoId, title)
-    toastSuccess(t('toast.trackBlocked'))
-  })
+export async function blockTrack(videoId, title) {
+  await api.blockTrack(videoId, title)
+  toastSuccess(t('toast.trackBlocked'))
 }
 
-export function unblockTrack(videoId) {
-  return run('unblocking track', async () => {
-    await api.unblockTrack(videoId)
-    toastSuccess(t('toast.trackUnblocked'))
-  })
+export async function unblockTrack(videoId) {
+  await api.unblockTrack(videoId)
+  toastSuccess(t('toast.trackUnblocked'))
 }
 
 export const blocklistActions = {

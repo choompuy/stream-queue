@@ -102,7 +102,7 @@ export function refreshTwitchStatus() {
   )
 }
 
-export function connectTwitch() {
+export async function connectTwitch() {
   const pending = state.twitch.authorization
   if (pending && pending.expiresAt > Date.now() + EXPIRY_TOLERANCE_MS) {
     window.open(pending.verificationUri, '_blank', 'noopener,noreferrer')
@@ -112,47 +112,43 @@ export function connectTwitch() {
   // opened up-front so the popup is attributed to the click and not to the API response
   const authWindow = openAuthorizationWindow()
 
-  return run('connecting Twitch', async () => {
-    let navigated = false
+  let navigated = false
 
-    try {
-      const response = await api.connectTwitch()
+  try {
+    const response = await api.connectTwitch()
 
-      if (!response?.verificationUri || !response?.userCode) {
-        throw new ApiError('Twitch authorization data is missing', { code: 'TWITCH_AUTH_ERROR' })
-      }
-
-      // From here the server keeps the state of the login (and says when it ends): this page does not wait for it, and
-      // after a reload the same code is still there, with the button leading back to its page
-      state.twitch.authorization = {
-        userCode: response.userCode,
-        verificationUri: response.verificationUri,
-        expiresAt: Date.now() + response.expiresIn * 1000
-      }
-      renderTwitchConnection()
-
-      navigateAuthorizationWindow(authWindow, response.verificationUri)
-      navigated = true
-    } finally {
-      // the popup was opened before the request, so it is closed on every path that never sent it to Twitch
-      if (!navigated) authWindow?.close()
+    if (!response?.verificationUri || !response?.userCode) {
+      throw new ApiError('Twitch authorization data is missing', { code: 'TWITCH_AUTH_ERROR' })
     }
-  })
+
+    // From here the server keeps the state of the login (and says when it ends): this page does not wait for it, and
+    // after a reload the same code is still there, with the button leading back to its page
+    state.twitch.authorization = {
+      userCode: response.userCode,
+      verificationUri: response.verificationUri,
+      expiresAt: Date.now() + response.expiresIn * 1000
+    }
+    renderTwitchConnection()
+
+    navigateAuthorizationWindow(authWindow, response.verificationUri)
+    navigated = true
+  } finally {
+    // the popup was opened before the request, so it is closed on every path that never sent it to Twitch
+    if (!navigated) authWindow?.close()
+  }
 }
 
-export function disconnectTwitch() {
-  return run('disconnecting Twitch', async () => {
-    const result = await api.disconnectTwitch()
-    applyStatus(null)
-    state.twitch.rewards = []
-    show(dom.twitchRewardForm, false)
-    renderTwitchConnection()
-    renderTwitchRewards()
+export async function disconnectTwitch() {
+  const result = await api.disconnectTwitch()
+  applyStatus(null)
+  state.twitch.rewards = []
+  show(dom.twitchRewardForm, false)
+  renderTwitchConnection()
+  renderTwitchRewards()
 
-    // queued tracks paid with points stay UNFULFILLED on Twitch: nobody else will close them
-    const open = Number(result?.openRedemptions) || 0
-    if (open > 0) toastInfo(t('toast.twitchDisconnectedWithOpenRewards', { count: open }))
-  })
+  // queued tracks paid with points stay UNFULFILLED on Twitch: nobody else will close them
+  const open = Number(result?.openRedemptions) || 0
+  if (open > 0) toastInfo(t('toast.twitchDisconnectedWithOpenRewards', { count: open }))
 }
 
 export function loadTwitchSettings() {

@@ -96,6 +96,34 @@ test('dispatchAction', async (t) => {
     assert.equal(button.disabled, false)
   })
 
+  await t.test('an action that fails is reported by the dispatcher, and the button is usable again', async () => {
+    panel.route('POST /api/player/skip', [500, { error: 'raw', code: 'SERVER_ERROR' }])
+    document.getElementById('toastContainer').innerHTML = ''
+    const button = document.createElement('button')
+    button.dataset.action = 'skip'
+
+    await dispatchAction(button, clickEvent())
+    await flush()
+
+    assert.ok(panel.toasts().includes('Internal server error'))
+    assert.equal(button.disabled, false)
+    panel.route('POST /api/player/skip', {})
+  })
+
+  await t.test('an action that throws at once is reported too, as something that went wrong', async () => {
+    ACTIONS.explode = () => {
+      throw new Error('boom')
+    }
+    document.getElementById('toastContainer').innerHTML = ''
+    const button = document.createElement('button')
+    button.dataset.action = 'explode'
+
+    await dispatchAction(button, clickEvent())
+
+    assert.ok(panel.toasts().includes('Something went wrong, see the log for details'))
+    delete ACTIONS.explode
+  })
+
   await t.test('an action nobody handles is logged and does nothing', () => {
     const button = document.createElement('button')
     button.dataset.action = 'no-such-action'

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { setupPanel, V } from './panel-env.js'
+import { setupPanel, V, act } from './panel-env.js'
 
 const panel = setupPanel()
 
@@ -65,7 +65,7 @@ test('blocking and unblocking', async (t) => {
     panel.route('POST /api/blocklist', [400, { error: 'raw', code: 'INVALID_VIDEO_ID' }])
     document.getElementById('toastContainer').innerHTML = ''
 
-    await blockTrack('nope', 'x')
+    await act(blockTrack, 'nope', 'x')
 
     assert.equal(panel.toasts().includes('Track blocked'), false)
     assert.ok(panel.toasts().includes('Invalid video ID'))

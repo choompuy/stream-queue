@@ -5,7 +5,7 @@ import { initI18n } from '../i18n.js'
 import './player.js'
 import { run } from './run.js'
 import { bindEvents } from './events.js'
-import { watch } from '../sse.js'
+import { watch } from '../watch.js'
 import { refreshState } from './queue.js'
 import { refreshFallbackState } from './fallback.js'
 import { loadActivity } from './activity.js'
@@ -15,7 +15,6 @@ import { loadSecrets, loadConfig, loadOverlaySettings, loadNetworkInfo } from '.
 import { loadTwitchSettings, loadTwitchConfig, loadTwitchSecrets, refreshTwitchStatus } from './twitch/index.js'
 import { isDashboardActive, isPlaylistsActive, isSettingsActive } from './tabs.js'
 import { showNotice } from './notices.js'
-import { setError } from '../shared.js'
 
 // What each topic reads again. Only what the person looks at is read: the rest is read when it is shown again
 const TOPICS = {
@@ -40,7 +39,6 @@ export async function startControlPanel() {
   const locale = settings?.locale
 
   await initI18n(locale)
-  setError(dom.localeSelect, false)
   dom.localeSelect.value = locale ?? dom.localeSelect.value
 
   bindEvents()

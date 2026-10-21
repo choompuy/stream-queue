@@ -1,8 +1,9 @@
-import { $, createLogger, displayTitle, formatDuration, getErrorMessage, show, setClass, setText } from './shared.js'
-import { initI18n, t, getCurrentLocale, requesterName } from './i18n.js'
+import { $, createLogger, displayTitle, formatDuration, formatTrackDuration, show, setClass, setText } from './shared.js'
+import { initI18n, getCurrentLocale, requesterName } from './i18n.js'
 import { loadYouTubeApi } from './youtube-api.js'
 import { claimPlayback } from './playback-lock.js'
-import { watch } from './sse.js'
+import { watch } from './watch.js'
+import { request } from './http.js'
 
 let player = null
 let currentState = null
@@ -22,12 +23,15 @@ const log = createLogger('PREVIEW')
 // only one overlay on this computer plays the music: the others (and any overlay opened by another address) just show the badge
 let isPlaybackSource = false
 
-const REQUEST_TIMEOUT_MS = 8000
-
 // The YouTube player reports error 5 for a problem of the player itself (not of the video); a retry usually fixes it
 const TEMPORARY_PLAYER_ERROR = 5
 const MAX_TEMPORARY_ERROR_RETRIES = 2
 const temporaryErrorRetries = new Map()
+
+// A track that does not start (no network in OBS, an autoplay that is blocked: the player says nothing then) would hold the queue for ever.
+// Not playing after this long counts as a temporary player error: retried, and reported when the retries are used up
+const START_TIMEOUT_MS = 25_000
+let startWatchdog = null
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -36,24 +40,44 @@ let dom = null
 
 const readState = () => watcher.refresh('state')
 
+function clearStartWatchdog() {
+  clearTimeout(startWatchdog)
+  startWatchdog = null
+}
+
+function armStartWatchdog(videoId) {
+  clearStartWatchdog()
+  const watched = player
+
+  startWatchdog = setTimeout(() => {
+    startWatchdog = null
+    if (player !== watched || currentState?.current?.videoId !== videoId || currentState.isPaused) return
+
+    log(`${videoId} did not start playing in ${START_TIMEOUT_MS / 1000} s`)
+    onPlayerError({ data: TEMPORARY_PLAYER_ERROR, target: watched })
+  }, START_TIMEOUT_MS)
+}
+
 async function fetchOverlayState() {
+  let data
+
   try {
-    const response = await fetch('/api/overlay-state', { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
-    if (!response.ok) throw new Error(`overlay-state request failed: ${response.status}`)
-
-    const body = await response.json()
-    settings = body.data.settings
-    currentState = body.data.state
-    const serverLocale = settings.locale || 'en'
-    if (!localeLoaded || serverLocale !== getCurrentLocale()) {
-      await initI18n(serverLocale)
-      localeLoaded = true
-    }
-
-    renderState()
+    data = await request('/api/overlay-state')
   } catch (error) {
-    log('Error fetching settings:', error)
+    log('Reading the state failed:', error)
+    return
   }
+
+  settings = data.settings
+  currentState = data.state
+  const serverLocale = settings.locale || 'en'
+  if (!localeLoaded || serverLocale !== getCurrentLocale()) {
+    await initI18n(serverLocale)
+    localeLoaded = true
+  }
+
+  // a fault of the drawing is not one of the network: it is not hidden behind the message of a failed read (the watcher logs it)
+  renderState()
 }
 
 function updateMediaVisibility() {
@@ -81,7 +105,7 @@ function renderCurrent() {
   if (currentState.nextTrack) {
     setText(dom.nextTitle, displayTitle(currentState.nextTrack.title))
 
-    setText(dom.nextElapsedTime, formatDuration(currentState.nextTrack.duration))
+    setText(dom.nextElapsedTime, formatTrackDuration(currentState.nextTrack.duration))
     show(dom.nextPlaying)
     setClass(dom.currentTitle, 'truncate-2line', false)
   } else {
@@ -100,6 +124,7 @@ function renderState() {
   if (!currentState.current) {
     temporaryErrorRetries.clear()
     loadedPlayId = null
+    clearStartWatchdog()
     player.stopVideo()
     return
   }
@@ -114,10 +139,12 @@ function renderState() {
 
     if (currentState.isPaused) {
       log(`Cueing video while paused: ${videoId}`)
+      clearStartWatchdog()
       player.cueVideoById(videoId)
     } else {
       log(`Loading video: ${videoId}`)
       player.loadVideoById(videoId)
+      armStartWatchdog(videoId)
     }
 
     loadedPlayId = playId
@@ -126,6 +153,8 @@ function renderState() {
   }
 
   if (currentState.isPaused) {
+    clearStartWatchdog()
+
     if (playerState === YT.PlayerState.PLAYING || playerState === YT.PlayerState.BUFFERING) {
       log('Pausing video')
       player.pauseVideo()
@@ -136,6 +165,7 @@ function renderState() {
   if (playerState === YT.PlayerState.PAUSED || playerState === YT.PlayerState.CUED) {
     log('Resuming video')
     player.playVideo()
+    if (playerState === YT.PlayerState.CUED) armStartWatchdog(videoId)
   }
 }
 
@@ -157,14 +187,17 @@ function updateProgress() {
 
   const currentTime = player.getCurrentTime() || 0
   const duration = currentState.current.duration
+  // a live stream has no length to count the progress against
+  const hasLength = duration > 0
 
-  setText(dom.elapsedTimeCurrent, formatDuration(currentTime, false))
+  setText(dom.elapsedTimeCurrent, formatDuration(currentTime))
 
-  if (currentTime > 0 || duration > 0) {
-    setText(dom.elapsedTimeEnd, `${duration <= 0 || settings.showVideo ? '/ ' : ''}${formatDuration(duration)}`)
+  if (currentTime > 0 || hasLength) {
+    const slash = !hasLength || settings.showVideo ? '/ ' : ''
+    setText(dom.elapsedTimeEnd, `${slash}${formatTrackDuration(duration)}`)
 
-    dom.progressBar.style.setProperty('--progress', `${Math.floor((currentTime / duration) * 100)}%`)
-    show(dom.progressBar, duration > 0)
+    if (hasLength) dom.progressBar.style.setProperty('--progress', `${Math.min(100, Math.floor((currentTime / duration) * 100))}%`)
+    show(dom.progressBar, hasLength)
     show(dom.elapsedTimeEnd)
   } else {
     show(dom.progressBar, false)
@@ -178,24 +211,15 @@ function updateProgress() {
 async function postWithRetry(url, body) {
   for (let attempt = 0; ; attempt++) {
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
-      })
-
-      if (response.ok) return true
-
-      if (response.status < 500 && response.status !== 429) {
-        log(`${url} was refused with ${response.status}, not retrying`)
+      await request(url, { method: 'POST', body: JSON.stringify(body) })
+      return true
+    } catch (error) {
+      // no status: the server could not be reached
+      if (error.status < 500 && error.status !== 429) {
+        log(`${url} was refused with ${error.status}, not retrying`)
         return false
       }
 
-      log(`${url} failed with ${response.status}`)
-    } catch (error) {
       log(`${url} failed:`, error)
     }
 
@@ -234,8 +258,12 @@ function retryTemporaryError(errorCode, videoId, retried) {
       const stillCurrent = player === retried && currentState?.current?.videoId === videoId
       if (!stillCurrent) return
 
-      if (currentState.isPaused) player.cueVideoById({ videoId, startSeconds })
-      else player.loadVideoById({ videoId, startSeconds })
+      if (currentState.isPaused) {
+        player.cueVideoById({ videoId, startSeconds })
+      } else {
+        player.loadVideoById({ videoId, startSeconds })
+        armStartWatchdog(videoId)
+      }
     },
     2000 * (retries + 1)
   )
@@ -254,6 +282,8 @@ function onPlayerReady(event) {
 function onPlayerStateChange(event) {
   log(`Player state: ${event.data}`)
 
+  if (event.data === YT.PlayerState.PLAYING) clearStartWatchdog()
+
   if (event.data === YT.PlayerState.ENDED && !isTransitioning) {
     log('Video ended, requesting next')
     isTransitioning = true
@@ -266,8 +296,9 @@ function onPlayerStateChange(event) {
 }
 
 function onPlayerError(event) {
-  const message = getErrorMessage(event.data, t)
-  log(`Player error: ${message}`)
+  // an error answers the wait: a retry waits again, and a failure is reported
+  clearStartWatchdog()
+  log(`Player error: ${event.data}`)
   const videoId = currentState?.current?.videoId
 
   if (!videoId) {
@@ -327,6 +358,7 @@ function createPlayer() {
 }
 
 async function resetPlayer() {
+  clearStartWatchdog()
   const oldPlayer = player
 
   player = null
@@ -360,6 +392,7 @@ function enablePlayback() {
   log('This overlay plays the music')
   isPlaybackSource = true
   dom.nowPlayingVideo.classList.remove('hidden')
+  show(dom.progressWrapper)
   loadYouTubeApi().then(createPlayer)
 }
 
@@ -379,6 +412,7 @@ export function startOverlay({ locks } = {}) {
     currentThumbnail: $('currentThumbnail'),
     currentTitle: $('currentTitle'),
     currentRequester: $('currentRequester'),
+    progressWrapper: $('progressWrapper'),
     progressBar: $('progressBar'),
     elapsedTimeCurrent: $('elapsedTimeCurrent'),
     elapsedTimeEnd: $('elapsedTimeEnd'),
@@ -391,6 +425,8 @@ export function startOverlay({ locks } = {}) {
 
   // hidden until the lock is granted: a waiting overlay must not show an empty video frame
   dom.nowPlayingVideo.classList.add('hidden')
+  // the time comes from the player of this page: an overlay without one would show 0:00 for ever
+  show(dom.progressWrapper, false)
 
   if (isLocalhost) claimPlayback(enablePlayback, locks)
   else log('Non-localhost origin: read-only widget, no embedded player')
@@ -405,6 +441,7 @@ export function startOverlay({ locks } = {}) {
     refresh: readState,
     stop() {
       clearInterval(timer)
+      clearStartWatchdog()
       watcher.close()
     }
   }

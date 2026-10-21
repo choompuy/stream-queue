@@ -42,7 +42,29 @@ test('toasts', async (t) => {
     assert.equal(shown().filter((text) => text === 'boom').length, 1)
   })
 
+  await t.test('the same message of any kind is one message while it is on screen', () => {
+    toastSuccess('saved', { duration: 0 })
+    toastSuccess('saved', { duration: 0 })
+
+    assert.equal(shown().filter((text) => text === 'saved').length, 1)
+  })
+
+  await t.test('a toast that leaves is removed after the time of its animation, and is not counted among those that stay', (t) => {
+    container.innerHTML = ''
+    t.mock.timers.enable({ apis: ['setTimeout'] })
+
+    for (const message of ['a', 'b', 'c', 'd']) toastSuccess(message, { duration: 0 })
+
+    assert.deepEqual(shown(), ['b', 'c', 'd'])
+    assert.equal(container.querySelectorAll('.toast-wrapper').length, 4, 'the first one is still leaving')
+
+    t.mock.timers.tick(200)
+    assert.equal(container.querySelectorAll('.toast-wrapper').length, 3)
+  })
+
   await t.test('no more than three are shown, the oldest one makes room', () => {
+    container.innerHTML = ''
+
     toastSuccess('one', { duration: 0 })
     toastSuccess('two', { duration: 0 })
     toastSuccess('three', { duration: 0 })

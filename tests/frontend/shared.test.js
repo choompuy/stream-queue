@@ -3,9 +3,9 @@ import assert from 'node:assert/strict'
 import {
   escapeHtml,
   formatDuration,
+  formatTrackDuration,
   youtubeThumbnail,
   formatViews,
-  getErrorMessage,
   translateErrorCode,
   setFieldState,
   setError,
@@ -39,12 +39,28 @@ test('formatDuration', async (t) => {
     assert.equal(formatDuration(605), '10:05')
   })
 
-  await t.test('zero', () => {
-    assert.equal(formatDuration(0, true), 'LIVE')
+  await t.test('zero, and what is no length at all, is 0:00', () => {
+    assert.equal(formatDuration(0), '0:00')
+    assert.equal(formatDuration(-5), '0:00')
+    assert.equal(formatDuration(undefined), '0:00')
+    assert.equal(formatDuration(NaN), '0:00')
   })
 
-  await t.test('live', () => {
-    assert.equal(formatDuration(0), 'LIVE')
+  await t.test('shows hours from an hour on, with minutes padded', () => {
+    assert.equal(formatDuration(3600), '1:00:00')
+    assert.equal(formatDuration(3725), '1:02:05')
+    assert.equal(formatDuration(7325), '2:02:05')
+  })
+})
+
+test('formatTrackDuration', async (t) => {
+  await t.test('a track with a length shows it', () => {
+    assert.equal(formatTrackDuration(65), '1:05')
+  })
+
+  await t.test('a track without one is a live stream, and the label is translated (the key itself while no language is loaded)', () => {
+    assert.equal(formatTrackDuration(0), 'common.live')
+    assert.equal(formatTrackDuration(null), 'common.live')
   })
 })
 
@@ -91,31 +107,6 @@ test('formatViews', async (t) => {
     assert.equal(russian(2_500_000), '2,5 млн')
     assert.equal(russian(15_400), '15,4 тыс.')
     assert.equal(russian(999), '999')
-  })
-})
-
-test('getErrorMessage', async (t) => {
-  await t.test('known code without a translator returns the raw key', () => {
-    assert.equal(getErrorMessage(100), 'player.error.videoNotFound')
-  })
-
-  await t.test('known code with a translator calls it with the key and code param', () => {
-    const calls = []
-    const fakeT = (key, params) => {
-      calls.push([key, params])
-      return `translated:${key}`
-    }
-    assert.equal(getErrorMessage(101, fakeT), 'translated:player.error.embedNotAllowed')
-    assert.deepEqual(calls, [['player.error.embedNotAllowed', { code: 101 }]])
-  })
-
-  await t.test('unknown code without a translator falls back to a generic string', () => {
-    assert.equal(getErrorMessage(9999), 'Error code 9999')
-  })
-
-  await t.test('unknown code with a translator uses the generic key', () => {
-    const fakeT = (key) => key
-    assert.equal(getErrorMessage(9999, fakeT), 'player.error.errorCode')
   })
 })
 

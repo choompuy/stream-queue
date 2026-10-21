@@ -4,7 +4,7 @@ import { dom } from './dom.js'
 import { renderStats } from './stats.js'
 import { views } from './views/index.js'
 import { run } from './run.js'
-import { toggleActive, formatDateTime } from './ui.js'
+import { formatDateTime } from './ui.js'
 import { t } from '../i18n.js'
 import { setText } from '../shared.js'
 
@@ -23,12 +23,14 @@ export function renderFallback() {
   const data = state.fallback
   const tracks = data?.upNext ?? []
 
-  toggleActive(dom.fallbackShuffleBtn, data?.shuffle)
-  toggleActive(dom.fallbackRepeatBtn, data?.repeat)
-  toggleActive(dom.fallbackEnabledBtn, data?.enabled)
+  dom.fallbackShuffleBtn.classList.toggle('active', Boolean(data?.shuffle))
+  dom.fallbackRepeatBtn.classList.toggle('active', Boolean(data?.repeat))
+  dom.fallbackEnabledBtn.classList.toggle('active', Boolean(data?.enabled))
   setText(dom.fallbackEnabledText, data?.enabled ? t('common.on') : t('common.off'))
 
   if (!tracks.length) {
+    // the list is built again when tracks come back: it follows the playing track again then
+    renderedActiveVideoId = undefined
     // an active playlist that has simply run out still counts as set; only a section with no playlist at all gets the hint
     setText(dom.fallbackInfo, data?.playlistId ? '' : t('fallback.notSet'))
     views.fallback.render([])

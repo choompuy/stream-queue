@@ -13,7 +13,7 @@ function addScript(attempt) {
 
   tag.onerror = () => {
     tag.remove()
-    const delay = Math.min(2000 * 2 ** Math.min(attempt, 5), 30000)
+    const delay = Math.min(2000 * 2 ** attempt, 30000)
     log(`API failed to load, retrying in ${delay / 1000}s`)
     setTimeout(() => addScript(attempt + 1), delay)
   }

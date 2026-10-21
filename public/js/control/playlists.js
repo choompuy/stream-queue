@@ -23,31 +23,26 @@ export function renderPlaylists() {
   views.playlists.render(state.playlists)
 }
 
-export function addPlaylist() {
+export async function addPlaylist() {
   const value = dom.playlistUrlInput.value.trim()
   if (!value) return undefined
 
-  return run('adding playlist', async () => {
-    await api.addPlaylist(value)
-    setValue(dom.playlistUrlInput, '')
-    toastSuccess(t('toast.playlistAdded'))
-  })
+  await api.addPlaylist(value)
+  setValue(dom.playlistUrlInput, '')
+  toastSuccess(t('toast.playlistAdded'))
 }
 
-export function activatePlaylist(id) {
-  return run('activating playlist', async () => {
-    const playlist = state.playlists.find(p => p.id === id)
-    const wasActive = playlist?.isActive
-    await api.activatePlaylist(id)
-    toastSuccess(wasActive ? t('toast.playlistDeactivated') : t('toast.playlistActivated'))
-  })
+export async function activatePlaylist(id) {
+  const playlist = state.playlists.find((p) => p.id === id)
+  const wasActive = playlist?.isActive
+
+  await api.activatePlaylist(id)
+  toastSuccess(wasActive ? t('toast.playlistDeactivated') : t('toast.playlistActivated'))
 }
 
-export function deletePlaylist(id) {
-  return run('deleting playlist', async () => {
-    await api.removePlaylist(id)
-    toastSuccess(t('toast.playlistDeleted'))
-  })
+export async function deletePlaylist(id) {
+  await api.removePlaylist(id)
+  toastSuccess(t('toast.playlistDeleted'))
 }
 
 export const playlistActions = {

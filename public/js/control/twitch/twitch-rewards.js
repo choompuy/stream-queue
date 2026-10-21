@@ -4,7 +4,6 @@ import { run } from '../run.js'
 import { state } from '../state.js'
 import { dom } from '../dom.js'
 import { fillForm, saveForm, toastSaveResult, trackForm } from '../form.js'
-import { toastSuccess } from '../toast.js'
 import { showRewardForm, bindRewardForm } from './twitch-reward-form.js'
 
 function option(select, value, text, selected = false) {
@@ -65,21 +64,21 @@ export function applyRewardConfig(config) {
   fillForm(dom.twitchRewardSection, config)
 }
 
+function persistTwitchConfig() {
+  return saveForm(
+    dom.twitchRewardSection,
+    async (body) => {
+      const answer = await api.updateTwitchConfig(body)
+      state.twitch.config = answer.config
+      return answer
+    },
+    { changedOnly: true }
+  )
+}
+
 // the selected reward and the auto-fulfil switch are saved at once, whenever one of them changes
 export function saveTwitchConfig() {
-  return run('saving Twitch config', async () => {
-    const result = await saveForm(
-      dom.twitchRewardSection,
-      async (body) => {
-        const answer = await api.updateTwitchConfig(body)
-        state.twitch.config = answer.config
-        return answer
-      },
-      { changedOnly: true }
-    )
-
-    toastSaveResult(result, 'toast.twitchSettingsSaved')
-  })
+  return run('saving Twitch config', async () => toastSaveResult(await persistTwitchConfig(), 'toast.twitchSettingsSaved'))
 }
 
 // back to the reward as Twitch has it (or to a blank form while a new one is being created)
@@ -87,26 +86,24 @@ export function cancelRewardChanges() {
   showRewardForm(state.twitch.editingReward)
 }
 
-export function saveReward() {
+export async function saveReward() {
   const editing = state.twitch.editingReward
 
-  return run(editing ? 'updating Twitch reward' : 'creating Twitch reward', async () => {
-    const result = await saveForm(dom.twitchRewardForm, (body) => (editing ? api.updateTwitchReward(editing.id, body) : api.createTwitchReward(body)))
+  const result = await saveForm(dom.twitchRewardForm, (body) => (editing ? api.updateTwitchReward(editing.id, body) : api.createTwitchReward(body)))
 
-    if (result.refused) return toastSaveResult(result, 'toast.twitchRewardUpdated')
+  if (result.refused) return toastSaveResult(result, 'toast.twitchRewardUpdated')
 
-    await readRewards()
+  await readRewards()
 
-    if (editing) {
-      state.twitch.editingReward = result.config
-      return toastSaveResult(result, 'toast.twitchRewardUpdated')
-    }
+  if (editing) {
+    state.twitch.editingReward = result.config
+    return toastSaveResult(result, 'toast.twitchRewardUpdated')
+  }
 
-    state.twitch.selectedRewardId = result.config.id
-    renderTwitchRewards()
-    await saveTwitchConfig()
-    toastSuccess(t('toast.twitchRewardCreated'))
-  })
+  state.twitch.selectedRewardId = result.config.id
+  renderTwitchRewards()
+  // the new reward is the one for the song requests: one message for both, not one for each
+  toastSaveResult(await persistTwitchConfig(), 'toast.twitchRewardCreated')
 }
 
 export function bindTwitchRewardTracking() {

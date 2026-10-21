@@ -1,4 +1,4 @@
-import { displayChannel, displayTitle, formatDuration, formatViews, getErrorMessage, show, setText } from '../shared.js'
+import { displayChannel, displayTitle, formatTrackDuration, formatViews, show, setText } from '../shared.js'
 import { PLAY_ICON, PAUSE_ICON } from '../icons.js'
 import { state } from './state.js'
 import { dom } from './dom.js'
@@ -23,7 +23,7 @@ export function renderCurrent() {
 
   setText(dom.currentTitle, displayTitle(current.title))
   setText(dom.currentChannel, displayChannel(current.channelTitle))
-  setText(dom.currentDuration, formatDuration(current.duration))
+  setText(dom.currentDuration, formatTrackDuration(current.duration))
   setText(dom.currentViews, t('player.views', { count: formatViews(current.views, getCurrentLocale()) }))
   setText(dom.currentRequester, requesterName(current))
 }
@@ -34,7 +34,7 @@ export function renderNext() {
   if (!next) return
 
   setText(dom.nextTitle, displayTitle(next.title))
-  setText(dom.nextDuration, formatDuration(next.duration))
+  setText(dom.nextDuration, formatTrackDuration(next.duration))
 }
 
 export function renderPlayPause() {
@@ -64,7 +64,7 @@ function onPlayerReady() {
 }
 
 function onPlayerError(event) {
-  log(`Player error: ${getErrorMessage(event.data, t)}`)
+  log(`Player error: ${event.data}`)
 }
 
 loadYouTubeApi().then(() => {

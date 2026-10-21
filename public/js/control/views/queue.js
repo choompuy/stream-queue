@@ -1,4 +1,4 @@
-import { displayChannel, displayTitle, escapeHtml, formatDuration } from '../../shared.js'
+import { displayChannel, displayTitle, escapeHtml, formatTrackDuration } from '../../shared.js'
 import { DELETE_ICON } from '../../icons.js'
 import { t, requesterName } from '../../i18n.js'
 import { dom } from '../dom.js'
@@ -19,7 +19,7 @@ export const queueView = createListView(dom.queueListWrapper, {
           ${escapeHtml(requesterName(item))}
         </span>
       `,
-      meta: formatDuration(item.duration),
+      meta: formatTrackDuration(item.duration),
       actions: item.isBlocked
         ? unblockTrackItem(item.videoId)
         : rowMenu([

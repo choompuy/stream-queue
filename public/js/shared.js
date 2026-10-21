@@ -16,14 +16,18 @@ export function escapeHtml(value) {
   )
 }
 
-export function formatDuration(duration, isNullable = true) {
-  if (isNullable) {
-    if (!duration || duration <= 0) return 'LIVE'
-  }
+export function formatDuration(seconds) {
+  const total = Math.max(0, Math.floor(seconds) || 0)
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  const secs = String(total % 60).padStart(2, '0')
 
-  const mins = Math.floor(duration / 60)
-  const secs = Math.floor(duration) % 60
-  return `${mins}:${secs.toString().padStart(2, '0')}`
+  return hours ? `${hours}:${String(minutes).padStart(2, '0')}:${secs}` : `${minutes}:${secs}`
+}
+
+// the length of a track: one without a length is a live stream
+export function formatTrackDuration(seconds) {
+  return seconds > 0 ? formatDuration(seconds) : t('common.live')
 }
 
 export function youtubeThumbnail(videoId, quality = 'mqdefault') {
@@ -41,28 +45,6 @@ export function createLogger(prefix) {
   return function (...args) {
     console.log(`[${prefix}]`, ...args)
   }
-}
-
-const errorMessages = {
-  2: 'player.error.invalidParameter',
-  5: 'player.error.html5Error',
-  100: 'player.error.videoNotFound',
-  101: 'player.error.embedNotAllowed',
-  150: 'player.error.embedNotAllowed'
-}
-
-export function getErrorMessage(code, t) {
-  const key = errorMessages[code]
-  if (key && t) {
-    return t(key, { code })
-  }
-  if (key) {
-    return key
-  }
-  if (t) {
-    return t('player.error.errorCode', { code })
-  }
-  return `Error code ${code}`
 }
 
 function codeToI18nKey(code) {

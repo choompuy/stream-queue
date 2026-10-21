@@ -8,17 +8,19 @@ export function errorMessage(error) {
   return translateErrorCode(t, error?.code, error?.params, error?.message || String(error))
 }
 
-export function run(label, action, { silent = false, onError = null } = {}) {
-  const execute = async () => {
-    try {
-      return await action()
-    } catch (error) {
-      log(`Error ${label}:`, error)
-      if (!silent) toastError(error instanceof ApiError ? errorMessage(error) : t('api.errors.unexpectedError'))
-      await onError?.(error)
-      return undefined
-    }
-  }
+// What the person is told about a failure: what the server said about it, or that something went wrong for what is not the server's
+export function reportError(error) {
+  toastError(error instanceof ApiError ? errorMessage(error) : t('api.errors.unexpectedError'))
+}
 
-  return execute()
+// Everything that can fail on the panel goes through here: logged, shown, and never left to end up as an unhandled rejection.
+// A failure gives undefined
+export async function run(label, action, { silent = false } = {}) {
+  try {
+    return await action()
+  } catch (error) {
+    log(`Error ${label}:`, error)
+    if (!silent) reportError(error)
+    return undefined
+  }
 }

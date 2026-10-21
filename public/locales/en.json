@@ -45,6 +45,7 @@
     "on": "On",
     "off": "Off",
     "more": "More actions",
+    "live": "LIVE",
     "unknownTitle": "Unknown title",
     "unknownChannel": "Unknown channel"
   },
@@ -221,14 +222,7 @@
     }
   },
   "player": {
-    "views": "{{count}} views",
-    "error": {
-      "invalidParameter": "Invalid parameter",
-      "html5Error": "HTML5 player error",
-      "videoNotFound": "Video not found",
-      "embedNotAllowed": "Embed not allowed",
-      "errorCode": "Error code {{code}}"
-    }
+    "views": "{{count}} views"
   },
   "api": {
     "errors": {
@@ -306,6 +300,8 @@
     "twitchChatCommandsSaved": "Chat commands saved",
     "twitchRewardCreated": "Reward created successfully",
     "twitchRewardUpdated": "Reward updated successfully",
-    "twitchDisconnectedWithOpenRewards": "Disconnected. Rewards still waiting in the Twitch rewards queue (fulfill or refund them there): {{count}}"
+    "twitchDisconnectedWithOpenRewards": "Disconnected. Rewards still waiting in the Twitch rewards queue (fulfill or refund them there): {{count}}",
+    "copied": "Copied",
+    "copyFailed": "Could not copy: select the link and copy it by hand"
   }
 }

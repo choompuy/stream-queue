@@ -6,7 +6,10 @@ const { api, ApiError } = await import('../../../public/js/control/api.js')
 const calls = []
 let reply = null
 
+let lastOptions = null
+
 globalThis.fetch = async (url, options = {}) => {
+  lastOptions = options
   calls.push({ url, method: options.method ?? 'GET' })
   if (reply instanceof Error) throw reply
 
@@ -93,4 +96,25 @@ test('api', async (t) => {
 
     assert.deepEqual(calls, [{ url: '/api/queue/video/a%2Fb%20c', method: 'DELETE' }])
   })
+})
+
+test('every request has a timeout, so a request that gets no answer fails instead of holding its topic for ever', async () => {
+  answer(200, { data: {} })
+  await api.getSettings()
+
+  assert.ok(lastOptions.signal instanceof AbortSignal)
+})
+
+test('a request has a JSON content type only when it has a body', async () => {
+  answer(200, { data: {} })
+  await api.getSettings()
+  assert.equal(lastOptions.headers['Content-Type'], undefined)
+
+  answer(200, { data: {} })
+  await api.skip()
+  assert.equal(lastOptions.headers['Content-Type'], undefined)
+
+  answer(200, { data: {} })
+  await api.updateSettings({ locale: 'en' })
+  assert.equal(lastOptions.headers['Content-Type'], 'application/json')
 })

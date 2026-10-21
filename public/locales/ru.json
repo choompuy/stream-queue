@@ -45,6 +45,7 @@
     "on": "Вкл",
     "off": "Выкл",
     "more": "Ещё действия",
+    "live": "LIVE",
     "unknownTitle": "Неизвестное название",
     "unknownChannel": "Неизвестный канал"
   },
@@ -221,14 +222,7 @@
     }
   },
   "player": {
-    "views": "{{count}} просмотров",
-    "error": {
-      "invalidParameter": "Неверный параметр",
-      "html5Error": "Ошибка HTML5 плеера",
-      "videoNotFound": "Видео не найдено",
-      "embedNotAllowed": "Встраивание не разрешено",
-      "errorCode": "Код ошибки {{code}}"
-    }
+    "views": "{{count}} просмотров"
   },
   "api": {
     "errors": {
@@ -298,7 +292,7 @@
     "trackUnblocked": "Трек разблокирован",
     "settingsSaved": "Настройки сохранены",
     "settingsPartiallySaved": "Сохранено {{saved}}, не сохранено {{rejected}} (некорректные значения)",
-    "apiKeyNotSaved": "Config saved, but API key was not",
+    "apiKeyNotSaved": "Настройки сохранены, а API ключ нет",
     "nowPlaying": "Сейчас играет: {{title}}",
     "addedToQueue": "Добавлено в очередь: {{title}} [#{{position}}]",
     "viewerRequest": "🎵 {{user}} добавил(а): {{title}}",
@@ -306,6 +300,8 @@
     "twitchChatCommandsSaved": "Команды чата сохранены",
     "twitchRewardCreated": "Награда успешно создана",
     "twitchRewardUpdated": "Награда успешно обновлена",
-    "twitchDisconnectedWithOpenRewards": "Отключено. Наград, ожидающих в очереди наград Twitch (примите или верните их там): {{count}}"
+    "twitchDisconnectedWithOpenRewards": "Отключено. Наград, ожидающих в очереди наград Twitch (примите или верните их там): {{count}}",
+    "copied": "Скопировано",
+    "copyFailed": "Не удалось скопировать: выделите ссылку и скопируйте вручную"
   }
 }

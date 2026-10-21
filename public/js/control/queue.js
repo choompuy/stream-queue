@@ -54,15 +54,13 @@ export function renderQueue() {
   views.queue.render(state.queue)
 }
 
-export function removeFromQueue(videoId) {
-  return run('removing from queue', async () => {
-    await api.removeFromQueue(videoId)
-    toastSuccess(t('toast.removedFromQueue'))
-  })
+export async function removeFromQueue(videoId) {
+  await api.removeFromQueue(videoId)
+  toastSuccess(t('toast.removedFromQueue'))
 }
 
 export function clearQueue() {
-  return run('clearing queue', () => api.clearQueue())
+  return api.clearQueue()
 }
 
 export const queueActions = {
