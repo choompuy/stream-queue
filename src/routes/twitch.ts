@@ -3,18 +3,19 @@ import { ok, sendConfigUpdate } from '../http.js'
 import type { TwitchConnectionResponse, TwitchCreateCustomReward, TwitchUpdateCustomReward } from '../integrations/twitch/types.js'
 import { AppError } from '../types.js'
 import { parseRewardInput, toRewardDto } from '../integrations/twitch/rewards.js'
-import { startDeviceAuthorization, disconnect, refreshConnection, getClient, isTwitchConnected, getTwitchHealth } from '../integrations/twitch/index.js'
+import { startDeviceAuthorization, disconnect, refreshConnection, isTwitchConnected, getTwitchHealth } from '../integrations/twitch/index.js'
+import { getRuntime } from '../integrations/twitch/state.js'
 import { getTwitchConfig, updateTwitchConfig } from '../integrations/twitch/config.js'
 import { isLocal, localOnly } from '../local-only.js'
 import { getPublicSecretsView } from '../secrets.js'
 import type { TwitchClient } from '../integrations/twitch/client.js'
 
 function requireClient(): TwitchClient {
-  const client = getClient()
-  if (!client || !isTwitchConnected()) {
+  const runtime = getRuntime()
+  if (!runtime || !isTwitchConnected()) {
     throw new AppError('TWITCH_NOT_CONNECTED')
   }
-  return client
+  return runtime.client
 }
 
 export const router = express.Router()

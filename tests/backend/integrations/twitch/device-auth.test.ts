@@ -6,8 +6,10 @@ import { join } from 'node:path'
 
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
-const { initializeTwitchIntegration, startDeviceAuthorization, disconnect, _test, _resetIntegration } =
+const { initializeTwitchIntegration, startDeviceAuthorization, disconnect, _resetIntegration } =
   await import('../../../../src/integrations/twitch/index.js')
+const { handleChannelPointsRedemption } = await import('../../../../src/integrations/twitch/redemptions.js')
+const { twitchBackoff } = await import('../../../../src/integrations/twitch/state.js')
 const { updateTwitchConfig } = await import('../../../../src/integrations/twitch/config.js')
 const { clearTwitchOAuthState, getSecrets, getPublicSecretsView } = await import('../../../../src/secrets.js')
 const { onNotice } = await import('../../../../src/state-events.js')
@@ -200,7 +202,7 @@ test('device authorization', async (t) => {
 
 test('a login whose account details cannot be fetched is rolled back and reported to the panel', async (t) => {
   await t.test('Twitch is told to forget the tokens, nothing stays on disk, and the panel learns why', async () => {
-    _test.setRetryDelay(1)
+    twitchBackoff.delayMs = 1
     // a 403 is a refusal that a retry does not change: it must not be repeated
     userInfoRefusal = json({ message: 'not yours' }, 403)
 
@@ -224,7 +226,7 @@ test('a login whose account details cannot be fetched is rolled back and reporte
   })
 
   await t.test('a passing failure is retried while attempts are left, then rolled back the same way', async () => {
-    _test.setRetryDelay(1)
+    twitchBackoff.delayMs = 1
     userInfoRefusal = json({ message: 'having a moment' }, 503)
 
     await startDeviceAuthorization()
@@ -241,18 +243,18 @@ const event = (id: string, userInput = '') => ({ id, user_name: 'viewer', user_i
 
 test('the same redemption delivered twice is taken once', async (t) => {
   updateTwitchConfig({ channelPointsRewardId: 'reward-1' })
-  _test.setRetryDelay(1)
+  twitchBackoff.delayMs = 1
 
   await t.test('the second delivery of one id is ignored, another id is not', async () => {
     const calls: string[] = []
     const client = { updateRedemptionStatus: async (_redemption: unknown, status: string) => void calls.push(status) } as unknown as TwitchClient
 
     // an empty request is refunded at once, which is what makes a handled redemption visible here
-    await _test.handleChannelPointsRedemption(event('red-1') as never, client)
-    await _test.handleChannelPointsRedemption(event('red-1') as never, client)
+    await handleChannelPointsRedemption(event('red-1') as never, client)
+    await handleChannelPointsRedemption(event('red-1') as never, client)
     assert.deepEqual(calls, ['CANCELED'])
 
-    await _test.handleChannelPointsRedemption(event('red-2') as never, client)
+    await handleChannelPointsRedemption(event('red-2') as never, client)
     assert.deepEqual(calls, ['CANCELED', 'CANCELED'])
   })
 })

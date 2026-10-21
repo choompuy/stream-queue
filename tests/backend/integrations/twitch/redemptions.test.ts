@@ -8,7 +8,10 @@ const workDir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
 cpSync(resolve('public/locales'), join(workDir, 'public/locales'), { recursive: true })
 process.chdir(workDir)
 
-const { isRetryable, _test, _resetIntegration, initializeTwitchIntegration, disconnect } = await import('../../../../src/integrations/twitch/index.js')
+const { _resetIntegration, initializeTwitchIntegration, disconnect } = await import('../../../../src/integrations/twitch/index.js')
+const { isRetryable } = await import('../../../../src/integrations/twitch/error.js')
+const { cancelRedemption, fulfillRedemption, handleChannelPointsRedemption } = await import('../../../../src/integrations/twitch/redemptions.js')
+const { chatConnection, twitchBackoff } = await import('../../../../src/integrations/twitch/state.js')
 const { buildRedemptionRejectionMessage, buildRedemptionRefundFailedMessage } = await import('../../../../src/chat-replies.js')
 const { AppError } = await import('../../../../src/types.js')
 const { updateTwitchOAuthState, updateSecrets } = await import('../../../../src/secrets.js')
@@ -48,12 +51,12 @@ function fakeClient(...answers: unknown[]): TwitchClient {
 beforeEach(() => {
   sent = []
   calls = []
-  _test.setRetryDelay(1)
-  _test.setChat({ isConnected: () => true, disconnect: async () => {}, sendMessage: async (message: string) => void sent.push(message) } as unknown as TwitchChat)
+  twitchBackoff.delayMs = 1
+  chatConnection.instance = { isConnected: () => true, disconnect: async () => {}, sendMessage: async (message: string) => void sent.push(message) } as unknown as TwitchChat
 })
 
 after(async () => {
-  _test.setChat(null)
+  chatConnection.instance = null
   await _resetIntegration()
 })
 
@@ -86,19 +89,19 @@ test('isRetryable()', async (t) => {
 
 test('cancelRedemption()', async (t) => {
   await t.test('a confirmed refund says so in chat', async () => {
-    await _test.cancelRedemption(redemption, fakeClient('ok'), reason)
+    await cancelRedemption(redemption, fakeClient('ok'), reason)
     assert.deepEqual(sent, [refunded()])
     assert.deepEqual(calls, ['CANCELED'])
   })
 
   await t.test('a passing failure is repeated and then confirmed', async () => {
-    await _test.cancelRedemption(redemption, fakeClient(api(503), new TypeError('fetch failed'), 'ok'), reason)
+    await cancelRedemption(redemption, fakeClient(api(503), new TypeError('fetch failed'), 'ok'), reason)
     assert.equal(calls.length, 3)
     assert.deepEqual(sent, [refunded()])
   })
 
   await t.test('a redemption that is no longer open (404) is left alone: one try, nothing is said in chat', async () => {
-    await _test.cancelRedemption(redemption, fakeClient(api(404)), reason)
+    await cancelRedemption(redemption, fakeClient(api(404)), reason)
     assert.equal(calls.length, 1)
     assert.deepEqual(sent, [])
   })
@@ -107,20 +110,20 @@ test('cancelRedemption()', async (t) => {
     for (const status of [400, 403]) {
       calls = []
       sent = []
-      await _test.cancelRedemption(redemption, fakeClient(api(status)), reason)
+      await cancelRedemption(redemption, fakeClient(api(status)), reason)
       assert.equal(calls.length, 1, String(status))
       assert.deepEqual(sent, [refundFailed()], String(status))
     }
   })
 
   await t.test('a login that is gone is one try, not three', async () => {
-    await _test.cancelRedemption(redemption, fakeClient(new AppError('TWITCH_NOT_CONNECTED', 'not connected')), reason)
+    await cancelRedemption(redemption, fakeClient(new AppError('TWITCH_NOT_CONNECTED', 'not connected')), reason)
     assert.equal(calls.length, 1)
     assert.deepEqual(sent, [refundFailed()])
   })
 
   await t.test('after three failed tries the refund is reported as failed, never as done', async () => {
-    await _test.cancelRedemption(redemption, fakeClient(api(503)), reason)
+    await cancelRedemption(redemption, fakeClient(api(503)), reason)
     assert.equal(calls.length, 3)
     assert.deepEqual(sent, [refundFailed()])
   })
@@ -128,12 +131,12 @@ test('cancelRedemption()', async (t) => {
 
 test('fulfillRedemption()', async (t) => {
   await t.test('a redemption that is no longer open is one try and no error', async () => {
-    await _test.fulfillRedemption(redemption, fakeClient(api(404)))
+    await fulfillRedemption(redemption, fakeClient(api(404)))
     assert.deepEqual(calls, ['FULFILLED'])
   })
 
   await t.test('when it cannot be fulfilled it is left open, not canceled (the song was played)', async () => {
-    await _test.fulfillRedemption(redemption, fakeClient(api(503)))
+    await fulfillRedemption(redemption, fakeClient(api(503)))
     assert.deepEqual(calls, ['FULFILLED', 'FULFILLED', 'FULFILLED'])
     assert.deepEqual(sent, [])
   })
@@ -174,19 +177,19 @@ test('handleChannelPointsRedemption()', async (t) => {
   t.beforeEach(() => {
     initializeTwitchIntegration({ clientId: 'client-1' })
     updateTwitchConfig({ channelPointsRewardId: 'reward-1' })
-    _test.setRetryDelay(1)
+    twitchBackoff.delayMs = 1
     calls = []
   })
 
   t.after(() => {
-    _test.setChat(null)
+    chatConnection.instance = null
   })
 
   await t.test('a redemption of another reward is ignored at debug level and not touched', async (t2) => {
     const debug = t2.mock.method(console, 'log', () => {})
     const errors = t2.mock.method(console, 'error', () => {})
 
-    await _test.handleChannelPointsRedemption({ ...event('red-other', 'song'), reward: { id: 'another-reward', title: 'Other' } } as never, fakeClient('ok'))
+    await handleChannelPointsRedemption({ ...event('red-other', 'song'), reward: { id: 'another-reward', title: 'Other' } } as never, fakeClient('ok'))
 
     assert.deepEqual(calls, [], 'no status update for a foreign reward')
     assert.equal(debug.mock.callCount(), 0, 'a debug line is below the default info level and does not show')
@@ -199,7 +202,7 @@ test('handleChannelPointsRedemption()', async (t) => {
     const A = 'aaaaaaaaaaa'
     blockTrack(A, 'blocked')
 
-    await _test.handleChannelPointsRedemption(event('red-block', `https://www.youtube.com/watch?v=${A}`) as never, fakeClient('ok'))
+    await handleChannelPointsRedemption(event('red-block', `https://www.youtube.com/watch?v=${A}`) as never, fakeClient('ok'))
 
     assert.deepEqual(calls, ['CANCELED'])
     assert.equal(warnings.mock.callCount(), 1)
@@ -222,7 +225,7 @@ test('handleChannelPointsRedemption()', async (t) => {
     }) as typeof fetch
 
     try {
-      await _test.handleChannelPointsRedemption(event('red-broken', 'some song') as never, fakeClient('ok'))
+      await handleChannelPointsRedemption(event('red-broken', 'some song') as never, fakeClient('ok'))
     } finally {
       globalThis.fetch = realFetch
     }
@@ -243,13 +246,13 @@ test('handleChannelPointsRedemption()', async (t) => {
     queue.setCurrent(null)
 
     // the chat connection breaks while the acceptance reply is being sent: the song is already playing
-    _test.setChat({
+    chatConnection.instance = {
       isConnected: () => {
         throw new Error('chat blew up')
       },
       disconnect: async () => {},
       sendMessage: async () => {}
-    } as unknown as TwitchChat)
+    } as unknown as TwitchChat
 
     const A = 'aaaaaaaaaaa'
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -270,12 +273,12 @@ test('handleChannelPointsRedemption()', async (t) => {
     try {
       // the broken chat must escape the handler instead of being mistaken for a failed request
       await assert.rejects(
-        _test.handleChannelPointsRedemption(event('red-late', `https://www.youtube.com/watch?v=${A}`) as never, fakeClient('ok')),
+        handleChannelPointsRedemption(event('red-late', `https://www.youtube.com/watch?v=${A}`) as never, fakeClient('ok')),
         /chat blew up/
       )
     } finally {
       globalThis.fetch = realFetch
-      _test.setChat(null)
+      chatConnection.instance = null
       await _resetIntegration()
       updateTwitchOAuthState({ tokenData: null })
     }

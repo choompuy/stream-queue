@@ -1,4 +1,5 @@
 import { AppError } from '../../types.js'
+import { retryableTransport } from '../../web-fetch.js'
 
 // `transient: 1` on an error's params says the same attempt may work later (a lost connection, a login that
 // could not be refreshed just now), so a retry is worth it. The literal lives here alone, and the error is
@@ -29,4 +30,17 @@ export function normalizeTwitchError(error: unknown): AppError {
   }
 
   return new AppError('TWITCH_UNKNOWN_ERROR', String(error))
+}
+
+// A repeat helps only when the failure can pass by itself: a lost connection or a timeout (they arrive as
+// plain errors where nothing normalized them on the way), a 429, a 5xx, or a login that could not be
+// refreshed right now (flagged `transient`). A refusal (4xx), a missing login or a token Twitch no longer
+// accepts gives the same answer every time, and any other error is a bug: repeating it would only repeat the bug
+export function isRetryable(error: unknown): boolean {
+  if (!(error instanceof AppError)) return isNetworkError(error)
+  if (error.params?.transient === 1) return true
+
+  // the same transport rule the fetch skeleton retries by: a 429, a 5xx
+  const status = error.params?.status
+  return typeof status === 'number' && retryableTransport({ status })
 }
