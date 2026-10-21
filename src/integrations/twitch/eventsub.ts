@@ -27,6 +27,7 @@ export class TwitchEventSub extends ReconnectingSocket {
   // own seamless reconnect request) stays below the threshold and out of the journal
   private hadReadySession = false
   private connectionLostAt: number | null = null
+  private journalTimer: ReturnType<typeof setTimeout> | null = null
   protected journalAfterMs = 60_000
 
   protected markReady(): void {
@@ -35,29 +36,50 @@ export class TwitchEventSub extends ReconnectingSocket {
   }
 
   protected onOpen(_socket: WebSocket): void {
-    const lostAt = this.connectionLostAt
+    // the connection is back: whatever outage it ended, the alarm is not needed anymore. A line in the journal
+    // was already written by the timer if the outage crossed the threshold, so nothing is written here
+    if (this.journalTimer) {
+      clearTimeout(this.journalTimer)
+      this.journalTimer = null
+    }
     this.connectionLostAt = null
-    if (lostAt === null) return
-
-    const downMs = Date.now() - lostAt
-    if (downMs < this.journalAfterMs) return
-
-    logActivity({
-      requestedBy: 'Twitch',
-      query: 'Twitch',
-      title: null,
-      videoId: null,
-      status: 'failed',
-      reasonCode: 'TWITCH_CONNECTION_LOST',
-      reasonParams: { minutes: Math.round(downMs / 60_000) }
-    })
   }
 
   protected onClosed(): void {
     // an intentional stop loses nothing (stopped is set before the teardown): no alarm afterwards
     if (this.stopped) return
-    if (this.hadReadySession) this.connectionLostAt = Date.now()
+
+    // only a session that was ready could lose something; the retries during an outage do not re-arm the alarm
+    const lostAt = this.hadReadySession ? Date.now() : null
     this.hadReadySession = false
+    if (lostAt === null) return
+
+    this.connectionLostAt = lostAt
+    // the journal line is written when the outage crosses the threshold, not when it ends: a long one must be
+    // visible even if the connection never comes back. A blip cancels the timer in onOpen and stays unrecorded
+    if (this.journalTimer) clearTimeout(this.journalTimer)
+    this.journalTimer = setTimeout(() => {
+      this.journalTimer = null
+      logActivity({
+        requestedBy: 'Twitch',
+        query: 'Twitch',
+        title: null,
+        videoId: null,
+        status: 'failed',
+        reasonCode: 'TWITCH_CONNECTION_LOST',
+        reasonParams: { minutes: Math.round((Date.now() - lostAt) / 60_000) }
+      })
+    }, this.journalAfterMs)
+  }
+
+  async disconnect(): Promise<void> {
+    // an intentional stop is not an outage: whatever alarm survived from it is cancelled here
+    if (this.journalTimer) {
+      clearTimeout(this.journalTimer)
+      this.journalTimer = null
+    }
+    this.connectionLostAt = null
+    await super.disconnect()
   }
 
   constructor(config: TwitchEventSubOptions) {
@@ -124,8 +146,9 @@ export class TwitchEventSub extends ReconnectingSocket {
       this.markReady()
       this.watchKeepalive(message)
     } catch (error) {
+      // no log line here: the rejected connect() reaches the caller, and connectOrRetry() reports the same
+      // failure once, with the retry plan - two error lines for one subscription refusal is a duplicate
       const normalized = normalizeTwitchError(error)
-      log.error(`EventSub subscription failed: ${describeError(normalized)}`)
       this.abort(normalized)
     }
   }

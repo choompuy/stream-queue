@@ -25,6 +25,8 @@ export async function fetchWithTimeout(url: string | URL, init: RequestInit | un
     try {
       const response = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) })
       if (retry && attempt < retry.attempts && retry.shouldRetry({ status: response.status })) {
+        // the answer is about to be thrown away: cancel its unread body, or the connection is held until the timeout
+        await response.body?.cancel().catch(() => {})
         await sleep(retry.delayMs(attempt))
         continue
       }

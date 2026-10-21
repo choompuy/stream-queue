@@ -21,12 +21,14 @@ export type RewardDto = {
 
 const TITLE_MAX_LENGTH = INPUT_LIMITS.rewardTitle
 const PROMPT_MAX_LENGTH = INPUT_LIMITS.rewardPrompt
+const COST_MAX = INPUT_LIMITS.rewardCost
 
-// the name of a limit in the panel, the switch that Twitch has for it, and the number that goes with the switch
+// the name of a limit in the panel, the switch that Twitch has for it, the number that goes with the switch,
+// and the app-side sanity cap for that number (see INPUT_LIMITS: Twitch documents the minimum only)
 const LIMITS = [
-  { name: 'maxPerStream', flag: 'is_max_per_stream_enabled', value: 'max_per_stream' },
-  { name: 'maxPerUserPerStream', flag: 'is_max_per_user_per_stream_enabled', value: 'max_per_user_per_stream' },
-  { name: 'globalCooldownSeconds', flag: 'is_global_cooldown_enabled', value: 'global_cooldown_seconds' }
+  { name: 'maxPerStream', flag: 'is_max_per_stream_enabled', value: 'max_per_stream', cap: INPUT_LIMITS.rewardMaxPerStream },
+  { name: 'maxPerUserPerStream', flag: 'is_max_per_user_per_stream_enabled', value: 'max_per_user_per_stream', cap: INPUT_LIMITS.rewardMaxPerUserPerStream },
+  { name: 'globalCooldownSeconds', flag: 'is_global_cooldown_enabled', value: 'global_cooldown_seconds', cap: INPUT_LIMITS.rewardGlobalCooldownSeconds }
 ] as const
 
 export function toRewardDto(reward: TwitchCustomReward): RewardDto {
@@ -73,7 +75,7 @@ export function parseRewardInput(
   }
 
   if (input.cost !== undefined || requireTitleAndCost) {
-    if (isPositiveInteger(input.cost)) payload.cost = input.cost
+    if (isPositiveInteger(input.cost) && input.cost <= COST_MAX) payload.cost = input.cost
     else reject('cost')
   }
 
@@ -101,7 +103,7 @@ export function parseRewardInput(
   if (input.limits !== undefined && !isPlain(input.limits)) reject('limits')
   const limits = isPlain(input.limits) ? input.limits : {}
 
-  for (const { name, flag, value } of LIMITS) {
+  for (const { name, flag, value, cap } of LIMITS) {
     const limit = limits[name]
     if (limit === undefined) continue
 
@@ -112,9 +114,9 @@ export function parseRewardInput(
 
     payload[flag] = limit.enabled
 
-    // the number counts only while its switch is on, and has to be a whole number above 0 then
+    // the number counts only while its switch is on, and has to be a whole number within its cap then
     if (!limit.enabled) continue
-    if (isPositiveInteger(limit.value)) payload[value] = limit.value
+    if (isPositiveInteger(limit.value) && limit.value <= cap) payload[value] = limit.value
     else reject(`limits.${name}.value`)
   }
 

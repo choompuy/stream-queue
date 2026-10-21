@@ -13,7 +13,16 @@ export const INPUT_LIMITS = {
   blocklistTitle: 200,
   chatMessage: 500,
   rewardTitle: 45,
-  rewardPrompt: 200
+  rewardPrompt: 200,
+  // The Twitch reference (dev.twitch.tv/docs/api/reference, Create/Update Custom Reward) documents the
+  // minimums only: the cost and every redemption limit are "a whole number of at least 1" - no ceiling is
+  // documented. The cost and per-stream caps below are app-side sanity caps, not Twitch rules; whatever
+  // still slips past them reaches Twitch and comes back as TWITCH_API_ERROR without a field name.
+  rewardCost: 10_000_000,
+  rewardMaxPerStream: 100_000,
+  rewardMaxPerUserPerStream: 100_000,
+  // The cooldown input in the creator dashboard is capped at 14 days, and seconds are what the API takes
+  rewardGlobalCooldownSeconds: 1_209_600
 } as const
 
 export function checkVideoId(value: unknown): asserts value is string {

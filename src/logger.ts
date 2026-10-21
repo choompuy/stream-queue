@@ -45,6 +45,11 @@ let logFile: string | null = null
 let fileSize: number | null = null
 let writeChain: Promise<void> = Promise.resolve()
 
+// a rotation that keeps failing (the file is locked by an antivirus, a viewer) is retried at most this often:
+// every line over the limit must not turn into another full rename cycle while the lock holds
+const ROTATION_RETRY_INTERVAL_MS = 30_000
+let lastFailedRotationAt = 0
+
 export function enableFileLogging(): void {
   logFile = join(getDataDir(), 'logs', 'app.log')
   fileSize = null
@@ -80,12 +85,23 @@ async function appendToFile(file: string, line: string): Promise<void> {
   const bytes = Buffer.byteLength(line)
 
   if (fileSize > 0 && fileSize + bytes > MAX_FILE_BYTES) {
-    // when the rotation did not happen, re-read the real size: the log keeps growing, and the next
-    // line over the limit retries the rotation instead of counting a nonexistent empty file
-    fileSize = (await rotate(file)) ? 0 : await stat(file).then(
-      (info) => info.size,
-      () => 0
-    )
+    // retried once per interval, not once per line: between the attempts the log keeps growing and this
+    // size keeps counting, so the limit condition stays honest and the next attempt lands on the first
+    // line over the limit after the pause
+    if (Date.now() - lastFailedRotationAt >= ROTATION_RETRY_INTERVAL_MS) {
+      if (await rotate(file)) {
+        lastFailedRotationAt = 0
+        fileSize = 0
+      } else {
+        lastFailedRotationAt = Date.now()
+        // re-read the real size: the log keeps growing, and the next line over the limit retries the
+        // rotation instead of counting a nonexistent empty file
+        fileSize = await stat(file).then(
+          (info) => info.size,
+          () => 0
+        )
+      }
+    }
   }
 
   await appendFile(file, line, 'utf8')

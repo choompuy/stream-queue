@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { parseRewardInput, toRewardDto } from '../../src/integrations/twitch/rewards.js'
+import { INPUT_LIMITS } from '../../src/validate.js'
 import type { TwitchCustomReward } from '../../src/integrations/twitch/types.js'
 
 const create = (body: unknown) => parseRewardInput(body, { requireTitleAndCost: true })
@@ -55,6 +56,11 @@ test('the title and the cost', async (t) => {
     for (const cost of [0, -5, 2.5, '100', null, Number.NaN]) assert.deepEqual(create({ title: 'a', cost }).rejected, ['cost'], String(cost))
     assert.deepEqual(create({ title: 'a', cost: 1 }).rejected, [])
   })
+
+  await t.test('a cost over the sanity cap is refused by its own name, not left for Twitch to refuse', () => {
+    assert.deepEqual(create({ title: 'a', cost: INPUT_LIMITS.rewardCost }).rejected, [])
+    assert.deepEqual(create({ title: 'a', cost: INPUT_LIMITS.rewardCost + 1 }).rejected, ['cost'])
+  })
 })
 
 test('an update', async (t) => {
@@ -107,6 +113,23 @@ test('the limits', async (t) => {
   await t.test('a switch that is on needs a whole number above 0', () => {
     for (const value of [null, 0, 1.5, '5']) {
       assert.deepEqual(update({ limits: { maxPerStream: { enabled: true, value } } }).rejected, ['limits.maxPerStream.value'], String(value))
+    }
+  })
+
+  await t.test('a limit over its cap is refused by its own name, not left for Twitch to refuse', () => {
+    const caps = {
+      maxPerStream: INPUT_LIMITS.rewardMaxPerStream,
+      maxPerUserPerStream: INPUT_LIMITS.rewardMaxPerUserPerStream,
+      globalCooldownSeconds: INPUT_LIMITS.rewardGlobalCooldownSeconds
+    }
+
+    assert.deepEqual(update({ limits: { maxPerStream: { enabled: true, value: caps.maxPerStream } } }).rejected, [])
+    for (const [name, cap] of Object.entries(caps)) {
+      assert.deepEqual(
+        update({ limits: { [name]: { enabled: true, value: cap + 1 } } }).rejected,
+        [`limits.${name}.value`],
+        name
+      )
     }
   })
 
