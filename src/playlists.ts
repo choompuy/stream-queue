@@ -1,5 +1,5 @@
-import { dataPath, createFileStore, loadList } from './persist.js'
-import { createLogger, describeError } from './logger.js'
+import { dataPath, createListStore } from './persist.js'
+import { onConfigChange } from './config.js'
 import { emit } from './state-events.js'
 
 export type SavedPlaylist = {
@@ -9,9 +9,6 @@ export type SavedPlaylist = {
   itemCount: number
   addedAt: number
 }
-
-const log = createLogger('PLAYLISTS')
-const store = createFileStore<SavedPlaylist[]>(() => dataPath('playlists.json'))
 
 // a saved playlist as the panel gets it: with the answer whether it is the one that is played
 export type PlaylistEntry = SavedPlaylist & { isActive: boolean }
@@ -30,46 +27,48 @@ function isSavedPlaylist(value: unknown): value is SavedPlaylist {
   )
 }
 
-// read from disk on first use, not when the module is imported
-let loaded: SavedPlaylist[] | null = null
-const current = (): SavedPlaylist[] => (loaded ??= loadList(store, isSavedPlaylist))
+const playlists = createListStore<SavedPlaylist>({
+  file: () => dataPath('playlists.json'),
+  guard: isSavedPlaylist,
+  topics: ['playlists']
+})
 
-function save(): void {
-  emit('playlists')
-  store.scheduleSave(
-    () => current(),
-    (error) => log.error(`Failed to save: ${describeError(error)}`)
-  )
-}
+// the active mark of the saved playlists is derived from the config's playlist id: it moved, the list is read again
+onConfigChange((previous, next) => {
+  if (previous.fallbackPlaylist.playlistId !== next.fallbackPlaylist.playlistId) emit('playlists')
+})
 
 export function getPlaylists(): SavedPlaylist[] {
-  return [...current()]
+  return playlists.all()
 }
 
 export function upsertPlaylist(meta: { id: string; title: string; thumbnail: string; itemCount: number }): SavedPlaylist {
-  const existing = current().find((p) => p.id === meta.id)
+  let saved!: SavedPlaylist
 
-  if (existing) {
-    const updated: SavedPlaylist = { ...existing, title: meta.title, thumbnail: meta.thumbnail, itemCount: meta.itemCount }
-    loaded = current().map((p) => (p.id === meta.id ? updated : p))
-    save()
-    return updated
-  }
+  playlists.update((list) => {
+    const index = list.findIndex((playlist) => playlist.id === meta.id)
 
-  const created: SavedPlaylist = { ...meta, addedAt: Date.now() }
-  current().push(created)
-  save()
-  return created
+    saved =
+      index >= 0
+        ? { ...list[index], title: meta.title, thumbnail: meta.thumbnail, itemCount: meta.itemCount }
+        : { ...meta, addedAt: Date.now() }
+
+    if (index >= 0) list[index] = saved
+    else list.push(saved)
+  })
+
+  return saved
 }
 
 export function removePlaylist(id: string): boolean {
-  const before = current().length
-  loaded = current().filter((p) => p.id !== id)
+  let removed = false
 
-  if (current().length !== before) {
-    save()
-    return true
-  }
+  playlists.update((list) => {
+    const index = list.findIndex((playlist) => playlist.id === id)
+    if (index === -1) return
+    list.splice(index, 1)
+    removed = true
+  })
 
-  return false
+  return removed
 }

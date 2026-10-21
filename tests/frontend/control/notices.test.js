@@ -24,4 +24,16 @@ test('showNotice()', async (t) => {
 
     assert.equal(panel.toasts().join('|'), before)
   })
+
+  await t.test('shows an error notice with the translation of its code, filled with its params', () => {
+    showNotice({ type: 'error', level: 'error', code: 'TWITCH_API_ERROR', params: { message: 'The custom reward title must be unique' } })
+
+    assert.ok(panel.toasts().some((toast) => toast.includes('Twitch API error: The custom reward title must be unique')))
+  })
+
+  await t.test('an error notice with a code it has no translation for falls back to the generic message', () => {
+    showNotice({ type: 'error', level: 'error', code: 'NOT_A_REAL_CODE' })
+
+    assert.ok(panel.toasts().some((toast) => toast.includes('Something went wrong')))
+  })
 })

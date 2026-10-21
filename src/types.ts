@@ -1,14 +1,54 @@
-export type ActivityReasonCode =
-  | AppErrorCode
+// What a route can answer with and requestSong throws: every code here has a row in STATUS_BY_CODE and a
+// key under api.errors.* in both locales
+export type HttpErrorCode =
+  | FilterFailureReason
+  | 'DUPLICATE'
+  | 'BLOCKED'
+  | 'QUEUE_FULL'
+  | 'USER_LIMIT'
+  | 'YOUTUBE_QUOTA'
+  | 'YOUTUBE_ERROR'
+  | 'NO_API_KEY'
+  | 'TWITCH_AUTH_ERROR'
+  | 'TWITCH_REFRESH_ERROR'
+  | 'TWITCH_NOT_CONNECTED'
+  | 'TWITCH_API_ERROR'
+  | 'TWITCH_NETWORK_ERROR'
+  | 'TWITCH_UNKNOWN_ERROR'
+  | 'INVALID_INPUT'
+  | 'SERVER_ERROR'
+  | 'INVALID_QUERY'
+  | 'INVALID_QUERY_RANGE'
+  | 'INVALID_VIDEO_ID'
+  | 'USERNAME_REQUIRED'
   | 'INVALID_YOUTUBE_URL'
   | 'SONG_NOT_FOUND'
-  | 'SERVER_ERROR'
+  | 'QUEUE_ITEM_NOT_FOUND'
+  | 'NOT_FOUND'
+  | 'INVALID_PLAYLIST_ID'
+  | 'PLAYLIST_NOT_FOUND'
+  | 'INVALID_CONFIG'
+  | 'LOCAL_ONLY'
+  | 'FORBIDDEN_ORIGIN'
+  | 'INVALID_JSON'
+  | 'PAYLOAD_TOO_LARGE'
+  | 'INVALID_REQUEST'
+  | 'TOO_MANY_CONNECTIONS'
+
+// Why a track ended without playing through (removed, cleared, blocked, playback failure) or an open reward
+// was left: these never answer an HTTP request, they only name activity entries and chat replies
+export type ChatReasonCode =
+  | 'TWITCH_CONNECTION_LOST'
   | 'PLAYBACK_VIDEO_UNAVAILABLE'
   | 'PLAYBACK_EMBED_DISALLOWED'
   | 'PLAYBACK_FAILED'
   | 'TRACK_REMOVED'
   | 'QUEUE_CLEARED'
   | 'REWARD_NOT_REFUNDED'
+
+export type AppErrorCode = HttpErrorCode | ChatReasonCode
+
+export type ActivityReasonCode = AppErrorCode
 
 export type ActivityStatus = 'accepted' | 'rejected' | 'failed' | 'skipped'
 export type ActivityEntry = {
@@ -28,7 +68,6 @@ export type Config = {
   maxDurationSeconds: number
   maxQueueSize: number
   maxRequestsPerUser: number
-  allowShorts: boolean
   allowLiveStreams: boolean
   contentMode: 'music' | 'any'
   regionCode: string
@@ -63,6 +102,8 @@ export type Song = {
 export type QueueItem = Song & {
   requestedBy: string
   isFallback?: boolean
+  // set when a track becomes the current one: a new value is a new play, even of the same track
+  playId?: number
   // set only when the song was added via a Twitch Channel Points redemption, and removed once the redemption is closed;
   // carries what finishItem() needs to fulfill or refund the points and notify the requester in chat
   channelPointsRedemption?: { id: string; rewardId: string; userName: string }
@@ -74,7 +115,7 @@ export type PlayerState = {
   isPaused: boolean
 }
 
-export type ApiError = { success: false; error: string; code: string; params?: Record<string, string | number> }
+export type ApiError = { success: false; error: string; code: AppErrorCode; params?: Record<string, string | number> }
 export type ApiOk<T> = { success: true; data: T }
 
 export type FilterFailureReason =
@@ -85,58 +126,35 @@ export type FilterFailureReason =
   | 'REGION_BLOCKED'
   | 'NOT_PLAYABLE'
   | 'IS_LIVE'
-  | 'IS_SHORT'
   | 'DURATION_OUT_OF_RANGE'
   | 'VIEWS_TOO_LOW'
 
-export type AppErrorCode =
-  | 'DUPLICATE'
-  | 'BLOCKED'
-  | 'QUEUE_FULL'
-  | 'USER_LIMIT'
-  | 'YOUTUBE_QUOTA'
-  | 'YOUTUBE_ERROR'
-  | 'NO_API_KEY'
-  | 'TWITCH_AUTH_ERROR'
-  | 'TWITCH_REFRESH_ERROR'
-  | 'TWITCH_NOT_CONNECTED'
-  | 'TWITCH_API_ERROR'
-  | 'INVALID_INPUT'
-  | FilterFailureReason
-
-// A reason a song request or an already-queued track's playback failed, with whatever the reason needs
-// to become a chat message ({{title}}, quota numbers, etc.) - shared by activity logging and Twitch chat replies
-export type FailureReason = { code: ActivityReasonCode; params?: Record<string, string | number> }
-
-export type ApiErrorCode =
-  | ActivityReasonCode
-  | 'INVALID_QUERY'
-  | 'INVALID_VIDEO_ID'
-  | 'USERNAME_REQUIRED'
-  | 'QUEUE_ITEM_NOT_FOUND'
-  | 'NOT_FOUND'
-  | 'INVALID_PLAYLIST_ID'
-  | 'PLAYLIST_NOT_FOUND'
-  | 'INVALID_CONFIG'
-  | 'LOCAL_ONLY'
-  | 'FORBIDDEN_ORIGIN'
-  | 'INVALID_JSON'
-  | 'PAYLOAD_TOO_LARGE'
-  | 'INVALID_REQUEST'
-  | 'SERVER_ERROR'
+// Why a track never played through or a request was refused, carried to finishItem and the chat reply.
+// Never thrown, so there is no message and no stack: a thrown refusal is an AppError, which fits this shape
+// wherever a plain reason is expected
+export type FailureReason = {
+  code: AppErrorCode
+  params?: Record<string, string | number>
+}
 
 export class AppError extends Error {
   constructor(
-    public code: AppErrorCode,
-    message: string,
+    public code: HttpErrorCode,
+    message: string = code,
     public params?: Record<string, string | number>
   ) {
     super(message)
+    this.name = 'AppError'
+  }
+
+  // the one way the error's own text travels: as the {{message}} parameter next to its params
+  toParams(): Record<string, string | number> {
+    return { ...this.params, message: this.message }
   }
 }
 
 export type Blockable<T> = T & { isBlocked: boolean }
-export type StateResponse = Omit<PlayerState, 'queue'> & { queue: Blockable<QueueItem>[]; nextTrack: QueueItem | null; playId: number }
+export type StateResponse = Omit<PlayerState, 'queue'> & { queue: Blockable<QueueItem>[]; nextTrack: QueueItem | null }
 export type PlayerActionResponse = StateResponse & { message: string }
 export type SettingsResponse = Settings
 export type OverlayStateResponse = { state: StateResponse; settings: Settings }
@@ -154,6 +172,7 @@ export type FallbackStateResponse = FallbackPlaylist & {
   lastRefreshedAt: number | null
   upNext: Blockable<Song>[]
   sourceCount: number
+  itemCount: number | null
   activeVideoId: string | null
 }
 export type QueueRemoveResponse = { removed: QueueItem; state: StateResponse }

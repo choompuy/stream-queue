@@ -1,6 +1,7 @@
 import express from 'express'
-import { StateResponse, QueueItem, FallbackEnqueueResponse } from '../types.js'
-import { ok, fail } from '../http.js'
+import { StateResponse, QueueItem, FallbackEnqueueResponse, AppError } from '../types.js'
+import { ok } from '../http.js'
+import { validateVideoIdParam } from '../validate.js'
 import {
   refreshFallback,
   getFallbackState,
@@ -12,15 +13,14 @@ import {
 } from '../fallback.js'
 import { getState } from '../player.js'
 
-function fallbackTrackOrNotFound(res: express.Response, item: QueueItem | null): item is QueueItem {
-  if (!item) {
-    fail(res, 'track not found in fallback', 'NOT_FOUND', 404)
-    return false
-  }
-  return true
+function fallbackTrackOrNotFound(item: QueueItem | null): QueueItem {
+  if (!item) throw new AppError('NOT_FOUND')
+  return item
 }
 
 export const router = express.Router()
+
+router.param('videoId', validateVideoIdParam)
 
 router.get('/', (_req, res) => {
   ok(res, getFallbackState())
@@ -43,13 +43,11 @@ router.post('/enabled', (_req, res) => {
 })
 
 router.post('/play/:videoId', (req, res) => {
-  const item = playFallbackTrackNow(req.params.videoId)
-  if (!fallbackTrackOrNotFound(res, item)) return
+  fallbackTrackOrNotFound(playFallbackTrackNow(req.params.videoId))
   ok<StateResponse>(res, getState())
 })
 
 router.post('/enqueue/:videoId', (req, res) => {
-  const item = queueFallbackTrack(req.params.videoId)
-  if (!fallbackTrackOrNotFound(res, item)) return
+  const item = fallbackTrackOrNotFound(queueFallbackTrack(req.params.videoId))
   ok<FallbackEnqueueResponse>(res, { song: item, state: getState() }, 201)
 })

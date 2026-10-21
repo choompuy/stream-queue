@@ -1,6 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { getSettings, updateSettings, validateSettingsUpdates } from '../../src/settings.js'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+// settings.json is written to process.cwd()/data: keep the test away from the real one
+process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
+
+const { getSettings, updateSettings, validateSettingsUpdates } = await import('../../src/settings.js')
+const { on } = await import('../../src/state-events.js')
+const { flushAllStores } = await import('../../src/persist.js')
 
 test('validateSettingsUpdates()', async (t) => {
   await t.test('accepts every valid field', () => {
@@ -35,5 +44,45 @@ test('updateSettings()', async (t) => {
     assert.deepEqual(config, { showVideo: false, hideOverlayInfo: false, opacity: 100, position: 'top-right', locale: 'en' })
     assert.deepEqual(rejected.sort(), ['locale', 'showVideo'])
     assert.deepEqual(getSettings(), config)
+  })
+})
+
+test('an update that changes nothing', async (t) => {
+  await t.test('rewrites no file and wakes no tab', async () => {
+    updateSettings({ opacity: 42 })
+    await flushAllStores()
+    const file = join(process.cwd(), 'data', 'settings.json')
+    assert.ok(existsSync(file))
+    rmSync(file)
+
+    const events: string[] = []
+    const stop = on('state', () => events.push('state'))
+
+    try {
+      assert.equal(updateSettings({ opacity: 42 }).changed, false, 'the same value')
+      assert.equal(updateSettings({}).changed, false, 'an empty update')
+      assert.equal(updateSettings({ opacity: 'nope' as never }).changed, false, 'a fully rejected update')
+      await flushAllStores()
+
+      assert.equal(existsSync(file), false, 'settings.json was not rewritten')
+      assert.deepEqual(events, [], 'no state event was emitted')
+    } finally {
+      stop()
+    }
+  })
+
+  await t.test('a real change still saves and emits', async () => {
+    const events: string[] = []
+    const stop = on('state', () => events.push('state'))
+
+    try {
+      assert.equal(updateSettings({ opacity: 43 }).changed, true)
+      await flushAllStores()
+
+      assert.deepEqual(events, ['state'])
+      assert.ok(existsSync(join(process.cwd(), 'data', 'settings.json')))
+    } finally {
+      stop()
+    }
   })
 })

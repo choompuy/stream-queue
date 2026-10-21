@@ -1,16 +1,8 @@
-import { cachePath, createFileStore } from './persist.js'
+import { cachePath, createFileStore, dataPath, isPlain } from './persist.js'
 import { QueueItem, Song } from './types.js'
 import { isValidPlaylistId, isValidVideoId } from './youtube/url.js'
 import { getQueue, getCurrent, hydrateQueue } from './queue.js'
-import {
-  getFallbackProgress,
-  getFallbackSourceTracks,
-  getFallbackSourceVersion,
-  hydrateFallback,
-  FallbackSnapshot,
-  alignFallbackCursor
-} from './fallback.js'
-import { on } from './state-events.js'
+import { getFallbackSnapshot, hydrateFallback, FallbackSnapshot } from './fallback.js'
 import { createLogger, describeError } from './logger.js'
 
 export type StateFile = {
@@ -28,12 +20,11 @@ export type SanitizedState = {
   problems: string[]
 }
 
-const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 const text = (value: unknown): string => (typeof value === 'string' ? value : '')
 const amount = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0)
 
 export function sanitizeSong(raw: unknown): Song | null {
-  if (!isObject(raw) || !isValidVideoId(raw.videoId) || !text(raw.title)) return null
+  if (!isPlain(raw) || !isValidVideoId(raw.videoId) || !text(raw.title)) return null
 
   const videoId = raw.videoId
 
@@ -49,7 +40,7 @@ export function sanitizeSong(raw: unknown): Song | null {
 }
 
 function sanitizeRedemption(raw: unknown): QueueItem['channelPointsRedemption'] {
-  if (!isObject(raw)) return undefined
+  if (!isPlain(raw)) return undefined
 
   const id = text(raw.id).trim()
   const rewardId = text(raw.rewardId).trim()
@@ -60,23 +51,27 @@ function sanitizeRedemption(raw: unknown): QueueItem['channelPointsRedemption'] 
 
 export function sanitizeQueueItem(raw: unknown): QueueItem | null {
   const song = sanitizeSong(raw)
-  const requestedBy = isObject(raw) ? text(raw.requestedBy).trim() : ''
+  const requestedBy = isPlain(raw) ? text(raw.requestedBy).trim() : ''
   if (!song || !requestedBy) return null
 
   // without the redemption a restored track would play, but its Channel Points reward would never be closed
-  const redemption = isObject(raw) ? sanitizeRedemption(raw.channelPointsRedemption) : undefined
+  const redemption = isPlain(raw) ? sanitizeRedemption(raw.channelPointsRedemption) : undefined
+  // the play id survives a restart, so a report that arrives late still names the play it belongs to
+  const playId = isPlain(raw) && Number.isInteger(raw.playId) && (raw.playId as number) > 0 ? (raw.playId as number) : undefined
 
   return {
     ...song,
     requestedBy,
-    ...(isObject(raw) && raw.isFallback === true ? { isFallback: true } : {}),
+    // the flag is read as written: a name alone never marks a track, for a viewer may go by it too
+    ...(isPlain(raw) && raw.isFallback === true ? { isFallback: true } : {}),
+    ...(playId !== undefined ? { playId } : {}),
     ...(redemption ? { channelPointsRedemption: redemption } : {})
   }
 }
 
 function sanitizeFallback(raw: unknown, problems: string[]): FallbackSnapshot | undefined {
   if (raw === undefined) return undefined
-  if (!isObject(raw)) {
+  if (!isPlain(raw)) {
     problems.push('fallback is not an object, ignored')
     return undefined
   }
@@ -93,29 +88,32 @@ function sanitizeFallback(raw: unknown, problems: string[]): FallbackSnapshot | 
   const order = [...new Set(rawOrder.filter((id): id is string => typeof id === 'string'))]
   const clean = order.length === rawOrder.length
 
+  // the saved order is kept only whole: a damaged one is dropped, and the load rebuilds it from the tracks
   if (!clean) problems.push('fallback: rotation is damaged, reset')
 
   const rawCursor = raw.cursor
   const cursor = clean && Number.isInteger(rawCursor) && (rawCursor as number) >= -1 && (rawCursor as number) < order.length ? (rawCursor as number) : -1
 
   const lastRefreshedAt = raw.lastRefreshedAt
+  const itemCount = raw.itemCount
 
   return {
     sourceTracks: [...tracks.values()],
-    order,
+    order: clean ? order : [],
     cursor,
     playlistId: isValidPlaylistId(raw.playlistId) ? raw.playlistId : null,
-    lastRefreshedAt: typeof lastRefreshedAt === 'number' && Number.isFinite(lastRefreshedAt) ? lastRefreshedAt : null
+    lastRefreshedAt: typeof lastRefreshedAt === 'number' && Number.isFinite(lastRefreshedAt) ? lastRefreshedAt : null,
+    itemCount: typeof itemCount === 'number' && Number.isFinite(itemCount) && itemCount >= 0 ? itemCount : null
   }
 }
 
 // Turns whatever was read from disk into something safe to load. Every part is repaired on its own:
 // a bad queue item, a bad setting or a bad fallback entry costs only itself, never the other parts
 export function sanitizeState(raw: unknown): SanitizedState {
-  const data = isObject(raw) ? raw : {}
+  const data = isPlain(raw) ? raw : {}
   const problems: string[] = []
 
-  if (!isObject(raw)) problems.push('state file is not an object, using defaults')
+  if (!isPlain(raw)) problems.push('state file is not an object, using defaults')
 
   let current: QueueItem | null = null
   if (data.current !== undefined && data.current !== null) {
@@ -146,35 +144,38 @@ export function sanitizeState(raw: unknown): SanitizedState {
   return { current, queue, fallback: sanitizeFallback(data.fallback, problems), problems }
 }
 
-const store = createFileStore<Partial<StateFile>>(() => cachePath('queue-state.json'))
+const store = createFileStore<Partial<StateFile>>(() => dataPath('queue-state.json'))
 const tracksStore = createFileStore<TracksFile>(() => cachePath('fallback-tracks.json'))
 
 const log = createLogger('STATE')
 
 function stateSnapshot(): StateFile {
+  const { sourceVersion: _version, sourceTracks: _tracks, ...fallback } = getFallbackSnapshot()
   return {
     current: getCurrent(),
     queue: getQueue(),
-    fallback: getFallbackProgress()
+    fallback
   }
 }
 
 // -1 until the track list has been saved (or read from its own file), so an older state file gets migrated
 let savedTracksVersion = -1
 
-function persistState(): void {
-  const onError = (error: unknown) => log.error(`Failed to save state: ${describeError(error)}`)
+// The stores that own the playing state save through this hook. Nothing is saved before the state was loaded:
+// a change made before would write the not-yet-loaded state over the file
+export function persistState(): void {
+  if (!initialized) return
 
-  store.scheduleSave(stateSnapshot, onError)
+  store.scheduleSave(stateSnapshot)
 
-  const version = getFallbackSourceVersion()
-  if (version !== savedTracksVersion) {
-    savedTracksVersion = version
+  const { sourceVersion } = getFallbackSnapshot()
+  if (sourceVersion !== savedTracksVersion) {
+    savedTracksVersion = sourceVersion
     tracksStore.scheduleSave(
-      () => ({ sourceTracks: getFallbackSourceTracks() }),
+      () => ({ sourceTracks: getFallbackSnapshot().sourceTracks }),
       (error) => {
         savedTracksVersion = -1 // not on disk: written again with the next save
-        onError(error)
+        log.error(`Failed to save the fallback tracks: ${describeError(error)}`)
       }
     )
   }
@@ -193,18 +194,18 @@ export function loadState(): void {
   const tracks = tracksStore.load({ sourceTracks: [] }).sourceTracks
 
   // an older state file still carries the tracks inside `fallback`: they are used until the track file exists
-  const raw = tracks.length > 0 && isObject(saved.fallback) ? { ...saved, fallback: { ...saved.fallback, sourceTracks: tracks } } : saved
+  const raw = tracks.length > 0 && isPlain(saved.fallback) ? { ...saved, fallback: { ...saved.fallback, sourceTracks: tracks } } : saved
   const { current, queue, fallback, problems } = sanitizeState(raw)
 
   for (const problem of problems) log.warn(problem)
 
   attempt('queue', () => hydrateQueue({ current, queue }))
+  // hydrateFallback() also puts the position under the track that is playing, if it is one of the rotation's
   attempt('fallback', () => hydrateFallback(fallback))
 
-  if (current?.isFallback) attempt('fallback position', () => alignFallbackCursor(current.videoId))
-  savedTracksVersion = tracks.length > 0 ? getFallbackSourceVersion() : -1
+  savedTracksVersion = tracks.length > 0 ? getFallbackSnapshot().sourceVersion : -1
 
-  log.log('State loaded from disk')
+  log.info('State loaded from disk')
 }
 
 let initialized = false
@@ -215,5 +216,4 @@ export function initState(): void {
   initialized = true
 
   loadState()
-  on('state', persistState)
 }

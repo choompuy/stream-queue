@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express'
-import { fail, failFromError } from './http.js'
+import { fail, failFromAppError, statusForCode } from './http.js'
 import { AppError } from './types.js'
 import { createLogger, describeError } from './logger.js'
 
@@ -7,19 +7,27 @@ const log = createLogger('SERVER')
 
 type HttpError = Error & { status?: number; statusCode?: number; type?: string }
 
+// The single exit for everything the routes throw: a thrown AppError becomes its own code and status,
+// a malformed or oversized body its own, and anything else is a bug and stays anonymous to the client
 export function errorHandler(err: HttpError, _req: Request, res: Response, next: NextFunction): void {
   if (res.headersSent) {
     next(err)
     return
   }
 
-  if (err instanceof AppError) return failFromError(res, err)
-  if (err.type === 'entity.parse.failed') return fail(res, 'request body is not valid JSON', 'INVALID_JSON', 400)
-  if (err.type === 'entity.too.large') return fail(res, 'request body is too large', 'PAYLOAD_TOO_LARGE', 413)
+  if (err instanceof AppError) {
+    const status = statusForCode(err.code)
+    // a 503 answers a request the service cannot serve right now (the quota is spent, the API is down):
+    // the answer tells the client, the line is a note for the operator and not an alarm
+    if (status >= 500) log[status === 503 ? 'warn' : 'error'](describeError(err))
+    return failFromAppError(res, err)
+  }
+  if (err.type === 'entity.parse.failed') return fail(res, 'INVALID_JSON')
+  if (err.type === 'entity.too.large') return fail(res, 'PAYLOAD_TOO_LARGE')
 
   const status = err.status ?? err.statusCode
-  if (typeof status === 'number' && status >= 400 && status < 500) return fail(res, 'bad request', 'INVALID_REQUEST', status)
+  if (typeof status === 'number' && status >= 400 && status < 500) return fail(res, 'INVALID_REQUEST', undefined, status)
 
   log.error(describeError(err, true))
-  fail(res, 'internal server error', 'SERVER_ERROR', 500)
+  fail(res, 'SERVER_ERROR')
 }

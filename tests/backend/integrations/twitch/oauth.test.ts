@@ -1,6 +1,7 @@
 import { test, beforeEach, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { TwitchOAuth } from '../../../../src/integrations/twitch/oauth.js'
+import { on } from '../../../../src/state-events.js'
 
 const realFetch = globalThis.fetch
 after(() => {
@@ -101,4 +102,59 @@ test('revokeTokens()', async (t) => {
     await new TwitchOAuth({ clientId: 'client-1' }).revokeTokens()
     assert.equal(sent.length, 0)
   })
+})
+
+test('a refresh answer that lands after the account was disconnected', async (t) => {
+  await t.test('the tokens Twitch issued are revoked, nothing is stored, and the drop is not an error', async (t2) => {
+    const errors = t2.mock.method(console, 'error', () => {})
+    const logs = t2.mock.method(console, 'log', () => {})
+    let updated = 0
+
+    let answerToken: ((response: Response) => void) | null = null
+    sent = []
+    globalThis.fetch = async (input, init) => {
+      const url = String(input instanceof Request ? input.url : input)
+      sent.push({ url, body: new URLSearchParams(String(init?.body ?? '')) })
+
+      if (url === 'https://id.twitch.tv/oauth2/token') {
+        return new Promise<Response>((resolve) => {
+          answerToken = resolve
+        })
+      }
+      return json(200)
+    }
+
+    const oauth = new TwitchOAuth({ clientId: 'client-1', onTokenUpdated: () => { updated++ } })
+    oauth.setTokenData({ accessToken: 'old-access', refreshToken: 'old-refresh', expiresAt: Date.now() - 1000, scope: [] })
+
+    const refresh = oauth.refreshAccessToken()
+    oauth.clearTokenData()
+    answerToken!(json(200, { access_token: 'late-access', refresh_token: 'late-refresh', expires_in: 3600, scope: [], token_type: 'bearer' }))
+
+    await assert.rejects(refresh, /cancelled during token refresh/)
+
+    assert.equal(oauth.getTokenData(), null)
+    assert.equal(updated, 0, 'onTokenUpdated never fires for a dropped refresh')
+
+    const revoked = sent.filter((request) => request.url === 'https://id.twitch.tv/oauth2/revoke')
+    assert.equal(revoked.length, 2)
+    assert.deepEqual(revoked.map((request) => request.body.get('token')).sort(), ['late-access', 'late-refresh'])
+
+    assert.equal(errors.mock.callCount(), 0, 'a cancelled refresh is not an error')
+    const logged = logs.mock.calls.map((call) => call.arguments.join(' ')).join('\n')
+    assert.ok(logged.includes('Token refresh dropped'), logged)
+  })
+})
+
+test('a change of the auth state announces the twitch topic', async (t) => {
+  stub(() => json(400, { status: 400, message: 'Invalid refresh token' }))
+  const oauth = expiredLogin()
+  const states: boolean[] = []
+  const off = on('twitch', () => states.push(oauth.needsReauthorization()))
+  t.after(off)
+
+  await assert.rejects(oauth.refreshAccessToken())
+  oauth.clearTokenData()
+
+  assert.deepEqual(states, [true, false])
 })

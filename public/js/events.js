@@ -1,7 +1,3 @@
-import { createLogger } from './shared.js'
-
-const log = createLogger('EVENTS')
-
 const COALESCE_MS = 100
 // the server pings every 25 s: a minute without any frame means the connection is dead (OBS and antivirus drop quiet ones without a word)
 const WATCHDOG_MS = 60_000

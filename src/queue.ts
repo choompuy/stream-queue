@@ -1,30 +1,39 @@
 import { getConfig } from './config.js'
-import { getVideoById, searchSongs, selectBestSong } from './youtube/index.js'
-import { parseYouTubeUrl } from './youtube/url.js'
-import { logRejection, logAcceptance, logSkippedWithOpenReward } from './activity.js'
-import { QueueItem, Song, AppError, AddedSong, FailureReason } from './types.js'
+import { QueueItem, Song, AppError } from './types.js'
 import { isBlocked } from './blocklist.js'
-import { emit } from './state-events.js'
+import { createStore } from './store.js'
 import { finishItem } from './finish.js'
-import { createLogger, describeError } from './logger.js'
+import { persistState } from './state-file.js'
+import { createLogger } from './logger.js'
 
 let currentSong: QueueItem | null = null
-let playId = 0
 const queue: QueueItem[] = []
 
-let isPaused = false
+let playCounter = 0
+
+// the playing state is saved and announced by the store when it changes
+const playing = createStore({
+  read: () => ({ current: currentSong, queue }),
+  topics: ['state'],
+  save: persistState
+})
 
 const log = createLogger('QUEUE')
 
 // Everything below is derived from `queue` on demand, so there is no second copy that could drift apart from it
 const isQueued = (videoId: string): boolean => queue.some((item) => item.videoId === videoId)
 
+// Whether the track already has a place in the playing state: it is the current one, or it is waiting in the queue
+export function isDuplicate(videoId: string): boolean {
+  return isActiveNonFallback(videoId) || isQueued(videoId)
+}
+
 function getUserActiveCount(username: string): number {
   const key = username.toLowerCase()
-  const isTheirs = (item: QueueItem): boolean => item.requestedBy.toLowerCase() === key
-  const playing = currentSong !== null && !currentSong.isFallback && isTheirs(currentSong)
+  // a blocked track never plays and a playlist track is nobody's request: neither occupies the viewer's slot
+  const isTheirs = (item: QueueItem): boolean => !item.isFallback && !isBlocked(item.videoId) && item.requestedBy.toLowerCase() === key
 
-  return queue.filter(isTheirs).length + (playing ? 1 : 0)
+  return queue.filter(isTheirs).length + (currentSong !== null && isTheirs(currentSong) ? 1 : 0)
 }
 
 function isActiveNonFallback(videoId: string): boolean {
@@ -33,6 +42,7 @@ function isActiveNonFallback(videoId: string): boolean {
 
 export function hydrateQueue(data: { current?: QueueItem | null; queue?: QueueItem[] }): void {
   if (data.current !== undefined) currentSong = data.current
+  playCounter = Math.max(playCounter, data.current?.playId ?? 0)
 
   if (Array.isArray(data.queue)) {
     queue.length = 0
@@ -54,14 +64,15 @@ export function hydrateQueue(data: { current?: QueueItem | null; queue?: QueueIt
 export function detachChannelPointsRedemptions(): number {
   let detached = 0
 
-  for (const item of [currentSong, ...queue]) {
-    if (item?.channelPointsRedemption) {
-      delete item.channelPointsRedemption
-      detached++
+  playing.update(() => {
+    for (const item of [currentSong, ...queue]) {
+      if (item?.channelPointsRedemption) {
+        delete item.channelPointsRedemption
+        detached++
+      }
     }
-  }
+  })
 
-  if (detached > 0) emit('state')
   return detached
 }
 
@@ -73,54 +84,75 @@ export function getCurrent(): QueueItem | null {
   return currentSong
 }
 
-export function getPlayId(): number {
-  return playId
-}
+// Dequeues the next playable track and makes it the current one, in one state change (saved and announced
+// once). Blocked tracks are closed on the way. Returns null when no playable track is left; whatever plays
+// then stays the current one until the caller decides what follows
+export function takeNextPlayable(): QueueItem | null {
+  const closedOnTheWay: QueueItem[] = []
+  const taken: QueueItem[] = []
 
-export function setPaused(value: boolean): void {
-  isPaused = value
-  emit('state')
-}
+  playing.update(() => {
+    for (;;) {
+      const candidate = queue.shift()
+      if (!candidate) break
+      if (isBlocked(candidate.videoId)) {
+        closedOnTheWay.push(candidate)
+        continue
+      }
+      candidate.playId = ++playCounter
+      currentSong = candidate
+      taken.push(candidate)
+      break
+    }
+  })
 
-export function getIsPaused(): boolean {
-  return isPaused
-}
+  for (const item of closedOnTheWay) {
+    log.info(`skipped blocked track in queue: "${item.title}"`)
+    finishItem(item, { code: 'BLOCKED' })
+  }
 
-export function shiftQueue(): QueueItem | null {
-  return queue.shift() ?? null
+  const next = taken[0] ?? null
+  if (next) log.info(`moved to next: "${next.title}"`)
+
+  return next
 }
 
 export type AddOptions = {
-  bypassLimits?: boolean
+  // an admin request (from this computer): neither the content filters nor the request limits apply
+  bypassFilters?: boolean
   channelPointsRedemption?: QueueItem['channelPointsRedemption']
+  // set for the tracks the playlist itself queues: they count as nobody's request
+  isFallback?: boolean
 }
 
-function assertCanRequestSong(requestedBy: string, { bypassLimits = false }: AddOptions = {}): void {
+// The refusals a new track can meet at the door, each in its own code, so every path that adds one answers
+// the same way (the search filters out candidates by the same predicates before they are ever looked at)
+export function assertCanRequestSong(requestedBy: string, { bypassFilters = false }: AddOptions = {}): void {
   const config = getConfig()
 
-  if (currentSong !== null && queue.length >= config.maxQueueSize) {
-    throw new AppError('QUEUE_FULL', 'the queue is full')
+  // blocked tracks do not occupy places: they are closed when their turn comes
+  const playable = queue.filter((item) => !isBlocked(item.videoId)).length
+  if (currentSong !== null && config.maxQueueSize !== 0 && playable >= config.maxQueueSize) {
+    throw new AppError('QUEUE_FULL')
   }
 
-  if (bypassLimits) return
+  if (bypassFilters) return
 
   const activeCount = getUserActiveCount(requestedBy)
   if (config.maxRequestsPerUser > 0 && activeCount >= config.maxRequestsPerUser) {
-    throw new AppError('USER_LIMIT', `you can only queue ${config.maxRequestsPerUser} track(s) at a time`, {
-      count: config.maxRequestsPerUser
-    })
+    throw new AppError('USER_LIMIT', undefined, { count: config.maxRequestsPerUser })
   }
 }
 
-function assertNotDuplicate(videoId: string): void {
-  if (isActiveNonFallback(videoId) || isQueued(videoId)) {
-    throw new AppError('DUPLICATE', 'this track is already in the queue')
+export function assertNotDuplicate(videoId: string): void {
+  if (isDuplicate(videoId)) {
+    throw new AppError('DUPLICATE')
   }
 }
 
-function assertNotBlocked(videoId: string): void {
+export function assertNotBlocked(videoId: string): void {
   if (isBlocked(videoId)) {
-    throw new AppError('BLOCKED', 'this track is blocked')
+    throw new AppError('BLOCKED')
   }
 }
 
@@ -136,6 +168,7 @@ export function addSong(song: Song, requestedBy: string, options: AddOptions = {
   const item: QueueItem = {
     ...song,
     requestedBy,
+    ...(options.isFallback ? { isFallback: true } : {}),
     ...(options.channelPointsRedemption ? { channelPointsRedemption: options.channelPointsRedemption } : {})
   }
   const started = currentSong === null
@@ -143,9 +176,10 @@ export function addSong(song: Song, requestedBy: string, options: AddOptions = {
   if (started) {
     setCurrent(item)
   } else {
-    queue.push(item)
-    log.log(`added "${song.title}" at position ${queue.length}`)
-    emit('state')
+    playing.update(() => {
+      queue.push(item)
+    })
+    log.info(`added "${song.title}" at position ${queue.length}`)
   }
 
   return { item, started }
@@ -153,117 +187,55 @@ export function addSong(song: Song, requestedBy: string, options: AddOptions = {
 
 export function setCurrent(item: QueueItem | null): void {
   const previous = currentSong
-  currentSong = item
-  if (item && item !== previous) playId++
-
-  // still attached = nobody closed it, so the track was skipped or replaced with its reward open
-  if (previous?.channelPointsRedemption && previous !== item) {
-    log.warn(`"${previous.title}" was bought with Channel Points: the reward stays UNFULFILLED on Twitch until it is fulfilled or refunded there`)
-    logSkippedWithOpenReward(previous)
-  }
 
   if (item?.videoId !== previous?.videoId) {
-    log.log(item ? `now playing "${item.title}"` : 'nothing is playing')
+    log.info(item ? `now playing "${item.title}"` : 'nothing is playing')
   }
 
-  // the playlist shows which of its tracks plays and what comes next: both follow the current track
-  emit('state')
-  emit('fallback')
+  playing.update(() => {
+    if (item === null) {
+      currentSong = null
+    } else {
+      item.playId = ++playCounter
+      currentSong = item
+    }
+  })
 }
 
 export function removeByVideoId(videoId: string): QueueItem | null {
   return removeAt(queue.findIndex((item) => item.videoId === videoId))
 }
 
-export function removeAt(index: number): QueueItem | null {
+function removeAt(index: number): QueueItem | null {
   if (index < 0 || index >= queue.length) {
     return null
   }
 
-  const [item] = queue.splice(index, 1)
+  let removed: QueueItem | undefined
 
-  if (item) {
-    log.log(`removed "${item.title}" at position ${index + 1}`)
-    finishItem(item, { code: 'TRACK_REMOVED' })
-  }
+  playing.update(() => {
+    const [item] = queue.splice(index, 1)
+    removed = item
 
-  emit('state')
+    if (item) {
+      log.info(`removed "${item.title}" at position ${index + 1}`)
+      finishItem(item, { code: 'TRACK_REMOVED' })
+    }
+  })
 
-  return item ?? null
+  return removed ?? null
 }
 
 export function clearQueue(): QueueItem[] {
-  const cleared = [...queue]
-  queue.length = 0
+  let cleared: QueueItem[] = []
 
-  log.log(`cleared ${cleared.length} songs`)
+  playing.update(() => {
+    cleared = [...queue]
+    queue.length = 0
+    for (const item of cleared) finishItem(item, { code: 'QUEUE_CLEARED' })
+  })
 
-  for (const item of cleared) finishItem(item, { code: 'QUEUE_CLEARED' })
-
-  emit('state')
+  log.info(`cleared ${cleared.length} songs`)
 
   return cleared
-}
-
-export type RequestSongResult =
-  | { outcome: 'invalid-url' }
-  | { outcome: 'not-found' }
-  | { outcome: 'added'; added: AddedSong }
-  | { outcome: 'error'; reason: FailureReason }
-
-type RequestOptions = {
-  // an admin request (from this computer): the filters and the limits do not apply
-  bypassFilters?: boolean
-  // set when a Channel Points redemption paid for the request: the track carries it until the redemption is closed
-  channelPointsRedemption?: QueueItem['channelPointsRedemption']
-}
-
-export async function requestSong(query: string, requestedBy: string, { bypassFilters = false, channelPointsRedemption }: RequestOptions = {}): Promise<RequestSongResult> {
-  let song: Song | null = null
-
-  try {
-    assertCanRequestSong(requestedBy, { bypassLimits: bypassFilters })
-
-    const { isYouTube, videoId } = parseYouTubeUrl(query)
-    log.log(`[REQUEST] ${requestedBy} → ${videoId ? `YouTube URL: ${videoId}` : `Search: "${query}"`}`)
-
-    if (isYouTube && !videoId) {
-      logRejection(requestedBy, query, 'INVALID_YOUTUBE_URL')
-      return { outcome: 'invalid-url' }
-    }
-
-    if (videoId) {
-      assertNotBlocked(videoId)
-      assertNotDuplicate(videoId)
-      song = await getVideoById(videoId, bypassFilters)
-    } else {
-      const songs = await searchSongs(query, bypassFilters)
-      song = selectBestSong(
-        songs,
-        (candidate) => !isBlocked(candidate.videoId) && !isQueued(candidate.videoId) && !isActiveNonFallback(candidate.videoId)
-      )
-    }
-
-    if (!song) {
-      logRejection(requestedBy, query, 'SONG_NOT_FOUND')
-      return { outcome: 'not-found' }
-    }
-
-    const { item, started } = addSong(song, requestedBy, { bypassLimits: bypassFilters, channelPointsRedemption })
-
-    log.log(`[ACCEPT] ${requestedBy} → "${song.title}" - ${started ? 'now playing' : 'queued'}`)
-    logAcceptance(requestedBy, query, song.title, song.videoId)
-
-    const position = started ? 0 : queue.length
-
-    return { outcome: 'added', added: { song: item, started, position } }
-  } catch (error) {
-    // an expected refusal (duplicate, limit, filter) is routine and logRejection() writes it down; anything else is a bug or an outage and keeps its details
-    if (!(error instanceof AppError)) log.error(`Unexpected error while adding a song for ${requestedBy}: ${describeError(error, true)}`)
-
-    const reasonCode = error instanceof AppError ? error.code : 'SERVER_ERROR'
-    const reasonParams = error instanceof AppError ? error.params : undefined
-    logRejection(requestedBy, query, reasonCode, { title: song?.title ?? null, videoId: song?.videoId ?? null, reasonParams })
-    return { outcome: 'error', reason: { code: reasonCode, params: reasonParams } }
-  }
 }

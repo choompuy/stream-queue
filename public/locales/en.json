@@ -31,7 +31,6 @@
       "REGION_BLOCKED": "@{{user}}, that video is not available in this region, points refunded",
       "NOT_PLAYABLE": "@{{user}}, that video cannot be played, points refunded",
       "IS_LIVE": "@{{user}}, live streams cannot be queued, points refunded",
-      "IS_SHORT": "@{{user}}, shorts cannot be queued, points refunded",
       "DURATION_OUT_OF_RANGE": "@{{user}}, that track does not meet the length requirement, points refunded",
       "VIEWS_TOO_LOW": "@{{user}}, that track does not meet the view count requirement, points refunded",
       "PLAYBACK_VIDEO_UNAVAILABLE": "@{{user}}, “{{title}}” could not be played: the video became unavailable, points refunded",
@@ -46,7 +45,9 @@
     "on": "On",
     "off": "Off",
     "more": "More actions",
-    "live": "LIVE"
+    "live": "LIVE",
+    "unknownTitle": "Unknown title",
+    "unknownChannel": "Unknown channel"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -73,6 +74,8 @@
   "queue": {
     "title": "Queue",
     "empty": "Queue is empty",
+    "info": "In queue: {{count}}",
+    "infoMax": "In queue: {{count}} ▪ limit {{max}}",
     "remove": "Remove from queue",
     "clear": "Clear",
     "clearConfirm": "Clear entire queue?"
@@ -80,18 +83,22 @@
   "fallback": {
     "title": "Playlist",
     "empty": "Playlist is empty",
+    "notSet": "No active playlist - add one on the Playlists page",
     "refresh": "Refresh",
     "shuffle": "Shuffle",
     "repeat": "Repeat",
     "enable": "Enable playlist",
     "info": "{{count}} tracks ▪ updated {{datetime}}",
+    "infoOf": "{{count}} of {{total}} tracks ▪ updated {{datetime}}",
     "addToQueue": "Add to queue",
     "playNow": "Play now",
-    "playing": "Playing"
+    "playing": "Playing",
+    "requester": "Playlist"
   },
   "activity": {
     "title": "Activity",
     "empty": "No requests yet",
+    "requests": "Requests: {{count}}",
     "clear": "Clear",
     "clearConfirm": "Clear Activity?",
     "accepted": "accepted",
@@ -119,7 +126,8 @@
     "activate": "Play playlist",
     "pause": "Pause playlist",
     "delete": "Delete playlist",
-    "deleteConfirm": "Remove this playlist?"
+    "deleteConfirm": "Remove this playlist?",
+    "untitled": "Untitled playlist"
   },
   "settings": {
     "title": "Settings",
@@ -152,7 +160,6 @@
         "maxQueue": "Max queue size",
         "maxPerUser": "Max requests per user",
         "regionCode": "Region code",
-        "allowShorts": "Shorts",
         "allowLiveStreams": "Live streams",
         "contentMode": "Content",
         "contentModeMusic": "Music only",
@@ -166,6 +173,7 @@
       "description": "Local music request manager for streamers",
       "developedBy": "Developed by"
     },
+    "remoteNote": "Opened from another device - settings that only this machine may change (the API key and the Twitch integration) are hidden. Change them on the computer running the app",
     "twitch": {
       "integration": "Twitch integration",
       "chanel": "Twitch channel",
@@ -230,6 +238,7 @@
       "playlistLoadFailed": "Failed to load playlist, check the ID",
       "invalidQuery": "Query must be at least 2 characters",
       "invalidQueryRange": "Query must be between 2 and 200 characters",
+      "invalidRequest": "Invalid request",
       "invalidYoutubeUrl": "Invalid YouTube URL",
       "songNotFound": "Could not find a suitable track",
       "usernameRequired": "Username is required",
@@ -237,6 +246,7 @@
       "queueItemNotFound": "Queue item not found",
       "trackNotFound": "Track not found in fallback",
       "serverError": "Internal server error",
+      "tooManyConnections": "Too many open connections, close a tab and try again",
       "unexpectedError": "Something went wrong, see the log for details",
       "notFound": "Not found",
       "duplicate": "This track is already in the queue",
@@ -264,13 +274,18 @@
       "twitchOAuthError": "Failed to complete Twitch authorization",
       "twitchAuthExpired": "Twitch authorization expired, try connecting again",
       "twitchNotConnected": "Twitch account is not connected",
-      "twitchRefreshError": "Failed to refresh Twitch connection"
+      "twitchRefreshError": "Failed to refresh Twitch connection",
+      "twitchApiError": "Twitch API error: {{message}}",
+      "twitchNetworkError": "No connection to Twitch",
+      "twitchUnknownError": "Unknown Twitch error",
+      "twitchConnectionLost": "Connection to Twitch was lost for {{minutes}} min: check the redemptions in the Twitch dashboard"
     }
   },
   "toast": {
     "removedFromQueue": "Removed from queue",
     "playlistAdded": "Playlist added",
     "playlistActivated": "Playlist activated",
+    "playlistDeactivated": "Playlist paused",
     "playlistDeleted": "Playlist deleted",
     "fallbackRefreshed": "Playlist refreshed",
     "trackBlocked": "Track blocked",

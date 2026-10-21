@@ -1,6 +1,6 @@
 import { test, mock } from 'node:test'
 import assert from 'node:assert/strict'
-import { setupPanel, installEventSource, flush, deferred, makeTrack as track } from './panel-env.js'
+import { setupPanel, installEventSource, flush, deferred, makeTrack as track, V } from './panel-env.js'
 import { api } from '../../../public/js/control/api.js'
 
 const panel = setupPanel()
@@ -42,9 +42,9 @@ async function elapse(ms) {
 const panelHandle = await startControlPanel()
 
 test('the control panel and its events', async (t) => {
-  await t.test('opens one connection for the six topics', () => {
+  await t.test('opens one connection for the seven topics', () => {
     assert.equal(sources.length, 1)
-    assert.equal(source().url, '/api/events?topics=state,activity,fallback,blocklist,playlists,twitch')
+    assert.equal(source().url, '/api/events?topics=state,activity,fallback,blocklist,playlists,config,twitch')
   })
 
   await t.test('everything is read again each time the connection comes up: what changed while it was down was never announced', async () => {
@@ -92,6 +92,49 @@ test('the control panel and its events', async (t) => {
 
     switchPageTab('dashboard')
     await flush()
+    panel.calls.length = 0
+  })
+
+  await t.test('the config is read only while its page is shown, and when it is opened', async () => {
+    panel.calls.length = 0
+    source().emit('changed', { topic: 'config' })
+    await elapse(100)
+    assert.deepEqual(panel.calls, [], 'the dashboard is shown: nobody looks at the config')
+
+    switchPageTab('settings')
+    await flush()
+    assert.deepEqual(panel.calls, ['GET /api/config'], 'opening the page reads it')
+
+    panel.calls.length = 0
+    source().emit('changed', { topic: 'config' })
+    await elapse(100)
+    assert.deepEqual(panel.calls, ['GET /api/config'])
+
+    switchPageTab('dashboard')
+    await flush()
+    panel.calls.length = 0
+  })
+
+  await t.test('the active row of the playlist follows the playing state without reading the playlist again', async () => {
+    panel.route('GET /api/fallback', () => ({ upNext: [track('e'), track('f')], activeVideoId: null, lastRefreshedAt: 1, sourceCount: 2, shuffle: false, repeat: false, enabled: true }))
+    panel.route('GET /api/state', () => ({ current: track('a'), queue: [], isPaused: false }))
+    panel.calls.length = 0
+
+    source().emit('changed', { topic: 'fallback' })
+    await elapse(100)
+    assert.deepEqual(panel.calls, ['GET /api/fallback'])
+    assert.equal(panel.$(`[data-video-id="${V('e')}"]`)?.classList.contains('row-active'), false)
+
+    panel.route('GET /api/state', () => ({ current: { ...track('f'), requestedBy: 'Playlist', isFallback: true }, queue: [], isPaused: false }))
+    panel.calls.length = 0
+    source().emit('changed', { topic: 'state' })
+    await elapse(100)
+
+    assert.deepEqual(panel.calls, ['GET /api/state'], 'a step of the rotation re-reads the state, not the playlist')
+    assert.equal(panel.$(`[data-video-id="${V('f')}"]`)?.classList.contains('row-active'), true)
+    assert.equal(panel.$(`[data-video-id="${V('e')}"]`)?.classList.contains('row-active'), false)
+
+    panel.route('GET /api/state', () => ({ current: track('a'), queue: [], isPaused: false }))
     panel.calls.length = 0
   })
 

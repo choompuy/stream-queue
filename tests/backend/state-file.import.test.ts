@@ -7,8 +7,8 @@ import { join } from 'node:path'
 const dir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
 process.chdir(dir)
 
-const stateFile = join(dir, 'cache', 'queue-state.json')
-mkdirSync(join(dir, 'cache'), { recursive: true })
+const stateFile = join(dir, 'data', 'queue-state.json')
+mkdirSync(join(dir, 'data'), { recursive: true })
 const original = JSON.stringify({
   current: { videoId: 'aaaaaaaaaaa', title: 'A', channelTitle: '', thumbnail: '', duration: 1, views: 1, url: 'u', requestedBy: 'viewer' },
   queue: []
@@ -28,4 +28,9 @@ test('importing the player modules has no side effects', async () => {
   await flushAllStores()
 
   assert.equal(readFileSync(stateFile, 'utf8'), original, 'the state file must not be written until initState() is called')
+
+  queue.setCurrent({ videoId: 'bbbbbbbbbbb', title: 'B', channelTitle: '', thumbnail: '', duration: 1, views: 1, url: 'u', requestedBy: 'viewer' })
+  await flushAllStores()
+
+  assert.equal(readFileSync(stateFile, 'utf8'), original, 'a change before the state was loaded is not saved either')
 })

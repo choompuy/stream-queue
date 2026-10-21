@@ -10,6 +10,7 @@ process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 const express = (await import('express')).default
 const { router } = await import('../../../src/routes/queue.js')
 const { router: searchRouter } = await import('../../../src/routes/search.js')
+const { errorHandler } = await import('../../../src/error-handler.js')
 const { updateConfig } = await import('../../../src/config.js')
 const { updateSecrets } = await import('../../../src/secrets.js')
 const queue = await import('../../../src/queue.js')
@@ -46,6 +47,7 @@ function appWithRemoteAddress(remoteAddress: string) {
   })
   app.use('/api/queue', router)
   app.use('/api/search', searchRouter)
+  app.use(errorHandler)
   return app
 }
 
@@ -106,6 +108,15 @@ test('"admin" filter bypass', async (t) => {
 
       assert.equal(response.status, 200)
       assert.equal(body.data.results.length, 1)
+    })
+  })
+
+  await t.test('GET /api/search: the same 2-200 character limit as a queue request', async () => {
+    await withServer('127.0.0.1', async (base) => {
+      const response = await fetch(`${base}/search?q=${'x'.repeat(201)}`)
+
+      assert.equal(response.status, 400)
+      assert.equal(((await response.json()) as Record<string, any>).code, 'INVALID_QUERY_RANGE')
     })
   })
 })

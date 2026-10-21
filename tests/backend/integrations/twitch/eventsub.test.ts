@@ -1,12 +1,18 @@
-import { test, after } from 'node:test'
+import { test, after, mock } from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { AddressInfo } from 'node:net'
 import { WebSocketServer, type WebSocket as ServerSocket } from 'ws'
 import { TwitchEventSub } from '../../../../src/integrations/twitch/eventsub.js'
 import { CHANNEL_POINTS_REDEMPTION, type TwitchClient } from '../../../../src/integrations/twitch/client.js'
 import type { TwitchChannelPointsRedemption } from '../../../../src/integrations/twitch/types.js'
+import { getActivity, clearActivity } from '../../../../src/activity.js'
 
 // EventSub, as far as the app is concerned: a socket that says "welcome", then sends notifications. A local server plays Twitch.
+// The journal of a lost connection lives in data/activity.json: keep the test away from the real one
+process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-eventsub-test-')))
 
 let counter = 0
 const meta = (type: string, id = `m-${++counter}`) => ({ message_id: id, message_type: type, message_timestamp: new Date().toISOString() })
@@ -66,7 +72,7 @@ async function startServer({ welcomeMessage = () => welcome() }: ServerOptions =
 
 class TestEventSub extends TwitchEventSub {
   watchdogs: number[] = []
-  protected timing = { initialDelayMs: 5, maxDelayMs: 20, maxAttempts: Infinity, readyTimeoutMs: 300, stableAfterMs: 0 }
+  protected timing = { initialDelayMs: 5, maxDelayMs: 20, readyTimeoutMs: 300, stableAfterMs: 0 }
 
   constructor(url: string, client: TwitchClient, onRedemption?: (event: TwitchChannelPointsRedemption) => void) {
     super({ client, onChannelPointsRedemption: onRedemption })
@@ -140,6 +146,154 @@ test('TwitchEventSub: connecting', async (t) => {
   await t.test('a refused subscription fails the connection with the reason', async () => {
     const { sub } = await setup({ failSubscribe: new Error('subscription refused') })
     await assert.rejects(sub.connect(), /subscription refused/)
+  })
+
+  await t.test('a refused subscription is answered by the rejected connect(), not by an error line of its own', async () => {
+    const { sub } = await setup({ failSubscribe: new Error('subscription refused') })
+    const lines: string[] = []
+    const realError = console.error
+    console.error = (line: string) => { lines.push(line) }
+
+    try {
+      await assert.rejects(sub.connect(), /subscription refused/)
+      await pause(20) // the teardown after the refusal finishes in the background
+    } finally {
+      console.error = realError
+    }
+
+    // connectOrRetry() in the integration reports the same failure once, with the retry plan; the socket
+    // itself must stay silent, or every attempt is an error line twice over
+    assert.equal(lines.filter((line) => line.includes('subscription')).length, 0)
+  })
+})
+
+test('TwitchEventSub: a connection lost to the outside', async (t) => {
+  await t.test('a blip under the threshold reconnects without a line in the journal', async () => {
+    const { sub, server } = await setup()
+    clearActivity()
+    await sub.connect()
+
+    // the network drops the connection: the socket reconnects by itself (the test timing retries within milliseconds)
+    server.dropClients()
+    await until(() => server.connections() >= 2, 'the reconnection')
+    await until(() => sub.isConnected(), 'the session to be ready again')
+
+    assert.equal(getActivity().some((entry) => entry.reasonCode === 'TWITCH_CONNECTION_LOST'), false)
+  })
+
+  await t.test('an outage long enough to miss redemptions leaves one line in the journal', async () => {
+    const { sub, server } = await setup()
+    // the real threshold is a minute (a blip stays out of the journal); here only the arithmetic is tested
+    ;(sub as unknown as { journalAfterMs: number }).journalAfterMs = 0
+    clearActivity()
+    await sub.connect()
+
+    server.dropClients()
+    await until(() => getActivity().some((entry) => entry.reasonCode === 'TWITCH_CONNECTION_LOST'), 'the journal line')
+
+    const entry = getActivity().find((entry) => entry.reasonCode === 'TWITCH_CONNECTION_LOST')
+    assert.equal(entry?.status, 'failed')
+    assert.equal(entry?.requestedBy, 'Twitch')
+  })
+
+  await t.test('an intentional disconnect journals nothing', async () => {
+    const { sub } = await setup()
+    ;(sub as unknown as { journalAfterMs: number }).journalAfterMs = 0
+    clearActivity()
+    await sub.connect()
+
+    await sub.disconnect()
+    await sub.connect()
+    await until(() => sub.isConnected(), 'the session to be ready again')
+
+    assert.equal(getActivity().some((entry) => entry.reasonCode === 'TWITCH_CONNECTION_LOST'), false)
+  })
+})
+
+test('TwitchEventSub: the outage line is written when the threshold is crossed, not when the outage ends', async (t) => {
+  // The real threshold is a minute; these subtests keep it real and drive the clock by hand instead. The
+  // socket talks to a local server over real I/O, so waiting is done with setImmediate - it survives the mocked
+  // timers - and the clock itself is mocked too: the minutes of the journal line are counted with Date.now().
+  const drainUntil = async (condition: () => boolean, what: string) => {
+    for (let i = 0; i < 1000 && !condition(); i++) await new Promise((resolve) => setImmediate(resolve))
+    if (!condition()) assert.fail(`timed out waiting for: ${what}`)
+  }
+
+  const lostLines = () => getActivity().filter((entry) => entry.reasonCode === 'TWITCH_CONNECTION_LOST')
+
+  await t.test('an outage that never ends leaves exactly one line, written by the timer with the minutes known then', async () => {
+    const { sub, server, login } = await setup()
+    ;(sub as unknown as { journalAfterMs: number }).journalAfterMs = 60_000
+    await sub.connect()
+    login.refused = true // the saved login is gone: no reconnection will end the outage instead of the timer
+    clearActivity()
+
+    mock.timers.enable({ apis: ['setTimeout', 'Date'] })
+    try {
+      server.dropClients()
+      await drainUntil(() => (sub as unknown as { journalTimer: unknown }).journalTimer !== null, 'the outage alarm to be armed')
+
+      mock.timers.tick(60_001)
+      await drainUntil(() => lostLines().length === 1, 'the journal line')
+
+      // still no second connection: the line is there anyway, and only one, saying what was known at the time
+      assert.deepEqual(lostLines()[0].reasonParams, { minutes: 1 })
+      assert.equal(server.connections(), 1)
+    } finally {
+      mock.timers.reset()
+    }
+  })
+
+  await t.test('a recovery under the threshold cancels the alarm and leaves the journal silent', async () => {
+    const { sub, server } = await setup()
+    ;(sub as unknown as { journalAfterMs: number }).journalAfterMs = 60_000
+    clearActivity()
+    await sub.connect()
+
+    mock.timers.enable({ apis: ['setTimeout', 'Date'] })
+    try {
+      server.dropClients()
+      await drainUntil(() => (sub as unknown as { journalTimer: unknown }).journalTimer !== null, 'the outage alarm to be armed')
+
+      mock.timers.tick(5) // the 5 ms reconnect delay of the test timing: the recovery starts, the 60 s alarm stays pending
+      await drainUntil(() => sub.isConnected(), 'the session to be ready again')
+      assert.equal((sub as unknown as { journalTimer: unknown }).journalTimer, null, 'the recovery cancelled the alarm')
+
+      mock.timers.tick(120_000) // had the alarm survived, its line would be written here
+      assert.equal(lostLines().length, 0)
+    } finally {
+      mock.timers.reset()
+    }
+  })
+
+  await t.test('a recovery over the threshold keeps the one line and corrects it to the real length', async () => {
+    const { sub, server } = await setup()
+    ;(sub as unknown as { journalAfterMs: number }).journalAfterMs = 60_000
+    // the first reconnect of the test timing is pushed past the threshold: the outage outlives it,
+    // so the journal line is written before the connection is back
+    ;(sub as unknown as { timing: { initialDelayMs: number } }).timing.initialDelayMs = 180_000
+    await sub.connect()
+    clearActivity()
+
+    mock.timers.enable({ apis: ['setTimeout', 'Date'] })
+    try {
+      server.dropClients()
+      await drainUntil(() => (sub as unknown as { journalTimer: unknown }).journalTimer !== null, 'the outage alarm to be armed')
+
+      // the outage crosses the threshold while the reconnection is still a minute away: the line says the one minute known then
+      mock.timers.tick(60_001)
+      await drainUntil(() => lostLines().length === 1, 'the journal line')
+      assert.deepEqual(lostLines()[0].reasonParams, { minutes: 1 }, 'written with the minutes known at the threshold')
+
+      // the connection only comes back at the third minute: no second line, the first one learns the real length
+      mock.timers.tick(120_000)
+      await drainUntil(() => sub.isConnected(), 'the session to be ready again')
+
+      assert.equal(lostLines().length, 1, 'exactly one line: the recovery corrected it, it did not add one')
+      assert.deepEqual(lostLines()[0].reasonParams, { minutes: 3 }, 'the line states the real length of the outage')
+    } finally {
+      mock.timers.reset()
+    }
   })
 })
 

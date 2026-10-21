@@ -4,13 +4,21 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { VideoItem } from '../../../src/youtube/types.js'
-import { AppError, type Song } from '../../../src/types.js'
+import type { Song, FilterFailureReason, Config } from '../../../src/types.js'
 
 // updateConfig() saves to data/config.json under the working directory: use a throwaway one, not the real one
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
-const { isAvailableInRegion, getFilterFailureReason, throwFilterError, isMusicVideo } = await import('../../../src/youtube/client.js')
-const { updateConfig } = await import('../../../src/config.js')
+const { isAvailableInRegion, checkFilters, isMusicVideo } = await import('../../../src/youtube/filters.js')
+const { updateConfig, getConfig } = await import('../../../src/config.js')
+
+// the reason the filters would answer with, or null when the track passes them all
+// (checkFilters answers with an AppError whose code is typed as the broad AppErrorCode union;
+// only the filter reasons ever reach this helper, hence the narrowing cast)
+const reasonOf = (song: Song, video: VideoItem): FilterFailureReason | null => {
+  const failure = checkFilters(song, video, getConfig())
+  return failure ? (failure.code as FilterFailureReason) : null
+}
 
 function baseSong(overrides: Partial<Song> = {}): Song {
   return {
@@ -73,38 +81,71 @@ test('isAvailableInRegion', async (t) => {
   })
 })
 
-test('getFilterFailureReason', async (t) => {
+test('checkFilters', async (t) => {
   await t.test('permissive config, clean video: no rejection reason', () => {
     updateConfig({ minViews: 0, minDurationSeconds: 0, maxDurationSeconds: 100_000, regionCode: '' })
-    assert.equal(getFilterFailureReason(baseSong(), baseVideo()), null)
+    assert.equal(reasonOf(baseSong(), baseVideo()), null)
   })
 
   await t.test('wrong category: NOT_MUSIC', () => {
     updateConfig({ minViews: 0, minDurationSeconds: 0, maxDurationSeconds: 100_000, regionCode: '' })
     const video = baseVideo({ snippet: { categoryId: '20' } })
-    assert.equal(getFilterFailureReason(baseSong(), video), 'NOT_MUSIC')
+    assert.equal(reasonOf(baseSong(), video), 'NOT_MUSIC')
   })
 
   await t.test('not embeddable: NOT_EMBEDDABLE', () => {
     updateConfig({ minViews: 0, minDurationSeconds: 0, maxDurationSeconds: 100_000, regionCode: '' })
     const video = baseVideo({ status: { embeddable: false } })
-    assert.equal(getFilterFailureReason(baseSong(), video), 'NOT_EMBEDDABLE')
+    assert.equal(reasonOf(baseSong(), video), 'NOT_EMBEDDABLE')
   })
 
   await t.test('duration outside configured range: DURATION_OUT_OF_RANGE', () => {
     updateConfig({ minViews: 0, minDurationSeconds: 60, maxDurationSeconds: 120, regionCode: '' })
-    assert.equal(getFilterFailureReason(baseSong({ duration: 10 }), baseVideo()), 'DURATION_OUT_OF_RANGE')
+    assert.equal(reasonOf(baseSong({ duration: 10 }), baseVideo()), 'DURATION_OUT_OF_RANGE')
   })
 
   await t.test('views below configured minimum: VIEWS_TOO_LOW', () => {
     updateConfig({ minViews: 5_000_000, minDurationSeconds: 0, maxDurationSeconds: 100_000, regionCode: '' })
-    assert.equal(getFilterFailureReason(baseSong({ views: 100 }), baseVideo()), 'VIEWS_TOO_LOW')
+    assert.equal(reasonOf(baseSong({ views: 100 }), baseVideo()), 'VIEWS_TOO_LOW')
   })
 
   await t.test('blocked in configured region: REGION_BLOCKED', () => {
     updateConfig({ minViews: 0, minDurationSeconds: 0, maxDurationSeconds: 100_000, regionCode: 'RU' })
     const video = baseVideo({ contentDetails: { regionRestriction: { blocked: ['RU'] } } })
-    assert.equal(getFilterFailureReason(baseSong(), video), 'REGION_BLOCKED')
+    assert.equal(reasonOf(baseSong(), video), 'REGION_BLOCKED')
+  })
+
+  await t.test('a short song is no reason on its own: only the configured range has a say about length', () => {
+    // the maximum must stay within the schema's day-long ceiling, or the field is quietly refused
+    updateConfig({ minViews: 0, minDurationSeconds: 0, maxDurationSeconds: 3600, regionCode: '' })
+
+    // the Shorts rule used to refuse any track under the line; 2:30 and 3:00 songs were its victims,
+    // and a duration alone cannot tell a Short from a short song anyway - so the rule is gone for good
+    assert.equal(reasonOf(baseSong({ duration: 60 }), baseVideo()), null)
+    assert.equal(reasonOf(baseSong({ duration: 150 }), baseVideo()), null)
+    assert.equal(reasonOf(baseSong({ duration: 180 }), baseVideo()), null)
+  })
+
+  await t.test('guardOnly: the guard rules alone say whether a track can be played at all', () => {
+    // the fields the filters never read are filled in with the repo defaults: only the five below matter
+    const config: Config = {
+      contentMode: 'music', minViews: 100_000, minDurationSeconds: 60, maxDurationSeconds: 480, regionCode: 'RU',
+      maxQueueSize: 20, maxRequestsPerUser: 4, allowLiveStreams: false,
+      fallbackPlaylist: { playlistId: null, enabled: true, shuffle: false, repeat: false }
+    }
+    const refusedByViewerRules = { ...baseSong({ duration: 120, views: 5 }) }
+    const video = baseVideo({ snippet: { categoryId: '20' } })
+
+    // the viewer rules refuse it four times over
+    assert.equal(reasonOf(refusedByViewerRules, video), 'NOT_MUSIC')
+
+    // the guard scope sees none of that: the track can be played, so the streamer can keep it in the playlist
+    const failure = checkFilters(refusedByViewerRules, video, config, true)
+    assert.equal(failure, null)
+
+    // what the guard rules refuse, the guard scope refuses too
+    const private_ = baseVideo({ status: { privacyStatus: 'private', embeddable: true } })
+    assert.equal(checkFilters(refusedByViewerRules, private_, config, true)?.code, 'NOT_PUBLIC')
   })
 })
 
@@ -119,87 +160,106 @@ test('contentMode', async (t) => {
     assert.equal(isMusicVideo(baseVideo()), true)
     assert.equal(isMusicVideo(clip), true)
     assert.equal(isMusicVideo(game), false)
-    assert.equal(getFilterFailureReason(baseSong(), clip), null)
-    assert.equal(getFilterFailureReason(baseSong(), game), 'NOT_MUSIC')
+    assert.equal(reasonOf(baseSong(), clip), null)
+    assert.equal(reasonOf(baseSong(), game), 'NOT_MUSIC')
   })
 
   await t.test('any: the music check is switched off', () => {
     updateConfig({ ...open, contentMode: 'any' })
 
-    assert.equal(getFilterFailureReason(baseSong(), game), null)
+    assert.equal(reasonOf(baseSong(), game), null)
     updateConfig({ contentMode: 'music' })
   })
 })
 
 test('live streams', async (t) => {
-  const live = baseVideo({ snippet: { categoryId: '10', liveBroadcastContent: 'live' } })
+  // while the stream is on, YouTube reports its upload as 'uploaded': the not-playable guard must not read
+  // that as an unfinished upload, or no stream the toggle allows would ever pass
+  const live = baseVideo({ snippet: { categoryId: '10', liveBroadcastContent: 'live' }, status: { embeddable: true, uploadStatus: 'uploaded' } })
   const stream = baseSong({ duration: 0 })
   const open = { minViews: 0, minDurationSeconds: 60, maxDurationSeconds: 480, regionCode: '' }
 
   await t.test('refused as IS_LIVE (not as a bad duration) when live streams are not allowed', () => {
     updateConfig({ ...open, allowLiveStreams: false })
-    assert.equal(getFilterFailureReason(stream, live), 'IS_LIVE')
+    assert.equal(reasonOf(stream, live), 'IS_LIVE')
   })
 
   await t.test('accepted when allowed: the duration rules do not apply to a stream', () => {
     updateConfig({ ...open, allowLiveStreams: true })
-    assert.equal(getFilterFailureReason(stream, live), null)
+    assert.equal(reasonOf(stream, live), null)
     updateConfig({ allowLiveStreams: false })
   })
 })
 
 test('scheduled streams', async (t) => {
   const open = { minViews: 0, minDurationSeconds: 60, maxDurationSeconds: 480, regionCode: '' }
-  const upcoming = baseVideo({ snippet: { categoryId: '10', liveBroadcastContent: 'upcoming' } })
-  const live = baseVideo({ snippet: { categoryId: '10', liveBroadcastContent: 'live' } })
+  // a scheduled stream reports its upload as 'uploaded' like the one that is on, a premiere as 'processed':
+  // either way the broadcast has not started, so there is nothing to play yet
+  const upcoming = baseVideo({ snippet: { categoryId: '10', liveBroadcastContent: 'upcoming' }, status: { embeddable: true, uploadStatus: 'uploaded' } })
+  const premiere = baseVideo({ snippet: { categoryId: '10', liveBroadcastContent: 'upcoming' }, status: { embeddable: true, uploadStatus: 'processed' } })
+  const live = baseVideo({ snippet: { categoryId: '10', liveBroadcastContent: 'live' }, status: { embeddable: true, uploadStatus: 'uploaded' } })
 
   await t.test('an upcoming stream or premiere is refused even when live streams are allowed: there is nothing to play yet', () => {
     updateConfig({ ...open, allowLiveStreams: true })
-    assert.equal(getFilterFailureReason(baseSong({ duration: 0 }), upcoming), 'NOT_PLAYABLE')
+    assert.equal(reasonOf(baseSong({ duration: 0 }), upcoming), 'NOT_PLAYABLE')
+    assert.equal(reasonOf(baseSong({ duration: 0 }), premiere), 'NOT_PLAYABLE')
   })
 
   await t.test('a stream that is on now is still accepted when live streams are allowed', () => {
     updateConfig({ ...open, allowLiveStreams: true })
-    assert.equal(getFilterFailureReason(baseSong({ duration: 0 }), live), null)
+    assert.equal(reasonOf(baseSong({ duration: 0 }), live), null)
     updateConfig({ allowLiveStreams: false })
   })
 })
 
-test('throwFilterError', async (t) => {
-  await t.test('REGION_BLOCKED does not leak the configured region', () => {
-    const config = { regionCode: 'RU' } as Parameters<typeof throwFilterError>[1]
-    assert.throws(
-      () => throwFilterError('REGION_BLOCKED', config),
-      (error: unknown) => error instanceof AppError && error.code === 'REGION_BLOCKED' && error.params === undefined
-    )
+test('an upload that has not finished processing', async (t) => {
+  const open = { minViews: 0, minDurationSeconds: 60, maxDurationSeconds: 480, regionCode: '' }
+  // a plain upload reports 'uploaded' only while it is still processing: there is nothing to play yet
+  const processing = baseVideo({ snippet: { categoryId: '10' }, status: { embeddable: true, uploadStatus: 'uploaded' } })
+
+  await t.test('refused even with live streams allowed: the guard still has plain uploads to speak for', () => {
+    updateConfig({ ...open, allowLiveStreams: true })
+    assert.equal(reasonOf(baseSong({ duration: 0 }), processing), 'NOT_PLAYABLE')
+  })
+})
+
+test('a rule carries the params its translation needs', async (t) => {
+  await t.test('REGION_BLOCKED carries no params: the region stays private', () => {
+    const config = { regionCode: 'RU' } as Parameters<typeof checkFilters>[2]
+    const video = baseVideo({ contentDetails: { regionRestriction: { blocked: ['RU'] } } })
+    const failure = checkFilters(baseSong(), video, config)
+
+    assert.equal(failure?.code, 'REGION_BLOCKED')
+    assert.equal(failure?.params, undefined)
   })
 
   await t.test('DURATION_OUT_OF_RANGE carries the configured bounds', () => {
-    const config = { minDurationSeconds: 60, maxDurationSeconds: 480 } as Parameters<typeof throwFilterError>[1]
-    assert.throws(
-      () => throwFilterError('DURATION_OUT_OF_RANGE', config),
-      (error: unknown) => error instanceof AppError && error.params?.min === 60 && error.params?.max === 480
-    )
+    const config = { minDurationSeconds: 60, maxDurationSeconds: 480 } as Parameters<typeof checkFilters>[2]
+    const failure = checkFilters(baseSong({ duration: 10 }), baseVideo(), config)
+
+    assert.equal(failure?.code, 'DURATION_OUT_OF_RANGE')
+    assert.equal(failure?.params?.min, 60)
+    assert.equal(failure?.params?.max, 480)
   })
 
   await t.test('VIEWS_TOO_LOW carries the configured minimum', () => {
-    const config = { minViews: 10_000 } as Parameters<typeof throwFilterError>[1]
-    assert.throws(
-      () => throwFilterError('VIEWS_TOO_LOW', config),
-      (error: unknown) => error instanceof AppError && error.params?.min === 10_000
-    )
+    const config = { minViews: 10_000 } as Parameters<typeof checkFilters>[2]
+    const failure = checkFilters(baseSong({ views: 100 }), baseVideo(), config)
+
+    assert.equal(failure?.code, 'VIEWS_TOO_LOW')
+    assert.equal(failure?.params?.min, 10_000)
   })
 
-  await t.test('NOT_MUSIC and NOT_EMBEDDABLE throw with no params', () => {
-    const config = {} as Parameters<typeof throwFilterError>[1]
-    assert.throws(
-      () => throwFilterError('NOT_MUSIC', config),
-      (error: unknown) => error instanceof AppError && error.code === 'NOT_MUSIC'
-    )
-    assert.throws(
-      () => throwFilterError('NOT_EMBEDDABLE', config),
-      (error: unknown) => error instanceof AppError && error.code === 'NOT_EMBEDDABLE'
-    )
+  await t.test('NOT_MUSIC and NOT_EMBEDDABLE carry no params, and the code is the whole message', () => {
+    const music = { contentMode: 'music' } as Parameters<typeof checkFilters>[2]
+    const notMusic = checkFilters(baseSong(), baseVideo({ snippet: { categoryId: '20' } }), music)
+    const notEmbeddable = checkFilters(baseSong(), baseVideo({ status: { embeddable: false } }), music)
+
+    assert.equal(notMusic?.code, 'NOT_MUSIC')
+    assert.equal(notMusic?.params, undefined)
+    assert.equal(notMusic?.message, 'NOT_MUSIC')
+    assert.equal(notEmbeddable?.code, 'NOT_EMBEDDABLE')
+    assert.equal(notEmbeddable?.params, undefined)
   })
 })
 

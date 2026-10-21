@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import type { AddressInfo } from 'node:net'
 import express from 'express'
 import { errorHandler } from '../../src/error-handler.js'
+import { AppError } from '../../src/types.js'
+import { describeError } from '../../src/logger.js'
 
 const app = express()
 app.use(express.json({ limit: '1kb' }))
@@ -14,6 +16,18 @@ app.get('/teapot', (_req, _res, next) => next(Object.assign(new Error('teapot'),
 app.get('/late', (_req, res, next) => {
   res.write('partial')
   next(new Error('after the headers were sent'))
+})
+app.get('/refused', () => {
+  throw new AppError('DUPLICATE', 'this track is already in the queue')
+})
+app.get('/twitch', () => {
+  throw new AppError('TWITCH_API_ERROR', 'title must be unique', { status: 400 })
+})
+app.get('/twitch-network', () => {
+  throw new AppError('TWITCH_NETWORK_ERROR', 'connect ECONNREFUSED')
+})
+app.get('/quota', () => {
+  throw new AppError('YOUTUBE_QUOTA')
 })
 app.use(errorHandler)
 
@@ -62,6 +76,69 @@ test('errorHandler', async (t) => {
     assert.equal(response.status, 500)
     assert.equal(JSON.parse(text).code, 'SERVER_ERROR')
     assert.equal(text.includes('secret internal detail'), false)
+  })
+
+  await t.test('a thrown AppError answers with its own code, status and parameters', async () => {
+    const response = await fetch(`${base}/refused`)
+    const body = (await response.json()) as Record<string, any>
+
+    assert.equal(response.status, 409)
+    assert.equal(body.success, false)
+    assert.equal(body.code, 'DUPLICATE')
+    assert.equal(body.params.message, 'this track is already in the queue')
+  })
+
+  await t.test('a thrown Twitch API error carries the message Twitch returned', async () => {
+    const response = await fetch(`${base}/twitch`)
+    const body = (await response.json()) as Record<string, any>
+
+    assert.equal(response.status, 502)
+    assert.equal(body.code, 'TWITCH_API_ERROR')
+    assert.ok(body.error.includes('title must be unique'))
+  })
+
+  await t.test('a 503 refusal is one warning, not an error: a day without quota would fill the log with them', async (t2) => {
+    const errors = t2.mock.method(console, 'error', () => {})
+    const warnings = t2.mock.method(console, 'warn', () => {})
+
+    const response = await fetch(`${base}/quota`)
+    const body = (await response.json()) as Record<string, any>
+
+    assert.equal(response.status, 503)
+    assert.equal(body.code, 'YOUTUBE_QUOTA')
+    assert.equal(errors.mock.callCount(), 0)
+    assert.equal(warnings.mock.callCount(), 1)
+    assert.ok(String(warnings.mock.calls[0]?.arguments ?? '').includes('YOUTUBE_QUOTA'))
+  })
+
+  await t.test('a server-side AppError is logged, an expected refusal is not', async (t2) => {
+    const errors = t2.mock.method(console, 'error', () => {})
+
+    const response = await fetch(`${base}/twitch-network`)
+    assert.equal(response.status, 502)
+    assert.equal(errors.mock.callCount(), 1)
+    const reported = String(errors.mock.calls[0]?.arguments ?? '')
+    assert.ok(reported.includes('TWITCH_NETWORK_ERROR'), reported)
+    assert.ok(reported.includes('connect ECONNREFUSED'), reported)
+
+    await fetch(`${base}/refused`) // DUPLICATE, 409
+    assert.equal(errors.mock.callCount(), 1, 'a 4xx refusal leaves no error line')
+  })
+
+  await t.test('AppError.toParams() is the one shape the message travels in', () => {
+    assert.deepEqual(new AppError('TWITCH_API_ERROR', 'title must be unique', { status: 400 }).toParams(), {
+      status: 400,
+      message: 'title must be unique'
+    })
+    assert.deepEqual(new AppError('DUPLICATE', 'already queued').toParams(), { message: 'already queued' })
+  })
+
+  await t.test('describeError says which error it was, not only its message', () => {
+    assert.equal(describeError(new AppError('USER_LIMIT', 'you can only queue 2 track(s) at a time', { count: 2 })), 'AppError USER_LIMIT: you can only queue 2 track(s) at a time {"count":2}')
+    assert.equal(describeError(new AppError('DUPLICATE')), 'AppError DUPLICATE')
+    assert.equal(describeError(new TypeError('fetch failed')), 'TypeError: fetch failed')
+    assert.equal(describeError(new Error('a plain one')), 'a plain one')
+    assert.equal(describeError('not even an error'), 'not even an error')
   })
 
   await t.test('an error after the response has started is left to Express instead of writing twice', async (t) => {

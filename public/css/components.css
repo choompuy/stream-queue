@@ -14,6 +14,18 @@ body {
   display: none !important;
 }
 
+.remote-only {
+  display: none;
+}
+
+body.not-local .local-only {
+  display: none;
+}
+
+body.not-local .remote-only {
+  display: block;
+}
+
 .text-primary {
   color: var(--text-primary);
 }
@@ -86,6 +98,16 @@ body {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: wrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.truncate-3line {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   white-space: wrap;
   overflow: hidden;

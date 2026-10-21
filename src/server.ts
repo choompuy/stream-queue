@@ -1,53 +1,24 @@
-import express from 'express'
-import path from 'node:path'
-
+import { createApp, listenOnFreePort } from './app.js'
 import { getServerConfig, updateServerConfig } from './server-config.js'
-import { getAppRoot, loadEnvFile } from './runtime.js'
+import { loadEnvFile } from './runtime.js'
+import { ensureDataDirectory } from './persist.js'
 import { initState } from './state-file.js'
 import { runStartupTasks } from './startup.js'
-import { errorHandler } from './error-handler.js'
-import { apiRouter } from './routes/index.js'
-import { initializeTwitchIntegration } from './integrations/twitch/index.js'
+import { initializeTwitchIntegration, stop } from './integrations/twitch/index.js'
 import { getTwitchClientId } from './env.js'
 import { clearTwitchAuthorization } from './secrets.js'
-import { createLogger, describeError, enableFileLogging, flushLogs } from './logger.js'
-import { hostCheck } from './host-check.js'
-import { installShutdownHandlers } from './shutdown.js'
-import type { Server } from 'node:http'
+import { createLogger, describeError, enableFileLogging } from './logger.js'
+import { installShutdownHandlers, registerBackgroundStop, registerServerStop, shutdown } from './shutdown.js'
 
-async function listenOnFreePort(start: number): Promise<{ server: Server; port: number }> {
-  for (let port = start; port < start + 100; port++) {
-    try {
-      const server = await new Promise<Server>((resolve, reject) => {
-        const candidate = app.listen(port)
-        candidate.once('listening', () => resolve(candidate))
-        candidate.once('error', reject)
-      })
-      return { server, port }
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error
-    }
-  }
-  throw new Error(`No free port in ${start}-${start + 99}`)
-}
-
-const app = express()
-
-const PUBLIC_DIR = path.join(getAppRoot(), 'public')
-
-app.use(hostCheck)
-app.use(express.json({ limit: '50kb' }))
-app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }))
-
+const app = createApp()
 const log = createLogger('SERVER')
-
-app.use('/api', apiRouter)
-app.use(errorHandler)
 
 async function main() {
   loadEnvFile()
   enableFileLogging()
   installShutdownHandlers()
+
+  await ensureDataDirectory()
 
   initState()
   clearTwitchAuthorization()
@@ -57,7 +28,15 @@ async function main() {
   else log.warn('Twitch integration disabled: TWITCH_CLIENT_ID is not set')
 
   const preferredPort = getServerConfig().port
-  const { server, port } = await listenOnFreePort(preferredPort)
+  const { server, port } = await listenOnFreePort(app, preferredPort)
+
+  // saved before the exit, a request accepted during the save would be lost after it
+  registerServerStop(() => server.close())
+
+  // the Twitch sockets stop before the save too: a reconnect racing it could change what is being saved
+  registerBackgroundStop(() => {
+    void stop()
+  })
 
   if (port !== preferredPort) {
     // remembered, so the link does not change again on the next launch
@@ -65,16 +44,18 @@ async function main() {
     updateServerConfig({ port: port })
   }
 
-  log.log(`Server running on http://localhost:${port}`)
+  log.info(`Server running on http://localhost:${port}`)
   void runStartupTasks()
 
   server.on('error', (error) => {
     log.error(`Fatal server error: ${error.message}`)
-    void flushLogs().finally(() => process.exit(1))
+    // one exit path: through shutdown(), so what changed since the last save is not lost
+    void shutdown(1)
   })
 }
 
 main().catch((error) => {
   log.error(`Fatal: ${describeError(error)}`)
-  void flushLogs().finally(() => process.exit(1))
+  // one exit path: through shutdown(), so what changed since the last save is not lost
+  void shutdown(1)
 })

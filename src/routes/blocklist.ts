@@ -1,10 +1,13 @@
 import express from 'express'
-import { ok, fail } from '../http.js'
-import { isValidVideoId } from '../youtube/url.js'
+import { AppError } from '../types.js'
+import { ok } from '../http.js'
+import { checkVideoId, validateVideoIdParam } from '../validate.js'
 import { getBlockedTracks, blockTrack, unblockTrack } from '../blocklist.js'
 import { skipIfCurrent } from '../player.js'
 
 export const router = express.Router()
+
+router.param('videoId', validateVideoIdParam)
 
 router.get('/', (_req, res) => {
   ok(res, { entries: getBlockedTracks() })
@@ -13,17 +16,16 @@ router.get('/', (_req, res) => {
 router.post('/', (req, res) => {
   const { videoId, title } = req.body ?? {}
 
-  if (!isValidVideoId(videoId)) {
-    return fail(res, 'a valid videoId is required', 'INVALID_VIDEO_ID', 400)
-  }
+  checkVideoId(videoId)
 
-  const entry = blockTrack(videoId, typeof title === 'string' ? title.slice(0, 200) : videoId)
+  const entry = blockTrack(videoId, typeof title === 'string' ? title : videoId)
   const skipped = skipIfCurrent(videoId)
   ok(res, { entry, skipped }, 201)
 })
 
 router.delete('/:videoId', (req, res) => {
   const removed = unblockTrack(req.params.videoId)
-  if (!removed) return fail(res, 'not found', 'NOT_FOUND', 404)
+
+  if (!removed) throw new AppError('NOT_FOUND')
   ok(res, { removed: true })
 })

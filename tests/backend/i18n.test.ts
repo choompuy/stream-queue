@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { t, translateErrorCode } from '../../src/i18n.js'
+import { t, hasKey, translateErrorCode, translateApiError } from '../../src/i18n.js'
 
 test('t()', async (test) => {
   await test.test('returns the English string for a known key', () => {
@@ -11,8 +11,14 @@ test('t()', async (test) => {
     assert.equal(t('xx', 'activity.title'), 'Activity')
   })
 
-  await test.test('returns null for a genuinely unknown key', () => {
-    assert.equal(t('en', 'this.key.does.not.exist'), null)
+  await test.test('returns the key itself for a genuinely unknown key', () => {
+    assert.equal(t('en', 'this.key.does.not.exist'), 'this.key.does.not.exist')
+  })
+
+  await test.test('hasKey() tells a missing key from a text that resolved', () => {
+    assert.equal(hasKey('en', 'this.key.does.not.exist'), false)
+    assert.equal(hasKey('en', 'activity.title'), true)
+    assert.equal(hasKey('ru', 'activity.title'), true)
   })
 
   await test.test('interpolates a plain param', () => {
@@ -38,5 +44,9 @@ test('translateErrorCode()', async (test) => {
 
   await test.test('an unknown code returns null', () => {
     assert.equal(translateErrorCode('en', 'NOT_A_REAL_CODE'), null)
+  })
+
+  await test.test('a code with no translation is answered with the generic message, not the key', () => {
+    assert.equal(translateApiError('en', 'NOT_A_REAL_CODE'), 'Something went wrong, see the log for details')
   })
 })

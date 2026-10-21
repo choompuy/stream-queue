@@ -9,6 +9,7 @@ process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
 const express = (await import('express')).default
 const { router } = await import('../../../src/routes/player.js')
+const { errorHandler } = await import('../../../src/error-handler.js')
 const queue = await import('../../../src/queue.js')
 const player = await import('../../../src/player.js')
 const { getActivity, clearActivity } = await import('../../../src/activity.js')
@@ -16,6 +17,8 @@ const { getActivity, clearActivity } = await import('../../../src/activity.js')
 const app = express()
 app.use(express.json())
 app.use('/api/player', router)
+// a malformed videoId is thrown, not answered inline
+app.use(errorHandler)
 
 const server = app.listen(0)
 const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/player`
@@ -39,7 +42,7 @@ const song = (videoId: string) => ({
 beforeEach(() => {
   queue.clearQueue()
   queue.setCurrent({ ...song(A), requestedBy: 'viewer' })
-  for (const id of [B, C, D]) queue.addSong(song(id), 'viewer', { bypassLimits: true })
+  for (const id of [B, C, D]) queue.addSong(song(id), 'viewer', { bypassFilters: true })
   clearActivity()
 })
 
@@ -76,16 +79,32 @@ test('POST /api/player/ended', async (t) => {
     assert.equal(currentId(), B)
   })
 
+  await t.test('an "ended" with the play id of an older play of the same track is ignored', async () => {
+    const stalePlayId = queue.getCurrent()!.playId
+    queue.setCurrent({ ...song(A), requestedBy: 'viewer' })
+    const currentPlayId = queue.getCurrent()!.playId
+    assert.notEqual(stalePlayId, currentPlayId)
+
+    const stale = await post('ended', { videoId: A, playId: stalePlayId })
+
+    assert.equal(((await stale.json()) as Record<string, any>).data.ignored, true)
+    assert.equal(currentId(), A)
+
+    await post('ended', { videoId: A, playId: currentPlayId })
+    assert.equal(currentId(), B)
+  })
+
   await t.test('without a videoId it still means the current track (older overlays)', async () => {
     await post('ended')
 
     assert.equal(currentId(), B)
   })
 
-  await t.test('a malformed videoId is a 400', async () => {
+  await t.test('a malformed videoId is a 400 INVALID_VIDEO_ID', async () => {
     const response = await post('ended', { videoId: 'x' })
 
     assert.equal(response.status, 400)
+    assert.equal(((await response.json()) as Record<string, any>).code, 'INVALID_VIDEO_ID')
     assert.equal(currentId(), A)
   })
 })
@@ -117,8 +136,27 @@ test('POST /api/player/report-failure', async (t) => {
 
   await t.test('nothing is playing: any report is ignored', async () => {
     queue.setCurrent(null)
-    const body = (await (await post('report-failure', { videoId: A })).json()) as Record<string, any>
+    const withId = (await (await post('report-failure', { videoId: A })).json()) as Record<string, any>
+
+    assert.equal(withId.data.ignored, true)
+  })
+
+  await t.test('nothing is playing: a report without a videoId is ignored too, and nothing starts', async () => {
+    queue.setCurrent(null)
+
+    const body = (await (await post('report-failure', { errorCode: 101 })).json()) as Record<string, any>
 
     assert.equal(body.data.ignored, true)
+    assert.equal(player.getState().current, null)
+    assert.equal(getActivity().length, 0)
+  })
+
+  await t.test('a malformed videoId is a 400 INVALID_VIDEO_ID', async () => {
+    const response = await post('report-failure', { videoId: 'x' })
+
+    assert.equal(response.status, 400)
+    assert.equal(((await response.json()) as Record<string, any>).code, 'INVALID_VIDEO_ID')
+    assert.equal(currentId(), A)
+    assert.equal(getActivity().length, 0, 'no playback failure is recorded for a malformed id')
   })
 })

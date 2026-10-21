@@ -1,4 +1,4 @@
-import { escapeHtml, translateErrorCode, youtubeThumbnail } from '../../shared.js'
+import { displayTitle, escapeHtml, translateErrorCode, youtubeThumbnail } from '../../shared.js'
 import { t } from '../../i18n.js'
 import { dom } from '../dom.js'
 import { formatDateTime } from '../ui.js'
@@ -18,7 +18,7 @@ export const activityView = createListView(dom.activityListWrapper, {
     ].join('|')
   },
   renderRow: (entry) => {
-    const title = entry.title || entry.query
+    const title = entry.title != null ? displayTitle(entry.title) : entry.query
     const status = STATUS_LABEL_KEYS[entry.status] ?? STATUS_LABEL_KEYS.rejected
 
     return row({

@@ -1,6 +1,6 @@
 import { api } from '../api.js'
 import { run } from '../run.js'
-import { state } from '../state.js'
+import { state, isLocalDevice } from '../state.js'
 import { applyChatCommands, bindChatCommandTracking, cancelChatCommandChanges, saveTwitchChatCommands } from './twitch-chat-commands.js'
 import { connectTwitch, disconnectTwitch } from './twitch-connection.js'
 import { applyRewardConfig, bindTwitchRewardTracking, cancelRewardChanges, saveReward } from './twitch-rewards.js'
@@ -16,6 +16,8 @@ export function bindTwitchFieldTracking() {
 
 export function loadTwitchConfig() {
   return run('loading Twitch config', async () => {
+    if (!isLocalDevice()) return
+
     const config = await api.getTwitchConfig()
 
     state.twitch.config = config

@@ -1,53 +1,64 @@
 import express from 'express'
 import { PlayerActionResponse } from '../types.js'
-import { ok, fail } from '../http.js'
-import { isValidVideoId } from '../youtube/url.js'
-import { translateWithFallback } from '../i18n.js'
+import { ok } from '../http.js'
+import { t } from '../i18n.js'
 import { buildSkipMessage } from '../chat-replies.js'
-import { setPaused } from '../queue.js'
-import { getState, endCurrent, skipCurrent, reportPlaybackFailure } from '../player.js'
+import { getState, endCurrent, skipCurrent, reportPlaybackFailure, setPaused } from '../player.js'
+import { getSettings } from '../settings.js'
+import { checkVideoId } from '../validate.js'
 
 export const router = express.Router()
 
 // `videoId` says which track the client is talking about; without it the report is taken to be about the current one
-function readVideoId(body: unknown): { videoId?: string; valid: boolean } {
+function readVideoId(body: unknown): string | undefined {
   const videoId = (body as { videoId?: unknown } | undefined)?.videoId
-  if (videoId === undefined) return { valid: true }
-  return isValidVideoId(videoId) ? { videoId, valid: true } : { valid: false }
+  if (videoId === undefined) return undefined
+  checkVideoId(videoId)
+  return videoId
+}
+
+// `playId` says which play of that track the report is about; a number that is not one is ignored, not refused
+function readPlayId(body: unknown): number | undefined {
+  const playId = (body as { playId?: unknown } | undefined)?.playId
+  return typeof playId === 'number' && Number.isInteger(playId) && playId > 0 ? playId : undefined
 }
 
 router.post('/ended', (req, res) => {
-  const { videoId, valid } = readVideoId(req.body)
-  if (!valid) return fail(res, 'a valid videoId is required', 'INVALID_VIDEO_ID', 400)
+  const videoId = readVideoId(req.body)
+  const playId = readPlayId(req.body)
 
-  const applied = endCurrent(videoId)
+  const applied = endCurrent(videoId, playId)
   ok(res, { ...getState(), ...(applied ? {} : { ignored: true }) })
 })
 
 router.post('/skip', (_req, res) => {
   skipCurrent()
   const state = getState()
-  ok<PlayerActionResponse>(res, { ...state, message: buildSkipMessage(state) })
+  const locale = getSettings().locale
+  ok<PlayerActionResponse>(res, { ...state, message: buildSkipMessage(state, locale) })
 })
 
 router.post('/pause', (_req, res) => {
   setPaused(true)
-  ok<PlayerActionResponse>(res, { ...getState(), message: translateWithFallback('chat.paused', undefined, 'Player paused') })
+  const locale = getSettings().locale
+  ok<PlayerActionResponse>(res, { ...getState(), message: t(locale, 'chat.paused') })
 })
 
 router.post('/resume', (_req, res) => {
   setPaused(false)
-  ok<PlayerActionResponse>(res, { ...getState(), message: translateWithFallback('chat.resumed', undefined, 'Playback resumed') })
+  const locale = getSettings().locale
+  ok<PlayerActionResponse>(res, { ...getState(), message: t(locale, 'chat.resumed') })
 })
 
 router.post('/report-failure', (req, res) => {
-  const { videoId, valid } = readVideoId(req.body)
-  if (!valid) return fail(res, 'a valid videoId is required', 'INVALID_VIDEO_ID', 400)
+  const videoId = readVideoId(req.body)
+  const playId = readPlayId(req.body)
 
   const errorCode = typeof req.body?.errorCode === 'number' ? req.body.errorCode : undefined
-  const applied = reportPlaybackFailure(errorCode, videoId)
+  const applied = reportPlaybackFailure(errorCode, videoId, playId)
   const state = getState()
+  const locale = getSettings().locale
 
   if (!applied) return ok(res, { ...state, ignored: true })
-  ok<PlayerActionResponse>(res, { ...state, message: buildSkipMessage(state) })
+  ok<PlayerActionResponse>(res, { ...state, message: buildSkipMessage(state, locale) })
 })

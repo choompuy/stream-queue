@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import type { AddressInfo } from 'node:net'
 import { WebSocketServer, type WebSocket as ServerSocket } from 'ws'
 import { ReconnectingSocket } from '../../../../src/integrations/twitch/socket.js'
+import { on } from '../../../../src/state-events.js'
 
 const logged: string[] = []
 
@@ -235,21 +236,22 @@ test('ReconnectingSocket', async (t) => {
     assert.equal(socket.isConnected(), true)
   })
 
-  await t.test('onStatusChange is called once when the connection goes up and once when it goes down', async () => {
+  await t.test('the twitch topic is announced once when the connection goes up and once when it goes down', async (t) => {
     const { server, socket } = await connected()
     const states: boolean[] = []
-    socket.onStatusChange = () => states.push(socket.isConnected())
+    const off = on('twitch', () => states.push(socket.isConnected()))
+    t.after(off)
     socket.retryAllowed = false
 
     await socket.connect()
     assert.deepEqual(states, [true])
 
     server.dropClients()
-    await until(() => states.length === 2, 'the drop to be reported')
+    await until(() => states.length === 2, 'the drop to be announced')
     assert.deepEqual(states, [true, false])
 
     await socket.disconnect()
-    assert.deepEqual(states, [true, false], 'a socket that is already down does not report again')
+    assert.deepEqual(states, [true, false], 'a socket that is already down does not announce again')
   })
 
   await t.test('restart() closes the socket and opens a fresh one', async () => {

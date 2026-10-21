@@ -3,6 +3,7 @@ import { refreshFallbackState, scrollToActiveFallback } from './fallback.js'
 import { loadActivity } from './activity.js'
 import { loadBlocklist } from './blocklist.js'
 import { loadPlaylists } from './playlists.js'
+import { loadConfig } from './settings.js'
 import { setClass, show } from '../shared.js'
 
 export let activeTab = 'dashboard'
@@ -10,6 +11,7 @@ let activeSection = 'queue'
 
 export const isDashboardActive = () => activeTab === 'dashboard'
 export const isPlaylistsActive = () => activeTab === 'playlists'
+export const isSettingsActive = () => activeTab === 'settings'
 
 export function switchPageTab(tabName) {
   const wasDashboard = activeTab === 'dashboard'
@@ -33,6 +35,8 @@ export function switchPageTab(tabName) {
 
   // the playlists were not read while their page was hidden
   if (tabName === 'playlists') loadPlaylists()
+  // and neither was the config
+  if (tabName === 'settings') loadConfig()
 }
 
 export function switchSection(sectionName) {

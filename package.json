@@ -16,7 +16,9 @@
     "test:frontend": "node --test \"tests/**/*.test.js\"",
     "test:smoke": "node scripts/smoke-frontend.mjs",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "npm run typecheck:src && npm run typecheck:tests",
+    "typecheck:src": "tsc --noEmit",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.test.json",
     "build": "tsc",
     "build:sea": "node scripts/build-sea.mjs",
     "build:release": "node scripts/build-release.mjs"

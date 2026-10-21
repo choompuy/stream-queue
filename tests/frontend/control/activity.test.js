@@ -21,6 +21,7 @@ test('loadActivity()', async (t) => {
 
     assert.equal(state.activity.length, 2)
     assert.equal(panel.$('#tabActivityCount').textContent, '2')
+    assert.equal(panel.$('#activityCount').textContent, 'Requests: 2')
     assert.equal(panel.$$('#activityListWrapper .row-item').length, 2)
     assert.equal(panel.toasts().join('|'), before)
   })
@@ -32,6 +33,20 @@ test('loadActivity()', async (t) => {
     await loadActivity(true)
 
     assert.equal(panel.toasts().join('|'), before)
+  })
+
+  await t.test('a track that came without a title shows the localized placeholder; an unresolved request keeps its query', async () => {
+    panel.route('GET /api/activity', {
+      entries: [
+        entry('d', { title: '' }),
+        entry('e', { title: null, status: 'rejected', reasonCode: 'SONG_NOT_FOUND' })
+      ]
+    })
+
+    await loadActivity()
+
+    const titles = panel.$$('#activityListWrapper .column-info .text-primary').map((node) => node.textContent)
+    assert.deepEqual(titles, ['Unknown title', 'q'])
   })
 
   await t.test('a silent read that fails says nothing and leaves the list as it was', async () => {

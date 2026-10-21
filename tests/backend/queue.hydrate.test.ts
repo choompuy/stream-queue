@@ -37,8 +37,8 @@ test('hydrateQueue()', async (t) => {
     )
     // Bob's two old entries are forgotten: with a limit of one request per user he may queue again
     updateConfig({ maxRequestsPerUser: 1 })
-    assert.doesNotThrow(() => queue.assertCanAddSong(item('eeeeeeeeeee'), 'Bob', { bypassLimits: false }))
-    assert.throws(() => queue.assertCanAddSong(item('fffffffffff'), 'Amy', { bypassLimits: false }), { code: 'USER_LIMIT' })
+    assert.doesNotThrow(() => queue.assertCanAddSong(item('eeeeeeeeeee'), 'Bob', { bypassFilters: false }))
+    assert.throws(() => queue.assertCanAddSong(item('fffffffffff'), 'Amy', { bypassFilters: false }), { code: 'USER_LIMIT' })
   })
 
   await t.test('a saved "nothing is playing" clears the current track instead of keeping the old one', () => {

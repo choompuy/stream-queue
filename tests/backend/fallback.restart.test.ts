@@ -8,6 +8,7 @@ import { join } from 'node:path'
 const dir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
 process.chdir(dir)
 mkdirSync(join(dir, 'cache'), { recursive: true })
+mkdirSync(join(dir, 'data'), { recursive: true })
 
 const fallback = await import('../../src/fallback.js')
 const { loadState } = await import('../../src/state-file.js')
@@ -49,7 +50,7 @@ function writeSavedState({ withTrackFile }: { withTrackFile: boolean }): void {
   const playing = { ...song(ids[9]), requestedBy: 'Playlist', isFallback: true }
   const fallbackProgress = { order: ids, cursor: 9, playlistId: PLAYLIST, lastRefreshedAt: 1 }
 
-  writeFileSync(join(dir, 'cache', 'queue-state.json'), JSON.stringify({ current: playing, queue: [], fallback: fallbackProgress }))
+  writeFileSync(join(dir, 'data', 'queue-state.json'), JSON.stringify({ current: playing, queue: [], fallback: fallbackProgress }))
 
   if (withTrackFile) writeFileSync(join(dir, 'cache', 'fallback-tracks.json'), JSON.stringify({ sourceTracks: ids.map(song) }))
   else rmSync(join(dir, 'cache', 'fallback-tracks.json'), { force: true })
@@ -58,8 +59,11 @@ function writeSavedState({ withTrackFile }: { withTrackFile: boolean }): void {
 beforeEach(async () => {
   queue.setCurrent(null)
   updateConfig({ fallbackPlaylist: { playlistId: null, enabled: true, repeat: true, shuffle: false } })
-  await fallback.refreshFallback() // the "no playlist" branch forgets the rotation of the previous test
+  // saving the id already starts the reaction, which resets the rotation through the "no playlist" branch
+  await fallback.settledConfigReaction(null)
+  stubPlaylist(ids)
   updateConfig({ fallbackPlaylist: { playlistId: PLAYLIST } })
+  await fallback.settledConfigReaction(PLAYLIST)
 })
 
 async function restart(options: { withTrackFile: boolean; playlist?: string[] }): Promise<void> {
@@ -84,44 +88,77 @@ test('after a restart the playlist goes on from where it was', async (t) => {
 
     assert.equal(queue.getCurrent()?.videoId, ids[9])
     assert.equal(nextId(), ids[10])
-    assert.deepEqual(fallback.getFallbackProgress().order, ids)
-    assert.equal(fallback.getFallbackProgress().cursor, 9)
+    assert.deepEqual(fallback.getFallbackSnapshot().order, ids)
+    assert.equal(fallback.getFallbackSnapshot().cursor, 9)
   })
 
   await t.test('the playlist changed meanwhile (a track before the playing one removed, one added): the playing track stays, the next is still the next', async () => {
     const edited = [...ids.slice(0, 3), ...ids.slice(4), 'trkNEW00001']
     await restart({ withTrackFile: false, playlist: edited })
 
-    assert.equal(fallback.getFallbackProgress().order[fallback.getFallbackProgress().cursor], ids[9])
+    assert.equal(fallback.getFallbackSnapshot().order[fallback.getFallbackSnapshot().cursor], ids[9])
     assert.equal(nextId(), ids[10])
-    assert.equal(fallback.getFallbackProgress().order.at(-1), 'trkNEW00001')
-    assert.equal(new Set(fallback.getFallbackProgress().order).size, fallback.getFallbackProgress().order.length)
+    assert.equal(fallback.getFallbackSnapshot().order.at(-1), 'trkNEW00001')
+    assert.equal(new Set(fallback.getFallbackSnapshot().order).size, fallback.getFallbackSnapshot().order.length)
   })
 
   await t.test('a saved position that disagrees with the playing track follows the playing track', async () => {
     writeSavedState({ withTrackFile: true })
     writeFileSync(
-      join(dir, 'cache', 'queue-state.json'),
+      join(dir, 'data', 'queue-state.json'),
       JSON.stringify({ current: { ...song(ids[9]), requestedBy: 'Playlist', isFallback: true }, queue: [], fallback: { order: ids, cursor: 2, playlistId: PLAYLIST, lastRefreshedAt: 1 } })
     )
     stubPlaylist(ids)
     loadState()
 
-    assert.equal(fallback.getFallbackProgress().cursor, 9)
+    assert.equal(fallback.getFallbackSnapshot().cursor, 9)
     assert.equal(nextId(), ids[10])
   })
 
   await t.test('a track a viewer requested is playing: the playlist keeps its own position', async () => {
     writeSavedState({ withTrackFile: true })
     writeFileSync(
-      join(dir, 'cache', 'queue-state.json'),
+      join(dir, 'data', 'queue-state.json'),
       JSON.stringify({ current: { ...song('viewerreq01'), requestedBy: 'viewer' }, queue: [], fallback: { order: ids, cursor: 4, playlistId: PLAYLIST, lastRefreshedAt: 1 } })
     )
     stubPlaylist(ids)
     loadState()
 
-    assert.equal(fallback.getFallbackProgress().cursor, 4)
+    assert.equal(fallback.getFallbackSnapshot().cursor, 4)
     assert.equal(nextId(), ids[5])
+  })
+})
+
+test('the rotation is reconciled with the track list it is saved next to', async (t) => {
+  // the order lives in data/, the tracks in cache/: they can drift apart when the cache is wiped
+  const trackIds = ['trk00000000', 'trk00000001', 'trk00000002']
+  const tracks = trackIds.map(song)
+
+  await t.test('a rotation with a vanished id and a duplicate becomes exactly the track list, from the start', () => {
+    fallback.hydrateFallback({
+      sourceTracks: tracks,
+      order: [trackIds[0], 'trkgone00001', trackIds[1], trackIds[0]],
+      cursor: 2,
+      playlistId: PLAYLIST,
+      lastRefreshedAt: 1
+    })
+
+    assert.deepEqual(fallback.getFallbackSnapshot().order, trackIds)
+    assert.equal(fallback.getFallbackSnapshot().cursor, -1)
+  })
+
+  await t.test('a track missing from the rotation is appended, not lost: it plays again', () => {
+    fallback.hydrateFallback({ sourceTracks: tracks, order: [trackIds[2], trackIds[1]], cursor: 1, playlistId: PLAYLIST, lastRefreshedAt: 1 })
+
+    assert.deepEqual(fallback.getFallbackSnapshot().order, [trackIds[2], trackIds[1], trackIds[0]])
+    assert.equal(fallback.getFallbackSnapshot().cursor, -1)
+  })
+
+  await t.test('a rotation that already matches the track list is left alone, cursor included', () => {
+    fallback.hydrateFallback({ sourceTracks: tracks, order: [...trackIds], cursor: 2, playlistId: PLAYLIST, lastRefreshedAt: 1 })
+
+    assert.deepEqual(fallback.getFallbackSnapshot().order, trackIds)
+    assert.equal(fallback.getFallbackSnapshot().cursor, 2)
   })
 })
 
@@ -129,12 +166,15 @@ test('without any track the position is not used up', async (t) => {
   // without repeat, walking an empty rotation to its end would leave the playlist "finished": that is what must not happen
   t.beforeEach(() => updateConfig({ fallbackPlaylist: { repeat: false } }))
 
-  await t.test('nothing to play: the position stays and the answer is null', () => {
+  await t.test('nothing to play: the answer is null and the position is not used up', () => {
     fallback.hydrateFallback({ sourceTracks: [], order: ids, cursor: 9, playlistId: PLAYLIST, lastRefreshedAt: 1 })
+    // the rotation without its tracks is repaired to an empty one, so the position starts over
+    assert.deepEqual(fallback.getFallbackSnapshot().order, [])
+    assert.equal(fallback.getFallbackSnapshot().cursor, -1)
 
     assert.equal(fallback.advanceFallback(), null)
     assert.equal(fallback.peekNextFallbackTrack(), null)
-    assert.equal(fallback.getFallbackProgress().cursor, 9)
+    assert.equal(fallback.getFallbackSnapshot().cursor, -1, 'advancing an empty rotation consumes nothing')
   })
 
   await t.test('and once the tracks are there the rotation goes on from the same place', () => {

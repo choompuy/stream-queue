@@ -1,14 +1,19 @@
 import { test, beforeEach, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync } from 'node:fs'
+import { cpSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import type { AddressInfo } from 'node:net'
 
-process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
+// the answers are localized: the real locale files are copied into the throwaway working directory
+// (copied, not symlinked: a symlink needs extra privileges on Windows)
+const workDir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
+cpSync(resolve('public/locales'), join(workDir, 'public/locales'), { recursive: true })
+process.chdir(workDir)
 
 const express = (await import('express')).default
 const { router } = await import('../../../src/routes/queue.js')
+const { errorHandler } = await import('../../../src/error-handler.js')
 const { updateSecrets } = await import('../../../src/secrets.js')
 const queue = await import('../../../src/queue.js')
 const player = await import('../../../src/player.js')
@@ -35,6 +40,8 @@ globalThis.fetch = async (input, init) => {
 const app = express()
 app.use(express.json())
 app.use('/api/queue', router)
+// the routes throw their refusals, this is where they become API answers
+app.use(errorHandler)
 app.get('/api/state', (_req, res) => res.json({ success: true, ...player.getState() }))
 
 const server = app.listen(0)
@@ -108,5 +115,52 @@ test('POST /api/queue/request', async (t) => {
     const rejected = getActivity().find((entry) => entry.status === 'rejected')
     assert.equal(rejected?.reasonCode, 'DUPLICATE')
     assert.equal(rejected?.requestedBy, 'amy')
+  })
+
+  await t.test('a query over 200 characters is a 400 INVALID_QUERY_RANGE', async () => {
+    const response = await request({ query: 'x'.repeat(201), requestedBy: 'amy' })
+
+    assert.equal(response.status, 400)
+    assert.equal(((await response.json()) as Record<string, any>).code, 'INVALID_QUERY_RANGE')
+  })
+
+  await t.test('a YouTube link without a video id is a 400 INVALID_YOUTUBE_URL', async () => {
+    const response = await request({ query: 'https://www.youtube.com/nothing-here', requestedBy: 'amy' })
+
+    assert.equal(response.status, 400)
+    assert.equal(((await response.json()) as Record<string, any>).code, 'INVALID_YOUTUBE_URL')
+    assert.equal(getActivity().find((entry) => entry.status === 'rejected')?.reasonCode, 'INVALID_YOUTUBE_URL')
+  })
+
+  // a broken row from the videos endpoint fails the request in a way that is nobody's refusal: the request
+  // becomes an unexpected error, and the errorHandler is the one place it is logged
+  await t.test('an unexpected request failure is logged once and stays a 500', async (t2) => {
+    const errors = t2.mock.method(console, 'error', () => {})
+    const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    const stubbed = globalThis.fetch
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (url.hostname !== 'www.googleapis.com') return stubbed(input, init)
+      return url.pathname.endsWith('/search') ? json({ items: [{ id: { videoId: 'zzzzzzzzzzz' } }] }) : json({ items: [null] })
+    }) as typeof fetch
+
+    try {
+      const response = await request({ query: 'some song', requestedBy: 'amy' })
+
+      assert.equal(response.status, 500)
+      assert.equal(((await response.json()) as Record<string, any>).code, 'SERVER_ERROR')
+      assert.equal(errors.mock.callCount(), 1, 'the errorHandler is the only one that logs the outage')
+    } finally {
+      globalThis.fetch = stubbed
+    }
+  })
+})
+
+test('DELETE /api/queue/video/:videoId', async (t) => {
+  await t.test('a malformed id is rejected by the shared param check', async () => {
+    const response = await fetch(`${base}/queue/video/oops` , { method: 'DELETE' })
+
+    assert.equal(response.status, 400)
+    assert.equal(((await response.json()) as Record<string, any>).code, 'INVALID_VIDEO_ID')
   })
 })

@@ -1,11 +1,15 @@
 import { api } from './api.js'
 import { state } from './state.js'
+import { dom } from './dom.js'
 import { renderStats } from './stats.js'
 import { views } from './views/index.js'
 import { run } from './run.js'
+import { t } from '../i18n.js'
+import { setText } from '../shared.js'
 
 function renderActivity() {
   views.activity.render(state.activity)
+  setText(dom.activityCount, t('activity.requests', { count: state.activity.length }))
 }
 
 export function loadActivity(silent = false) {

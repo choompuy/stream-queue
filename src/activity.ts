@@ -1,11 +1,8 @@
-import { ActivityEntry, ActivityReasonCode, QueueItem } from './types.js'
-import { dataPath, createFileStore, loadList } from './persist.js'
-import { createLogger, describeError } from './logger.js'
-import { emit } from './state-events.js'
+import { ActivityEntry, ActivityReasonCode } from './types.js'
+import { dataPath, createListStore } from './persist.js'
+import { createLogger } from './logger.js'
 
 const ACTIVITY_LIMIT = 100
-
-const store = createFileStore<ActivityEntry[]>(() => dataPath('activity.json'))
 
 const isNullableString = (value: unknown): boolean => value === null || typeof value === 'string'
 
@@ -25,38 +22,42 @@ function isActivityEntry(value: unknown): value is ActivityEntry {
   )
 }
 
-// read from disk on first use, not when the module is imported; a file that grew past the limit is cut to it
-let loaded: ActivityEntry[] | null = null
-const entries = (): ActivityEntry[] => (loaded ??= loadList(store, isActivityEntry).slice(0, ACTIVITY_LIMIT))
-
 const log = createLogger('ACTIVITY')
 
-function save(): void {
-  store.scheduleSave(
-    () => entries(),
-    (error) => log.error(`Failed to save: ${describeError(error)}`)
-  )
+const entries = createListStore<ActivityEntry>({
+  file: () => dataPath('activity.json'),
+  guard: isActivityEntry,
+  limit: ACTIVITY_LIMIT,
+  topics: ['activity']
+})
+
+/** Appends one line to the journal. Returns the moment of the entry: the key it can be found by again (the outage line of the Twitch integration corrects itself with it). */
+export function logActivity(entry: Omit<ActivityEntry, 'at'>): number {
+  const at = Date.now()
+  entries.update((list) => {
+    list.unshift({ ...entry, at })
+    if (list.length > ACTIVITY_LIMIT) list.length = ACTIVITY_LIMIT
+  })
+  return at
 }
 
-export function logActivity(entry: Omit<ActivityEntry, 'at'>): void {
-  const list = entries()
-  list.unshift({ ...entry, at: Date.now() })
-  if (list.length > ACTIVITY_LIMIT) {
-    list.length = ACTIVITY_LIMIT
-  }
-  save()
-  emit('activity')
+/** Reworks the reasonParams of one line: the outage entry states its minutes while the outage is still going on, and learns the real length when the connection returns. */
+export function updateActivityReasonParams(at: number, reasonParams: ReasonParams): void {
+  entries.update((list) => {
+    const entry = list.find((entry) => entry.at === at)
+    if (entry) entry.reasonParams = { ...entry.reasonParams, ...reasonParams }
+  })
 }
 
 export function getActivity(): ActivityEntry[] {
-  return [...entries()]
+  return entries.all()
 }
 
 export function clearActivity(): void {
-  entries().length = 0
-  save()
-  emit('activity')
-  log.log('cleared')
+  entries.update((list) => {
+    list.length = 0
+  })
+  log.info('cleared')
 }
 
 type ReasonParams = Record<string, string | number>
@@ -67,7 +68,7 @@ export function logRejection(
   reasonCode: ActivityReasonCode,
   options: { title?: string | null; videoId?: string | null; reasonParams?: ReasonParams } = {}
 ): void {
-  log.log(`[REJECT] ${requestedBy} → ${reasonCode}`)
+  log.info(`[REJECT] ${requestedBy} → ${reasonCode}`)
   logActivity({
     requestedBy,
     query,
@@ -81,31 +82,4 @@ export function logRejection(
 
 export function logAcceptance(requestedBy: string, query: string, title: string, videoId: string): void {
   logActivity({ requestedBy, query, title, videoId, status: 'accepted', reasonCode: null })
-}
-
-/**
- * A track bought with Channel Points was skipped. Skipping does not touch the reward (the streamer or a moderator decides):
- * it stays UNFULFILLED on Twitch with the points held, and this entry is where that can be seen.
- */
-export function logSkippedWithOpenReward(item: QueueItem): void {
-  logActivity({
-    requestedBy: item.requestedBy,
-    query: item.url,
-    title: item.title,
-    videoId: item.videoId,
-    status: 'skipped',
-    reasonCode: 'REWARD_NOT_REFUNDED'
-  })
-}
-
-export function logFailure(item: QueueItem, reasonCode: ActivityReasonCode, reasonParams?: ReasonParams): void {
-  logActivity({
-    requestedBy: item.requestedBy,
-    query: item.url,
-    title: item.title,
-    videoId: item.videoId,
-    status: 'failed',
-    reasonCode,
-    reasonParams
-  })
 }

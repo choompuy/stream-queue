@@ -1,5 +1,5 @@
-import { $, formatDuration, formatTrackDuration, createLogger, show, setClass, setText } from './shared.js'
-import { initI18n, getCurrentLocale } from './i18n.js'
+import { $, createLogger, displayTitle, formatDuration, formatTrackDuration, show, setClass, setText } from './shared.js'
+import { initI18n, getCurrentLocale, requesterName } from './i18n.js'
 import { loadYouTubeApi } from './youtube-api.js'
 import { claimPlayback } from './playback-lock.js'
 import { watch } from './watch.js'
@@ -9,6 +9,7 @@ let player = null
 let currentState = null
 let isPlayerReady = false
 let isTransitioning = false
+// the play the player was last loaded for: a new value means the same track is played again
 let loadedPlayId = null
 // set while a broken player is being replaced and its failure is reported: what the player says meanwhile is not news
 let resetting = null
@@ -98,11 +99,11 @@ function renderCurrent() {
 
   dom.badge.dataset.position = settings.position
   dom.currentThumbnail.src = currentState.current.thumbnail
-  setText(dom.currentTitle, currentState.current.title)
-  setText(dom.currentRequester, `@${currentState.current.requestedBy}`)
+  setText(dom.currentTitle, displayTitle(currentState.current.title))
+  setText(dom.currentRequester, requesterName(currentState.current))
 
   if (currentState.nextTrack) {
-    setText(dom.nextTitle, currentState.nextTrack.title)
+    setText(dom.nextTitle, displayTitle(currentState.nextTrack.title))
 
     setText(dom.nextElapsedTime, formatTrackDuration(currentState.nextTrack.duration))
     show(dom.nextPlaying)
@@ -122,18 +123,19 @@ function renderState() {
 
   if (!currentState.current) {
     temporaryErrorRetries.clear()
+    loadedPlayId = null
     clearStartWatchdog()
     player.stopVideo()
     return
   }
 
   const videoId = currentState.current.videoId
+  const playId = currentState.current.playId ?? null
   const currentVideoId = player.getVideoData()?.video_id
   const playerState = player.getPlayerState()
 
-  if (currentVideoId !== videoId || currentState.playId !== loadedPlayId) {
+  if (currentVideoId !== videoId || playId !== loadedPlayId) {
     temporaryErrorRetries.clear()
-    loadedPlayId = currentState.playId
 
     if (currentState.isPaused) {
       log(`Cueing video while paused: ${videoId}`)
@@ -145,6 +147,7 @@ function renderState() {
       armStartWatchdog(videoId)
     }
 
+    loadedPlayId = playId
     configurePlayer()
     return
   }
@@ -224,13 +227,13 @@ async function postWithRetry(url, body) {
   }
 }
 
-async function notifyEnded(videoId) {
-  await postWithRetry('/api/player/ended', { videoId })
+async function notifyEnded(videoId, playId) {
+  await postWithRetry('/api/player/ended', { videoId, ...(playId != null ? { playId } : {}) })
   await readState()
 }
 
-async function reportFailure(errorCode, videoId) {
-  if (await postWithRetry('/api/player/report-failure', { errorCode, videoId })) {
+async function reportFailure(errorCode, videoId, playId) {
+  if (await postWithRetry('/api/player/report-failure', { errorCode, videoId, ...(playId != null ? { playId } : {}) })) {
     log(`Playback failure reported for ${videoId}`)
   }
 
@@ -286,7 +289,7 @@ function onPlayerStateChange(event) {
     isTransitioning = true
     // the track that actually finished in the player, which may differ from what the server considers current now
     const endedVideoId = event.target.getVideoData?.().video_id || currentState?.current?.videoId
-    notifyEnded(endedVideoId).finally(() => {
+    notifyEnded(endedVideoId, loadedPlayId).finally(() => {
       isTransitioning = false
     })
   }
@@ -311,7 +314,7 @@ function onPlayerError(event) {
   if (retryTemporaryError(event.data, videoId, event.target)) return
 
   resetting = resetPlayer()
-    .then(() => reportFailure(event.data, videoId))
+    .then(() => reportFailure(event.data, videoId, loadedPlayId))
     .finally(() => {
       resetting = null
     })

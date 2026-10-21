@@ -1,13 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const dir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
 process.chdir(dir)
 mkdirSync(join(dir, 'cache'), { recursive: true })
-const { sanitizeState, sanitizeQueueItem, initState } = await import('../../src/state-file.js')
+mkdirSync(join(dir, 'data'), { recursive: true })
+const { sanitizeState, sanitizeQueueItem, initState, loadState } = await import('../../src/state-file.js')
 const queue = await import('../../src/queue.js')
 const { flushAllStores } = await import('../../src/persist.js')
 
@@ -33,7 +34,7 @@ const goodState = () => ({
   current: item(A),
   queue: [item(B), item(C)],
   settings: { showVideo: true, position: 'top-left', locale: 'ru' },
-  fallback: { sourceTracks: [song(F1), song(F2)], order: [F1, F2], cursor: 0, playlistId: 'PLstate0000001', lastRefreshedAt: 5 }
+  fallback: { sourceTracks: [song(F1), song(F2)], order: [F1, F2], cursor: 0, playlistId: 'PLstate0000001', lastRefreshedAt: 5, itemCount: 12 }
 })
 
 test('sanitizeState()', async (t) => {
@@ -59,7 +60,17 @@ test('sanitizeState()', async (t) => {
     )
     assert.equal(result.current?.videoId, A)
     assert.equal(result.fallback?.playlistId, 'PLstate0000001')
+    assert.equal(result.fallback?.itemCount, 12, 'the declared playlist size travels with the state')
     assert.ok(result.problems.some((problem) => problem.includes('dropped 4 invalid')))
+  })
+
+  await t.test('an unusable declared playlist size becomes unknown, not a lie', () => {
+    const state = goodState()
+    state.fallback.itemCount = 'many' as never
+    const result = sanitizeState(state)
+
+    assert.equal(result.fallback?.itemCount, null)
+    assert.deepEqual(result.problems, [])
   })
 
   await t.test('duplicates are dropped, including a queued copy of the track that is playing', () => {
@@ -113,7 +124,8 @@ test('sanitizeState()', async (t) => {
     state.fallback.cursor = 1
     const result = sanitizeState(state)
 
-    assert.deepEqual(result.fallback?.order, [F1, F2])
+    // the saved order is dropped whole: the load rebuilds it from the tracks, the position starts over
+    assert.deepEqual(result.fallback?.order, [])
     assert.equal(result.fallback?.cursor, -1)
     assert.equal(
       result.problems.some((problem) => problem.includes('rotation is damaged')),
@@ -183,10 +195,17 @@ test('sanitizeQueueItem()', async (t) => {
     assert.equal(sanitizeQueueItem({ videoId: A, title: '', requestedBy: 'x' }), null)
     assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: '  ' }), null)
   })
+
+  await t.test('the fallback flag is restored as written, and a name alone never sets it', () => {
+    assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: 'bob', isFallback: true })?.isFallback, true)
+    assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: 'Playlist' })?.isFallback, undefined)
+    assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: 'playlist', isFallback: 'yes' })?.isFallback, undefined)
+    assert.equal(sanitizeQueueItem({ videoId: A, title: 'T', requestedBy: 'bob', isFallback: 1 })?.isFallback, undefined)
+  })
 })
 
 test('initState()', async (t) => {
-  const stateFile = join(dir, 'cache', 'queue-state.json')
+  const stateFile = join(dir, 'data', 'queue-state.json')
 
   writeFileSync(
     stateFile,
@@ -213,12 +232,50 @@ test('initState()', async (t) => {
   })
 
   await t.test('calling it again neither reloads the file nor registers a second saver', async () => {
-    queue.removeAt(0)
+    queue.removeByVideoId(B)
     initState()
 
     assert.deepEqual(
       queue.getQueue().map((entry) => entry.videoId),
       [C]
     )
+  })
+
+  await t.test('a change of the overlay settings does not rewrite the queue state', async () => {
+    const { updateSettings } = await import('../../src/settings.js')
+    await flushAllStores()
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    const before = statSync(stateFile).mtimeMs
+
+    updateSettings({ opacity: 37 })
+    await flushAllStores()
+
+    assert.equal(statSync(stateFile).mtimeMs, before)
+  })
+
+  await t.test('a state announcement alone does not rewrite the queue state', async () => {
+    const { emit } = await import('../../src/state-events.js')
+    await flushAllStores()
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    const before = statSync(stateFile).mtimeMs
+
+    emit('state')
+    await flushAllStores()
+
+    assert.equal(statSync(stateFile).mtimeMs, before)
+  })
+})
+
+test('loadState() with a damaged state file', async (t) => {
+  await t.test('a null state file next to a non-empty track file does not crash the load', (t2) => {
+    t2.mock.method(console, 'warn', () => {})
+    // the queue state lives in data/, the track file in cache/
+    writeFileSync(join(dir, 'data', 'queue-state.json'), JSON.stringify(null))
+    writeFileSync(join(dir, 'cache', 'fallback-tracks.json'), JSON.stringify({ sourceTracks: [song(F1)] }))
+
+    assert.doesNotThrow(() => loadState())
+
+    assert.equal(queue.getCurrent(), null)
+    assert.deepEqual(queue.getQueue(), [])
   })
 })

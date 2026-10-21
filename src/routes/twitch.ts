@@ -3,32 +3,26 @@ import { ok, sendConfigUpdate } from '../http.js'
 import type { TwitchConnectionResponse, TwitchCreateCustomReward, TwitchUpdateCustomReward } from '../integrations/twitch/types.js'
 import { AppError } from '../types.js'
 import { parseRewardInput, toRewardDto } from '../integrations/twitch/rewards.js'
-import { startDeviceAuthorization, disconnect, refreshConnection, getClient, getTwitchHealth } from '../integrations/twitch/index.js'
+import { startDeviceAuthorization, disconnect, refreshConnection, isTwitchConnected, getTwitchHealth } from '../integrations/twitch/index.js'
+import { getRuntime } from '../integrations/twitch/state.js'
 import { getTwitchConfig, updateTwitchConfig } from '../integrations/twitch/config.js'
-import { localOnly } from '../local-only.js'
+import { isLocal, localOnly } from '../local-only.js'
 import { getPublicSecretsView } from '../secrets.js'
-import { isLocalAddress } from '../local-only.js'
+import type { TwitchClient } from '../integrations/twitch/client.js'
 
-function toUserResponse(user: { displayName: string; login: string }) {
-  return {
-    displayName: user.displayName,
-    login: user.login
+function requireClient(): TwitchClient {
+  const runtime = getRuntime()
+  if (!runtime || !isTwitchConnected()) {
+    throw new AppError('TWITCH_NOT_CONNECTED')
   }
-}
-
-function requireClient() {
-  const client = getClient()
-  if (!client || !getPublicSecretsView().twitch.connected) {
-    throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
-  }
-  return client
+  return runtime.client
 }
 
 export const router = express.Router()
 
 // open on purpose (the panel on a phone or from a QR code reads it), so what only this computer may see is left out for the rest
 router.get('/', (req, res) => {
-  const twitch = getPublicSecretsView({ includeAuthorization: isLocalAddress(req.socket.remoteAddress) }).twitch
+  const twitch = getPublicSecretsView({ includeAuthorization: isLocal(req) }).twitch
   ok<TwitchConnectionResponse>(res, { ...twitch, health: getTwitchHealth() })
 })
 
@@ -36,12 +30,15 @@ router.get('/config', (_req, res) => {
   ok(res, getTwitchConfig())
 })
 
-router.put('/config', localOnly, async (req, res) => {
+// everything below is for this machine only
+router.use(localOnly)
+
+router.put('/config', async (req, res) => {
   const { config, rejected } = updateTwitchConfig(req.body)
   sendConfigUpdate(res, config, rejected)
 })
 
-router.post('/connect', localOnly, async (_req, res) => {
+router.post('/connect', async (_req, res) => {
   const device = await startDeviceAuthorization()
 
   ok(res, {
@@ -51,17 +48,17 @@ router.post('/connect', localOnly, async (_req, res) => {
   })
 })
 
-router.post('/disconnect', localOnly, async (_req, res) => {
+router.post('/disconnect', async (_req, res) => {
   const openRedemptions = await disconnect()
   ok(res, { openRedemptions })
 })
 
-router.post('/refresh', localOnly, async (_req, res) => {
+router.post('/refresh', async (_req, res) => {
   const userInfo = await refreshConnection()
-  ok(res, { user: toUserResponse(userInfo) })
+  ok(res, { user: { displayName: userInfo.displayName, login: userInfo.login } })
 })
 
-router.get('/rewards', localOnly, async (_req, res) => {
+router.get('/rewards', async (_req, res) => {
   const client = requireClient()
   const rewards = await client.getCustomRewards()
 
@@ -71,7 +68,7 @@ router.get('/rewards', localOnly, async (_req, res) => {
 })
 
 // A reward is saved like a config: the answer is { config: the stored reward, rejected: the names the panel has to mark }
-router.post('/rewards', localOnly, async (req, res) => {
+router.post('/rewards', async (req, res) => {
   const client = requireClient()
   const { payload, rejected } = parseRewardInput(req.body, { requireTitleAndCost: true })
   if (rejected.length) return sendConfigUpdate(res, {}, rejected)
@@ -80,7 +77,7 @@ router.post('/rewards', localOnly, async (req, res) => {
   sendConfigUpdate(res, toRewardDto(reward), [])
 })
 
-router.patch('/rewards/:id', localOnly, async (req, res) => {
+router.patch('/rewards/:id', async (req, res) => {
   const client = requireClient()
   const { payload, rejected } = parseRewardInput(req.body, { requireTitleAndCost: false })
   if (rejected.length) return sendConfigUpdate(res, {}, rejected)

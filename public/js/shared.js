@@ -126,3 +126,11 @@ export function setChecked(element, checked) {
 export function setText(element, text) {
   element.textContent = text
 }
+
+export function displayTitle(title) {
+  return title || t('common.unknownTitle')
+}
+
+export function displayChannel(channelTitle) {
+  return channelTitle || t('common.unknownChannel')
+}

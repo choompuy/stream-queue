@@ -1,4 +1,5 @@
 import WebSocket from 'ws'
+import { emit } from '../../state-events.js'
 import { describeError, type createLogger } from '../../logger.js'
 
 /**
@@ -18,12 +19,28 @@ export function closeQuietly(socket: WebSocket | null | undefined): void {
   }
 }
 
+/**
+ * For a connection already known to be dead (a watchdog kill, a network change): the close handshake will not
+ * complete on it, and ws would hold the socket and its timers for up to 30s - terminate() cuts through.
+ */
+export function terminateQuietly(socket: WebSocket | null | undefined): void {
+  if (!socket) return
+
+  socket.removeAllListeners()
+  socket.on('error', () => {})
+
+  try {
+    socket.terminate()
+  } catch {
+    // already closed
+  }
+}
+
 export abstract class ReconnectingSocket {
   protected socket: WebSocket | null = null
   protected ready = false
   protected stopped = false
-  // maxAttempts is unlimited on purpose: after a sleep or a network outage the connection must come back by itself, however long it took
-  protected timing = { initialDelayMs: 5_000, maxDelayMs: 60_000, maxAttempts: Infinity, readyTimeoutMs: 10_000, stableAfterMs: 30_000 }
+  protected timing = { initialDelayMs: 5_000, maxDelayMs: 60_000, readyTimeoutMs: 10_000, stableAfterMs: 30_000 }
 
   protected abstract readonly log: ReturnType<typeof createLogger>
   protected abstract readonly url: string
@@ -32,9 +49,6 @@ export abstract class ReconnectingSocket {
   protected beforeOpen(): void | Promise<void> {}
   protected onOpen(_socket: WebSocket): void {}
   protected onClosed(): void {}
-
-  // Called when the connection goes up or down (the panel shows it); it does not carry the state, the listener reads it
-  onStatusChange: (() => void) | null = null
 
   private reportedConnected = false
   private starting: Promise<void> | null = null
@@ -84,7 +98,7 @@ export abstract class ReconnectingSocket {
     if (!socket) return
 
     closeQuietly(socket)
-    this.log.log('Disconnected')
+    this.log.info('Disconnected')
   }
 
   // does not undo a disconnect(): the caller of a failed first connect() must not bring back a socket that was closed on purpose
@@ -108,11 +122,7 @@ export abstract class ReconnectingSocket {
     if (connected === this.reportedConnected) return
 
     this.reportedConnected = connected
-    try {
-      this.onStatusChange?.()
-    } catch (error) {
-      this.log.error(`Status listener failed: ${describeError(error)}`)
-    }
+    emit('twitch')
   }
 
   protected abort(error: Error): void {
@@ -132,7 +142,8 @@ export abstract class ReconnectingSocket {
     this.socket = null
     this.teardown()
     this.reportStatus()
-    closeQuietly(socket)
+    // dead by the time it gets here: terminate, not a close whose handshake cannot complete
+    terminateQuietly(socket)
   }
 
   private markStable(): void {
@@ -257,6 +268,7 @@ export abstract class ReconnectingSocket {
       return
     }
 
+    // no attempt cap: after a sleep or a network outage the connection must come back by itself, however long it took
     const delay = Math.min(this.timing.initialDelayMs * 2 ** this.attempts, this.timing.maxDelayMs)
     this.attempts++
 

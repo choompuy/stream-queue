@@ -8,6 +8,7 @@ const { initI18n } = await import('../../../public/js/i18n.js')
 await initI18n('en')
 const { state } = await import('../../../public/js/control/state.js')
 const actions = await import('../../../public/js/control/fallback-actions.js')
+const { renderFallback } = await import('../../../public/js/control/fallback.js')
 
 const fallback = (extra = {}) => ({ upNext: [track('f'), track('g')], activeVideoId: null, lastRefreshedAt: 1, sourceCount: 2, shuffle: false, repeat: false, enabled: false, ...extra })
 
@@ -95,5 +96,23 @@ test('a track of the playlist', async (t) => {
   await t.test('the buttons of the rows pass the video id on', () => {
     assert.equal(typeof actions.fallbackActions['fallback-play'], 'function')
     assert.equal(typeof actions.fallbackActions['fallback-enqueue'], 'function')
+  })
+})
+
+test('the header line of the playlist section', async (t) => {
+  await t.test('a section with no playlist at all explains where to set one', () => {
+    state.fallback = fallback({ playlistId: null, upNext: [] })
+
+    renderFallback()
+
+    assert.equal(panel.$('#fallbackInfo').textContent, 'No active playlist - add one on the Playlists page')
+  })
+
+  await t.test('a playlist that has simply run out still counts as set: no hint, the line stays for the state of the buttons', () => {
+    state.fallback = fallback({ playlistId: 'PL123', upNext: [] })
+
+    renderFallback()
+
+    assert.equal(panel.$('#fallbackInfo').textContent, '')
   })
 })

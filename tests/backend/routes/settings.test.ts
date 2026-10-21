@@ -10,7 +10,7 @@ process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 const express = (await import('express')).default
 const { router } = await import('../../../src/routes/settings.js')
 const { errorHandler } = await import('../../../src/error-handler.js')
-const { updateTwitchOAuthState } = await import('../../../src/secrets.js')
+const { updateTwitchOAuthState, updateSecrets } = await import('../../../src/secrets.js')
 
 const app = express()
 app.use(express.json())
@@ -61,7 +61,7 @@ test('PUT /api/config', async (t) => {
 
     const response = await putConfig({
       minViews: before.minViews + 1,
-      maxQueueSize: 0
+      maxQueueSize: -1
     })
 
     const config = await getConfig()
@@ -107,12 +107,14 @@ test('PUT /api/config and the fallback playlist', async (t) => {
     assert.equal((await getConfig()).fallbackPlaylist.shuffle, false)
   })
 
-  await t.test('a malformed playlist id is a 400 INVALID_PLAYLIST_ID', async () => {
+  await t.test('a malformed playlist id is refused as a field, like every other invalid value', async () => {
     const response = await putConfig({ fallbackPlaylist: { playlistId: 'not a playlist' } })
     const body = (await response.json()) as Record<string, any>
 
     assert.equal(response.status, 400)
-    assert.equal(body.code, 'INVALID_PLAYLIST_ID')
+    assert.equal(body.code, 'INVALID_CONFIG')
+    assert.equal(body.params.fields, 'fallbackPlaylist.playlistId')
+    assert.equal((await getConfig()).fallbackPlaylist.playlistId, null)
   })
 
   await t.test('an empty playlist id clears it', async () => {
@@ -125,7 +127,7 @@ test('PUT /api/config and the fallback playlist', async (t) => {
 
 test('PUT /api/config with a refused field (partial save)', async (t) => {
   await t.test('stores the valid fields and returns them together with the refused ones', async () => {
-    const response = await putConfig({ minViews: 4242, maxQueueSize: 0 })
+    const response = await putConfig({ minViews: 4242, maxQueueSize: -1 })
     const body = (await response.json()) as Record<string, any>
 
     assert.equal(response.status, 400)
@@ -208,4 +210,34 @@ test('GET /api/secrets and a login that waits for its code', async (t) => {
   })
 
   updateTwitchOAuthState({ authorization: null })
+})
+
+test('PUT /api/config while a playlist is still loading', async (t) => {
+  updateSecrets({ youtubeApiKey: 'test-key' })
+  const realFetch = globalThis.fetch
+  after(() => {
+    globalThis.fetch = realFetch
+  })
+
+  await t.test('a save that does not touch the playlist is answered at once, and with its own result', async () => {
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input instanceof Request ? input.url : input))
+      if (url.hostname === 'www.googleapis.com') {
+        await new Promise((resolve) => setTimeout(resolve, 30))
+        return new Response(JSON.stringify({ error: { message: 'refused' } }), { status: 403 })
+      }
+      return realFetch(input, init)
+    }
+
+    const playlistSave = putConfig({ fallbackPlaylist: { playlistId: 'PLraceslower01' } })
+    await new Promise((resolve) => setTimeout(resolve, 5))
+
+    const response = await putConfig({ minViews: 777 })
+
+    assert.equal(response.status, 200)
+    assert.equal((await getConfig()).minViews, 777)
+
+    assert.equal((await playlistSave).status, 503)
+    assert.equal((await getConfig()).fallbackPlaylist.playlistId, null, 'the failed playlist save was rolled back')
+  })
 })

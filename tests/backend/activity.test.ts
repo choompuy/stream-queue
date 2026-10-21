@@ -6,7 +6,8 @@ import { join } from 'node:path'
 
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
-const { getActivity, clearActivity, logRejection, logAcceptance, logFailure } = await import('../../src/activity.js')
+const { getActivity, clearActivity, logRejection, logAcceptance } = await import('../../src/activity.js')
+const { finishItem } = await import('../../src/finish.js')
 
 beforeEach(() => clearActivity())
 
@@ -47,17 +48,39 @@ test('activity entry helpers', async (t) => {
     assert.equal(last().title, 'Song')
   })
 
-  await t.test('logFailure: a queued track that could not be played, attributed to whoever requested it', () => {
-    logFailure(
+  await t.test('finishItem: a track that could not be played is journaled as failed, attributed to whoever requested it', () => {
+    finishItem(
       { videoId: 'ccccccccccc', title: 'Broken', channelTitle: '', thumbnail: '', duration: 1, views: 1, url: 'u', requestedBy: 'zed' },
-      'PLAYBACK_EMBED_DISALLOWED',
-      { errorCode: 101 }
+      { code: 'PLAYBACK_EMBED_DISALLOWED', params: { errorCode: 101 } }
     )
 
     assert.equal(last().status, 'failed')
     assert.equal(last().requestedBy, 'zed')
     // the title is in `title` already; `query` keeps what identifies the track
     assert.equal(last().query, 'u')
+    assert.equal(last().reasonCode, 'PLAYBACK_EMBED_DISALLOWED')
     assert.deepEqual(last().reasonParams, { errorCode: 101 })
+  })
+
+  await t.test('finishItem: a blocked track is journaled as a refusal', () => {
+    finishItem(
+      { videoId: 'ddddddddddd', title: 'Blocked', channelTitle: '', thumbnail: '', duration: 1, views: 1, url: 'u2', requestedBy: 'zed' },
+      { code: 'BLOCKED' }
+    )
+
+    assert.equal(last().status, 'rejected')
+    assert.equal(last().reasonCode, 'BLOCKED')
+  })
+})
+
+test('the journal of a way out does not need a redemption', async (t) => {
+  await t.test('a removed or cleared track writes nothing: the streamer did it on purpose', () => {
+    const track = { videoId: 'eeeeeeeeeee', title: 'Gone', channelTitle: '', thumbnail: '', duration: 1, views: 1, url: 'u3', requestedBy: 'zed' }
+
+    finishItem(track, { code: 'TRACK_REMOVED' })
+    finishItem(track, { code: 'QUEUE_CLEARED' })
+    finishItem(track, 'played')
+
+    assert.deepEqual(getActivity(), [])
   })
 })

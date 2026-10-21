@@ -18,12 +18,10 @@ const commandSchema: Schema = {
   permission: rules.oneOf(PERMISSIONS)
 }
 
-// `validateTwitchConfigUpdates` and `restoreTwitchConfig` are exported for tests
+// The routes read and update through the same module; the tests drive the update path the routes take
 export const {
   getConfig: getTwitchConfig,
-  updateConfig: updateTwitchConfig,
-  validateConfigUpdates: validateTwitchConfigUpdates,
-  restoreConfig: restoreTwitchConfig
+  updateConfig: updateTwitchConfig
 } = createConfigModule<TwitchConfig>({
   filePath: () => dataPath('twitch-config.json'),
   defaults: {
@@ -53,23 +51,20 @@ export const {
   },
 
   refine: (clean, current, reject) => {
-    if (!clean.chatCommands) return
+    const updated = CHAT_COMMAND_KEYS.filter((key) => typeof clean.chatCommands?.[key]?.command === 'string')
+    if (updated.length === 0) return
 
-    const stored = current.chatCommands
-    const merged = deepMerge(stored, clean.chatCommands)
+    // One pass over the changed commands: each is checked against the merged view (stored + this update),
+    // so the final state must be collision-free - a mutual exchange lands in one step this way
+    const merged = deepMerge(current.chatCommands, clean.chatCommands ?? {})
     const overlaps = (a: string, b: string) => a === b || a.startsWith(`${b} `) || b.startsWith(`${a} `)
     const collides = (key: (typeof CHAT_COMMAND_KEYS)[number]) =>
       CHAT_COMMAND_KEYS.some((other) => other !== key && overlaps(merged[other].command, merged[key].command))
 
-    for (let pass = 0; pass < CHAT_COMMAND_KEYS.length; pass++) {
-      const conflicting = CHAT_COMMAND_KEYS.filter((key) => collides(key) && merged[key].command !== stored[key].command)
-      if (conflicting.length === 0) return
-
-      for (const key of conflicting) {
-        merged[key] = { ...merged[key], command: stored[key].command }
-        delete clean.chatCommands[key]?.command
-        reject(`chatCommands.${key}.command`)
-      }
+    for (const key of updated) {
+      if (!collides(key)) continue
+      delete clean.chatCommands?.[key]?.command
+      reject(`chatCommands.${key}.command`)
     }
   }
 })

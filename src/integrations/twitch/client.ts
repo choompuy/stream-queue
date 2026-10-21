@@ -12,11 +12,16 @@ import type {
 import { TwitchOAuth } from './oauth.js'
 import { AppError } from '../../types.js'
 import { createLogger, describeError } from '../../logger.js'
+import { markTransient, normalizeTwitchError } from './error.js'
+import { fetchWithTimeout } from '../../web-fetch.js'
 
 const log = createLogger('TWITCH CLIENT')
 
 const REQUEST_TIMEOUT_MS = 15_000
 const REWARDS_URL = 'https://api.twitch.tv/helix/channel_points/custom_rewards'
+
+// StreamQueue's own reward always takes the viewer's input: the flag lives once, not in each method that writes it
+const REWARD_REQUIRES_INPUT = true
 
 export const CHANNEL_POINTS_REDEMPTION = 'channel.channel_points_custom_reward_redemption.add'
 
@@ -29,11 +34,11 @@ export class TwitchClient {
   }
 
   private async makeAuthenticatedRequest<T>(url: string, options: RequestInit = {}): Promise<T> {
-    if (!this.oauth.getConfig().clientId) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch client ID not configured')
-
     const accessToken = await this.oauth.getValidAccessToken()
     if (!accessToken) {
-      throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected', this.refreshMayWorkLater() ? { transient: 1 } : undefined)
+      const notConnected = new AppError('TWITCH_NOT_CONNECTED')
+      // a login exists and Twitch has not refused it: a failed refresh was a passing problem, the request may work later
+      throw this.refreshMayWorkLater() ? markTransient(notConnected) : notConnected
     }
 
     const response = await this.request(url, options, accessToken)
@@ -42,17 +47,18 @@ export class TwitchClient {
     // another app, a missing scope), so it is reported as it is, without a pointless refresh
     if (response.status !== 401) return this.handleResponse<T>(response)
 
+    // the refused body is never read on this path: drain it, so the connection is not held until it times out
+    await response.body?.cancel().catch(() => {})
+
     let refreshedToken: Awaited<ReturnType<TwitchOAuth['refreshAccessToken']>>
     try {
       refreshedToken = await this.oauth.refreshAccessToken()
     } catch (error) {
-      const reason = describeError(error)
-      log.error(`Token refresh failed: ${reason}`)
-      throw new AppError(
-        'TWITCH_REFRESH_ERROR',
-        `Authentication failed - please reconnect your Twitch account (${reason})`,
-        this.refreshMayWorkLater() ? { transient: 1 } : undefined
-      )
+      const normalized = normalizeTwitchError(error)
+      log.error(`Token refresh failed: ${describeError(normalized)}`)
+      // a login exists and Twitch has not refused it: the refresh failure was passing, a retry is worth it
+      // (an error that already carries the flag keeps it, whatever the login looks like)
+      throw this.refreshMayWorkLater() ? markTransient(normalized) : normalized
     }
 
     // an error of the retried request itself is its own error, not a failed login
@@ -60,15 +66,17 @@ export class TwitchClient {
   }
 
   private async request(url: string, options: RequestInit, accessToken: string): Promise<Response> {
-    return fetch(url, {
-      ...options,
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      headers: {
-        ...options.headers,
-        Authorization: `Bearer ${accessToken}`,
-        'Client-Id': this.oauth.getConfig().clientId
-      }
-    })
+    // headers arrive as a plain object, a Headers or an array of pairs: a spread would silently lose the
+    // non-plain forms, so they merge instead
+    const headers = new Headers(options.headers)
+    headers.set('Authorization', `Bearer ${accessToken}`)
+    headers.set('Client-Id', this.oauth.getConfig().clientId)
+
+    try {
+      return await fetchWithTimeout(url, { ...options, headers }, REQUEST_TIMEOUT_MS)
+    } catch (error) {
+      throw normalizeTwitchError(error)
+    }
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
@@ -83,7 +91,7 @@ export class TwitchClient {
       // Ignore invalid/non-JSON responses.
     }
 
-    throw new AppError('TWITCH_API_ERROR', `Twitch API error: ${message}`, { status: response.status })
+    throw new AppError('TWITCH_API_ERROR', message, { status: response.status })
   }
 
   // a login exists and Twitch has not refused it: a failed refresh was a passing problem
@@ -96,7 +104,7 @@ export class TwitchClient {
   }
 
   private get broadcasterId(): string {
-    if (!this.userInfo) throw new AppError('TWITCH_NOT_CONNECTED', 'Twitch account is not connected')
+    if (!this.userInfo) throw new AppError('TWITCH_NOT_CONNECTED')
     return this.userInfo.id
   }
 
@@ -126,7 +134,7 @@ export class TwitchClient {
       profileImageUrl: userData.profile_image_url
     }
 
-    log.log(`Retrieved user info for: ${this.userInfo.displayName}`)
+    log.info(`Retrieved user info for: ${this.userInfo.displayName}`)
     return this.userInfo
   }
 
@@ -156,13 +164,13 @@ export class TwitchClient {
   async createCustomReward(data: TwitchCreateCustomReward): Promise<TwitchCustomReward> {
     const params = new URLSearchParams({ broadcaster_id: this.broadcasterId })
 
-    return this.sendForOne(`${REWARDS_URL}?${params}`, 'POST', { ...data, is_user_input_required: true }, 'Twitch API returned no created reward')
+    return this.sendForOne(`${REWARDS_URL}?${params}`, 'POST', { ...data, is_user_input_required: REWARD_REQUIRES_INPUT }, 'Twitch API returned no created reward')
   }
 
   async updateCustomReward(rewardId: string, data: TwitchUpdateCustomReward): Promise<TwitchCustomReward> {
     const params = new URLSearchParams({ broadcaster_id: this.broadcasterId, id: rewardId })
 
-    return this.sendForOne(`${REWARDS_URL}?${params}`, 'PATCH', { ...data, is_user_input_required: true }, 'Twitch API returned no updated reward')
+    return this.sendForOne(`${REWARDS_URL}?${params}`, 'PATCH', { ...data, is_user_input_required: REWARD_REQUIRES_INPUT }, 'Twitch API returned no updated reward')
   }
 
   // Subscribes a live EventSub WebSocket session to Channel Points redemptions of the connected channel

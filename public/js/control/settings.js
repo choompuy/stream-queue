@@ -1,6 +1,6 @@
 import { escapeHtml, show, setValue } from '../shared.js'
 import { api } from './api.js'
-import { state } from './state.js'
+import { state, isLocalDevice } from './state.js'
 import { dom } from './dom.js'
 import { log } from './log.js'
 import { run } from './run.js'
@@ -8,7 +8,7 @@ import { syncPlayer } from './player.js'
 import { renderQueue } from './queue.js'
 import { t } from '../i18n.js'
 import { toastError, toastSuccess } from './toast.js'
-import { fillForm, saveForm, toastSaveResult } from './form.js'
+import { fillForm, saveForm, toastSaveResult, formInputs, isChanged } from './form.js'
 
 let qrCodePromise
 
@@ -99,6 +99,7 @@ export async function copyOverlayUrl() {
 export function loadNetworkInfo() {
   return run('loading network info', async () => {
     state.network = await api.getNetworkInfo()
+    applyDeviceLocality()
     const { ips } = state.network
 
     if (!ips.length) state.selectedIp = 'localhost'
@@ -107,6 +108,10 @@ export function loadNetworkInfo() {
     renderIpSelect()
     renderQrUrl()
   })
+}
+
+export function applyDeviceLocality() {
+  document.body.classList.toggle('not-local', !isLocalDevice())
 }
 
 function renderIpSelect() {
@@ -157,7 +162,10 @@ export function toggleQr() {
 export function loadConfig() {
   return run('loading config', async () => {
     state.config = await api.getConfig()
-    fillForm(dom.botSettingsPanel, state.config)
+    const editing = formInputs(dom.botSettingsPanel)
+      .filter(isChanged)
+      .map((input) => input.name)
+    fillForm(dom.botSettingsPanel, state.config, { skip: editing, keepMarks: true })
   })
 }
 

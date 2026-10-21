@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -8,6 +8,9 @@ import { join } from 'node:path'
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
 const { getConfig, updateConfig, validateConfigUpdates } = await import('../../src/config.js')
+const { flushAllStores } = await import('../../src/persist.js')
+import type { Config } from '../../src/types.js'
+import type { DeepPartial } from '../../src/persist.js'
 
 const DEFAULTS = getConfig()
 
@@ -120,12 +123,27 @@ test('updateConfig()', async (t) => {
     assert.deepEqual(getConfig().fallbackPlaylist, before)
   })
 
-  await t.test('returns copies: mutating a result does not change the stored config', () => {
-    const { config } = updateConfig({})
-    config.fallbackPlaylist.repeat = true
-    getConfig().fallbackPlaylist.shuffle = true
+  await t.test('getConfig() hands out the live object: one snapshot per read, no per-read copy', () => {
+    assert.strictEqual(getConfig(), getConfig())
 
-    assert.equal(getConfig().fallbackPlaylist.repeat, false)
-    assert.equal(getConfig().fallbackPlaylist.shuffle, false)
+    const { config } = updateConfig({})
+    assert.strictEqual(config, getConfig())
+  })
+
+  await t.test('an update that changes nothing rewrites no file', async () => {
+    updateConfig({ minViews: 4242 })
+    await flushAllStores()
+    const file = join(process.cwd(), 'data', 'config.json')
+    assert.ok(existsSync(file))
+    rmSync(file)
+
+    assert.equal(updateConfig({ minViews: 4242 }).changed, false, 'the same value')
+    assert.equal(updateConfig({}).changed, false, 'an empty update')
+    assert.equal(updateConfig({ minViews: 4242, nope: 1 } as DeepPartial<Config>).changed, false, 'a fully rejected update')
+    await flushAllStores()
+
+    assert.equal(existsSync(file), false, 'config.json was not rewritten')
+
+    assert.equal(updateConfig({ minViews: 4243 }).changed, true, 'a real change')
   })
 })

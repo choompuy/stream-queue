@@ -1,7 +1,7 @@
 import { createLogger, describeError } from './logger.js'
 
 // What changed, not how: a topic only says "read it again". The data stays behind the existing GET endpoints
-export const TOPICS = ['state', 'activity', 'fallback', 'twitch', 'blocklist', 'playlists'] as const
+export const TOPICS = ['state', 'activity', 'fallback', 'twitch', 'blocklist', 'playlists', 'config'] as const
 export type Topic = (typeof TOPICS)[number]
 
 type Listener = () => void
@@ -20,7 +20,9 @@ export function on(topic: Topic, listener: Listener): () => void {
 
 // A notice is something that happened and is worth telling to whoever watches the panel, with what it is about.
 // Unlike a change it is not read again from anywhere: it exists only as long as it is being told
-export type Notice = { type: 'viewerRequest'; user: string; title: string }
+export type Notice =
+  | { type: 'viewerRequest'; user: string; title: string }
+  | { type: 'error'; level: 'error'; code: string; params?: Record<string, string | number> }
 
 const noticeListeners = new Set<(notice: Notice) => void>()
 

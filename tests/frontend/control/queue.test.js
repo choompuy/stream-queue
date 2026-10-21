@@ -58,13 +58,41 @@ test('renderQueue', async (t) => {
 
     queue.renderQueue()
 
-    assert.equal(panel.$('#queueCount').textContent, '2/5')
+    assert.equal(panel.$('#queueCount').textContent, 'In queue: 2 ▪ limit 5')
     assert.equal(panel.$('#tabQueueCount').textContent, '2')
 
     const rows = panel.$$('#queueListWrapper .row-item')
     assert.equal(rows.length, 2)
     assert.equal(rows[0].querySelector('.status-pill'), null)
     assert.ok(rows[1].querySelector('.status-pill'))
+  })
+
+  await t.test('an empty queue says so in words: a bare 0/0 tells nobody anything', () => {
+    state.config = { maxQueueSize: 5 }
+    state.queue = []
+
+    queue.renderQueue()
+
+    assert.equal(panel.$('#queueCount').textContent, 'In queue: 0 ▪ limit 5')
+
+    state.config = { maxQueueSize: 0 }
+    queue.renderQueue()
+    assert.equal(panel.$('#queueCount').textContent, 'Queue is empty')
+  })
+
+  await t.test('a playlist track goes by the localized name, and follows the panel\'s language', async () => {
+    state.config = { maxQueueSize: 5 }
+    state.queue = [track('a', { isFallback: true, requestedBy: 'playlist' })]
+
+    queue.renderQueue()
+    assert.equal(panel.$('#queueListWrapper .column-requested-by').textContent.trim(), 'Playlist')
+
+    // the track still carries the same marker: only the language changed, and the row shows it
+    await initI18n('ru')
+    queue.renderQueue()
+    assert.equal(panel.$('#queueListWrapper .column-requested-by').textContent.trim(), 'Плейлист')
+
+    await initI18n('en')
   })
 })
 

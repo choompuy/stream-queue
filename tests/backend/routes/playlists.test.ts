@@ -11,7 +11,17 @@ const express = (await import('express')).default
 const { router } = await import('../../../src/routes/playlists.js')
 const { getConfig, updateConfig } = await import('../../../src/config.js')
 const { upsertPlaylist } = await import('../../../src/playlists.js')
+const { hydrateFallback } = await import('../../../src/fallback.js')
 const { errorHandler } = await import('../../../src/error-handler.js')
+
+const song = (videoId: string) => ({ videoId, title: `Track ${videoId}`, channelTitle: 'Channel', thumbnail: '', duration: 120, views: 100_000, url: `https://youtu.be/${videoId}` })
+
+// saving a playlist id starts the reaction that loads it; hydrating the rotation first makes the id one the
+// rotation already holds, so the config can be set up without a (key-less, failing) load
+const setLoadedPlaylist = (playlistId: string | null) => {
+  hydrateFallback({ sourceTracks: playlistId ? [song('trk00000000')] : [], order: playlistId ? ['trk00000000'] : [], cursor: -1, playlistId, lastRefreshedAt: null })
+  updateConfig({ fallbackPlaylist: { playlistId } })
+}
 
 const app = express()
 app.use(express.json())
@@ -56,11 +66,36 @@ test('POST /api/playlists/:id/activate', async (t) => {
 
 const list = async () => ((await (await fetch(base)).json()) as Record<string, any>).data.playlists as Array<{ id: string; isActive: boolean }>
 
+const create = (playlistId: unknown) =>
+  fetch(base, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playlistId })
+  })
+
+test('POST /api/playlists', async (t) => {
+  await t.test('a malformed playlist id is a 400 INVALID_PLAYLIST_ID from the shared ID-or-URL check', async () => {
+    for (const playlistId of ['not a playlist', 'aaaaaaaaaaa']) {
+      const response = await create(playlistId)
+
+      assert.equal(response.status, 400, String(playlistId))
+      assert.equal(((await response.json()) as Record<string, any>).code, 'INVALID_PLAYLIST_ID', String(playlistId))
+    }
+  })
+
+  await t.test('a well-formed id or URL is parsed and goes on to load it (no key here, so the load refuses)', async () => {
+    const response = await create('https://www.youtube.com/playlist?list=PLsaved00000001')
+
+    assert.equal(response.status, 400)
+    assert.equal(((await response.json()) as Record<string, any>).code, 'NO_API_KEY')
+  })
+})
+
 test('GET /api/playlists', async (t) => {
   await t.test('says for every playlist whether it is the active one', async () => {
     upsertPlaylist({ id: 'PLfirst000000001', title: 'First', thumbnail: '', itemCount: 1 })
     upsertPlaylist({ id: 'PLsecond00000001', title: 'Second', thumbnail: '', itemCount: 2 })
-    updateConfig({ fallbackPlaylist: { playlistId: 'PLsecond00000001' } })
+    setLoadedPlaylist('PLsecond00000001')
 
     const playlists = await list()
 
@@ -75,8 +110,15 @@ test('GET /api/playlists', async (t) => {
 })
 
 test('DELETE /api/playlists/:id', async (t) => {
+  await t.test('a malformed id is rejected by the shared param check before the route runs', async () => {
+    const response = await fetch(`${base}/oops`, { method: 'DELETE' })
+
+    assert.equal(response.status, 400)
+    assert.equal(((await response.json()) as Record<string, any>).code, 'INVALID_PLAYLIST_ID')
+  })
+
   await t.test('answers with the playlists that are left, with their active marks, and says when it cleared the active one', async () => {
-    updateConfig({ fallbackPlaylist: { playlistId: 'PLsecond00000001' } })
+    setLoadedPlaylist('PLsecond00000001')
 
     const response = await fetch(`${base}/PLsecond00000001`, { method: 'DELETE' })
     const body = (await response.json()) as Record<string, any>

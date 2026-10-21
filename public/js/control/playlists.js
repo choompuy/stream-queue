@@ -33,8 +33,11 @@ export async function addPlaylist() {
 }
 
 export async function activatePlaylist(id) {
+  const playlist = state.playlists.find((p) => p.id === id)
+  const wasActive = playlist?.isActive
+
   await api.activatePlaylist(id)
-  toastSuccess(t('toast.playlistActivated'))
+  toastSuccess(wasActive ? t('toast.playlistDeactivated') : t('toast.playlistActivated'))
 }
 
 export async function deletePlaylist(id) {

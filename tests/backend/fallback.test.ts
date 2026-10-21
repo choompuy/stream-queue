@@ -1,15 +1,20 @@
 import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync } from 'node:fs'
+import { cpSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 
-process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
+// the playlist's requester name comes from the real locale files
+// (copied, not symlinked: creating a symlink needs extra privileges on Windows)
+const workDir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
+cpSync(resolve('public/locales'), join(workDir, 'public/locales'), { recursive: true })
+process.chdir(workDir)
 
 const fallback = await import('../../src/fallback.js')
 const { getConfig, updateConfig } = await import('../../src/config.js')
 const { setCurrent } = await import('../../src/queue.js')
 const { on } = await import('../../src/state-events.js')
+const { updateSettings } = await import('../../src/settings.js')
 
 const IDS = Array.from({ length: 12 }, (_, i) => `track${String(i).padStart(2, '0')}`)
 const song = (videoId: string) => ({
@@ -28,7 +33,7 @@ beforeEach(() => {
   updateConfig({ fallbackPlaylist: { shuffle: false } })
 })
 
-const order = () => fallback.getFallbackProgress().order
+const order = () => fallback.getFallbackSnapshot().order
 
 test('reorderFallback()', async (t) => {
   await t.test('re-orders the rotation without touching the stored shuffle flag', () => {
@@ -87,7 +92,30 @@ test('state persistence hooks', async (t) => {
       countNotifications(() => fallback.clearFallback()),
       1
     )
-    assert.deepEqual(fallback.getFallbackProgress().order, [])
-    assert.equal(fallback.getFallbackProgress().playlistId, null)
+    assert.deepEqual(fallback.getFallbackSnapshot().order, [])
+    assert.equal(fallback.getFallbackSnapshot().playlistId, null)
+  })
+})
+
+test('the tracks the playlist itself queues', async (t) => {
+  await t.test('queueFallbackTrack() marks the track as the playlist\'s own', () => {
+    setCurrent({ ...song('playing000001'), requestedBy: 'viewer' })
+
+    const item = fallback.queueFallbackTrack('track00')
+
+    assert.equal(item?.isFallback, true)
+    assert.equal(item?.requestedBy, 'playlist')
+    assert.equal(fallback.queueFallbackTrack('nosuchtrack00'), null)
+  })
+
+  await t.test('the marker is stable whatever the locale: the localized name is put in where the track is shown', () => {
+    updateSettings({ locale: 'ru' })
+    setCurrent({ ...song('playing000001'), requestedBy: 'viewer' })
+
+    assert.equal(fallback.queueFallbackTrack('track05')?.requestedBy, 'playlist')
+    assert.equal(fallback.advanceFallback()?.requestedBy, 'playlist')
+
+    updateSettings({ locale: 'en' })
+    assert.equal(fallback.peekNextFallbackTrack()?.requestedBy, 'playlist')
   })
 })

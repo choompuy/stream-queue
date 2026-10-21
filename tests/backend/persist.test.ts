@@ -1,14 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 
 const testDir = mkdtempSync(join(tmpdir(), 'streamqueue-persist-'))
 process.chdir(testDir)
 
-const { createFileStore, flushAllStores } = await import('../../src/persist.js')
+const { createFileStore, flushAllStores, ensureDataDirectory } = await import('../../src/persist.js')
 
 let counter = 0
 const filePath = () => join(testDir, `store-${++counter}.json`)
@@ -55,6 +55,40 @@ test('load()', async (t) => {
     const store = createFileStore<{ a: number | null }>(path)
 
     assert.deepEqual(store.load({ a: 1 }), { a: null })
+  })
+
+  await t.test('a top-level value of the wrong kind gives the defaults instead of lying about the type', (t2) => {
+    t2.mock.method(console, 'warn', () => {})
+
+    for (const saved of ['null', '"text"', '5', 'true']) {
+      const path = filePath()
+      writeFileSync(path, saved)
+      const store = createFileStore<{ a: number }>(path)
+
+      assert.deepEqual(store.load({ a: 1 }), { a: 1 }, `file holding ${saved}`)
+    }
+  })
+
+  await t.test('an object where a list belongs gives the defaults', (t2) => {
+    t2.mock.method(console, 'warn', () => {})
+    const path = filePath()
+    writeFileSync(path, JSON.stringify({ a: 1 }))
+    const store = createFileStore<Array<{ id: string }>>(path)
+
+    assert.deepEqual(store.load([{ id: 'x' }]), [{ id: 'x' }])
+  })
+
+  await t.test('a file of the wrong kind is set aside, like a corrupt one, instead of being silently overwritten', (t2) => {
+    t2.mock.method(console, 'warn', () => {})
+    const path = filePath()
+    writeFileSync(path, 'null')
+    const store = createFileStore<{ a: number }>(path)
+
+    assert.deepEqual(store.load({ a: 1 }), { a: 1 })
+
+    assert.equal(existsSync(path), false)
+    const kept = readdirSync(testDir).filter((name) => name.startsWith(`${basename(path)}.corrupt-`))
+    assert.equal(kept.length, 1)
   })
 })
 
@@ -270,6 +304,211 @@ test('debounce timing', async (t) => {
 
     assert.equal(calls.count, 1, 'getData should only be read once, for the final write')
     assert.deepEqual(readJson(path), { n: 4 })
+  })
+})
+
+test('transient write failures are retried', async (t) => {
+  const { rename: realRename } = await import('node:fs/promises')
+  const busy = (): Error & { code: string } => {
+    const error = new Error('resource busy or locked') as Error & { code: string }
+    error.code = 'EBUSY'
+    return error
+  }
+
+  await t.test('a rename blocked once (an antivirus letting go of the file) succeeds on the second attempt', async () => {
+    const path = filePath()
+    let calls = 0
+    const store = createFileStore<{ n: number }>(path, {
+      rename: async (from, to) => {
+        calls++
+        if (calls === 1) throw busy()
+        return realRename(from, to)
+      },
+      retryDelayMs: 1
+    })
+
+    store.scheduleSave(() => ({ n: 1 }))
+    await store.flush()
+
+    assert.equal(calls, 2)
+    assert.deepEqual(readJson(path), { n: 1 })
+  })
+
+  await t.test('a rename that keeps failing is given up after three attempts and the .tmp is cleaned up', async (t2) => {
+    t2.mock.method(console, 'error', () => {})
+    const path = filePath()
+    let calls = 0
+    const store = createFileStore<{ n: number }>(path, {
+      rename: async () => {
+        calls++
+        throw busy()
+      },
+      retryDelayMs: 1
+    })
+    const errors: unknown[] = []
+
+    store.scheduleSave(
+      () => ({ n: 1 }),
+      (error) => errors.push(error)
+    )
+    await store.flush()
+
+    assert.equal(calls, 3)
+    assert.equal(errors.length, 1)
+    assert.equal(existsSync(`${path}.tmp`), false)
+  })
+
+  await t.test('a non-transient failure is not retried at all', async () => {
+    const path = filePath()
+    let calls = 0
+    const store = createFileStore<{ n: number }>(path, {
+      rename: async () => {
+        calls++
+        const error = new Error('is a directory') as Error & { code: string }
+        error.code = 'EISDIR'
+        throw error
+      },
+      retryDelayMs: 1
+    })
+    const errors: unknown[] = []
+
+    store.scheduleSave(
+      () => ({ n: 1 }),
+      (error) => errors.push(error)
+    )
+    await store.flush()
+
+    assert.equal(calls, 1)
+    assert.equal(errors.length, 1)
+  })
+})
+
+test('a store without its own onError reports the failure itself', async (t) => {
+  const errors = t.mock.method(console, 'error', () => {})
+  const badDir = join(testDir, `not-writable-${++counter}`)
+  mkdirSync(badDir)
+  const path = join(badDir, 'sub') // a directory in place of the file makes the write fail
+  mkdirSync(path)
+
+  const store = createFileStore<{ n: number }>(path)
+  store.scheduleSave(() => ({ n: 1 }))
+  await store.flush()
+
+  assert.equal(errors.mock.callCount(), 1)
+  // raw arguments, not JSON.stringify: on Windows JSON-escaping doubles the backslashes in the path
+  const reported = String(errors.mock.calls[0]?.arguments ?? '')
+  assert.ok(reported.includes('Failed to save'), reported)
+  assert.ok(reported.includes(path), reported)
+})
+
+test('ensureDataDirectory()', async (t) => {
+  await t.test('creates the directory, checks that it is writable and says where it is', async (t2) => {
+    const logs = t2.mock.method(console, 'log', () => {})
+
+    await ensureDataDirectory()
+
+    const dataDir = join(testDir, 'data')
+    assert.ok(existsSync(dataDir))
+    assert.equal(existsSync(join(dataDir, '.write-test')), false, 'the probe file is cleaned up')
+    const logged = logs.mock.calls.map((call) => call.arguments.join(' ')).join('\n')
+    assert.ok(logged.includes(`Data directory: ${dataDir}`), logged)
+  })
+
+  await t.test('reports a data directory that cannot be created, without throwing', async (t2) => {
+    const errors = t2.mock.method(console, 'error', () => {})
+    const blocked = join(testDir, `blocked-${++counter}`)
+    mkdirSync(blocked)
+    writeFileSync(join(blocked, 'data'), 'a file in place of the directory')
+
+    process.chdir(blocked)
+    try {
+      await assert.doesNotReject(ensureDataDirectory())
+    } finally {
+      process.chdir(testDir)
+    }
+
+    assert.equal(errors.mock.callCount(), 1)
+    const reported = JSON.stringify(errors.mock.calls[0]?.arguments ?? [])
+    assert.ok(reported.includes('not writable'), reported)
+  })
+})
+
+test('saveNow()', async (t) => {
+  await t.test('writes the file at once, without waiting for the debounce', async () => {
+    const path = filePath()
+    const store = createFileStore<{ n: number }>(path)
+
+    await store.saveNow(
+      () => ({ n: 1 }),
+      () => {}
+    )
+
+    assert.deepEqual(readJson(path), { n: 1 })
+  })
+
+  await t.test('joins the chain: a save scheduled before it is waited for, not raced, and both land once each', async () => {
+    const path = filePath()
+    const store = createFileStore<{ n: number }>(path)
+    const order: string[] = []
+
+    store.scheduleSave(
+      () => {
+        order.push('scheduled')
+        return { n: 1 }
+      },
+      () => {}
+    )
+    await store.saveNow(
+      () => {
+        order.push('now')
+        return { n: 2 }
+      },
+      () => {}
+    )
+    await store.flush()
+
+    assert.deepEqual(order, ['now', 'scheduled'], 'one write at a time: the .tmp file is never shared by two saves')
+    assert.deepEqual(readJson(path), { n: 1 }, 'the debounced write ran last, with its own data')
+  })
+
+  await t.test('flush() waits for a saveNow that is still on the chain', async () => {
+    const path = filePath()
+    const store = createFileStore<{ n: number }>(path)
+
+    void store.saveNow(
+      () => ({ n: 7 }),
+      () => {}
+    )
+    await store.flush()
+
+    assert.deepEqual(readJson(path), { n: 7 }, 'the exit flush did not leave before this save was written')
+  })
+
+  await t.test('an error is reported through onError, and a later save still works', async () => {
+    const badDir = join(testDir, `not-writable-${++counter}`)
+    mkdirSync(badDir)
+    const path = join(badDir, 'sub') // a directory in place of the file makes the write fail
+    mkdirSync(path)
+
+    const store = createFileStore<{ n: number }>(path)
+    const errors: unknown[] = []
+
+    await assert.doesNotReject(
+      store.saveNow(
+        () => ({ n: 1 }),
+        (error) => errors.push(error)
+      )
+    )
+    assert.equal(errors.length, 1)
+
+    const goodPath = filePath()
+    const goodStore = createFileStore<{ n: number }>(goodPath)
+    goodStore.scheduleSave(
+      () => ({ n: 2 }),
+      () => {}
+    )
+    await goodStore.flush()
+    assert.deepEqual(readJson(goodPath), { n: 2 })
   })
 })
 

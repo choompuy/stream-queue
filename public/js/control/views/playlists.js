@@ -10,7 +10,7 @@ export const playlistsView = createListView(dom.playlistsListWrapper, {
     row({
       className: playlist.isActive ? 'row-active' : '',
       thumbnail: playlist.thumbnail,
-      title: playlist.title,
+      title: playlist.title || t('playlists.untitled'),
       subtitle: t('playlists.tracks', { count: playlist.itemCount }),
       actions: rowMenu([
         {

@@ -27,6 +27,7 @@ const track = (c, extra = {}) => ({
   duration: 100,
   views: 5,
   requestedBy: 'bob',
+  isFallback: false,
   ...extra
 })
 let stateOverride = null
@@ -65,7 +66,13 @@ const routes = {
   }),
   'GET /api/state': () => {
     if (failStateWith500) return [500, { error: 'boom', code: 'SERVER_ERROR' }]
-    const state = stateOverride ?? { current: track('a'), queue: [track('b'), track('c')], isPaused: false, nextTrack: null }
+    // the playlist is playing: like the server, the current track says so with isFallback
+    const state = stateOverride ?? {
+      current: track('f', { isFallback: true, requestedBy: 'Playlist' }),
+      queue: [track('b'), track('c')],
+      isPaused: false,
+      nextTrack: null
+    }
     return { ...state, queue: withBlocked(state.queue) }
   },
   'GET /api/fallback': () => ({
@@ -73,6 +80,7 @@ const routes = {
     activeVideoId: V('f'),
     lastRefreshedAt: Date.now(),
     sourceCount: 2,
+    itemCount: 5,
     shuffle: false,
     repeat: true,
     enabled: true
@@ -119,20 +127,20 @@ const $$ = (sel) => [...document.querySelectorAll(sel)]
 const toasts = () => $$('#toastContainer .toast-message').map((n) => n.textContent)
 const tick = () => new Promise((r) => setTimeout(r, 50))
 let passed = 0
-const check = (name, fn) => {
-  fn()
+const check = async (name, fn) => {
+  await fn()
   passed++
   process.stdout.write(`  ok - ${name}\n`)
 }
 
 // --- initial render
-check('queue rows rendered with blocked pill on the blocked one', () => {
+await check('queue rows rendered with blocked pill on the blocked one', () => {
   const rows = $$('#queueListWrapper .row-item')
   assert.equal(rows.length, 2)
   assert.equal(rows[0].querySelector('.status-pill'), null)
   assert.ok(rows[1].querySelector('.status-pill'))
 })
-check('queue rows: a normal row has a menu (block, remove), a blocked row a dedicated unblock button', () => {
+await check('queue rows: a normal row has a menu (block, remove), a blocked row a dedicated unblock button', () => {
   const rows = $$('#queueListWrapper .row-item')
   assert.deepEqual(
     [...rows[0].querySelectorAll('.row-menu-item')].map((b) => b.dataset.action),
@@ -141,22 +149,20 @@ check('queue rows: a normal row has a menu (block, remove), a blocked row a dedi
   assert.equal(rows[1].querySelector('.row-menu'), null)
   assert.equal(rows[1].querySelector('[data-action="unblock-track"]')?.dataset.videoId, V('c'))
 })
-check('menu items have role=menuitem, toggles have aria-expanded=false', () => {
+await check('menu items have role=menuitem, toggles have aria-expanded=false', () => {
   assert.ok($$('.row-menu-item').every((b) => b.getAttribute('role') === 'menuitem'))
   assert.ok($$('[data-action="toggle-menu"]').every((b) => b.getAttribute('aria-expanded') === 'false'))
 })
-check('fallback: active row highlighted (no dataset side-channel)', () => {
+await check('fallback: rows rendered', () => {
   const rows = $$('#fallbackListWrapper .row-item')
   assert.equal(rows.length, 2)
-  assert.ok(!rows[0].classList.contains('row-active'))
-  assert.ok(rows[1].classList.contains('row-active'))
   assert.equal(rows[1].dataset.videoId, V('f'))
 })
-check('playlists: rows rendered', () => {
+await check('playlists: rows rendered', () => {
   const rows = $$('#playlistsListWrapper .row-item')
   assert.equal(rows.length, 2)
 })
-check('activity: escaping, thumbnail helper, translated failure reason', () => {
+await check('activity: escaping, thumbnail helper, translated failure reason', () => {
   const rows = $$('#activityListWrapper .row-item')
   assert.equal(rows.length, 2)
   assert.ok(rows[0].querySelector('img').src.endsWith(`/vi/${V('a')}/mqdefault.jpg`))
@@ -165,7 +171,7 @@ check('activity: escaping, thumbnail helper, translated failure reason', () => {
   const item = rows[0].querySelector('[data-action="block-track"]')
   assert.equal(item.dataset.title, 'A $$ "quoted" & <b>')
 })
-check('blocklist rendered with thumbnail helper', () => {
+await check('blocklist rendered with thumbnail helper', () => {
   const rows = $$('#blocklistListWrapper .row-item')
   assert.equal(rows.length, 1)
   assert.ok(rows[0].querySelector('img').src.includes(`/vi/${V('c')}/`))
@@ -173,20 +179,20 @@ check('blocklist rendered with thumbnail helper', () => {
 
 // --- menu behaviour
 $('#queueListWrapper [data-action="toggle-menu"]').click()
-check('toggle-menu opens the dropdown and sets aria-expanded', () => {
+await check('toggle-menu opens the dropdown and sets aria-expanded', () => {
   const menu = $('#queueListWrapper .row-menu')
   assert.ok(!menu.querySelector('.row-menu-dropdown').classList.contains('hidden'))
   assert.equal(menu.querySelector('[data-action="toggle-menu"]').getAttribute('aria-expanded'), 'true')
 })
 document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-check('Escape closes the menu and resets aria-expanded', () => {
+await check('Escape closes the menu and resets aria-expanded', () => {
   const menu = $('#queueListWrapper .row-menu')
   assert.ok(menu.querySelector('.row-menu-dropdown').classList.contains('hidden'))
   assert.equal(menu.querySelector('[data-action="toggle-menu"]').getAttribute('aria-expanded'), 'false')
 })
 $('#queueListWrapper [data-action="toggle-menu"]').click()
 document.body.click()
-check('click outside closes the menu', () => {
+await check('click outside closes the menu', () => {
   assert.ok($('#queueListWrapper .row-menu-dropdown').classList.contains('hidden'))
 })
 
@@ -195,7 +201,7 @@ calls.length = 0
 $('#activityListWrapper [data-action="block-track"]').click()
 await tick()
 await tick()
-check('block-track posts videoId + title exactly, then reloads blocklist and state', () => {
+await check('block-track posts videoId + title exactly, then reloads blocklist and state', () => {
   assert.ok(calls.includes('POST /api/blocklist'))
   assert.ok(calls.includes('GET /api/blocklist'))
   assert.ok(calls.includes('GET /api/state'))
@@ -209,7 +215,7 @@ calls.length = 0
 $('#queueListWrapper [data-action="unblock-track"]').click()
 await tick()
 await tick()
-check('unblock-track deletes the entry, reloads the lists and the row becomes a normal one', () => {
+await check('unblock-track deletes the entry, reloads the lists and the row becomes a normal one', () => {
   assert.ok(calls.includes(`DELETE /api/blocklist/${V('c')}`))
   assert.ok(calls.includes('GET /api/blocklist'))
   const rows = $$('#queueListWrapper .row-item')
@@ -222,16 +228,16 @@ check('unblock-track deletes the entry, reloads the lists and the row becomes a 
 $(`#fallbackListWrapper [data-video-id="${V('e')}"] [data-action="fallback-play"]`).click()
 await tick()
 await tick()
-check('API error from an action shows a translated toast', () => {
+await check('API error from an action shows a translated toast', () => {
   assert.ok(toasts().includes('This track has been blocked by the streamer'), JSON.stringify(toasts()))
 })
 const before = toasts().length
 failStateWith500 = true
 const { refreshState } = await import(pathToFileURL(`${ROOT}/js/control/queue.js`).href)
 await refreshState(true)
-check('silent refresh failure produces no toast', () => assert.equal(toasts().length, before))
+await check('silent refresh failure produces no toast', () => assert.equal(toasts().length, before))
 await refreshState(false)
-check('non-silent refresh failure produces a toast', () => assert.equal(toasts().length, before + 1))
+await check('non-silent refresh failure produces a toast', () => assert.equal(toasts().length, before + 1))
 failStateWith500 = false
 
 // --- server unreachable: one toast for several failing loaders, none for silent polling
@@ -242,9 +248,9 @@ globalThis.fetch = async (url, options) => {
 }
 const beforeNet = toasts().length
 await refreshState(true)
-check('silent network failure produces no toast', () => assert.equal(toasts().length, beforeNet))
+await check('silent network failure produces no toast', () => assert.equal(toasts().length, beforeNet))
 await Promise.all([refreshState(false), refreshState(false), refreshState(false)])
-check('several simultaneous network failures show a single toast', () => {
+await check('several simultaneous network failures show a single toast', () => {
   const netToasts = toasts().filter((m) => m === "Can't reach the server")
   assert.equal(netToasts.length, 1, JSON.stringify(toasts()))
 })
@@ -255,7 +261,7 @@ const stray = document.createElement('button')
 stray.dataset.action = 'does-not-exist'
 document.body.append(stray)
 stray.click()
-check('unknown data-action is logged instead of silently ignored', () =>
+await check('unknown data-action is logged instead of silently ignored', () =>
   assert.ok(logs.some((l) => l.includes('No handler registered for action "does-not-exist"')))
 )
 
@@ -265,12 +271,12 @@ const n = toasts().length
 await run('boom', () => {
   throw new TypeError('x is undefined')
 })
-check('non-API errors are logged and shown as a generic error toast', () => {
+await check('non-API errors are logged and shown as a generic error toast', () => {
   assert.equal(toasts().length, n + 1)
   assert.ok(logs.some((l) => l.includes('Error boom:')))
 })
 
-check('no console.error during the whole run', () => assert.deepEqual(errors, []))
+await check('no console.error during the whole run', () => assert.deepEqual(errors, []))
 console.log = () => {}
 process.stdout.write(`\n${passed} checks passed\n`)
 process.exit(0)

@@ -31,7 +31,6 @@
       "REGION_BLOCKED": "@{{user}}, это видео недоступно в этом регионе, баллы возвращены",
       "NOT_PLAYABLE": "@{{user}}, это видео нельзя воспроизвести, баллы возвращены",
       "IS_LIVE": "@{{user}}, трансляции нельзя добавлять в очередь, баллы возвращены",
-      "IS_SHORT": "@{{user}}, шортсы нельзя добавлять в очередь, баллы возвращены",
       "DURATION_OUT_OF_RANGE": "@{{user}}, этот трек не соответствует требованиям по длительности, баллы возвращены",
       "VIEWS_TOO_LOW": "@{{user}}, этот трек не соответствует требованиям по просмотрам, баллы возвращены",
       "PLAYBACK_VIDEO_UNAVAILABLE": "@{{user}}, «{{title}}» не удалось сыграть: видео стало недоступно, баллы возвращены",
@@ -46,7 +45,9 @@
     "on": "Вкл",
     "off": "Выкл",
     "more": "Ещё действия",
-    "live": "LIVE"
+    "live": "LIVE",
+    "unknownTitle": "Неизвестное название",
+    "unknownChannel": "Неизвестный канал"
   },
   "nav": {
     "dashboard": "Панель",
@@ -73,6 +74,8 @@
   "queue": {
     "title": "Очередь",
     "empty": "Очередь пуста",
+    "info": "В очереди: {{count}}",
+    "infoMax": "В очереди: {{count}} ▪ лимит {{max}}",
     "remove": "Удалить из очереди",
     "clear": "Очистить",
     "clearConfirm": "Очистить всю очередь?"
@@ -80,18 +83,22 @@
   "fallback": {
     "title": "Плейлист",
     "empty": "Плейлист пуст",
+    "notSet": "Нет активного плейлиста - добавьте его на странице «Плейлисты»",
     "refresh": "Обновить",
     "shuffle": "Перемешать",
     "repeat": "Повтор",
     "enable": "Включить плейлист",
     "info": "{{count}} треков ▪ обновлено {{datetime}}",
+    "infoOf": "{{count}} из {{total}} треков ▪ обновлено {{datetime}}",
     "addToQueue": "Добавить в очередь",
     "playNow": "Воспроизвести сейчас",
-    "playing": "Играет"
+    "playing": "Играет",
+    "requester": "Плейлист"
   },
   "activity": {
     "title": "Активность",
     "empty": "Нет запросов",
+    "requests": "Запросов: {{count}}",
     "clear": "Очистить",
     "clearConfirm": "Очистить активность?",
     "accepted": "Принято",
@@ -119,7 +126,8 @@
     "activate": "Воспроизвести плейлист",
     "pause": "Пауза плейлиста",
     "delete": "Удалить плейлист",
-    "deleteConfirm": "Удалить этот плейлист?"
+    "deleteConfirm": "Удалить этот плейлист?",
+    "untitled": "Плейлист без названия"
   },
   "settings": {
     "title": "Настройки",
@@ -152,7 +160,6 @@
         "maxQueue": "Макс. размер очереди",
         "maxPerUser": "Макс. запросов на пользователя",
         "regionCode": "Код региона",
-        "allowShorts": "Видео Shorts",
         "allowLiveStreams": "Прямая трансляции",
         "contentMode": "Контент",
         "contentModeMusic": "Только музыка",
@@ -166,6 +173,7 @@
       "description": "Локальное управление музыкальными запросами для стримеров",
       "developedBy": "Разработано"
     },
+    "remoteNote": "Панель открыта с другого устройства - настройки, доступные только самому компьютеру (ключ API и интеграция с Twitch), скрыты. Меняйте их на компьютере, где запущено приложение",
     "twitch": {
       "integration": "Интеграция с Twitch",
       "chanel": "Twitch канал",
@@ -230,6 +238,7 @@
       "playlistLoadFailed": "Не удалось загрузить плейлист, проверьте ID",
       "invalidQuery": "Запрос должен содержать минимум 2 символа",
       "invalidQueryRange": "Запрос должен быть от 2 до 200 символов",
+      "invalidRequest": "Некорректный запрос",
       "invalidYoutubeUrl": "Некорректная ссылка на YouTube",
       "songNotFound": "Не удалось найти подходящий трек",
       "usernameRequired": "Имя пользователя обязательно",
@@ -237,6 +246,7 @@
       "queueItemNotFound": "Элемент очереди не найден",
       "trackNotFound": "Трек не найден в fallback",
       "serverError": "Внутренняя ошибка сервера",
+      "tooManyConnections": "Слишком много открытых соединений, закройте вкладку и попробуйте снова",
       "unexpectedError": "Что-то пошло не так, подробности в логе",
       "notFound": "Не найдено",
       "duplicate": "Этот трек уже находится в очереди",
@@ -264,13 +274,18 @@
       "twitchOAuthError": "Не удалось завершить авторизацию Twitch",
       "twitchAuthExpired": "Время авторизации Twitch истекло, попробуйте подключиться снова",
       "twitchNotConnected": "Аккаунт Twitch не подключён",
-      "twitchRefreshError": "Не удалось обновить подключение Twitch"
+      "twitchRefreshError": "Не удалось обновить подключение Twitch",
+      "twitchApiError": "Ошибка Twitch API: {{message}}",
+      "twitchNetworkError": "Нет связи с Twitch",
+      "twitchUnknownError": "Неизвестная ошибка Twitch",
+      "twitchConnectionLost": "Связь с Twitch пропадала на {{minutes}} мин: проверьте награды в панели Twitch"
     }
   },
   "toast": {
     "removedFromQueue": "Удалено из очереди",
     "playlistAdded": "Плейлист добавлен",
     "playlistActivated": "Плейлист активирован",
+    "playlistDeactivated": "Плейлист на паузе",
     "playlistDeleted": "Плейлист удалён",
     "fallbackRefreshed": "Плейлист обновлён",
     "trackBlocked": "Трек заблокирован",

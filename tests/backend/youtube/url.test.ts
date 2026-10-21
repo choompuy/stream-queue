@@ -108,6 +108,17 @@ test('parsePlaylistId', async (t) => {
     assert.equal(parsePlaylistId('dQw4w9WgXcQ'), null)
   })
 
+  await t.test('a list param on a foreign host is ignored', () => {
+    assert.equal(parsePlaylistId('https://example.com/?list=PLbpi6ZahtOH6Blw3RGYpWkSByi_T7Rygb'), null)
+  })
+
+  await t.test('list links keep working on every YouTube host', () => {
+    const id = 'PLbpi6ZahtOH6Blw3RGYpWkSByi_T7Rygb'
+    assert.equal(parsePlaylistId(`https://youtube.com/playlist?list=${id}`), id)
+    assert.equal(parsePlaylistId(`https://music.youtube.com/playlist?list=${id}`), id)
+    assert.equal(parsePlaylistId(`https://youtu.be/dQw4w9WgXcQ?list=${id}`), id)
+  })
+
   await t.test('empty string', () => {
     assert.equal(parsePlaylistId(''), null)
   })

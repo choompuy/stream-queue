@@ -2,7 +2,9 @@ import type WebSocket from 'ws'
 import { TwitchOAuth } from './oauth.js'
 import { ReconnectingSocket } from './socket.js'
 import type { TwitchChatMessage } from './types.js'
+import { AppError } from '../../types.js'
 import { createLogger, describeError } from '../../logger.js'
+import { INPUT_LIMITS } from '../../validate.js'
 
 const log = createLogger('TWITCH CHAT')
 
@@ -10,12 +12,11 @@ const IRC_WS_URL = 'wss://irc-ws.chat.twitch.tv:443'
 const PING_INTERVAL_MS = 2 * 60 * 1000
 // Twitch answers our PING at once: no data at all for this long means the connection is dead
 const WATCHDOG_MS = PING_INTERVAL_MS + 60_000
-const MAX_MESSAGE_LENGTH = 500
+const MAX_MESSAGE_LENGTH = INPUT_LIMITS.chatMessage
 
 export type TwitchChatOptions = {
   oauth: TwitchOAuth
   channelLogin: string
-  botLogin: string
   onMessage?: (message: TwitchChatMessage) => Promise<void> | void
 }
 
@@ -84,8 +85,7 @@ export class TwitchChat extends ReconnectingSocket {
 
   async sendMessage(text: string): Promise<void> {
     if (!this.isConnected() || !this.socket) {
-      log.warn(`Cannot send message, not connected: ${text}`)
-      return
+      throw new AppError('TWITCH_NOT_CONNECTED')
     }
 
     // a line break would end the IRC command and let the rest be read as a new one; Twitch drops anything over 500 characters
@@ -104,13 +104,13 @@ export class TwitchChat extends ReconnectingSocket {
 
   protected async beforeOpen(): Promise<void> {
     const accessToken = await this.config.oauth.getValidAccessToken()
-    if (!accessToken) throw new Error('Twitch account is not connected, cannot open chat connection')
+    if (!accessToken) throw new AppError('TWITCH_NOT_CONNECTED')
     this.accessToken = accessToken
   }
 
   protected onOpen(socket: WebSocket): void {
     socket.send(`PASS oauth:${this.accessToken}`)
-    socket.send(`NICK ${this.config.botLogin}`)
+    socket.send(`NICK ${this.config.channelLogin}`)
     socket.send('CAP REQ :twitch.tv/commands twitch.tv/tags')
     socket.send(`JOIN #${this.config.channelLogin}`)
     this.accessToken = ''
@@ -146,8 +146,8 @@ export class TwitchChat extends ReconnectingSocket {
         // below, since a bad channel name would otherwise be reported as connected
         return
       case 'JOIN':
-        if (prefix?.split('!')[0] === this.config.botLogin && params[0] === `#${this.config.channelLogin}`) {
-          log.log(`Joined channel #${this.config.channelLogin}`)
+        if (prefix?.split('!')[0] === this.config.channelLogin && params[0] === `#${this.config.channelLogin}`) {
+          log.info(`Joined channel #${this.config.channelLogin}`)
           this.markReady()
           this.startPingLoop()
         }
@@ -172,7 +172,9 @@ export class TwitchChat extends ReconnectingSocket {
     const userLogin = prefix?.split('!')[0] ?? ''
     const displayName = tags['display-name'] || userLogin
     const isBroadcaster = hasBadge(tags.badges, 'broadcaster')
-    const isModerator = tags.mod === '1' || hasBadge(tags.badges, 'moderator') || isBroadcaster
+    // the account is the channel's own: "mod" is 1 exactly when the user moderates the channel, so the
+    // moderator badge would only repeat what the tag already says
+    const isModerator = tags.mod === '1' || isBroadcaster
 
     const message: TwitchChatMessage = {
       channel: this.config.channelLogin,

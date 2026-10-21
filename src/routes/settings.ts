@@ -1,12 +1,11 @@
 import express from 'express'
 import { ConfigResponse, SettingsResponse } from '../types.js'
-import { ok, fail, sendConfigUpdate } from '../http.js'
-import { isLocalAddress, localOnly } from '../local-only.js'
+import { ok, sendConfigUpdate } from '../http.js'
+import { isLocal, localOnly } from '../local-only.js'
 import { getConfig, updateConfig } from '../config.js'
 import { getSettings, updateSettings } from '../settings.js'
 import { getPublicSecretsView, SecretsResponse, updateSecrets } from '../secrets.js'
-import { parsePlaylistId } from '../youtube/url.js'
-import { refreshFallbackOrRollback, reorderFallback } from '../fallback.js'
+import { settledConfigReaction } from '../fallback.js'
 
 export const router = express.Router()
 
@@ -24,45 +23,21 @@ router.get('/config', (_req, res) => {
   ok<ConfigResponse>(res, getConfig())
 })
 
+// saves; the fallback module reacts to what changed (a new playlist is loaded, the rotation re-ordered)
+// and the route waits for that outcome, so a playlist that cannot be loaded is answered with its error
 router.put('/config', async (req, res) => {
-  const body = { ...(req.body ?? {}) }
-
-  if (body.fallbackPlaylist !== undefined) {
-    if (typeof body.fallbackPlaylist !== 'object' || body.fallbackPlaylist === null || Array.isArray(body.fallbackPlaylist)) {
-      fail(res, 'invalid fallbackPlaylist: must be an object', 'INVALID_CONFIG', 400, { fields: 'fallbackPlaylist' })
-      return
-    }
-
-    if (typeof body.fallbackPlaylist.playlistId === 'string') {
-      const rawPlaylistId = body.fallbackPlaylist.playlistId.trim()
-
-      if (rawPlaylistId) {
-        const parsedId = parsePlaylistId(rawPlaylistId)
-        if (!parsedId) {
-          fail(res, 'invalid playlist ID or URL', 'INVALID_PLAYLIST_ID', 400)
-          return
-        }
-        body.fallbackPlaylist = { ...body.fallbackPlaylist, playlistId: parsedId }
-      } else {
-        body.fallbackPlaylist = { ...body.fallbackPlaylist, playlistId: null }
-      }
-    }
-  }
-
   const previous = getConfig()
-  const { config: updated, rejected } = updateConfig(body)
+  const { config: updated, rejected } = updateConfig(req.body ?? {})
 
   if (updated.fallbackPlaylist.playlistId !== previous.fallbackPlaylist.playlistId) {
-    await refreshFallbackOrRollback(previous.fallbackPlaylist.playlistId)
-  } else if (updated.fallbackPlaylist.shuffle !== previous.fallbackPlaylist.shuffle) {
-    reorderFallback(updated.fallbackPlaylist.shuffle)
+    await settledConfigReaction(updated.fallbackPlaylist.playlistId)
   }
 
   sendConfigUpdate(res, updated, rejected)
 })
 
 router.get('/secrets', (req, res) => {
-  ok<SecretsResponse>(res, getPublicSecretsView({ includeAuthorization: isLocalAddress(req.socket.remoteAddress) }))
+  ok<SecretsResponse>(res, getPublicSecretsView({ includeAuthorization: isLocal(req) }))
 })
 
 router.put('/secrets', localOnly, (req, res) => {
