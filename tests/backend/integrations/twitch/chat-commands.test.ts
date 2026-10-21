@@ -10,8 +10,8 @@ const { getConfig, updateConfig } = await import('../../../../src/config.js')
 const { updateTwitchConfig } = await import('../../../../src/integrations/twitch/config.js')
 const { hydrateQueue } = await import('../../../../src/queue.js')
 const { getState, setPaused, getIsPaused } = await import('../../../../src/player.js')
-const { _resetIntegration } = await import('../../../../src/integrations/twitch/index.js')
-const { hasPermission, matchesCommand, handleChatMessage, resetCommandCooldowns } = await import('../../../../src/integrations/twitch/chat-commands.js')
+const { stop: stopIntegration, initializeTwitchIntegration } = await import('../../../../src/integrations/twitch/index.js')
+const { hasPermission, matchesCommand, handleChatMessage } = await import('../../../../src/integrations/twitch/chat-commands.js')
 const { chatConnection } = await import('../../../../src/integrations/twitch/state.js')
 const { clearTwitchOAuthState } = await import('../../../../src/secrets.js')
 
@@ -33,9 +33,8 @@ function message(overrides: Partial<TwitchChatMessage> = {}): TwitchChatMessage 
 const DEFAULTS = getConfig()
 
 beforeEach(async () => {
-  await _resetIntegration()
+  await stopIntegration()
   clearTwitchOAuthState()
-  resetCommandCooldowns()
   chatConnection.instance = null
   hydrateQueue({ current: null, queue: [] })
   setPaused(false)
@@ -43,9 +42,8 @@ beforeEach(async () => {
     ...DEFAULTS,
     fallbackPlaylist: { ...DEFAULTS.fallbackPlaylist }
   })
-  // Reset twitch config to defaults using cloneTwitchConfig and restore
-  const { restoreTwitchConfig } = await import('../../../../src/integrations/twitch/config.js')
-  restoreTwitchConfig({
+  // Reset twitch config to its defaults: a full snapshot is a valid update and replaces every field
+  updateTwitchConfig({
     channelPointsRewardId: null,
     autoFulfillRedemptions: false,
     chatCommands: {
@@ -220,9 +218,10 @@ test('handleChatMessage() - control commands (skip/pause/resume)', async (t) => 
 
 test('a chat reply that waits for a connection', async (t) => {
   await t.test('is sent as soon as the chat reconnects, not a fixed minute later', async () => {
-    // short limits, so a lost reply does not take a minute to give up; the real ones are 5s/60s
-    chatConnection.startWaitMs = 100
-    chatConnection.reconnectWaitMs = 300
+    // short wait windows, so a lost reply does not take a minute to give up; the real ones are 5s/60s.
+    // They are options of the initialization, not knobs of the state a test pokes at
+    await stopIntegration()
+    initializeTwitchIntegration({ clientId: 'test' }, { chatStartWaitMs: 100, chatReconnectWaitMs: 300 })
 
     const sent: string[] = []
     let connected = false
@@ -255,9 +254,9 @@ test('a chat reply that waits for a connection', async (t) => {
   })
 
   await t.test('is dropped, without hanging, when the chat does not come back within its window', async () => {
-    // short limits, so the "gave up" path does not take a minute; the real ones are 5s/60s
-    chatConnection.startWaitMs = 100
-    chatConnection.reconnectWaitMs = 300
+    // short wait windows, so the "gave up" path does not take a minute; the real ones are 5s/60s
+    await stopIntegration()
+    initializeTwitchIntegration({ clientId: 'test' }, { chatStartWaitMs: 100, chatReconnectWaitMs: 300 })
 
     const sent: string[] = []
     chatConnection.instance = {

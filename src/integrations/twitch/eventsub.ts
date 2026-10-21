@@ -3,7 +3,7 @@ import { CHANNEL_POINTS_REDEMPTION, type TwitchClient } from './client.js'
 import { ReconnectingSocket, closeQuietly } from './socket.js'
 import type { EventSubMessage, TwitchChannelPointsRedemption } from './types.js'
 import { createLogger, describeError } from '../../logger.js'
-import { logActivity } from '../../activity.js'
+import { logActivity, updateActivityReasonParams } from '../../activity.js'
 import { normalizeTwitchError } from './error.js'
 
 const log = createLogger('TWITCH EVENTSUB')
@@ -23,11 +23,13 @@ export class TwitchEventSub extends ReconnectingSocket {
   private static readonly MAX_RECENT_MESSAGE_IDS = 100
 
   // A dropped session loses whatever Twitch sent while it was down (a laptop asleep, a changed network), and
-  // the streamer can only learn it from the journal. A real outage leaves a line there; a blip (and Twitch's
-  // own seamless reconnect request) stays below the threshold and out of the journal
+  // the streamer can only learn it from the journal. A real outage leaves a line there as soon as it crosses the
+  // threshold - with the minutes known at that moment - and the line learns the real length when the connection
+  // returns, still as one line; a blip (and Twitch's own seamless reconnect request) stays out of the journal
   private hadReadySession = false
   private connectionLostAt: number | null = null
   private journalTimer: ReturnType<typeof setTimeout> | null = null
+  private journalEntryAt: number | null = null
   protected journalAfterMs = 60_000
 
   protected markReady(): void {
@@ -36,12 +38,17 @@ export class TwitchEventSub extends ReconnectingSocket {
   }
 
   protected onOpen(_socket: WebSocket): void {
-    // the connection is back: whatever outage it ended, the alarm is not needed anymore. A line in the journal
-    // was already written by the timer if the outage crossed the threshold, so nothing is written here
+    // the connection is back: whatever outage it ended, the alarm is not needed anymore. The line the threshold
+    // already wrote says how long the outage was at that moment; the recovery knows the real length and
+    // corrects that same line instead of writing a second one
     if (this.journalTimer) {
       clearTimeout(this.journalTimer)
       this.journalTimer = null
     }
+    if (this.connectionLostAt !== null && this.journalEntryAt !== null) {
+      updateActivityReasonParams(this.journalEntryAt, { minutes: Math.round((Date.now() - this.connectionLostAt) / 60_000) })
+    }
+    this.journalEntryAt = null
     this.connectionLostAt = null
   }
 
@@ -56,11 +63,12 @@ export class TwitchEventSub extends ReconnectingSocket {
 
     this.connectionLostAt = lostAt
     // the journal line is written when the outage crosses the threshold, not when it ends: a long one must be
-    // visible even if the connection never comes back. A blip cancels the timer in onOpen and stays unrecorded
+    // visible even if the connection never comes back, and its minutes are the ones known at that moment -
+    // a blip cancels the timer in onOpen and stays unrecorded
     if (this.journalTimer) clearTimeout(this.journalTimer)
     this.journalTimer = setTimeout(() => {
       this.journalTimer = null
-      logActivity({
+      this.journalEntryAt = logActivity({
         requestedBy: 'Twitch',
         query: 'Twitch',
         title: null,
@@ -73,11 +81,13 @@ export class TwitchEventSub extends ReconnectingSocket {
   }
 
   async disconnect(): Promise<void> {
-    // an intentional stop is not an outage: whatever alarm survived from it is cancelled here
+    // an intentional stop is not an outage: whatever alarm survived from it is cancelled here, together with
+    // the correction a later recovery would have written
     if (this.journalTimer) {
       clearTimeout(this.journalTimer)
       this.journalTimer = null
     }
+    this.journalEntryAt = null
     this.connectionLostAt = null
     await super.disconnect()
   }

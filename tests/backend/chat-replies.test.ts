@@ -30,6 +30,11 @@ test('buildNowPlayingMessage', async (t) => {
     assert.equal(buildNowPlayingMessage(playing(playlistTrack), 'en'), 'Now playing: T (requested by Playlist)')
     assert.equal(buildNowPlayingMessage(playing(playlistTrack), 'ru'), 'Сейчас играет: T (заказал Плейлист)')
   })
+
+  await t.test('a track that came without a title shows the localized placeholder, not a blank', () => {
+    assert.equal(buildNowPlayingMessage(playing(track({ title: '' })), 'en'), 'Now playing: Unknown title (requested by bob)')
+    assert.equal(buildNowPlayingMessage(playing(track({ title: '' })), 'ru'), 'Сейчас играет: Неизвестное название (заказал bob)')
+  })
 })
 
 test('buildQueueMessage', async (t) => {

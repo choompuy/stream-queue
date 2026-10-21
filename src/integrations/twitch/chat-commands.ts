@@ -1,6 +1,5 @@
-import { setTimeout as sleep } from 'node:timers/promises'
 import type { TwitchChatMessage, TwitchChatPermission } from './types.js'
-import { chatConnection } from './state.js'
+import { replyInChat } from './chat-reply.js'
 import {
   buildNowPlayingMessage,
   buildQueueMessage,
@@ -10,11 +9,11 @@ import { getTwitchConfig, CHAT_COMMAND_KEYS } from './config.js'
 import { getState, skipCurrent, setPaused } from '../../player.js'
 import { getSettings } from '../../settings.js'
 import { t } from '../../i18n.js'
-import { createLogger, describeError } from '../../logger.js'
+import { createLogger } from '../../logger.js'
 
-// Chat commands of the queue: matching, permissions, cooldowns and the replies. The chat
-// socket itself belongs to the lifecycle in index.ts; this module reads its connection
-// state (from state.ts) to wait for it before answering.
+// Chat commands of the queue: matching, permissions, cooldowns and the replies. The chat socket
+// belongs to the lifecycle in index.ts, and sending through it to chat-reply.ts; this module
+// only decides what a message triggers and what the answer says.
 
 const chatLog = createLogger('TWITCH CHAT')
 
@@ -37,40 +36,6 @@ export function hasPermission(message: TwitchChatMessage, permission: TwitchChat
 export function matchesCommand(text: string, command: string): boolean {
   const normalized = text.trim().toLowerCase().replace(/\s+/g, ' ')
   return normalized === command || normalized.startsWith(`${command} `)
-}
-
-const CHAT_CONNECT_POLL_MS = 250
-
-async function waitForChat(limitMs: number): Promise<boolean> {
-  const deadline = Date.now() + limitMs
-
-  while (true) {
-    const chat = chatConnection.instance
-    if (!chat) return false
-    if (chat.isConnected()) return true
-
-    const remaining = deadline - Date.now()
-    if (remaining <= 0) return false
-    await sleep(Math.min(CHAT_CONNECT_POLL_MS, remaining))
-  }
-}
-
-/** Sends a message through the chat socket of the connected account, waiting out a start or a reconnect. */
-export async function replyInChat(message: string): Promise<void> {
-  const chat = chatConnection.instance
-  if (!chat) return
-
-  if (!chat.isConnected()) {
-    const connected = await waitForChat(chatConnection.starting ? chatConnection.startWaitMs : chatConnection.reconnectWaitMs)
-    if (!connected) {
-      chatLog.warn(`Chat not connected, skipping reply: ${message}`)
-      return
-    }
-  }
-
-  await chat.sendMessage(message).catch((error) => {
-    chatLog.error(`Failed to send chat reply: ${describeError(error)}`)
-  })
 }
 
 // One global (not per-user) cooldown per kind of command: two moderators can't double up on skip/pause/resume,
@@ -139,7 +104,7 @@ export async function handleChatMessage(message: TwitchChatMessage): Promise<voi
   }
 }
 
-/** @internal Clears the command cooldowns (used by the integration reset and the tests). */
+/** Clears the command cooldowns: stop() resets them when the integration is torn down. */
 export function resetCommandCooldowns(): void {
   lastRun.plainCooldownSeconds = lastRun.controlCooldownSeconds = 0
 }

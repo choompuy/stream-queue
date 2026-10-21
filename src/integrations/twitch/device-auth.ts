@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import type { TwitchDeviceCodeResponse, TwitchUserInfo } from './types.js'
-import { getRuntime, twitchBackoff } from './state.js'
+import { getRuntime, getTunables } from './state.js'
 import { isRetryable } from './error.js'
 import { clearTwitchAuthorization, clearTwitchOAuthState, getPublicSecretsView, updateTwitchOAuthState } from '../../secrets.js'
 import { notify } from '../../state-events.js'
@@ -80,7 +80,7 @@ export async function runDeviceAuthorization(startSockets: () => Promise<void>):
           // a refusal (4xx) or a refused token gives the same answer every time: repeating it only delays the rollback
           if (attempt === USER_INFO_RETRY_ATTEMPTS || !isRetryable(error)) break
           log.warn(`getUserInfo attempt ${attempt} failed, retrying: ${describeError(error)}`)
-          await sleep(twitchBackoff.delayMs * 2 ** (attempt - 1))
+          await sleep(getTunables().retryDelayMs * 2 ** (attempt - 1))
         }
       }
 
@@ -139,7 +139,7 @@ export async function runDeviceAuthorization(startSockets: () => Promise<void>):
   return device
 }
 
-/** @internal Forgets a waiting login (used by the integration reset). */
+/** Forgets a waiting login: stop() calls it when the integration is torn down (the tokens are not touched). */
 export function resetDeviceAuthorization(): void {
   deviceAuthorizationPromise = null
   deviceAuthorizationGeneration = 0

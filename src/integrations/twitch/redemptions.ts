@@ -1,8 +1,8 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import type { TwitchClient } from './client.js'
 import type { TwitchChannelPointsRedemption } from './types.js'
-import { getRuntime, twitchBackoff } from './state.js'
-import { replyInChat } from './chat-commands.js'
+import { getRuntime, getTunables } from './state.js'
+import { replyInChat } from './chat-reply.js'
 import { isRetryable } from './error.js'
 import { detachChannelPointsRedemptions } from '../../queue.js'
 import { requestSong } from '../../request.js'
@@ -149,8 +149,10 @@ async function setRedemptionStatus(
         return 'failed'
       }
 
-      const delay = twitchBackoff.delayMs * 2 ** (attempt - 1)
-      log.error(
+      const delay = getTunables().retryDelayMs * 2 ** (attempt - 1)
+      // an intermediate failure of a retryable kind is an expected hiccup on the way, not an error;
+      // the final failure below is the one that is an error
+      log.warn(
         `Failed to set redemption ${redemption.id} to ${status} (attempt ${attempt}/${REDEMPTION_RETRY_ATTEMPTS}): ${reason}. Retrying in ${delay}ms`
       )
       await sleep(delay)
@@ -197,7 +199,7 @@ export async function cancelRedemption(redemption: TrackedRedemption, twitchClie
   await replyInChat(buildRedemptionRefundFailedMessage(redemption.userName, locale))
 }
 
-/** @internal Forgets the seen redemption ids (used by the integration reset and the tests). */
+/** Forgets the seen redemption ids: stop() clears them when the integration is torn down. */
 export function resetHandledRedemptions(): void {
   handledRedemptions.clear()
 }

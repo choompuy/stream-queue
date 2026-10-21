@@ -212,7 +212,8 @@ test('TwitchEventSub: a connection lost to the outside', async (t) => {
 
 test('TwitchEventSub: the outage line is written when the threshold is crossed, not when the outage ends', async (t) => {
   // The real threshold is a minute; these subtests keep it real and drive the clock by hand instead. The
-  // socket talks to a local server over real I/O, so waiting is done with setImmediate - it survives the mocked timers
+  // socket talks to a local server over real I/O, so waiting is done with setImmediate - it survives the mocked
+  // timers - and the clock itself is mocked too: the minutes of the journal line are counted with Date.now().
   const drainUntil = async (condition: () => boolean, what: string) => {
     for (let i = 0; i < 1000 && !condition(); i++) await new Promise((resolve) => setImmediate(resolve))
     if (!condition()) assert.fail(`timed out waiting for: ${what}`)
@@ -220,14 +221,14 @@ test('TwitchEventSub: the outage line is written when the threshold is crossed, 
 
   const lostLines = () => getActivity().filter((entry) => entry.reasonCode === 'TWITCH_CONNECTION_LOST')
 
-  await t.test('an outage that never ends leaves exactly one line, written by the timer', async () => {
+  await t.test('an outage that never ends leaves exactly one line, written by the timer with the minutes known then', async () => {
     const { sub, server, login } = await setup()
     ;(sub as unknown as { journalAfterMs: number }).journalAfterMs = 60_000
     await sub.connect()
     login.refused = true // the saved login is gone: no reconnection will end the outage instead of the timer
     clearActivity()
 
-    mock.timers.enable({ apis: ['setTimeout'] })
+    mock.timers.enable({ apis: ['setTimeout', 'Date'] })
     try {
       server.dropClients()
       await drainUntil(() => (sub as unknown as { journalTimer: unknown }).journalTimer !== null, 'the outage alarm to be armed')
@@ -235,7 +236,8 @@ test('TwitchEventSub: the outage line is written when the threshold is crossed, 
       mock.timers.tick(60_001)
       await drainUntil(() => lostLines().length === 1, 'the journal line')
 
-      // still no second connection: the line is there anyway, and only one
+      // still no second connection: the line is there anyway, and only one, saying what was known at the time
+      assert.deepEqual(lostLines()[0].reasonParams, { minutes: 1 })
       assert.equal(server.connections(), 1)
     } finally {
       mock.timers.reset()
@@ -248,7 +250,7 @@ test('TwitchEventSub: the outage line is written when the threshold is crossed, 
     clearActivity()
     await sub.connect()
 
-    mock.timers.enable({ apis: ['setTimeout'] })
+    mock.timers.enable({ apis: ['setTimeout', 'Date'] })
     try {
       server.dropClients()
       await drainUntil(() => (sub as unknown as { journalTimer: unknown }).journalTimer !== null, 'the outage alarm to be armed')
@@ -264,23 +266,31 @@ test('TwitchEventSub: the outage line is written when the threshold is crossed, 
     }
   })
 
-  await t.test('a recovery over the threshold keeps the timer line, without a second one from the recovery', async () => {
+  await t.test('a recovery over the threshold keeps the one line and corrects it to the real length', async () => {
     const { sub, server } = await setup()
     ;(sub as unknown as { journalAfterMs: number }).journalAfterMs = 60_000
-    clearActivity()
+    // the first reconnect of the test timing is pushed past the threshold: the outage outlives it,
+    // so the journal line is written before the connection is back
+    ;(sub as unknown as { timing: { initialDelayMs: number } }).timing.initialDelayMs = 180_000
     await sub.connect()
+    clearActivity()
 
-    mock.timers.enable({ apis: ['setTimeout'] })
+    mock.timers.enable({ apis: ['setTimeout', 'Date'] })
     try {
       server.dropClients()
       await drainUntil(() => (sub as unknown as { journalTimer: unknown }).journalTimer !== null, 'the outage alarm to be armed')
 
-      // one tick passes both the reconnect delay (5 ms) and the journal threshold (60 s)
+      // the outage crosses the threshold while the reconnection is still a minute away: the line says the one minute known then
       mock.timers.tick(60_001)
       await drainUntil(() => lostLines().length === 1, 'the journal line')
+      assert.deepEqual(lostLines()[0].reasonParams, { minutes: 1 }, 'written with the minutes known at the threshold')
+
+      // the connection only comes back at the third minute: no second line, the first one learns the real length
+      mock.timers.tick(120_000)
       await drainUntil(() => sub.isConnected(), 'the session to be ready again')
 
-      assert.equal(lostLines().length, 1, 'exactly one line: the timer wrote it, the recovery added nothing')
+      assert.equal(lostLines().length, 1, 'exactly one line: the recovery corrected it, it did not add one')
+      assert.deepEqual(lostLines()[0].reasonParams, { minutes: 3 }, 'the line states the real length of the outage')
     } finally {
       mock.timers.reset()
     }

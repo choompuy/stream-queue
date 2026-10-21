@@ -8,10 +8,10 @@ const workDir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
 cpSync(resolve('public/locales'), join(workDir, 'public/locales'), { recursive: true })
 process.chdir(workDir)
 
-const { _resetIntegration, initializeTwitchIntegration, disconnect } = await import('../../../../src/integrations/twitch/index.js')
+const { stop: stopIntegration, initializeTwitchIntegration, disconnect } = await import('../../../../src/integrations/twitch/index.js')
 const { isRetryable } = await import('../../../../src/integrations/twitch/error.js')
 const { cancelRedemption, fulfillRedemption, handleChannelPointsRedemption } = await import('../../../../src/integrations/twitch/redemptions.js')
-const { chatConnection, twitchBackoff } = await import('../../../../src/integrations/twitch/state.js')
+const { chatConnection } = await import('../../../../src/integrations/twitch/state.js')
 const { buildRedemptionRejectionMessage, buildRedemptionRefundFailedMessage } = await import('../../../../src/chat-replies.js')
 const { AppError } = await import('../../../../src/types.js')
 const { updateTwitchOAuthState, updateSecrets } = await import('../../../../src/secrets.js')
@@ -48,16 +48,19 @@ function fakeClient(...answers: unknown[]): TwitchClient {
   } as unknown as TwitchClient
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   sent = []
   calls = []
-  twitchBackoff.delayMs = 1
+  // stop() first, so every test starts from a fresh integration; the small retry delay keeps the
+  // suites fast - it is an option of the initialization, not a knob of the state a test pokes at
+  await stopIntegration()
+  initializeTwitchIntegration({ clientId: 'client-1' }, { retryDelayMs: 1 })
   chatConnection.instance = { isConnected: () => true, disconnect: async () => {}, sendMessage: async (message: string) => void sent.push(message) } as unknown as TwitchChat
 })
 
 after(async () => {
   chatConnection.instance = null
-  await _resetIntegration()
+  await stopIntegration()
 })
 
 test('isRetryable()', async (t) => {
@@ -144,7 +147,7 @@ test('fulfillRedemption()', async (t) => {
 
 test('disconnect()', async (t) => {
   await t.test('without an integration there is nothing left open', async () => {
-    await _resetIntegration()
+    await stopIntegration()
     assert.equal(await disconnect(), 0)
   })
 
@@ -175,9 +178,7 @@ test('handleChannelPointsRedemption()', async (t) => {
   })
 
   t.beforeEach(() => {
-    initializeTwitchIntegration({ clientId: 'client-1' })
     updateTwitchConfig({ channelPointsRewardId: 'reward-1' })
-    twitchBackoff.delayMs = 1
     calls = []
   })
 
@@ -237,9 +238,9 @@ test('handleChannelPointsRedemption()', async (t) => {
 
   await t.test('a failure after the track is queued does not refund the points', async () => {
     // a token in storage makes the account look authenticated, so the flow reaches the chat reply
-    await _resetIntegration()
+    await stopIntegration()
     updateTwitchOAuthState({ tokenData: { accessToken: 'token', refreshToken: 'refresh', expiresAt: Date.now() + 3600_000, scope: [] } })
-    initializeTwitchIntegration({ clientId: 'client-1' })
+    initializeTwitchIntegration({ clientId: 'client-1' }, { retryDelayMs: 1 })
     updateTwitchConfig({ channelPointsRewardId: 'reward-1' })
 
     queue.clearQueue()
@@ -279,7 +280,7 @@ test('handleChannelPointsRedemption()', async (t) => {
     } finally {
       globalThis.fetch = realFetch
       chatConnection.instance = null
-      await _resetIntegration()
+      await stopIntegration()
       updateTwitchOAuthState({ tokenData: null })
     }
 

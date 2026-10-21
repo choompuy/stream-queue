@@ -6,10 +6,9 @@ import { join } from 'node:path'
 
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
-const { initializeTwitchIntegration, startDeviceAuthorization, disconnect, _resetIntegration } =
+const { initializeTwitchIntegration, startDeviceAuthorization, disconnect, stop } =
   await import('../../../../src/integrations/twitch/index.js')
 const { handleChannelPointsRedemption } = await import('../../../../src/integrations/twitch/redemptions.js')
-const { twitchBackoff } = await import('../../../../src/integrations/twitch/state.js')
 const { updateTwitchConfig } = await import('../../../../src/integrations/twitch/config.js')
 const { clearTwitchOAuthState, getSecrets, getPublicSecretsView } = await import('../../../../src/secrets.js')
 const { onNotice } = await import('../../../../src/state-events.js')
@@ -76,14 +75,16 @@ beforeEach(async () => {
     throw new Error(`unexpected request: ${url}`)
   }) as typeof fetch
 
-  await _resetIntegration()
+  await stop()
   clearTwitchOAuthState()
-  initializeTwitchIntegration({ clientId: 'client-1' })
+  // the small retry delay keeps the getUserInfo retries of some subtests fast - an option of the
+  // initialization, not a knob of the state a test pokes at
+  initializeTwitchIntegration({ clientId: 'client-1' }, { retryDelayMs: 1 })
 })
 
 afterEach(async () => {
   globalThis.fetch = originalFetch
-  await _resetIntegration()
+  await stop()
   clearTwitchOAuthState()
 })
 
@@ -202,7 +203,6 @@ test('device authorization', async (t) => {
 
 test('a login whose account details cannot be fetched is rolled back and reported to the panel', async (t) => {
   await t.test('Twitch is told to forget the tokens, nothing stays on disk, and the panel learns why', async () => {
-    twitchBackoff.delayMs = 1
     // a 403 is a refusal that a retry does not change: it must not be repeated
     userInfoRefusal = json({ message: 'not yours' }, 403)
 
@@ -226,7 +226,6 @@ test('a login whose account details cannot be fetched is rolled back and reporte
   })
 
   await t.test('a passing failure is retried while attempts are left, then rolled back the same way', async () => {
-    twitchBackoff.delayMs = 1
     userInfoRefusal = json({ message: 'having a moment' }, 503)
 
     await startDeviceAuthorization()
@@ -243,7 +242,6 @@ const event = (id: string, userInput = '') => ({ id, user_name: 'viewer', user_i
 
 test('the same redemption delivered twice is taken once', async (t) => {
   updateTwitchConfig({ channelPointsRewardId: 'reward-1' })
-  twitchBackoff.delayMs = 1
 
   await t.test('the second delivery of one id is ignored, another id is not', async () => {
     const calls: string[] = []

@@ -19,7 +19,8 @@ import {
   setRuntime,
   eventSubConnection,
   chatConnection,
-  resetTunables,
+  applyTunables,
+  type TwitchTunables,
   type SocketState
 } from './state.js'
 import { handleChatMessage, resetCommandCooldowns } from './chat-commands.js'
@@ -86,7 +87,7 @@ const chatSocket: ManagedSocket<TwitchChat> = {
 
 const managedSockets: ManagedSocket<ReconnectingSocket>[] = [eventSubSocket, chatSocket]
 
-export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = {}): void {
+export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = {}, options: Partial<TwitchTunables> = {}): void {
   if (getRuntime()) {
     log.info('Twitch integration already initialized')
     return
@@ -96,6 +97,10 @@ export function initializeTwitchIntegration(config: Partial<TwitchAuthConfig> = 
     log.info('Twitch client ID not configured, integration will not be functional')
     return
   }
+
+  // the waits and retries of this integration instance come from the options (the defaults are the real pace);
+  // this is the only place they are written
+  applyTunables(options)
 
   const oauth = new TwitchOAuth({
     clientId: config.clientId,
@@ -240,9 +245,13 @@ export function isTwitchConnected(): boolean {
   return runtime !== null && runtime.oauth.isAuthenticated() && runtime.client.getCachedUserInfo() !== null
 }
 
-// Export for testing purposes only
-/** @internal exported for tests */
-export async function _resetIntegration(): Promise<void> {
+/**
+ * Tears the integration down without touching the account: both sockets are closed, the runtime is dropped and
+ * the per-run memories (command cooldowns, seen redemptions, a waiting device-code login) are cleared. The
+ * counterpart of initializeTwitchIntegration: the server shutdown calls it before saving, so nothing changes
+ * state while it is being written. The account itself is only disconnected by disconnect(), which revokes.
+ */
+export async function stop(): Promise<void> {
   for (const entry of managedSockets) {
     if (entry.state.instance) await entry.state.instance.disconnect()
     entry.state.instance = null
@@ -250,7 +259,6 @@ export async function _resetIntegration(): Promise<void> {
   }
 
   setRuntime(null)
-  resetTunables()
   resetCommandCooldowns()
   resetHandledRedemptions()
   resetDeviceAuthorization()

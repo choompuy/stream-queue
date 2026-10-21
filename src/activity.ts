@@ -31,10 +31,21 @@ const entries = createListStore<ActivityEntry>({
   topics: ['activity']
 })
 
-export function logActivity(entry: Omit<ActivityEntry, 'at'>): void {
+/** Appends one line to the journal. Returns the moment of the entry: the key it can be found by again (the outage line of the Twitch integration corrects itself with it). */
+export function logActivity(entry: Omit<ActivityEntry, 'at'>): number {
+  const at = Date.now()
   entries.update((list) => {
-    list.unshift({ ...entry, at: Date.now() })
+    list.unshift({ ...entry, at })
     if (list.length > ACTIVITY_LIMIT) list.length = ACTIVITY_LIMIT
+  })
+  return at
+}
+
+/** Reworks the reasonParams of one line: the outage entry states its minutes while the outage is still going on, and learns the real length when the connection returns. */
+export function updateActivityReasonParams(at: number, reasonParams: ReasonParams): void {
+  entries.update((list) => {
+    const entry = list.find((entry) => entry.at === at)
+    if (entry) entry.reasonParams = { ...entry.reasonParams, ...reasonParams }
   })
 }
 

@@ -18,12 +18,10 @@ const commandSchema: Schema = {
   permission: rules.oneOf(PERMISSIONS)
 }
 
-// `validateTwitchConfigUpdates` and `restoreTwitchConfig` are exported for tests
+// The routes read and update through the same module; the tests drive the update path the routes take
 export const {
   getConfig: getTwitchConfig,
-  updateConfig: updateTwitchConfig,
-  validateConfigUpdates: validateTwitchConfigUpdates,
-  restoreConfig: restoreTwitchConfig
+  updateConfig: updateTwitchConfig
 } = createConfigModule<TwitchConfig>({
   filePath: () => dataPath('twitch-config.json'),
   defaults: {

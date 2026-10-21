@@ -9,9 +9,18 @@ let shuttingDown = false
 // The HTTP server registers itself at startup: shutdown stops accepting new requests before saving
 let stopAcceptingRequests: (() => void) | null = null
 
+// The long-lived background connections (the Twitch sockets) register the same way at startup:
+// they are closed before the save, so nothing changes state while it is being written
+let stopBackgroundConnections: (() => void) | null = null
+
 /** The one hook the HTTP server needs at shutdown: close the listener so no request lands after the save starts. */
 export function registerServerStop(stop: () => void): void {
   stopAcceptingRequests = stop
+}
+
+/** The one hook the background connections need at shutdown: they stop before the save starts. */
+export function registerBackgroundStop(stop: () => void): void {
+  stopBackgroundConnections = stop
 }
 
 // If saving never finishes (a stuck disk, a hung write) the process must still end: a crashed Node stays alive otherwise
@@ -28,6 +37,9 @@ export async function shutdown(code = 0, exit: (code: number) => void = (c) => p
   // the server stops taking new requests: one accepted after this point would change state
   // just for its changes to be lost by the save below
   stopAcceptingRequests?.()
+
+  // the background connections stop for the same reason: their work must not change what is being saved
+  stopBackgroundConnections?.()
 
   // the safety net owns the exit from the moment it fires: the normal path must not add a second one
   // when its own save completes right after (a hung save can still finish, just too late)
