@@ -259,13 +259,13 @@ test('disconnectTwitch', async (t) => {
   })
 })
 
-test('loadTwitchSettings', async (t) => {
+test('refreshTwitchStatus (the twitch topic)', async (t) => {
   t.beforeEach(reset)
 
   await t.test('does not ask for rewards while disconnected', async () => {
     handlers = { 'GET /api/integrations/twitch': () => ({ connected: false }) }
 
-    await settings.loadTwitchSettings()
+    await settings.refreshTwitchStatus()
 
     assert.deepEqual(requests, ['GET /api/integrations/twitch'])
     assert.ok(dom.twitchRewardSection.classList.contains('hidden'))
@@ -273,10 +273,11 @@ test('loadTwitchSettings', async (t) => {
 
   await t.test('does not even ask Twitch for its status while the client id is not configured', async () => {
     state.twitch.configured = false
+    handlers = { 'GET /api/secrets': () => ({ twitch: { configured: false } }) }
 
-    await settings.loadTwitchSettings()
+    await configSettings.loadSecrets()
 
-    assert.deepEqual(requests, [])
+    assert.deepEqual(requests, ['GET /api/secrets'], 'only the secrets are asked: they say the client id is not there')
     assert.ok(!dom.twitchNotConfigured.classList.contains('hidden'), 'the "not configured" notice is shown')
     assert.ok(dom.twitchConnectionControls.classList.contains('hidden'), 'the connect controls are hidden')
   })
@@ -287,7 +288,7 @@ test('loadTwitchSettings', async (t) => {
       'GET /api/integrations/twitch/rewards': () => ({ rewards: [] })
     }
 
-    await settings.loadTwitchSettings()
+    await settings.refreshTwitchStatus()
 
     assert.ok(!dom.twitchConnectionControls.classList.contains('hidden'))
     assert.ok(!dom.twitchRewardSection.classList.contains('hidden'))
@@ -302,7 +303,7 @@ test('loadTwitchSettings', async (t) => {
       'GET /api/integrations/twitch/rewards': () => ({ rewards: [] })
     }
 
-    await settings.loadTwitchSettings()
+    await settings.refreshTwitchStatus()
 
     assert.equal(dom.twitchRewardSelect.textContent.trim(), translate('settings.twitch.noRewards'))
   })
@@ -314,7 +315,7 @@ test('loadTwitchSettings', async (t) => {
       'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: 'reward-2' })
     }
 
-    await settings.loadTwitchSettings()
+    await settings.refreshTwitchStatus()
     await settings.loadTwitchConfig()
 
     assert.equal(state.twitch.selectedRewardId, 'reward-2')
@@ -332,7 +333,7 @@ test('loadTwitchSettings', async (t) => {
     // the <select> is still empty here - the id has to survive in state until the options exist
     assert.equal(dom.twitchRewardSelect.value, '')
 
-    await settings.loadTwitchSettings()
+    await settings.refreshTwitchStatus()
 
     assert.equal(dom.twitchRewardSelect.value, 'reward-2')
   })
@@ -345,20 +346,20 @@ test('loadTwitchSettings', async (t) => {
     }
 
     await settings.loadTwitchConfig()
-    await settings.loadTwitchSettings()
+    await settings.refreshTwitchStatus()
 
     assert.equal(state.twitch.selectedRewardId, 'reward-gone')
   })
 })
 
-test('loadTwitchSecrets', async (t) => {
+test('loadSecrets (the one read of the secrets)', async (t) => {
   t.beforeEach(reset)
 
   await t.test('remembers that a client id is configured', async () => {
     state.twitch.configured = false
     handlers = { 'GET /api/secrets': () => ({ twitch: { configured: true } }) }
 
-    await settings.loadTwitchSecrets()
+    await configSettings.loadSecrets()
 
     assert.equal(state.twitch.configured, true)
   })
@@ -366,7 +367,7 @@ test('loadTwitchSecrets', async (t) => {
   await t.test('hides the connect controls and shows the notice when no client id is configured', async () => {
     handlers = { 'GET /api/secrets': () => ({ twitch: { configured: false } }) }
 
-    await settings.loadTwitchSecrets()
+    await configSettings.loadSecrets()
 
     assert.equal(state.twitch.configured, false)
     assert.ok(!dom.twitchNotConfigured.classList.contains('hidden'))
@@ -398,7 +399,7 @@ test('the selected reward is saved as the select shows it', async (t) => {
       }
     }
 
-    await settings.loadTwitchSettings()
+    await settings.refreshTwitchStatus()
     dom.twitchRewardSelect.value = 'reward-1'
     settings.onTwitchRewardChange()
     await settings.saveTwitchConfig()

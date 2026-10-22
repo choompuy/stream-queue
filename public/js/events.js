@@ -40,8 +40,10 @@ function createTimers() {
  * onStatus(status) 'open', or 'down' when there is no EventSource or no connection for 10 s (the page polls meanwhile)
  * onNotice(notice) something that happened and is shown as it is told (see src/state-events.ts). Told once: what is missed while the
  *                  connection is down is not told afterwards, and it is not a change to read again
+ * announceFirstOpen  whether the connection's first open announces every topic. A page that read everything itself
+ *                    right before (watch's `readNow`) passes false: its first open would only repeat that read
  */
-export function connectEvents({ topics, onChange, onStatus, onNotice, EventSourceImpl = globalThis.EventSource }) {
+export function connectEvents({ topics, onChange, onStatus, onNotice, EventSourceImpl = globalThis.EventSource, announceFirstOpen = true }) {
   if (!EventSourceImpl) {
     onStatus('down')
     return { close() {} }
@@ -52,6 +54,7 @@ export function connectEvents({ topics, onChange, onStatus, onNotice, EventSourc
   let source = null
   let status = null
   let closed = false
+  let openedBefore = false
 
   function setStatus(next) {
     if (status === next) return
@@ -103,7 +106,10 @@ export function connectEvents({ topics, onChange, onStatus, onNotice, EventSourc
       timers.clear('down')
       setStatus('open')
       armWatchdog()
-      topics.forEach(notify)
+      // the page that read everything itself right before (watch's first read) skips the announcement of this first
+      // open; every later one announces everything, because what changed while the connection was down was never announced
+      if (announceFirstOpen || openedBefore) topics.forEach(notify)
+      openedBefore = true
     })
 
     listen('changed', (event) => {

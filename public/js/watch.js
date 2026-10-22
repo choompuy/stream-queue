@@ -11,10 +11,12 @@ const log = createLogger('WATCH')
  *  - a topic is read one at a time, and a change that is announced while it is read makes it read once more (see serialized)
  *  - everything is read when the connection comes up: what changed while it was down was never announced
  *  - while the connection is down the page reads everything every `safetyMs`, as it did before there were events
+ *  - `readNow` reads everything once at once (the first read of the page); the connection's first open announces nothing
+ *    on top of it, later opens announce everything as always
  *
  * Returns refresh(name), refreshAll(), isOpen() and close().
  */
-export function watch(topics, { onNotice, safetyMs = 10_000, EventSourceImpl } = {}) {
+export function watch(topics, { onNotice, safetyMs = 10_000, EventSourceImpl = globalThis.EventSource, readNow = false } = {}) {
   const names = Object.keys(topics)
   // a read that fails is logged here: nobody awaits what an event or a timer starts, and a rejection would go unhandled
   const guarded = (name) => async () => {
@@ -47,8 +49,12 @@ export function watch(topics, { onNotice, safetyMs = 10_000, EventSourceImpl } =
         safetyNet ??= setInterval(refreshAll, safetyMs)
       }
     },
-    EventSourceImpl
+    EventSourceImpl,
+    announceFirstOpen: !readNow
   })
+
+  // the first read: no event has ever arrived, and the connection's first open does not repeat it
+  if (readNow) refreshAll()
 
   return {
     refresh,

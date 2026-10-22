@@ -1,30 +1,26 @@
 import { api } from './api.js'
 import { state } from './state.js'
 import { views } from './views/index.js'
-import { renderFallback } from './fallback.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 
+// Every answer of these is the new state of the playlist: it goes to the store, and the store draws the list
 export async function refreshFallback() {
   state.fallback = await api.refreshFallback()
-  renderFallback()
   toastSuccess(t('toast.fallbackRefreshed'))
 }
 
 export async function toggleFallbackShuffle() {
   state.fallback = await api.shuffleFallback()
   views.fallback.invalidate()
-  renderFallback()
 }
 
 export async function toggleFallbackRepeat() {
   state.fallback = await api.repeatFallback()
-  renderFallback()
 }
 
 export async function toggleFallbackEnabled() {
   state.fallback = await api.enabledFallback()
-  renderFallback()
 }
 
 const fallbackTitle = (videoId) => state.fallback?.upNext?.find((track) => track.videoId === videoId)?.title

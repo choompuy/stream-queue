@@ -2,16 +2,10 @@ import { request as http, ApiError } from '../http.js'
 
 export { ApiError }
 
-// What the panel does after it changed something on the server: while the events are not open nothing else would tell it to read again
-let afterChange = () => {}
-export const onServerChange = (callback) => {
-  afterChange = callback
-}
-
-async function request(url, options = {}, flags) {
-  const data = await http(url, options, flags)
-  if (options.method) afterChange()
-  return data
+// a change the panel itself made is not read back here: with the events open the server announces what changed,
+// and while they are down the safety poll of the watcher reads everything again soon enough
+async function request(url, options = {}) {
+  return http(url, options)
 }
 
 const send = (method) => (url, body) => request(url, { method, ...(body !== undefined && { body: JSON.stringify(body) }) })

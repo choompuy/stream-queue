@@ -1,26 +1,18 @@
 import { api } from './api.js'
-import { state } from './state.js'
+import { state, on } from './state.js'
 import { dom } from './dom.js'
 import { views } from './views/index.js'
-import { run } from './run.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 import { setValue } from '../shared.js'
 
-export function loadPlaylists(silent = false) {
-  return run(
-    'loading playlists',
-    async () => {
-      state.playlists = (await api.getPlaylists()).playlists
-      renderPlaylists()
-    },
-    { silent }
-  )
-}
+on('playlists', () => views.playlists.render(state.playlists))
 
-// every playlist says whether it is the active one
-export function renderPlaylists() {
-  views.playlists.render(state.playlists)
+// The playlists topic: the data is written to the store and the drawing is a subscriber; the watcher logs a read that fails
+export function readPlaylists() {
+  return api.getPlaylists().then((data) => {
+    state.playlists = data.playlists
+  })
 }
 
 export async function addPlaylist() {

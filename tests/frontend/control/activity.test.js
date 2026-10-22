@@ -7,17 +7,19 @@ const panel = setupPanel()
 const { initI18n } = await import('../../../public/js/i18n.js')
 await initI18n('en')
 const { state } = await import('../../../public/js/control/state.js')
-const { loadActivity } = await import('../../../public/js/control/activity.js')
+const { readActivity } = await import('../../../public/js/control/activity.js')
+// the counters on the tabs follow the lists: their subscription is registered by importing the module
+await import('../../../public/js/control/stats.js')
 
 let at = 1_000
 const entry = (char, extra = {}) => ({ at: ++at, videoId: V(char), title: `Song ${char}`, query: 'q', status: 'accepted', requestedBy: 'amy', reasonCode: null, ...extra })
 
-test('loadActivity()', async (t) => {
+test('readActivity()', async (t) => {
   await t.test('shows the entries and their count on the tab, and never a toast about them: that is for the notices of the server', async () => {
     panel.route('GET /api/activity', { entries: [entry('a'), entry('b', { status: 'rejected', reasonCode: 'DUPLICATE' })] })
     const before = panel.toasts().join('|')
 
-    await loadActivity()
+    await readActivity()
 
     assert.equal(state.activity.length, 2)
     assert.equal(panel.$('#tabActivityCount').textContent, '2')
@@ -30,7 +32,7 @@ test('loadActivity()', async (t) => {
     panel.route('GET /api/activity', { entries: [entry('c'), entry('a')] })
     const before = panel.toasts().join('|')
 
-    await loadActivity(true)
+    await readActivity()
 
     assert.equal(panel.toasts().join('|'), before)
   })
@@ -43,17 +45,17 @@ test('loadActivity()', async (t) => {
       ]
     })
 
-    await loadActivity()
+    await readActivity()
 
     const titles = panel.$$('#activityListWrapper .column-info .text-primary').map((node) => node.textContent)
     assert.deepEqual(titles, ['Unknown title', 'q'])
   })
 
-  await t.test('a silent read that fails says nothing and leaves the list as it was', async () => {
+  await t.test('a read that fails says nothing and leaves the list as it was (the watcher logs it)', async () => {
     panel.route('GET /api/activity', [500, { error: 'raw', code: 'SERVER_ERROR' }])
     const before = panel.toasts().join('|')
 
-    await loadActivity(true)
+    await assert.rejects(readActivity())
 
     assert.equal(panel.toasts().join('|'), before)
     assert.equal(state.activity.length, 2)

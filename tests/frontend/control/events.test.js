@@ -10,9 +10,21 @@ await initI18n('en')
 const { state } = await import('../../../public/js/control/state.js')
 const { bindEvents } = await import('../../../public/js/control/events.js')
 const { fillForm } = await import('../../../public/js/control/form.js')
-const { isDashboardActive } = await import('../../../public/js/control/tabs.js')
+const { isDashboardActive, onTabShown } = await import('../../../public/js/control/tabs.js')
+const { readState } = await import('../../../public/js/control/queue.js')
+const { readActivity } = await import('../../../public/js/control/activity.js')
+const { readBlocklist } = await import('../../../public/js/control/blocklist.js')
+const { readFallback } = await import('../../../public/js/control/fallback.js')
 
 bindEvents()
+
+// what index.js does for the real panel: whatever the page that just became shown needs is read again
+onTabShown(() => {
+  readState()
+  readActivity()
+  readBlocklist()
+  readFallback()
+})
 
 // lets the promises that wait for a fetch answer run
 const flush = () => new Promise((resolve) => setImmediate(resolve))
@@ -51,6 +63,8 @@ test('the tabs', async (t) => {
     assert.equal(panel.count('GET /api/blocklist'), 1)
     assert.ok(panel.count('GET /api/fallback') >= 1, 'the playlist is read too (twice when the track changed)')
   })
+
+  // the wiring itself (what the watcher reads when a page is shown) is tested by wiring.test.js, which starts the real panel
 
   await t.test('choosing the tab that is already shown reads nothing', async () => {
     panel.calls.length = 0

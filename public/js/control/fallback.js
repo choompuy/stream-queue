@@ -1,22 +1,17 @@
 import { api } from './api.js'
-import { state } from './state.js'
+import { state, on } from './state.js'
 import { dom } from './dom.js'
-import { renderStats } from './stats.js'
 import { views } from './views/index.js'
-import { run } from './run.js'
 import { formatDateTime } from './ui.js'
 import { t } from '../i18n.js'
 import { setText } from '../shared.js'
 
-export function refreshFallbackState(silent = false) {
-  return run(
-    'fetching fallback playlist',
-    async () => {
-      state.fallback = await api.getFallback()
-      renderFallback()
-    },
-    { silent }
-  )
+// The fallback topic: the data is written to the store and the drawings are its subscribers; the watcher logs a read
+// that fails
+export function readFallback() {
+  return api.getFallback().then((data) => {
+    state.fallback = data
+  })
 }
 
 export function renderFallback() {
@@ -34,7 +29,6 @@ export function renderFallback() {
     // an active playlist that has simply run out still counts as set; only a section with no playlist at all gets the hint
     setText(dom.fallbackInfo, data?.playlistId ? '' : t('fallback.notSet'))
     views.fallback.render([])
-    renderStats()
     return
   }
 
@@ -54,7 +48,6 @@ export function renderFallback() {
         })
   )
   renderFallbackTracks()
-  renderStats()
 }
 
 let renderedActiveVideoId
@@ -71,6 +64,9 @@ export function renderFallbackTracks() {
     scrollToActiveFallback()
   }
 }
+
+on('fallback', renderFallback)
+on('current', renderFallbackTracks)
 
 export function scrollToActiveFallback() {
   const activeVideoId = state.current?.isFallback ? state.current.videoId : null

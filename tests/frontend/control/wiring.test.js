@@ -47,7 +47,29 @@ test('the control panel and its events', async (t) => {
     assert.equal(source().url, '/api/events?topics=state,activity,fallback,blocklist,playlists,config,twitch')
   })
 
-  await t.test('everything is read again each time the connection comes up: what changed while it was down was never announced', async () => {
+  await t.test('the first read of every shown topic happens once: the open of the connection does not repeat it', async () => {
+    await flush()
+
+    assert.equal(panel.count('GET /api/settings'), 1)
+    assert.equal(panel.count('GET /api/secrets'), 1)
+    assert.equal(panel.count('GET /api/network-info'), 1)
+    assert.equal(panel.count('GET /api/integrations/twitch/config'), 1)
+    for (const call of Object.values(READ)) assert.equal(panel.count(call), 1, call)
+    assert.equal(panel.count('GET /api/integrations/twitch/rewards'), 1, 'a first status that says connected reads the rewards once')
+    assert.equal(panel.count('GET /api/playlists'), 0, 'the playlists page is not shown')
+    assert.equal(panel.count('GET /api/config'), 0, 'the settings page is not shown')
+  })
+
+  await t.test('the first open of the connection announces nothing: everything was just read', async () => {
+    panel.calls.length = 0
+
+    source().emit('open')
+    await elapse(100)
+
+    assert.deepEqual(panel.calls, [])
+  })
+
+  await t.test('a later open (a reconnect) reads everything again: what changed while it was down was never announced', async () => {
     panel.calls.length = 0
 
     source().emit('open')
@@ -83,7 +105,7 @@ test('the control panel and its events', async (t) => {
 
     switchPageTab('playlists')
     await flush()
-    assert.deepEqual(panel.calls, ['GET /api/playlists'], 'opening the page reads them')
+    assert.deepEqual(panel.calls, ['GET /api/playlists', READ.twitch], 'opening the page reads it, and so is the Twitch status, which is shown on every page')
 
     panel.calls.length = 0
     source().emit('changed', { topic: 'playlists' })
@@ -103,7 +125,7 @@ test('the control panel and its events', async (t) => {
 
     switchPageTab('settings')
     await flush()
-    assert.deepEqual(panel.calls, ['GET /api/config'], 'opening the page reads it')
+    assert.deepEqual(panel.calls, ['GET /api/config', READ.twitch], 'opening the page reads it, and so is the Twitch status, which is shown on every page')
 
     panel.calls.length = 0
     source().emit('changed', { topic: 'config' })
@@ -146,8 +168,16 @@ test('the control panel and its events', async (t) => {
     await elapse(100)
 
     assert.deepEqual(panel.calls, [READ.twitch])
+
+    panel.calls.length = 0
     switchPageTab('dashboard')
     await flush()
+
+    assert.equal(panel.count(READ.state), 1, 'what the dashboard shows is read again')
+    assert.equal(panel.count(READ.activity), 1)
+    assert.equal(panel.count(READ.blocklist), 1)
+    assert.ok(panel.count(READ.fallback) >= 1)
+    assert.equal(panel.count(READ.twitch), 1, 'and so is the Twitch status, which is shown on every page')
   })
 
   await t.test('reads of one topic never overlap, and a change that comes during a read gets one more read after it', async () => {
@@ -196,7 +226,7 @@ test('the control panel and its events', async (t) => {
     assert.deepEqual(panel.calls, [])
   })
 
-  await t.test('a change that the panel makes is left to the events while they are open, and read at once while they are down', async () => {
+  await t.test('a change that the panel makes is left to the events while they are open, and to the poll while they are down', async () => {
     source().emit('open')
     await elapse(100)
     panel.calls.length = 0
@@ -211,6 +241,9 @@ test('the control panel and its events', async (t) => {
 
     await api.clearQueue()
     await elapse(0)
+    assert.deepEqual(panel.calls, ['POST /api/queue/clear'], 'down: nothing is read at once any more — the poll reads it soon')
+
+    await elapse(10_000)
     assert.equal(panel.calls[0], 'POST /api/queue/clear')
     for (const topic of ['state', 'activity', 'fallback', 'blocklist']) assert.equal(panel.count(READ[topic]), 1, topic)
 

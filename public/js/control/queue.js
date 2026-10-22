@@ -1,44 +1,15 @@
 import { api } from './api.js'
-import { state } from './state.js'
+import { state, on } from './state.js'
 import { dom } from './dom.js'
-import { renderStats } from './stats.js'
 import { views } from './views/index.js'
-import { run } from './run.js'
-import { renderCurrent, renderNext, renderPlayPause, syncPlayer } from './player.js'
-import { renderFallbackTracks } from './fallback.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 import { setText } from '../shared.js'
 
-// Every request gets a number: an answer that arrives after a newer request was sent describes an older state and is dropped
-let stateRequestId = 0
-
-export function refreshState(silent = false) {
-  return run(
-    'fetching state',
-    async () => {
-      const requestId = ++stateRequestId
-      const nextState = await api.getState()
-      if (requestId !== stateRequestId) return
-
-      state.current = nextState.current
-      state.queue = nextState.queue
-      state.isPaused = nextState.isPaused
-      state.nextTrack = nextState.nextTrack
-      renderState()
-    },
-    { silent }
-  )
-}
-
-export function renderState() {
-  renderCurrent()
-  renderNext()
-  renderQueue()
-  renderPlayPause()
-  renderFallbackTracks()
-  renderStats()
-  syncPlayer()
+// The state topic: the data is written to the store and the drawings are its subscribers (player.js, the queue below);
+// the watcher logs a read that fails
+export function readState() {
+  return api.getState().then((nextState) => Object.assign(state, nextState))
 }
 
 function queueHeaderText(length, max) {
@@ -46,6 +17,7 @@ function queueHeaderText(length, max) {
   return length > 0 ? t('queue.info', { count: length }) : t('queue.empty')
 }
 
+// the counts follow the queue and the config together: the limit of the queue is a setting
 export function renderQueue() {
   const maxQueueSize = state.config?.maxQueueSize ?? 0
   setText(dom.queueCount, queueHeaderText(state.queue.length, maxQueueSize))
@@ -53,6 +25,8 @@ export function renderQueue() {
 
   views.queue.render(state.queue)
 }
+
+on(['queue', 'config'], renderQueue)
 
 export async function removeFromQueue(videoId) {
   await api.removeFromQueue(videoId)

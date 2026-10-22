@@ -1,20 +1,20 @@
-import { refreshState } from './queue.js'
-import { refreshFallbackState, scrollToActiveFallback } from './fallback.js'
-import { loadActivity } from './activity.js'
-import { loadBlocklist } from './blocklist.js'
-import { loadPlaylists } from './playlists.js'
-import { loadConfig } from './settings.js'
+import { scrollToActiveFallback } from './fallback.js'
 import { setClass, show } from '../shared.js'
 
 export let activeTab = 'dashboard'
 let activeSection = 'queue'
+
+// the watcher reads again whatever the page that just became shown needs; the panel registers it here (index.js)
+let refreshShown = () => {}
+export const onTabShown = (callback) => {
+  refreshShown = callback
+}
 
 export const isDashboardActive = () => activeTab === 'dashboard'
 export const isPlaylistsActive = () => activeTab === 'playlists'
 export const isSettingsActive = () => activeTab === 'settings'
 
 export function switchPageTab(tabName) {
-  const wasDashboard = activeTab === 'dashboard'
   if (activeTab === tabName) return
 
   activeTab = tabName
@@ -25,18 +25,8 @@ export function switchPageTab(tabName) {
     setClass(el, 'active', el.dataset.pageTabTarget === tabName)
   })
 
-  if (!wasDashboard && tabName === 'dashboard') {
-    // nothing was read while the dashboard was hidden
-    refreshState()
-    refreshFallbackState()
-    loadActivity()
-    loadBlocklist()
-  }
-
-  // the playlists were not read while their page was hidden
-  if (tabName === 'playlists') loadPlaylists()
-  // and neither was the config
-  if (tabName === 'settings') loadConfig()
+  // nothing was read while this page was hidden: whatever it shows is read again
+  refreshShown()
 }
 
 export function switchSection(sectionName) {

@@ -43,35 +43,39 @@ function isUnhealthy(health) {
   return Boolean(health) && (health.auth === 'reauthorize' || !health.eventSub || !health.chat)
 }
 
-// A refused login ('reauthorize') is shown at once, a connection that is down only after it stayed down for a while
-function trackHealth(health) {
-  state.twitch.health = health ?? null
+// no status -> disconnected. The slice is assigned whole: the drawings (renderTwitchConnection) are called by hand
+// where the flow needs them
+function applyStatus(status) {
+  const connected = Boolean(status?.connected)
+  const health = connected ? status.health : null
+  // a refused login ('reauthorize') is shown at once; a connection that is down only after it stayed down for a while
+  const down = isUnhealthy(health) && health.auth !== 'reauthorize'
 
-  const down = isUnhealthy(state.twitch.health) && state.twitch.health.auth !== 'reauthorize'
-  if (!down) {
-    clearTimeout(offlineTimer)
-    offlineTimer = null
-    state.twitch.offlineWarning = false
-    return
+  clearTimeout(offlineTimer)
+  offlineTimer = null
+  let offlineWarning = false
+
+  if (down) {
+    if (state.twitch.offlineWarning) offlineWarning = true
+    else {
+      offlineTimer = setTimeout(() => {
+        offlineTimer = null
+        state.twitch = { ...state.twitch, offlineWarning: true }
+        renderTwitchHealth(Boolean(state.twitch.connected && state.twitch.user))
+      }, OFFLINE_WARNING_DELAY_MS)
+    }
   }
 
-  if (state.twitch.offlineWarning || offlineTimer) return
-
-  offlineTimer = setTimeout(() => {
-    offlineTimer = null
-    state.twitch.offlineWarning = true
-    renderTwitchHealth(Boolean(state.twitch.connected && state.twitch.user))
-  }, OFFLINE_WARNING_DELAY_MS)
-}
-
-// no status -> disconnected
-function applyStatus(status) {
-  state.twitch.connected = Boolean(status?.connected)
-  state.twitch.user = status?.user ?? null
-  state.twitch.connectedAt = status?.connectedAt ?? null
-  // a login that waits for its code is only remembered while there is no account yet: the connect button is the way back to it
-  state.twitch.authorization = status?.connected ? null : (status?.authorization ?? null)
-  trackHealth(status?.connected ? status.health : null)
+  state.twitch = {
+    ...state.twitch,
+    connected,
+    user: status?.user ?? null,
+    connectedAt: status?.connectedAt ?? null,
+    health,
+    offlineWarning,
+    // a login that waits for its code is only remembered while there is no account yet: the connect button is the way back to it
+    authorization: connected ? null : (status?.authorization ?? null)
+  }
 }
 
 // Reads the connection again and shows it as it is now. The account changes without this page doing it: a login finished in
@@ -141,7 +145,7 @@ export async function connectTwitch() {
 export async function disconnectTwitch() {
   const result = await api.disconnectTwitch()
   applyStatus(null)
-  state.twitch.rewards = []
+  state.twitch = { ...state.twitch, rewards: [] }
   show(dom.twitchRewardForm, false)
   renderTwitchConnection()
   renderTwitchRewards()
@@ -149,30 +153,6 @@ export async function disconnectTwitch() {
   // queued tracks paid with points stay UNFULFILLED on Twitch: nobody else will close them
   const open = Number(result?.openRedemptions) || 0
   if (open > 0) toastInfo(t('toast.twitchDisconnectedWithOpenRewards', { count: open }))
-}
-
-export function loadTwitchSettings() {
-  return run('loading Twitch settings', async () => {
-    if (!state.twitch.configured) {
-      renderTwitchConnection()
-      return
-    }
-
-    if (!isLocalDevice()) return
-
-    applyStatus(await api.getTwitchStatus())
-    renderTwitchConnection()
-
-    if (state.twitch.connected) await loadTwitchRewards()
-  })
-}
-
-export function loadTwitchSecrets() {
-  return run('loading Twitch secrets', async () => {
-    const data = await api.getSecrets()
-    state.twitch.configured = Boolean(data.twitch?.configured)
-    renderTwitchConnection()
-  })
 }
 
 // Shows what the plain "connected" label hides: a saved token Twitch no longer accepts, or a connection that is down

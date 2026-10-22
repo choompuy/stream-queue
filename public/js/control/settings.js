@@ -1,14 +1,14 @@
 import { escapeHtml, show, setValue } from '../shared.js'
 import { api } from './api.js'
-import { state, isLocalDevice } from './state.js'
+import { state, on, isLocalDevice } from './state.js'
 import { dom } from './dom.js'
 import { log } from './log.js'
 import { run } from './run.js'
 import { syncPlayer } from './player.js'
-import { renderQueue } from './queue.js'
 import { t } from '../i18n.js'
 import { toastError, toastSuccess } from './toast.js'
 import { fillForm, saveForm, toastSaveResult, formInputs, isChanged } from './form.js'
+import { renderTwitchConnection } from './twitch/twitch-connection.js'
 
 let qrCodePromise
 
@@ -38,12 +38,16 @@ export function changeLocale(locale) {
   })
 }
 
+// What the overlay settings answer is used for: the locale of the panel at startup, and the controls of the settings
+// form itself — one read serves both, so the panel never asks for the settings twice in a row
+export function applyOverlaySettings(settings) {
+  state.settings = settings ?? {}
+  renderOverlayUrl()
+  fillForm(dom.overlaySettingsPanel, state.settings)
+}
+
 export function loadOverlaySettings() {
-  return run('loading settings', async () => {
-    state.settings = await api.getSettings()
-    renderOverlayUrl()
-    fillForm(dom.overlaySettingsPanel, state.settings)
-  })
+  return run('loading settings', async () => applyOverlaySettings(await api.getSettings()))
 }
 
 // the overlay settings are saved at once, whenever one of them changes
@@ -96,19 +100,46 @@ export async function copyOverlayUrl() {
   }
 }
 
+// One read of the secrets for everything they answer: whether the YouTube key is set (the status under the bot
+// settings) and whether the Twitch client id is configured (the Twitch topic asks only once it is)
+export function loadSecrets() {
+  return run('loading secrets', async () => {
+    const data = await api.getSecrets()
+
+    state.secrets = data
+    state.twitch = { ...state.twitch, configured: Boolean(data.twitch?.configured) }
+    renderTwitchConnection()
+  })
+}
+
+on('secrets', () => {
+  const data = state.secrets
+  const key = data?.hasYoutubeApiKey ? 'settings.bot.apiKeyConfigured' : 'settings.bot.apiKeyNotConfigured'
+
+  dom.secretsStatus.textContent = t(key)
+  dom.secretsStatus.setAttribute('data-i18n', key)
+  dom.secretsStatus.classList.toggle('text-red', !data?.hasYoutubeApiKey)
+})
+
 export function loadNetworkInfo() {
   return run('loading network info', async () => {
     state.network = await api.getNetworkInfo()
-    applyDeviceLocality()
     const { ips } = state.network
 
     if (!ips.length) state.selectedIp = 'localhost'
     else if (!state.selectedIp || !ips.includes(state.selectedIp)) state.selectedIp = ips[0]
-
-    renderIpSelect()
-    renderQrUrl()
   })
 }
+
+// the address that the QR code and the "not this computer" hints follow: the network info and whichever of its
+// addresses was chosen
+on(['network', 'selectedIp'], () => {
+  applyDeviceLocality()
+  if (!state.network) return
+
+  renderIpSelect()
+  renderQrUrl()
+})
 
 export function applyDeviceLocality() {
   document.body.classList.toggle('not-local', !isLocalDevice())
@@ -150,7 +181,6 @@ export async function renderQrUrl() {
 
 export function onIpChange() {
   state.selectedIp = dom.selectIp.value
-  renderQrUrl()
 }
 
 export function toggleQr() {
@@ -159,6 +189,8 @@ export function toggleQr() {
   renderQrUrl()
 }
 
+// The config topic: read while the settings page is shown. The stored values go into the form, except the fields
+// the person is editing right now — their answer would be older than what was typed since (K12)
 export function loadConfig() {
   return run('loading config', async () => {
     state.config = await api.getConfig()
@@ -176,20 +208,9 @@ export function cancelConfigChanges() {
   setValue(dom.secYoutubeKey, '')
 }
 
-export function loadSecrets() {
-  return run('loading secrets', async () => {
-    const data = await api.getSecrets()
-    const key = data.hasYoutubeApiKey ? 'settings.bot.apiKeyConfigured' : 'settings.bot.apiKeyNotConfigured'
-    dom.secretsStatus.textContent = t(key)
-    dom.secretsStatus.setAttribute('data-i18n', key)
-    dom.secretsStatus.classList.toggle('text-red', !data.hasYoutubeApiKey)
-  })
-}
-
 export async function saveConfigSetting() {
   const youtubeApiKey = dom.secYoutubeKey.value.trim()
 
-  // partial save: the server stores every valid field and lists the refused ones
   const result = await saveForm(
     dom.botSettingsPanel,
     async (config) => {
@@ -214,7 +235,6 @@ export async function saveConfigSetting() {
     }
   }
 
-  renderQueue()
   toastSaveResult(result, 'toast.settingsSaved', { successToast: !apiKeyFailed })
 }
 

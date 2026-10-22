@@ -16,6 +16,8 @@ globalThis.CSS = { escape: (s) => String(s) }
 globalThis.confirm = () => true
 globalThis.location = window.location
 window.HTMLElement.prototype.scrollBy = () => {}
+// jsdom says "prerender" until told otherwise: the panel only refreshes what a visible page shows
+Object.defineProperty(window.document, 'visibilityState', { value: 'visible', configurable: true })
 
 const calls = []
 const V = (c) => c.repeat(11)
@@ -96,6 +98,35 @@ const routes = {
   [`POST /api/fallback/play/${V('e')}`]: () => [409, { error: 'server text', code: 'BLOCKED' }]
 }
 
+// the events of the server, driven by the test: a mutation that succeeded is announced (the real server announces the
+// topics it touched; announcing them all is the same thing to the panel — a topic only says "read again")
+const sources = []
+const TOPICS = ['state', 'activity', 'fallback', 'blocklist', 'playlists', 'config', 'twitch']
+globalThis.EventSource = class FakeEventSource {
+  constructor(url) {
+    this.url = url
+    this.listeners = {}
+    this.closed = false
+    sources.push(this)
+  }
+
+  addEventListener(name, listener) {
+    ;(this.listeners[name] ??= []).push(listener)
+  }
+
+  close() {
+    this.closed = true
+  }
+
+  emit(name, data) {
+    for (const listener of this.listeners[name] ?? []) listener({ data: data === undefined ? undefined : JSON.stringify(data) })
+  }
+}
+
+const announce = () => {
+  for (const topic of TOPICS) sources.at(-1)?.emit('changed', { topic })
+}
+
 globalThis.fetch = async (url, options = {}) => {
   const method = options.method ?? 'GET'
   calls.push(`${method} ${url}`)
@@ -106,6 +137,8 @@ globalThis.fetch = async (url, options = {}) => {
   let status = 200
   if (Array.isArray(result)) [status, result] = result
   const body = status < 400 ? { success: true, data: result } : { success: false, ...result }
+  // the answer of a change that was stored is followed by its announcement, as the real server does
+  if (status < 400 && method !== 'GET') queueMicrotask(announce)
   return { ok: status < 400, status, json: async () => body }
 }
 
@@ -126,6 +159,8 @@ const $ = (sel) => document.querySelector(sel)
 const $$ = (sel) => [...document.querySelectorAll(sel)]
 const toasts = () => $$('#toastContainer .toast-message').map((n) => n.textContent)
 const tick = () => new Promise((r) => setTimeout(r, 50))
+// the announcement is coalesced for 100 ms, then the reads run: wait for them
+const settled = () => new Promise((r) => setTimeout(r, 250))
 let passed = 0
 const check = async (name, fn) => {
   await fn()
@@ -158,9 +193,14 @@ await check('fallback: rows rendered', () => {
   assert.equal(rows.length, 2)
   assert.equal(rows[1].dataset.videoId, V('f'))
 })
-await check('playlists: rows rendered', () => {
+await check('playlists: rows rendered once their page is opened (their topic is not read while the dashboard is shown)', async () => {
+  $('[data-page-tab-target="playlists"]').click()
+  await settled()
   const rows = $$('#playlistsListWrapper .row-item')
   assert.equal(rows.length, 2)
+
+  $('[data-page-tab-target="dashboard"]').click()
+  await settled()
 })
 await check('activity: escaping, thumbnail helper, translated failure reason', () => {
   const rows = $$('#activityListWrapper .row-item')
@@ -199,9 +239,8 @@ await check('click outside closes the menu', () => {
 // --- block flow (data attributes round-trip through the DOM)
 calls.length = 0
 $('#activityListWrapper [data-action="block-track"]').click()
-await tick()
-await tick()
-await check('block-track posts videoId + title exactly, then reloads blocklist and state', () => {
+await settled()
+await check('block-track posts videoId + title exactly, and the announcement of the change reloads the blocklist and the state', () => {
   assert.ok(calls.includes('POST /api/blocklist'))
   assert.ok(calls.includes('GET /api/blocklist'))
   assert.ok(calls.includes('GET /api/state'))
@@ -213,9 +252,8 @@ await check('block-track posts videoId + title exactly, then reloads blocklist a
 // --- unblock from the dedicated button on a blocked queue row
 calls.length = 0
 $('#queueListWrapper [data-action="unblock-track"]').click()
-await tick()
-await tick()
-await check('unblock-track deletes the entry, reloads the lists and the row becomes a normal one', () => {
+await settled()
+await check('unblock-track deletes the entry, the announcement reloads the lists and the row becomes a normal one', () => {
   assert.ok(calls.includes(`DELETE /api/blocklist/${V('c')}`))
   assert.ok(calls.includes('GET /api/blocklist'))
   const rows = $$('#queueListWrapper .row-item')
@@ -224,7 +262,7 @@ await check('unblock-track deletes the entry, reloads the lists and the row beco
   assert.equal($('#queueListWrapper [data-action="unblock-track"]'), null)
 })
 
-// --- errors: API error -> toast (translated), silent polling -> no toast
+// --- errors: API error -> toast (translated); a read that fails -> nothing (the watcher logs it, the safety poll covers connectivity)
 $(`#fallbackListWrapper [data-video-id="${V('e')}"] [data-action="fallback-play"]`).click()
 await tick()
 await tick()
@@ -233,24 +271,24 @@ await check('API error from an action shows a translated toast', () => {
 })
 const before = toasts().length
 failStateWith500 = true
-const { refreshState } = await import(pathToFileURL(`${ROOT}/js/control/queue.js`).href)
-await refreshState(true)
-await check('silent refresh failure produces no toast', () => assert.equal(toasts().length, before))
-await refreshState(false)
-await check('non-silent refresh failure produces a toast', () => assert.equal(toasts().length, before + 1))
+const { readState } = await import(pathToFileURL(`${ROOT}/js/control/queue.js`).href)
+await assert.rejects(readState())
+await check('a failed read says nothing: only actions talk to the person, reads are silent', () => assert.equal(toasts().length, before))
 failStateWith500 = false
 
-// --- server unreachable: one toast for several failing loaders, none for silent polling
+// --- server unreachable: one toast for several failing manual loads, none for the reads
 const realFetch = globalThis.fetch
 globalThis.fetch = async (url, options) => {
   if (String(url).startsWith('/locales/')) return realFetch(url, options)
   throw new TypeError('fetch failed')
 }
 const beforeNet = toasts().length
-await refreshState(true)
-await check('silent network failure produces no toast', () => assert.equal(toasts().length, beforeNet))
-await Promise.all([refreshState(false), refreshState(false), refreshState(false)])
-await check('several simultaneous network failures show a single toast', () => {
+await assert.rejects(readState())
+await check('a read that cannot reach the server says nothing', () => assert.equal(toasts().length, beforeNet))
+const { loadSecrets, loadNetworkInfo } = await import(pathToFileURL(`${ROOT}/js/control/settings.js`).href)
+const { loadTwitchConfig } = await import(pathToFileURL(`${ROOT}/js/control/twitch/index.js`).href)
+await Promise.allSettled([loadSecrets(), loadNetworkInfo(), loadTwitchConfig()])
+await check('several simultaneous manual loads that cannot reach the server show a single toast', () => {
   const netToasts = toasts().filter((m) => m === "Can't reach the server")
   assert.equal(netToasts.length, 1, JSON.stringify(toasts()))
 })

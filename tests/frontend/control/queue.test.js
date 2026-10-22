@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { setupPanel, deferred, makeTrack as track, V, act } from './panel-env.js'
+import { setupPanel, makeTrack as track, V, act } from './panel-env.js'
 
 const panel = setupPanel()
 
@@ -11,42 +11,37 @@ const queue = await import('../../../public/js/control/queue.js')
 
 const fallbackAnswer = { upNext: [track('e')], activeVideoId: null, lastRefreshedAt: Date.now(), sourceCount: 1, shuffle: false, repeat: false, enabled: true }
 
-test('refreshState', async (t) => {
+test('readState (the state topic)', async (t) => {
   panel.route('GET /api/fallback', fallbackAnswer)
 
-  await t.test('an answer that arrives after a newer request was sent is dropped', async () => {
-    const older = deferred()
-    const newer = deferred()
-    const answers = [older, newer]
-    panel.route('GET /api/state', () => answers.shift().promise)
+  await t.test('writes the answer to the store, and only the state is read: the playlist is announced by the server', async () => {
+    panel.route('GET /api/state', { current: track('d'), queue: [track('a')], isPaused: false })
+    panel.calls.length = 0
 
-    const first = queue.refreshState(true)
-    const second = queue.refreshState(true)
+    await queue.readState()
 
-    newer.resolve({ current: track('b'), queue: [], isPaused: false })
-    await second
-    older.resolve({ current: track('a'), queue: [track('c')], isPaused: false })
-    await first
+    assert.deepEqual(panel.calls, ['GET /api/state'])
+    assert.equal(state.current.videoId, V('d'))
+    assert.equal(state.queue.length, 1)
+  })
+
+  await t.test('a failed read rejects (the watcher logs it) and leaves the state as it was', async () => {
+    panel.route('GET /api/state', [500, { error: 'boom', code: 'SERVER_ERROR' }])
+
+    await assert.rejects(queue.readState())
+
+    assert.equal(state.current.videoId, V('d'))
+  })
+
+  await t.test('reads of one topic never overlap and the older answer is dropped: the watcher reads through serialized', async () => {
+    // the guarantee is the watcher's (see watch.js and wiring.test.js); this is the half of it that lives in the store:
+    // the answer that arrives is written at once, whole
+    panel.route('GET /api/state', { current: track('b'), queue: [], isPaused: false })
+
+    await queue.readState()
 
     assert.equal(state.current.videoId, V('b'))
     assert.equal(state.queue.length, 0)
-  })
-
-  await t.test('a track that changed does not make the panel read the playlist: the server announces that itself', async () => {
-    panel.route('GET /api/state', { current: track('d'), queue: [], isPaused: false })
-    panel.calls.length = 0
-
-    await queue.refreshState(true)
-
-    assert.deepEqual(panel.calls, ['GET /api/state'])
-  })
-
-  await t.test('a failed poll leaves the state as it was', async () => {
-    panel.route('GET /api/state', [500, { error: 'boom', code: 'SERVER_ERROR' }])
-
-    await queue.refreshState(true)
-
-    assert.equal(state.current.videoId, V('d'))
   })
 })
 

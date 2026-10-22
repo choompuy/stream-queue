@@ -7,26 +7,28 @@ const panel = setupPanel()
 const { initI18n } = await import('../../../public/js/i18n.js')
 await initI18n('en')
 const { state } = await import('../../../public/js/control/state.js')
-const { loadBlocklist, blockTrack, unblockTrack, blocklistActions } = await import('../../../public/js/control/blocklist.js')
+const { readBlocklist, blockTrack, unblockTrack, blocklistActions } = await import('../../../public/js/control/blocklist.js')
+// the counters on the tabs follow the lists: their subscription is registered by importing the module
+await import('../../../public/js/control/stats.js')
 
 const entry = (char) => ({ videoId: V(char), title: `Track ${char}`, blockedAt: 1 })
 
-test('loadBlocklist', async (t) => {
+test('readBlocklist (the blocklist topic)', async (t) => {
   await t.test('shows the list and the count on its tab', async () => {
     panel.route('GET /api/blocklist', { entries: [entry('a'), entry('b')] })
 
-    await loadBlocklist()
+    await readBlocklist()
 
     assert.equal(state.blocklist.length, 2)
     assert.equal(panel.$$('#blocklistListWrapper .row-item').length, 2)
     assert.equal(panel.$('#tabBlocklistCount').textContent, '2')
   })
 
-  await t.test('a silent read that fails says nothing', async () => {
+  await t.test('a read that fails says nothing (the watcher logs it)', async () => {
     panel.route('GET /api/blocklist', [500, { error: 'raw', code: 'SERVER_ERROR' }])
     const before = panel.toasts().join('|')
 
-    await loadBlocklist(true)
+    await assert.rejects(readBlocklist())
 
     assert.equal(panel.toasts().join('|'), before)
     assert.equal(state.blocklist.length, 2, 'the list stays as it was')

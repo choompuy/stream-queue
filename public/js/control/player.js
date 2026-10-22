@@ -1,6 +1,6 @@
 import { displayChannel, displayTitle, formatTrackDuration, formatViews, show, setText } from '../shared.js'
 import { PLAY_ICON, PAUSE_ICON } from '../icons.js'
-import { state } from './state.js'
+import { state, on } from './state.js'
 import { dom } from './dom.js'
 import { log } from './log.js'
 import { t, getCurrentLocale, requesterName } from '../i18n.js'
@@ -8,6 +8,17 @@ import { loadYouTubeApi } from '../youtube-api.js'
 
 let player = null
 let playerReady = false
+
+// the now-playing card follows the state of the player: current track, next track, pause — the store calls this when
+// any of them changes, and nothing else calls the drawings by hand
+function renderPlayerState() {
+  renderCurrent()
+  renderNext()
+  renderPlayPause()
+  syncPlayer()
+}
+
+on(['current', 'nextTrack', 'isPaused'], renderPlayerState)
 
 export function renderCurrent() {
   const current = state.current

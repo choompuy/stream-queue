@@ -1,22 +1,16 @@
 import { api } from './api.js'
-import { state } from './state.js'
-import { renderStats } from './stats.js'
+import { state, on } from './state.js'
 import { views } from './views/index.js'
-import { run } from './run.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 
-export function loadBlocklist(silent = false) {
-  return run(
-    'loading blocklist',
-    async () => {
-      const data = await api.getBlocklist()
-      state.blocklist = data.entries
-      views.blocklist.render(state.blocklist)
-      renderStats()
-    },
-    { silent }
-  )
+on('blocklist', () => views.blocklist.render(state.blocklist))
+
+// The blocklist topic: the data is written to the store and the drawing is a subscriber; the watcher logs a read that fails
+export function readBlocklist() {
+  return api.getBlocklist().then((data) => {
+    state.blocklist = data.entries
+  })
 }
 
 export async function blockTrack(videoId, title) {
