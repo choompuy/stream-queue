@@ -1,78 +1,124 @@
-import { escapeHtml, setClass } from '../../shared.js'
+import { escapeHtml } from '../../shared.js'
 import { BLOCK_ICON, MORE_ICON, UNBLOCK_ICON } from '../../icons.js'
 import { t } from '../../i18n.js'
 
-export function createListView(wrapper, { renderRow, getKey, cache = true }) {
-  if (cache && !getKey) {
-    console.warn('[UI] createListView: no getKey provided - falling back to a naive key that may not detect all changes')
-  }
+/**
+ * The one way a row is written: a tagged template. Every value it puts into the markup is escaped - a title that
+ * comes from a viewer is always text - except a value that is markup itself: the result of html`` (or a list of
+ * them), assembled by this file or by a row that follows the same rule. The result is an { html } value, so it can
+ * be nested into another template without being escaped a second time.
+ */
+export function html(strings, ...values) {
+  let markup = ''
+  strings.forEach((chunk, index) => {
+    markup += chunk
+    if (index < values.length) markup += toMarkup(values[index])
+  })
 
+  return { html: markup }
+}
+
+const toMarkup = (value) => {
+  if (value == null || value === false || value === true) return ''
+  if (typeof value === 'object' && value.html) return value.html
+  if (Array.isArray(value)) return value.map(toMarkup).join('')
+  return escapeHtml(String(value))
+}
+
+/** Markup that is already what it must be where it is put in: an icon, or an attribute list built by this file */
+export const raw = (string) => ({ html: String(string) })
+
+/**
+ * A list of rows that keeps its elements. A row is keyed by what it is (its video, its playlist), and a row whose
+ * markup did not change keeps its element: an open menu, a focus or a hover survives a change somewhere else in the
+ * list. The rows that changed are built anew, and the list is put in order without taking the rows that stay out of
+ * the document. `renderRow(item, index)` returns the markup of a row (html``); `rowKey(item, index)` says what the
+ * row is, and must not name two rows of one list the same.
+ */
+export function createListView(wrapper, { renderRow, rowKey }) {
   const list = wrapper.querySelector('.row-list')
-  const empty = wrapper.querySelector('.empty')
 
-  let lastKey = null
+  // the rows that are drawn: their markup and their element, by their key
+  const drawn = new Map()
 
   function setEmpty(isEmpty) {
-    setClass(wrapper, 'is-empty', isEmpty)
+    wrapper.classList.toggle('is-empty', isEmpty)
   }
 
   function render(items = []) {
     setEmpty(items.length === 0)
-    const key = getKey ? getKey(items) : items.map((item) => item?.id ?? item?.videoId ?? item).join('|')
 
-    if (cache && key === lastKey) return false
+    const next = new Map()
+    const elements = []
 
-    lastKey = key
+    items.forEach((item, index) => {
+      const key = rowKey(item, index)
+      const markup = renderRow(item, index).html
+      const previous = key === undefined ? undefined : drawn.get(key)
 
-    if (!items.length) {
-      list.innerHTML = ''
-      return true
+      if (previous && previous.html === markup && !next.has(key)) {
+        next.set(key, previous)
+        elements.push(previous.element)
+        return
+      }
+
+      const template = document.createElement('template')
+      template.innerHTML = markup
+      const element = template.content.firstElementChild
+      if (key !== undefined && !next.has(key)) next.set(key, { html: markup, element })
+      elements.push(element)
+    })
+
+    drawn.clear()
+    next.forEach((value, key) => drawn.set(key, value))
+
+    // the rows that stay keep their place in the document; the ones that go are taken out after
+    let anchor = list.firstChild
+    for (const element of elements) {
+      if (element === anchor) {
+        anchor = anchor.nextSibling
+        continue
+      }
+      list.insertBefore(element, anchor)
     }
-
-    list.innerHTML = items.map((item, index) => renderRow(item, index)).join('')
-    return true
+    while (anchor) {
+      const stale = anchor
+      anchor = anchor.nextSibling
+      stale.remove()
+    }
   }
 
   function clear() {
-    lastKey = null
+    drawn.clear()
     setEmpty(true)
-    list.innerHTML = ''
+    list.replaceChildren()
   }
 
-  function invalidate() {
-    lastKey = null
-  }
-
-  return {
-    render,
-    clear,
-    invalidate,
-    list,
-    empty,
-    wrapper
-  }
+  return { render, clear, list, wrapper }
 }
 
 const toKebab = (name) => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)
 
 /** { videoId: 'x', title: 'y' } -> ` data-video-id="x" data-title="y"` (values are escaped) */
 export function dataAttributes(data = {}) {
-  return Object.entries(data)
-    .map(([name, value]) => ` data-${toKebab(name)}="${escapeHtml(value)}"`)
-    .join('')
+  return raw(
+    Object.entries(data)
+      .map(([name, value]) => ` data-${toKebab(name)}="${escapeHtml(value)}"`)
+      .join('')
+  )
 }
 
-export function row({ index, thumbnail, title, subtitle, meta = '', extra = '', actions = '', className = '', attributes = '' }) {
-  return `
-    <div class="row-item ${className}" ${attributes}>
-      ${index != null ? `<span class="row-index text-sm text-secondary text-bold">${index}</span>` : ''}
-      ${thumbnail ? `<img src="${escapeHtml(thumbnail)}" class="thumbnail" alt="${escapeHtml(title)}">` : ''}
+export function row({ index, thumbnail, title, subtitle, extra, meta = '', actions = '', className = '', attributes = '' }) {
+  return html`
+    <div class="row-item ${className}"${attributes} role="listitem">
+      ${index != null ? html`<span class="row-index text-sm text-secondary text-bold">${index}</span>` : ''}
+      ${thumbnail ? html`<img src="${thumbnail}" class="thumbnail" alt="" loading="lazy">` : ''}
       <div class="column-info">
-        <div class="text-sm text-primary truncate">${escapeHtml(title)}</div>
-        ${subtitle ? `<div class="text-xs text-secondary truncate">${escapeHtml(subtitle)}</div>` : ''}
+        <div class="text-sm text-primary truncate">${title}</div>
+        ${subtitle ? html`<div class="text-xs text-secondary truncate">${subtitle}</div>` : ''}
       </div>
       ${extra}
-      ${meta ? `<span class="text-sm text-secondary">${meta}</span>` : ''}
+      ${meta ? html`<span class="text-sm text-secondary">${meta}</span>` : ''}
       ${actions}
     </div>
   `
@@ -80,7 +126,7 @@ export function row({ index, thumbnail, title, subtitle, meta = '', extra = '', 
 
 /** items: [{ action, data?, icon?, label, danger? }] */
 export function rowMenu(items) {
-  return `
+  return html`
     <div class="row-menu">
       <button
         class="btn btn-sm btn-icon"
@@ -90,25 +136,23 @@ export function rowMenu(items) {
         aria-label="${t('common.more')}"
         title="${t('common.more')}"
       >
-        ${MORE_ICON()}
+        ${raw(MORE_ICON())}
       </button>
       <div class="row-menu-dropdown hidden" role="menu">
-        ${items
-          .map(
-            (item) => `
-              <button class="row-menu-item btn btn-sm btn-secondary${item.danger ? ' btn-danger' : ''}" role="menuitem" data-action="${item.action}"${dataAttributes(item.data)}>
-                <span>${item.label}</span>
-                <span class="row-menu-icon">${item.icon ? item.icon(20) : ''}</span>
-              </button>
-            `
-          )
-          .join('')}
+        ${items.map(
+          (item) => html`
+            <button class="row-menu-item btn btn-sm btn-secondary${item.danger ? ' btn-danger' : ''}" role="menuitem" data-action="${item.action}"${dataAttributes(item.data)}>
+              <span>${item.label}</span>
+              <span class="row-menu-icon">${item.icon ? raw(item.icon(20)) : ''}</span>
+            </button>
+          `
+        )}
       </div>
     </div>
   `
 }
 
-export const statusPill = (label, status) => `<span class="text-xs text-bold status-pill ${escapeHtml(status)}">${label}</span>`
+export const statusPill = (label, status) => html`<span class="text-xs text-bold status-pill ${status}">${label}</span>`
 
 export const blockTrackItem = (videoId, title) => ({
   action: 'block-track',
@@ -118,13 +162,13 @@ export const blockTrackItem = (videoId, title) => ({
   danger: true
 })
 
-export const unblockTrackItem = (videoId) => `
+export const unblockTrackItem = (videoId) => html`
   <button
     class="btn btn-sm btn-icon"
     data-action="unblock-track"
-    data-video-id="${escapeHtml(videoId)}"
+    data-video-id="${videoId}"
     title="${t('blocklist.unblock')}"
   >
-    ${UNBLOCK_ICON()}
+    ${raw(UNBLOCK_ICON())}
   </button>
 `

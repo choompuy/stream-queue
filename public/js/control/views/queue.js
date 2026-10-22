@@ -1,23 +1,20 @@
-import { displayChannel, displayTitle, escapeHtml, formatTrackDuration } from '../../shared.js'
+import { displayChannel, displayTitle, formatTrackDuration } from '../../shared.js'
 import { DELETE_ICON } from '../../icons.js'
 import { t, requesterName } from '../../i18n.js'
 import { dom } from '../dom.js'
-import { blockTrackItem, createListView, row, rowMenu, statusPill, unblockTrackItem } from './primitives.js'
+import { blockTrackItem, createListView, dataAttributes, html, row, rowMenu, statusPill, unblockTrackItem } from './primitives.js'
 
 export const queueView = createListView(dom.queueListWrapper, {
-  getKey: (items) =>
-    items.map((item) => [item.videoId, requesterName(item), item.title, item.thumbnail, item.duration, item.isBlocked].join(':')).join('|'),
+  rowKey: (item) => item.videoId,
   renderRow: (item, index) =>
     row({
       index: index + 1,
       thumbnail: item.thumbnail,
       title: displayTitle(item.title),
       subtitle: displayChannel(item.channelTitle),
-      extra: `
+      extra: html`
         ${item.isBlocked ? statusPill(t('blocklist.blockedLabel'), 'rejected') : ''}
-        <span class="column-requested-by text-sm text-green truncate">
-          ${escapeHtml(requesterName(item))}
-        </span>
+        <span class="column-requested-by text-sm text-green truncate">${requesterName(item)}</span>
       `,
       meta: formatTrackDuration(item.duration),
       actions: item.isBlocked
@@ -26,6 +23,6 @@ export const queueView = createListView(dom.queueListWrapper, {
             blockTrackItem(item.videoId, item.title),
             { action: 'queue-remove', data: { videoId: item.videoId }, icon: DELETE_ICON, label: t('queue.remove'), danger: true }
           ]),
-      attributes: `data-queue-index="${index}"`
+      attributes: dataAttributes({ videoId: item.videoId })
     })
 })

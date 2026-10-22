@@ -1,6 +1,5 @@
 import { api } from './api.js'
 import { state } from './state.js'
-import { views } from './views/index.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
 
@@ -12,7 +11,6 @@ export async function refreshFallback() {
 
 export async function toggleFallbackShuffle() {
   state.fallback = await api.shuffleFallback()
-  views.fallback.invalidate()
 }
 
 export async function toggleFallbackRepeat() {

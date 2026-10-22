@@ -1,8 +1,8 @@
-import { displayTitle, escapeHtml, translateErrorCode, youtubeThumbnail } from '../../shared.js'
+import { displayTitle, translateErrorCode, youtubeThumbnail } from '../../shared.js'
 import { t } from '../../i18n.js'
 import { dom } from '../dom.js'
 import { formatDateTime } from '../ui.js'
-import { blockTrackItem, createListView, row, rowMenu, statusPill } from './primitives.js'
+import { blockTrackItem, createListView, html, row, rowMenu, statusPill } from './primitives.js'
 
 const STATUS_LABEL_KEYS = {
   accepted: { key: 'activity.accepted', status: 'accepted' },
@@ -12,11 +12,7 @@ const STATUS_LABEL_KEYS = {
 }
 
 export const activityView = createListView(dom.activityListWrapper, {
-  getKey: (items) => {
-    return [
-      ...items.map((entry) => [entry.at, entry.status, entry.title, entry.videoId, entry.query, entry.requestedBy, entry.reasonCode].join(':'))
-    ].join('|')
-  },
+  rowKey: (entry) => `${entry.at}:${entry.videoId ?? ''}:${entry.query ?? ''}`,
   renderRow: (entry) => {
     const title = translateErrorCode(t, entry.reasonCode, entry.reasonParams) || displayTitle(entry.title)
     const status = STATUS_LABEL_KEYS[entry.status] ?? STATUS_LABEL_KEYS.rejected
@@ -26,13 +22,11 @@ export const activityView = createListView(dom.activityListWrapper, {
       thumbnail: entry.videoId ? youtubeThumbnail(entry.videoId) : '',
       title,
       subtitle: entry.query,
-      extra: `
+      extra: html`
         ${statusPill(t(status.key), status.status)}
-        <span class="column-requested-by text-sm text-green truncate">
-          @${escapeHtml(entry.requestedBy)}
-        </span>
+        <span class="column-requested-by text-sm text-green truncate">@${entry.requestedBy}</span>
       `,
-      actions: entry.videoId ? rowMenu([blockTrackItem(entry.videoId, entry.title || entry.query)]) : '<span class="btn-sm"></span>'
+      actions: entry.videoId ? rowMenu([blockTrackItem(entry.videoId, entry.title || entry.query)]) : html`<span class="btn-sm"></span>`
     })
   }
 })

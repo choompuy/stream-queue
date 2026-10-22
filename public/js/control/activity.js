@@ -23,7 +23,6 @@ export function readActivity() {
 export async function clearActivity() {
   const data = await api.clearActivity()
   state.activity = data.entries
-  views.activity.invalidate()
 }
 
 export const activityActions = {

@@ -5,12 +5,12 @@ import { dom } from '../dom.js'
 import { blockTrackItem, createListView, dataAttributes, row, rowMenu, statusPill, unblockTrackItem } from './primitives.js'
 
 export const fallbackView = createListView(dom.fallbackListWrapper, {
-  getKey: (items) => items.map((item) => `${item.videoId}:${item.isBlocked}:${item.isActive}`).join('|'),
+  rowKey: (track) => track.videoId,
   renderRow: (track, index) =>
     row({
       index: index + 1,
       className: track.isActive ? 'row-active' : '',
-      attributes: dataAttributes({ videoId: track.videoId }).trim(),
+      attributes: dataAttributes({ videoId: track.videoId }),
       thumbnail: track.thumbnail,
       title: displayTitle(track.title),
       subtitle: displayChannel(track.channelTitle),

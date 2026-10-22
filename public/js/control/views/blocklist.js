@@ -4,7 +4,7 @@ import { formatDateTime } from '../ui.js'
 import { createListView, row, unblockTrackItem } from './primitives.js'
 
 export const blocklistView = createListView(dom.blocklistListWrapper, {
-  getKey: (items) => items.map((entry) => [entry.videoId, entry.title, entry.blockedAt].join(':')).join('|'),
+  rowKey: (entry) => entry.videoId,
   renderRow: (entry) =>
     row({
       index: formatDateTime(entry.blockedAt, '\n'),
