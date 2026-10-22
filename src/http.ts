@@ -1,4 +1,4 @@
-import { Response } from 'express-serve-static-core'
+import type { Response } from 'express'
 import { AppError, HttpErrorCode, ApiOk, ApiError, ConfigUpdateResponse, FilterFailureReason } from './types.js'
 import { getSettings } from './settings.js'
 import { translateApiError } from './i18n.js'

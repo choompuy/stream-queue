@@ -7,7 +7,7 @@ import { finishItem } from './finish.js'
 import { on, emit } from './state-events.js'
 import { isBlocked, markBlocked } from './blocklist.js'
 import { createStore } from './store.js'
-import { persistState } from './state-file.js'
+import { requestStateSave } from './state-persistence.js'
 import { createLogger, describeError } from './logger.js'
 
 const log = createLogger('FALLBACK')
@@ -50,7 +50,7 @@ const rotationStore = createStore({
     itemCount: rotation.itemCount
   }),
   topics: ['state'],
-  save: persistState
+  save: requestStateSave
 })
 
 function replaceSourceTracks(tracks: Song[]): void {

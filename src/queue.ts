@@ -3,7 +3,7 @@ import { QueueItem, Song, AppError } from './types.js'
 import { isBlocked } from './blocklist.js'
 import { createStore } from './store.js'
 import { finishItem } from './finish.js'
-import { persistState } from './state-file.js'
+import { requestStateSave } from './state-persistence.js'
 import { createLogger } from './logger.js'
 
 let currentSong: QueueItem | null = null
@@ -15,7 +15,7 @@ let playCounter = 0
 const playing = createStore({
   read: () => ({ current: currentSong, queue }),
   topics: ['state'],
-  save: persistState
+  save: requestStateSave
 })
 
 const log = createLogger('QUEUE')

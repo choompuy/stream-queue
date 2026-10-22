@@ -132,15 +132,6 @@ export function createConfigModule<T extends object>(options: {
     return { rejected, ...commit(clean) }
   }
 
-  function restoreConfig(snapshot: T): void {
-    const previous = current()
-    config = structuredClone(snapshot)
-    if (isDeepStrictEqual(config, previous)) return
-
-    save()
-    announce(previous, config)
-  }
-
   function announce(previous: T, next: T): void {
     for (const topic of topics ?? []) emit(topic)
     for (const listener of [...changeListeners]) {
@@ -165,7 +156,6 @@ export function createConfigModule<T extends object>(options: {
     validateConfigUpdates,
     updateConfig,
     updateConfigStrict,
-    restoreConfig,
     onConfigChange,
     saveNow: async (onError?: (error: unknown) => void) => {
       await store.saveNow(() => current(), onError)

@@ -29,7 +29,7 @@ export function checkVideoId(value: unknown): asserts value is string {
   if (!isValidVideoId(value)) throw new AppError('INVALID_VIDEO_ID')
 }
 
-export function checkPlaylistId(value: unknown): void {
+function checkPlaylistId(value: unknown): void {
   if (!isValidPlaylistId(value)) throw new AppError('INVALID_PLAYLIST_ID')
 }
 

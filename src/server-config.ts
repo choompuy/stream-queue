@@ -7,7 +7,7 @@ export type ServerConfig = {
 
 // 4747: not assigned to a well-known service, and below the ranges the OS hands out for temporary connections
 // (49152+ on Windows, 32768+ on Linux), so it rarely clashes with anything
-export const DEFAULT_PORT = 4747
+const DEFAULT_PORT = 4747
 
 // Edit data/server.json to change the port; the file also remembers the port the server actually got,
 // so the overlay URL in OBS stays the same between launches

@@ -2,7 +2,7 @@ import path from 'node:path'
 import { isSea } from 'node:sea'
 import { config as loadDotenv } from 'dotenv'
 
-export function isPackaged(): boolean {
+function isPackaged(): boolean {
   return isSea()
 }
 

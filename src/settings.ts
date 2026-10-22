@@ -5,7 +5,7 @@ import type { Settings } from './types.js'
 const POSITIONS = ['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const satisfies readonly Settings['position'][]
 
 // The one list of locales on the backend. The frontend has its own copy in public/js/i18n.js
-export const LOCALES = ['en', 'ru'] as const satisfies readonly Settings['locale'][]
+const LOCALES = ['en', 'ru'] as const satisfies readonly Settings['locale'][]
 
 const defaultSettings: Settings = {
   showVideo: false,

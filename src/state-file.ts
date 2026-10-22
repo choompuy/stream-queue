@@ -3,6 +3,7 @@ import { QueueItem, Song } from './types.js'
 import { isValidPlaylistId, isValidVideoId } from './youtube/url.js'
 import { getQueue, getCurrent, hydrateQueue } from './queue.js'
 import { getFallbackSnapshot, hydrateFallback, FallbackSnapshot } from './fallback.js'
+import { bindStatePersistence } from './state-persistence.js'
 import { createLogger, describeError } from './logger.js'
 
 export type StateFile = {
@@ -23,7 +24,7 @@ export type SanitizedState = {
 const text = (value: unknown): string => (typeof value === 'string' ? value : '')
 const amount = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0)
 
-export function sanitizeSong(raw: unknown): Song | null {
+function sanitizeSong(raw: unknown): Song | null {
   if (!isPlain(raw) || !isValidVideoId(raw.videoId) || !text(raw.title)) return null
 
   const videoId = raw.videoId
@@ -161,11 +162,9 @@ function stateSnapshot(): StateFile {
 // -1 until the track list has been saved (or read from its own file), so an older state file gets migrated
 let savedTracksVersion = -1
 
-// The stores that own the playing state save through this hook. Nothing is saved before the state was loaded:
-// a change made before would write the not-yet-loaded state over the file
-export function persistState(): void {
-  if (!initialized) return
-
+// The stores that own the playing state save through this hook. It is reachable only through the binding that
+// initState() makes after the load, so nothing is saved over the not-yet-loaded state
+function persistState(): void {
   store.scheduleSave(stateSnapshot)
 
   const { sourceVersion } = getFallbackSnapshot()
@@ -216,4 +215,5 @@ export function initState(): void {
   initialized = true
 
   loadState()
+  bindStatePersistence(persistState)
 }

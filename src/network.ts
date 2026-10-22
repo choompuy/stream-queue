@@ -29,7 +29,7 @@ function refresh(): void {
   cached = { at: now, addresses, lan, hostname: os.hostname().toLowerCase() }
 }
 
-export function withoutMappedPrefix(address: string): string {
+function withoutMappedPrefix(address: string): string {
   return address.replace(/^::ffff:/i, '').toLowerCase()
 }
 

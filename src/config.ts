@@ -8,7 +8,7 @@ const MAX_DURATION_SECONDS = 24 * 60 * 60
 const MAX_COUNT = 1000
 
 // `validateConfigUpdates` is exported for tests: the routes validate through `updateConfig`
-export const { getConfig, updateConfig, validateConfigUpdates, restoreConfig, onConfigChange } = createConfigModule<Config>({
+export const { getConfig, updateConfig, validateConfigUpdates, onConfigChange } = createConfigModule<Config>({
   filePath: () => dataPath('config.json'),
   topics: ['config'],
   defaults: {

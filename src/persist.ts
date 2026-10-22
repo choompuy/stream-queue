@@ -187,7 +187,7 @@ export async function ensureDataDirectory(): Promise<void> {
  * Reads a file that holds a list. Valid JSON is not always what the code expects (a file edited by hand, one left by an
  * older version): what is not a list becomes an empty one, and an item that fails `isItem` is dropped
  */
-export function loadList<T>(store: { load: (defaults: T[]) => T[]; path: () => string }, isItem: (value: unknown) => value is T): T[] {
+function loadList<T>(store: { load: (defaults: T[]) => T[]; path: () => string }, isItem: (value: unknown) => value is T): T[] {
   const stored: unknown = store.load([])
 
   if (!Array.isArray(stored)) {
