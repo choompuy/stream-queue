@@ -6,7 +6,9 @@ import { ReconnectingSocket } from './socket.js'
 import type {
   TwitchAuthConfig,
   TwitchUserInfo,
-  TwitchDeviceCodeResponse
+  TwitchDeviceCodeResponse,
+  TwitchAuthorizationState,
+  TwitchHealthView
 } from './types.js'
 import { clearTwitchOAuthState, getSecrets, updateTwitchOAuthState } from '../../secrets.js'
 import { detachChannelPointsRedemptions } from '../../queue.js'
@@ -25,7 +27,7 @@ import {
 } from './state.js'
 import { handleChatMessage, resetCommandCooldowns } from './chat-commands.js'
 import { handleChannelPointsRedemption, handleChannelPointsPlaybackOutcome, resetHandledRedemptions } from './redemptions.js'
-import { cancelDeviceAuthorization, runDeviceAuthorization, resetDeviceAuthorization } from './device-auth.js'
+import { cancelDeviceAuthorization, getAuthorizationOutcome, runDeviceAuthorization, resetDeviceAuthorization } from './device-auth.js'
 
 const log = createLogger('TWITCH')
 const chatLog = createLogger('TWITCH CHAT')
@@ -172,20 +174,33 @@ export function startDeviceAuthorization(): Promise<TwitchDeviceCodeResponse> {
   return runDeviceAuthorization(startSockets)
 }
 
-export type TwitchHealth = {
-  /** 'reauthorize': Twitch refused the saved token (a public client's refresh token lives 30 days), the account has to be connected again */
-  auth: 'ok' | 'reauthorize'
-  eventSub: boolean
-  chat: boolean
-}
+export type TwitchHealth = TwitchHealthView
+
+// when the connection entered the state it is in now: a change of the state (or the first look at it) starts the clock
+let healthSignature: string | null = null
+let healthSince = 0
 
 export function getTwitchHealth(): TwitchHealth {
   // named fields by name: the typed answer of the panel - the list would only hide what is written
-  return {
+  const health: Omit<TwitchHealth, 'since'> = {
     auth: getRuntime()?.oauth.needsReauthorization() ? 'reauthorize' : 'ok',
     eventSub: eventSubConnection.instance?.isConnected() ?? false,
     chat: chatConnection.instance?.isConnected() ?? false
   }
+
+  const signature = JSON.stringify(health)
+  if (signature !== healthSignature) {
+    healthSignature = signature
+    healthSince = Date.now()
+  }
+
+  return { ...health, since: healthSince }
+}
+
+/** The state of the login as the panel sees it: a code that waits, or how the last one ended. Nothing to show is null. */
+export function describeAuthorization(pending: { userCode: string; verificationUri: string; expiresAt: number } | null): TwitchAuthorizationState | null {
+  if (pending) return { ...pending, state: 'pending' }
+  return getAuthorizationOutcome()
 }
 
 /** Disconnects the account. Returns how many queued redemptions were left UNFULFILLED on Twitch for the streamer to close by hand. */

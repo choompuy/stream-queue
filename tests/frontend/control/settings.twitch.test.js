@@ -155,7 +155,7 @@ function reset() {
   document.getElementById('toastContainer').innerHTML = ''
 }
 
-const deviceCode = (expiresIn = 600) => ({ verificationUri: 'https://twitch.tv/activate', userCode: 'ABCD-1234', expiresIn })
+const deviceCode = (expiresIn = 600) => ({ verificationUri: 'https://twitch.tv/activate', userCode: 'ABCD-1234', expiresIn, expiresAt: Date.now() + expiresIn * 1000 })
 test('connectTwitch', async (t) => {
   t.beforeEach(() => {
     reset()

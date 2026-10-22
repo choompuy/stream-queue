@@ -20,6 +20,8 @@ export type TwitchDeviceCodeResponse = {
   verification_uri: string
   expires_in: number
   interval: number
+  /** the moment the code stops being valid, on the server's clock: the panel shows it without counting on its own */
+  expiresAt: number
 }
 
 export type TwitchErrorResponse = {
@@ -175,6 +177,22 @@ export type TwitchConnectionResponse = {
   connected: boolean
   user: { displayName: string; login: string } | null
   connectedAt: number | null
-  authorization: { userCode: string; verificationUri: string; expiresAt: number } | null
-  health: { auth: 'ok' | 'reauthorize'; eventSub: boolean; chat: boolean }
+  authorization: TwitchAuthorizationState | null
+  health: TwitchHealthView
+}
+
+/** The state of the device-code login, on the server's clock: pending while the code waits, or how the last one ended */
+export type TwitchAuthorizationState = {
+  state: 'pending' | 'expired' | 'denied'
+  expiresAt: number
+  userCode?: string
+  verificationUri?: string
+}
+
+export type TwitchHealthView = {
+  auth: 'ok' | 'reauthorize'
+  eventSub: boolean
+  chat: boolean
+  /** when this state of the connection began: a connection that is down for a moment is not worth a red warning yet */
+  since: number
 }

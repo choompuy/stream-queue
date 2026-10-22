@@ -31,7 +31,6 @@ export const store = createStore({
     user: null,
     connectedAt: null,
     health: null,
-    offlineWarning: false,
     authorization: null,
     rewards: [],
     config: null,

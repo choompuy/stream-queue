@@ -6,7 +6,7 @@ import { join } from 'node:path'
 
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
-const { initializeTwitchIntegration, startDeviceAuthorization, disconnect, stop } =
+const { initializeTwitchIntegration, startDeviceAuthorization, disconnect, stop, describeAuthorization } =
   await import('../../../../src/integrations/twitch/index.js')
 const { handleChannelPointsRedemption } = await import('../../../../src/integrations/twitch/redemptions.js')
 const { updateTwitchConfig } = await import('../../../../src/integrations/twitch/config.js')
@@ -180,6 +180,19 @@ test('device authorization', async (t) => {
     await sleep(1400)
 
     assert.equal(getPublicSecretsView({ includeAuthorization: true }).twitch.authorization, null)
+  })
+
+  await t.test('how the login ended is told to the panel: the code expired, and the news lasts until the next login starts', async () => {
+    const device = await startDeviceAuthorization()
+
+    // the fake Twitch gives every code one second
+    await sleep(1400)
+
+    // what the status route answers: the outcome of the login, with the deadline the code had
+    assert.deepEqual(describeAuthorization(null), { state: 'expired', expiresAt: device.expiresAt })
+
+    await startDeviceAuthorization()
+    assert.equal(describeAuthorization(null), null, 'a login that started anew has no news of an old one')
   })
 
   await t.test('disconnect() removes the code and gives up a login that is still waiting for it', async () => {

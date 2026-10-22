@@ -111,11 +111,16 @@ test('twitch routes localOnly protection', async (t) => {
     updateTwitchOAuthState({ authorization: { userCode: 'ABCD-1234', verificationUri: 'https://www.twitch.tv/activate', expiresAt } })
 
     const waiting = (await (await api('/')).json()) as Record<string, any>
-    assert.deepEqual(waiting.data.authorization, { userCode: 'ABCD-1234', verificationUri: 'https://www.twitch.tv/activate', expiresAt })
+    assert.deepEqual(waiting.data.authorization, {
+      state: 'pending',
+      userCode: 'ABCD-1234',
+      verificationUri: 'https://www.twitch.tv/activate',
+      expiresAt
+    })
 
     updateTwitchOAuthState({ authorization: { userCode: 'ABCD-1234', verificationUri: 'https://www.twitch.tv/activate', expiresAt: Date.now() - 1 } })
     const expired = (await (await api('/')).json()) as Record<string, any>
-    assert.equal(expired.data.authorization, null)
+    assert.equal(expired.data.authorization, null, 'a code that expired on its own is not a login any more')
 
     updateTwitchOAuthState({ authorization: null })
   })
@@ -241,7 +246,7 @@ async function readStatusFrom(remoteAddress: string): Promise<Record<string, any
 }
 
 test('a login that waits for its code is shown to this computer only', async (t) => {
-  const login = { userCode: 'ABCD-1234', verificationUri: 'https://www.twitch.tv/activate', expiresAt: Date.now() + 60_000 }
+  const login = { state: 'pending', userCode: 'ABCD-1234', verificationUri: 'https://www.twitch.tv/activate', expiresAt: Date.now() + 60_000 }
   updateTwitchOAuthState({ authorization: login })
 
   await t.test('this computer sees the address', async () => {

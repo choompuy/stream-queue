@@ -8,13 +8,10 @@ import { dom } from '../dom.js'
 import { log } from '../log.js'
 import { loadTwitchRewards, renderTwitchRewards } from './twitch-rewards.js'
 
-// A connection that is down for a moment (a reconnect takes seconds) is not worth a red warning: it is shown only if it stays down
+// A connection that is down for a moment (a reconnect takes seconds) is not worth a red warning: it is shown only if it
+// stayed down. The server says since when the connection is in the state it is in; the redraw that decides waits for
+// the moment it has been down long enough
 const OFFLINE_WARNING_DELAY_MS = 6000
-
-// the server drops the code a moment before or after its own deadline: a code that went away this close to it has expired
-const EXPIRY_TOLERANCE_MS = 5000
-
-let offlineTimer = null
 
 function openAuthorizationWindow() {
   try {
@@ -43,28 +40,44 @@ function isUnhealthy(health) {
   return Boolean(health) && (health.auth === 'reauthorize' || !health.eventSub || !health.chat)
 }
 
+// the state of the connection is drawn again when the grace period of a down connection ends, without asking anything:
+// when that moment comes, the warning is due
+let offlineRecheck = null
+let offlineOverdue = false
+
+function scheduleOfflineRecheck(health) {
+  clearTimeout(offlineRecheck)
+  offlineRecheck = null
+  offlineOverdue = false
+  if (!isUnhealthy(health) || health.auth === 'reauthorize') return
+
+  const wait = health.since + OFFLINE_WARNING_DELAY_MS - Date.now()
+  if (wait <= 0) {
+    offlineOverdue = true
+    return
+  }
+
+  offlineRecheck = setTimeout(() => {
+    offlineRecheck = null
+    offlineOverdue = true
+    renderTwitchHealth(Boolean(state.twitch.connected && state.twitch.user))
+  }, wait)
+}
+
+// A connection that has been down for a while is a warning; one that is only just down is not. Refused ('reauthorize')
+// is shown at once: it stays until the account is connected again
+function isOfflineWarning() {
+  const { health } = state.twitch
+  return Boolean(health) && health.auth !== 'reauthorize' && isUnhealthy(health) && (offlineOverdue || Date.now() - health.since > OFFLINE_WARNING_DELAY_MS)
+}
+
 // no status -> disconnected. The slice is assigned whole: the drawings (renderTwitchConnection) are called by hand
 // where the flow needs them
 function applyStatus(status) {
   const connected = Boolean(status?.connected)
   const health = connected ? status.health : null
-  // a refused login ('reauthorize') is shown at once; a connection that is down only after it stayed down for a while
-  const down = isUnhealthy(health) && health.auth !== 'reauthorize'
 
-  clearTimeout(offlineTimer)
-  offlineTimer = null
-  let offlineWarning = false
-
-  if (down) {
-    if (state.twitch.offlineWarning) offlineWarning = true
-    else {
-      offlineTimer = setTimeout(() => {
-        offlineTimer = null
-        state.twitch = { ...state.twitch, offlineWarning: true }
-        renderTwitchHealth(Boolean(state.twitch.connected && state.twitch.user))
-      }, OFFLINE_WARNING_DELAY_MS)
-    }
-  }
+  scheduleOfflineRecheck(health)
 
   state.twitch = {
     ...state.twitch,
@@ -72,7 +85,6 @@ function applyStatus(status) {
     user: status?.user ?? null,
     connectedAt: status?.connectedAt ?? null,
     health,
-    offlineWarning,
     // a login that waits for its code is only remembered while there is no account yet: the connect button is the way back to it
     authorization: connected ? null : (status?.authorization ?? null)
   }
@@ -97,8 +109,8 @@ export function refreshTwitchStatus() {
 
       if (status.connected && !wasConnected) await loadTwitchRewards()
 
-      // a code that went away without anybody entering it: it expired. A refused or replaced one is not worth a message
-      if (waitingFor && !status.connected && !status.authorization && waitingFor.expiresAt <= Date.now() + EXPIRY_TOLERANCE_MS) {
+      // how the login ended is the server's to say: an expired code was waiting for its entry a moment ago
+      if (waitingFor?.state === 'pending' && !status.connected && status.authorization?.state === 'expired') {
         toastError(t('api.errors.twitchAuthExpired'))
       }
     },
@@ -108,7 +120,7 @@ export function refreshTwitchStatus() {
 
 export async function connectTwitch() {
   const pending = state.twitch.authorization
-  if (pending && pending.expiresAt > Date.now() + EXPIRY_TOLERANCE_MS) {
+  if (pending?.state === 'pending' && pending.expiresAt > Date.now()) {
     window.open(pending.verificationUri, '_blank', 'noopener,noreferrer')
     return
   }
@@ -126,11 +138,13 @@ export async function connectTwitch() {
     }
 
     // From here the server keeps the state of the login (and says when it ends): this page does not wait for it, and
-    // after a reload the same code is still there, with the button leading back to its page
+    // after a reload the same code is still there, with the button leading back to its page. The deadline is the
+    // server's own, not counted from the moment this answer arrived
     state.twitch.authorization = {
+      state: 'pending',
       userCode: response.userCode,
       verificationUri: response.verificationUri,
-      expiresAt: Date.now() + response.expiresIn * 1000
+      expiresAt: response.expiresAt
     }
     renderTwitchConnection()
 
@@ -155,14 +169,15 @@ export async function disconnectTwitch() {
   if (open > 0) toastInfo(t('toast.twitchDisconnectedWithOpenRewards', { count: open }))
 }
 
-// Shows what the plain "connected" label hides: a saved token Twitch no longer accepts, or a connection that is down
+// Shows what the plain "connected" label hides: a saved token Twitch no longer accepts, or a connection that has
+// been down for a while (the server says since when)
 function renderTwitchHealth(isConnected) {
   const { health } = state.twitch
   let key = ''
 
   if (isConnected && health) {
     if (health.auth === 'reauthorize') key = 'settings.twitch.healthReauthorize'
-    else if (state.twitch.offlineWarning) key = 'settings.twitch.healthOffline'
+    else if (isOfflineWarning()) key = 'settings.twitch.healthOffline'
   }
 
   setText(dom.twitchHealthWarning, key ? t(key) : '')

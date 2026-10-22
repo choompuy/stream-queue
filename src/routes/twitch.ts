@@ -3,7 +3,7 @@ import { ok, sendConfigUpdate } from '../http.js'
 import type { TwitchConnectionResponse, TwitchCreateCustomReward, TwitchUpdateCustomReward } from '../integrations/twitch/types.js'
 import { AppError } from '../types.js'
 import { parseRewardInput, toRewardDto } from '../integrations/twitch/rewards.js'
-import { startDeviceAuthorization, disconnect, refreshConnection, isTwitchConnected, getTwitchHealth } from '../integrations/twitch/index.js'
+import { startDeviceAuthorization, disconnect, refreshConnection, isTwitchConnected, getTwitchHealth, describeAuthorization } from '../integrations/twitch/index.js'
 import { getRuntime } from '../integrations/twitch/state.js'
 import { getTwitchConfig, updateTwitchConfig } from '../integrations/twitch/config.js'
 import { isLocal, localOnly } from '../local-only.js'
@@ -23,7 +23,12 @@ export const router = express.Router()
 // open on purpose (the panel on a phone or from a QR code reads it), so what only this computer may see is left out for the rest
 router.get('/', (req, res) => {
   const twitch = getPublicSecretsView({ includeAuthorization: isLocal(req) }).twitch
-  ok<TwitchConnectionResponse>(res, { ...twitch, health: getTwitchHealth() })
+  ok<TwitchConnectionResponse>(res, {
+    ...twitch,
+    // the state of the login (pending, or how the last one ended) is the server's to say: the panel used to guess it
+    authorization: isLocal(req) ? describeAuthorization(twitch.authorization) : null,
+    health: getTwitchHealth()
+  })
 })
 
 router.get('/config', (_req, res) => {
@@ -44,7 +49,9 @@ router.post('/connect', async (_req, res) => {
   ok(res, {
     userCode: device.user_code,
     verificationUri: device.verification_uri,
-    expiresIn: device.expires_in
+    expiresIn: device.expires_in,
+    // the server's clock, so the panel does not count the deadline from the moment its own answer arrived
+    expiresAt: device.expiresAt
   })
 })
 

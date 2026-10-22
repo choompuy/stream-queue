@@ -2,7 +2,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import type { TwitchDeviceCodeResponse, TwitchUserInfo } from './types.js'
 import { getRuntime, getTunables } from './state.js'
 import { isRetryable } from './error.js'
-import { clearTwitchAuthorization, clearTwitchOAuthState, getPublicSecretsView, updateTwitchOAuthState } from '../../secrets.js'
+import { clearTwitchAuthorization, clearTwitchOAuthState, getPublicSecretsView, getSecrets, updateTwitchOAuthState } from '../../secrets.js'
 import { notify } from '../../state-events.js'
 import { AppError } from '../../types.js'
 import { createLogger, describeError } from '../../logger.js'
@@ -19,12 +19,30 @@ const USER_INFO_RETRY_ATTEMPTS = 3
 let deviceAuthorizationPromise: Promise<unknown> | null = null
 let deviceAuthorizationGeneration = 0
 
+// How the login that waits for its code ended: told to the panel by the status (the state of a login is the server's
+// to say - the panel used to guess it from a code that vanished). Remembered until the next login starts or the
+// account connects; a cancelled login is nobody's news
+let authorizationOutcome: { state: 'expired' | 'denied'; expiresAt: number } | null = null
+
+export function getAuthorizationOutcome(): { state: 'expired' | 'denied'; expiresAt: number } | null {
+  return authorizationOutcome
+}
+
+function outcomeOf(error: unknown): { state: 'expired' | 'denied'; expiresAt: number } | null {
+  if (!(error instanceof AppError)) return null
+
+  const state = error.message.includes('denied') ? 'denied' : error.message.includes('expired') ? 'expired' : null
+  // the code that ended is not in the file any more by the time this is asked: its deadline is the one it had
+  return state ? { state, expiresAt: getSecrets().twitch.authorization?.expiresAt ?? Date.now() } : null
+}
+
 // What a login that waits for the code finds out is not used any more once it is cancelled (it only logs that it was)
 export function cancelDeviceAuthorization(): void {
   if (deviceAuthorizationPromise) log.info('Device authorization cancelled')
 
   deviceAuthorizationGeneration++
   deviceAuthorizationPromise = null
+  authorizationOutcome = null
   clearTwitchAuthorization()
 }
 
@@ -51,8 +69,9 @@ export async function runDeviceAuthorization(startSockets: () => Promise<void>):
   if (generation !== deviceAuthorizationGeneration) throw new AppError('TWITCH_AUTH_ERROR', 'Twitch authorization was cancelled')
 
   // what the panel shows while the login waits (also after the page is reloaded): it ends with the login, however it ends
+  const expiresAt = Date.now() + device.expires_in * 1000
   updateTwitchOAuthState({
-    authorization: { userCode: device.user_code, verificationUri: device.verification_uri, expiresAt: Date.now() + device.expires_in * 1000 }
+    authorization: { userCode: device.user_code, verificationUri: device.verification_uri, expiresAt }
   })
 
   deviceAuthorizationPromise = runtime.oauth
@@ -105,6 +124,7 @@ export async function runDeviceAuthorization(startSockets: () => Promise<void>):
         userInfo: fetchedUserInfo,
         connectedAt: Date.now()
       })
+      authorizationOutcome = null
 
       await startSockets()
 
@@ -119,6 +139,9 @@ export async function runDeviceAuthorization(startSockets: () => Promise<void>):
       }
 
       log.error(`Twitch authorization failed: ${describeError(error)}`)
+
+      // what the panel is told about it: the code expired, or the login was refused at twitch.tv/activate
+      if (generation === deviceAuthorizationGeneration) authorizationOutcome = outcomeOf(error)
 
       // a non-AppError is a bug: it stays in the log above, and the panel gets the generic auth failure
       const failure = error instanceof AppError ? error : undefined
@@ -136,11 +159,13 @@ export async function runDeviceAuthorization(startSockets: () => Promise<void>):
       clearTwitchAuthorization()
     })
 
-  return device
+  // the panel needs the code and its deadline right away: the status repeat of it comes with the next read
+  return { ...device, expiresAt }
 }
 
 /** Forgets a waiting login: stop() calls it when the integration is torn down (the tokens are not touched). */
 export function resetDeviceAuthorization(): void {
   deviceAuthorizationPromise = null
   deviceAuthorizationGeneration = 0
+  authorizationOutcome = null
 }

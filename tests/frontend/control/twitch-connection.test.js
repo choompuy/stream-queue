@@ -22,11 +22,12 @@ const el = (id) => document.getElementById(id)
 const hidden = (id) => el(id).classList.contains('hidden')
 
 const user = { displayName: 'Streamer', login: 'streamer', profileImageUrl: 'https://example.com/a.png' }
-const up = { auth: 'ok', eventSub: true, chat: true }
-const down = { auth: 'ok', eventSub: false, chat: false }
+const now = Date.now()
+const up = { auth: 'ok', eventSub: true, chat: true, since: now }
+const down = (since = Date.now()) => ({ auth: 'ok', eventSub: false, chat: false, since })
 
-function connected(health, offlineWarning = false) {
-  Object.assign(state.twitch, { configured: true, connected: true, user, health, offlineWarning })
+function connected(health) {
+  Object.assign(state.twitch, { configured: true, connected: true, user, health })
 }
 
 test('without a Client ID', async (t) => {
@@ -60,14 +61,15 @@ test('the connection warning', async (t) => {
   await t.test('is not shown for a connection that has only just come down', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] })
     connected(up)
-    status = { connected: true, user, health: down }
+    status = { connected: true, user, health: down() }
 
     await refreshTwitchStatus()
-    t.mock.timers.tick(5999)
+    // the clock is the server's (since), so the boundary is a moment, not a tick: comfortably before it
+    t.mock.timers.tick(5000)
 
     assert.equal(hidden('twitchHealthWarning'), true)
 
-    // the timer belongs to this test's clock: a healthy answer takes it back, so that the next test starts clean
+    // the re-draw belongs to this test's clock: a healthy answer takes it back, so that the next test starts clean
     status = { connected: true, user, health: up }
     await refreshTwitchStatus()
   })
@@ -75,10 +77,11 @@ test('the connection warning', async (t) => {
   await t.test('is shown when it stays down for 6 seconds', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] })
     connected(up)
-    status = { connected: true, user, health: down }
+    status = { connected: true, user, health: down() }
 
     await refreshTwitchStatus()
-    t.mock.timers.tick(6000)
+    // comfortably past the grace period, whenever within it the answer that brought the state arrived
+    t.mock.timers.tick(7000)
 
     assert.equal(hidden('twitchHealthWarning'), false)
   })
@@ -86,7 +89,7 @@ test('the connection warning', async (t) => {
   await t.test('a connection that comes back in time never shows it', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] })
     connected(up)
-    status = { connected: true, user, health: down }
+    status = { connected: true, user, health: down() }
     await refreshTwitchStatus()
     t.mock.timers.tick(3000)
 
@@ -95,22 +98,21 @@ test('the connection warning', async (t) => {
     t.mock.timers.tick(10000)
 
     assert.equal(hidden('twitchHealthWarning'), true)
-    assert.equal(state.twitch.offlineWarning, false)
   })
 
-  await t.test('goes away by itself once the connection is up, without reloading the page', async () => {
-    connected(down, true)
+  await t.test('a state that the server says has been down for a while is a warning the moment it is drawn', () => {
+    connected(down(Date.now() - 60_000))
     renderTwitchConnection()
     assert.equal(hidden('twitchHealthWarning'), false)
 
     status = { connected: true, user, health: up }
-    await refreshTwitchStatus()
-    assert.equal(hidden('twitchHealthWarning'), true)
-    assert.equal(state.twitch.offlineWarning, false)
+    return refreshTwitchStatus().then(() => {
+      assert.equal(hidden('twitchHealthWarning'), true)
+    })
   })
 
   await t.test('a refused login is shown at once', () => {
-    connected({ auth: 'reauthorize', eventSub: false, chat: false })
+    connected({ auth: 'reauthorize', eventSub: false, chat: false, since: Date.now() })
     renderTwitchConnection()
     assert.equal(hidden('twitchHealthWarning'), false)
   })
@@ -127,7 +129,7 @@ test('the connection warning', async (t) => {
 test('a connection made elsewhere', async (t) => {
   await t.test('shows up on the next refresh, also on a page that was reloaded in the middle of the login', async () => {
     // the panel was loaded while nobody was logged in; the login is finished later, in another tab
-    Object.assign(state.twitch, { configured: true, connected: false, user: null, health: null, offlineWarning: false })
+    Object.assign(state.twitch, { configured: true, connected: false, user: null, health: null })
     renderTwitchConnection()
     assert.equal(hidden('twitchDisconnectBtn'), true)
 
@@ -202,11 +204,12 @@ test('a connection made elsewhere', async (t) => {
   })
 })
 
-const waiting = (expiresAt) => ({ userCode: 'ABCD-1234', verificationUri: 'https://www.twitch.tv/activate', expiresAt })
+const waiting = (expiresAt) => ({ state: 'pending', userCode: 'ABCD-1234', verificationUri: 'https://www.twitch.tv/activate', expiresAt })
+const ended = (state, expiresAt) => ({ state, expiresAt })
 
 test('a login that waits for its code', async (t) => {
   t.beforeEach(() => {
-    Object.assign(state.twitch, { configured: true, connected: false, user: null, health: null, offlineWarning: false, authorization: null })
+    Object.assign(state.twitch, { configured: true, connected: false, user: null, health: null, authorization: null })
     document.getElementById('toastContainer').innerHTML = ''
   })
 
@@ -216,18 +219,18 @@ test('a login that waits for its code', async (t) => {
     await refreshTwitchStatus()
   })
 
-  await t.test('goes away, with a message, when nobody entered the code in time', async () => {
+  await t.test('goes away, with a message, when nobody entered the code in time: the server says it expired', async () => {
     state.twitch.authorization = waiting(Date.now() - 1000)
-    status = { connected: false, user: null, authorization: null }
+    status = { connected: false, user: null, authorization: ended('expired', Date.now() - 1000) }
 
     await refreshTwitchStatus()
 
     assert.ok(document.getElementById('toastContainer').textContent.includes('twitchAuthExpired'))
   })
 
-  await t.test('goes away quietly when it was replaced or refused before its time', async () => {
+  await t.test('goes away quietly when it was refused (a refused login has its own message from the server)', async () => {
     state.twitch.authorization = waiting(Date.now() + 10 * 60_000)
-    status = { connected: false, user: null, authorization: null }
+    status = { connected: false, user: null, authorization: ended('denied', Date.now()) }
 
     await refreshTwitchStatus()
 
@@ -255,7 +258,7 @@ test('a login that waits for its code', async (t) => {
     assert.equal(hidden('twitchConnectBtn'), false)
 
     state.twitch.authorization = waiting(Date.now() - 1000)
-    status = { connected: false, user: null, authorization: null }
+    status = { connected: false, user: null, authorization: ended('expired', Date.now() - 1000) }
     await refreshTwitchStatus()
     assert.equal(button.getAttribute('data-i18n'), 'settings.twitch.connect')
   })
