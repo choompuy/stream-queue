@@ -36,7 +36,7 @@ const failure = async (action) => {
   assert.fail('expected a rejection')
 }
 
-const refusedSave = { code: 'INVALID_CONFIG', params: { fields: 'maxQueueSize' }, data: { config: { minViews: 1 }, rejected: ['maxQueueSize'] } }
+const refusedSave = { config: { minViews: 1 }, rejected: ['maxQueueSize'] }
 
 test('api', async (t) => {
   await t.test('a successful answer is its data, and nothing at all is null', async () => {
@@ -74,16 +74,16 @@ test('api', async (t) => {
     assert.equal(error.cause, reply)
   })
 
-  await t.test('a partial save is a result for the endpoints that save a form: the stored config and the refused fields', async () => {
-    answer(400, refusedSave)
-    assert.deepEqual(await api.updateConfig({ maxQueueSize: 0 }), refusedSave.data)
-    assert.deepEqual(await api.updateTwitchConfig({}), refusedSave.data)
-    assert.deepEqual(await api.updateSettings({ opacity: 5 }), refusedSave.data)
-    assert.deepEqual(await api.createTwitchReward({}), refusedSave.data)
+  await t.test('a save the server refused in part is still a result: the stored config and the refused fields', async () => {
+    answer(200, { data: refusedSave })
+    assert.deepEqual(await api.updateConfig({ maxQueueSize: 0 }), refusedSave)
+    assert.deepEqual(await api.updateTwitchConfig({}), refusedSave)
+    assert.deepEqual(await api.updateSettings({ opacity: 5 }), refusedSave)
+    assert.deepEqual(await api.createTwitchReward({}), refusedSave)
   })
 
-  await t.test('the same answer from any other endpoint is a failure', async () => {
-    answer(400, refusedSave)
+  await t.test('a refused save from any other endpoint is a failure too, now that no endpoint carries its result in an error', async () => {
+    answer(400, { error: 'refused', code: 'INVALID_CONFIG', data: refusedSave })
     const error = await failure(() => api.clearQueue())
 
     assert.equal(error.code, 'INVALID_CONFIG')

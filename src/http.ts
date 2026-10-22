@@ -8,24 +8,11 @@ export function ok<T extends object>(res: Response, data: T, status = 200): void
   res.status(status).json(body)
 }
 
+// A settings save is always a success: what the server refused is named in `rejected`, and the stored state is in
+// `config` — the panel shows that result (form.js marks the refused fields). An error answer is reserved for what went
+// wrong outside the form, so `data` never travels inside an error again
 export function sendConfigUpdate<T extends object>(res: Response, config: T, rejected: string[]): void {
-  const data: ConfigUpdateResponse<T> = { config, rejected }
-
-  if (rejected.length === 0) {
-    ok(res, data)
-    return
-  }
-
-  const params = { fields: rejected.join(', ') }
-  const localized = translateApiError(getSettings().locale, 'INVALID_CONFIG', params)
-  const body: ApiError & { data: ConfigUpdateResponse<T> } = {
-    success: false,
-    error: localized,
-    code: 'INVALID_CONFIG',
-    params,
-    data
-  }
-  res.status(STATUS_BY_CODE.INVALID_CONFIG).json(body)
+  ok<ConfigUpdateResponse<T>>(res, { config, rejected })
 }
 
 // the single place that knows which HTTP status an error code answers with; Record makes a missing row a
@@ -55,7 +42,6 @@ const STATUS_BY_CODE: Record<HttpErrorCode, number> = {
   NOT_FOUND: 404,
   INVALID_PLAYLIST_ID: 400,
   PLAYLIST_NOT_FOUND: 404,
-  INVALID_CONFIG: 400,
   LOCAL_ONLY: 403,
   FORBIDDEN_ORIGIN: 403,
   INVALID_JSON: 400,

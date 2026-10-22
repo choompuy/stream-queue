@@ -58,10 +58,9 @@ test('request', async (t) => {
     await assert.rejects(request('/api/x'), (error) => error.code === 'NETWORK_ERROR' && error.status === undefined && error.cause instanceof TypeError)
   })
 
-  await t.test('INVALID_CONFIG with data is a result when the endpoint asks for it, and a failure otherwise', async () => {
+  await t.test('a non-ok answer is a failure even when it carries data (an old server answering a refused save as an error)', async () => {
     answer(400, { code: 'INVALID_CONFIG', error: 'bad', data: { rejected: ['a'] } })
 
-    assert.deepEqual(await request('/api/x', {}, { partial: true }), { rejected: ['a'] })
     await assert.rejects(request('/api/x'), (error) => error.code === 'INVALID_CONFIG')
   })
 

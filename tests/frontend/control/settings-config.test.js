@@ -96,10 +96,7 @@ test('saving the bot settings', async (t) => {
   })
 
   await t.test('a refused field keeps what was typed, through the echo as well', async () => {
-    panel.route('PUT /api/config', () => [
-      400,
-      { error: 'raw', code: 'INVALID_CONFIG', params: { fields: 'regionCode' }, data: { config: { ...stored }, rejected: ['regionCode'] } }
-    ])
+    panel.route('PUT /api/config', () => ({ config: { ...stored }, rejected: ['regionCode'] }))
     field('cfgRegionCode').value = 'zz'
 
     await settings.saveConfigSetting()

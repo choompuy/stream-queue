@@ -440,17 +440,10 @@ test('saveTwitchConfig() highlights the reward select when the backend rejects i
 
   await t.test('a rejected channelPointsRewardId puts the error class on the select and toasts', async () => {
     handlers = {
-      'PUT /api/integrations/twitch/config': () => {
-        throw new MockApiFailure(
-          'invalid config fields',
-          'INVALID_CONFIG',
-          { fields: 'channelPointsRewardId' },
-          {
-            config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG },
-            rejected: ['channelPointsRewardId']
-          }
-        )
-      }
+      'PUT /api/integrations/twitch/config': () => ({
+        config: { channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG },
+        rejected: ['channelPointsRewardId']
+      })
     }
 
     await settings.saveTwitchConfig()
@@ -643,17 +636,10 @@ test('saveTwitchChatCommands()', async (t) => {
 
   await t.test('a refused command keeps what was typed, so it can be corrected', async () => {
     handlers = {
-      'PUT /api/integrations/twitch/config': () => {
-        throw new MockApiFailure(
-          'invalid config fields',
-          'INVALID_CONFIG',
-          { fields: 'chatCommands.skip.command' },
-          {
-            config: { chatCommands: CHAT_COMMANDS_CONFIG },
-            rejected: ['chatCommands.skip.command']
-          }
-        )
-      }
+      'PUT /api/integrations/twitch/config': () => ({
+        config: { chatCommands: CHAT_COMMANDS_CONFIG },
+        rejected: ['chatCommands.skip.command']
+      })
     }
     dom.chatCmdSkipCommand.value = 'no-bang'
 

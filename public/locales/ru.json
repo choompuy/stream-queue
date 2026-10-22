@@ -227,7 +227,6 @@
   "api": {
     "errors": {
       "networkError": "Нет связи с сервером",
-      "invalidConfig": "Некорректные настройки: {{fields}}",
       "invalidVideoId": "Некорректный ID видео",
       "invalidJson": "Тело запроса не является корректным JSON",
       "payloadTooLarge": "Тело запроса слишком большое",

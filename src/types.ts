@@ -27,7 +27,6 @@ export type HttpErrorCode =
   | 'NOT_FOUND'
   | 'INVALID_PLAYLIST_ID'
   | 'PLAYLIST_NOT_FOUND'
-  | 'INVALID_CONFIG'
   | 'LOCAL_ONLY'
   | 'FORBIDDEN_ORIGIN'
   | 'INVALID_JSON'

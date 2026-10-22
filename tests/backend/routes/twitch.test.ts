@@ -141,15 +141,16 @@ test('twitch routes localOnly protection', async (t) => {
     assert.equal(body.data.config.channelPointsRewardId, 'test-reward-id')
   })
 
-  await t.test('PUT /config rejects invalid config fields', async () => {
+  await t.test('PUT /config refuses invalid config fields, answering with their names', async () => {
     const response = await api('/config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channelPointsRewardId: 123 })
     })
-    assert.equal(response.status, 400)
     const body = (await response.json()) as Record<string, any>
-    assert.equal(body.code, 'INVALID_CONFIG')
+
+    assert.equal(response.status, 200)
+    assert.deepEqual(body.data.rejected, ['channelPointsRewardId'])
   })
 
   await t.test('PUT /config with one refused field stores the valid ones and returns both in the body, answering exactly once', async () => {
@@ -162,8 +163,7 @@ test('twitch routes localOnly protection', async (t) => {
     })
     const body = (await response.json()) as Record<string, any>
 
-    assert.equal(response.status, 400)
-    assert.equal(body.code, 'INVALID_CONFIG')
+    assert.equal(response.status, 200)
     assert.deepEqual(body.data.rejected, ['chatCommands.skip.command'])
     assert.equal(body.data.config.channelPointsRewardId, 'r-partial')
     assert.equal(getTwitchConfig().channelPointsRewardId, 'r-partial')

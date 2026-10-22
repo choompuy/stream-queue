@@ -24,14 +24,11 @@ globalThis.fetch = async (url, options = {}) => {
   assert.ok(handler, `unexpected request ${key}`)
 
   const result = await handler()
-  if (result?.refusal) return { ok: false, status: 400, json: async () => result.refusal }
   return { ok: true, status: 200, json: async () => ({ data: result }) }
 }
 
-// the answer of a save that the server refuses for some fields: 400, with { config, rejected } as its data
-const refusal = (rejected) => ({
-  refusal: { success: false, error: 'invalid', code: 'INVALID_CONFIG', params: { fields: rejected.join(', ') }, data: { config: {}, rejected } }
-})
+// the answer of a save that the server refuses for some fields: a success that names them in `rejected`
+const refusal = (rejected) => ({ config: {}, rejected })
 
 const { state } = await import('../../../public/js/control/state.js')
 const { showRewardForm, bindRewardForm } = await import('../../../public/js/control/twitch/twitch-reward-form.js')

@@ -69,7 +69,7 @@ test('saving the overlay settings', async (t) => {
   await t.test('an empty opacity is sent as it is, and the server refusing it marks the field', async () => {
     panel.route('PUT /api/settings', (body) => {
       puts.push(body)
-      return [400, { error: 'raw', code: 'INVALID_CONFIG', params: { fields: 'opacity' }, data: { config: { ...stored }, rejected: ['opacity'] } }]
+      return { config: { ...stored }, rejected: ['opacity'] }
     })
     field('overlayOpacity').value = ''
 

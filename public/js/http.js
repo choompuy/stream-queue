@@ -14,11 +14,8 @@ const REQUEST_TIMEOUT_MS = 15_000
 /**
  * How the pages (the panel and the overlay) talk to the server: the `data` of the reply, or an ApiError.
  * The error has the `status`, `code` and `params` the server gave, and no status at all when the server could not be reached.
- *
- * `partial`: the endpoint answers a save with some refused fields as INVALID_CONFIG plus the stored config and the list of refused fields,
- * which is a result to show and not a failure
  */
-export async function request(url, options = {}, { partial = false } = {}) {
+export async function request(url, options = {}) {
   let response
 
   try {
@@ -44,8 +41,6 @@ export async function request(url, options = {}, { partial = false } = {}) {
   }
 
   if (!response.ok) {
-    if (partial && body?.code === 'INVALID_CONFIG' && body?.data) return body.data
-
     throw new ApiError(body?.error || `Request failed: ${response.status}`, {
       status: response.status,
       code: body?.code,

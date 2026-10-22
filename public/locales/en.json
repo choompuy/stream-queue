@@ -227,7 +227,6 @@
   "api": {
     "errors": {
       "networkError": "Can't reach the server",
-      "invalidConfig": "Invalid settings: {{fields}}",
       "invalidVideoId": "Invalid video ID",
       "invalidJson": "Request body is not valid JSON",
       "payloadTooLarge": "Request body is too large",

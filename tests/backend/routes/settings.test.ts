@@ -37,23 +37,21 @@ test('PUT /api/config', async (t) => {
   })
 
   for (const value of ['x', 5, null, []]) {
-    await t.test(`fallbackPlaylist = ${JSON.stringify(value)} is a 400, not a crash`, async () => {
+    await t.test(`fallbackPlaylist = ${JSON.stringify(value)} is refused as a field, not a crash`, async () => {
       const response = await putConfig({ fallbackPlaylist: value })
       const body = (await response.json()) as Record<string, any>
 
-      assert.equal(response.status, 400)
-      assert.equal(body.code, 'INVALID_CONFIG')
-      assert.equal(body.params.fields, 'fallbackPlaylist')
+      assert.equal(response.status, 200)
+      assert.deepEqual(body.data.rejected, ['fallbackPlaylist'])
     })
   }
 
-  await t.test('invalid fields (nested included) are named in the error', async () => {
+  await t.test('invalid fields (nested included) are named in the answer', async () => {
     const response = await putConfig({ maxQueueSize: -5, fallbackPlaylist: { repeat: 'yes' } })
     const body = (await response.json()) as Record<string, any>
 
-    assert.equal(response.status, 400)
-    assert.equal(body.code, 'INVALID_CONFIG')
-    assert.deepEqual(body.params.fields.split(', ').sort(), ['fallbackPlaylist.repeat', 'maxQueueSize'])
+    assert.equal(response.status, 200)
+    assert.deepEqual(body.data.rejected.sort(), ['fallbackPlaylist.repeat', 'maxQueueSize'])
   })
 
   await t.test('applies valid fields and rejects invalid fields independently', async () => {
@@ -63,29 +61,32 @@ test('PUT /api/config', async (t) => {
       minViews: before.minViews + 1,
       maxQueueSize: -1
     })
+    const body = (await response.json()) as Record<string, any>
 
     const config = await getConfig()
 
-    assert.equal(response.status, 400)
+    assert.equal(response.status, 200)
+    assert.deepEqual(body.data.rejected, ['maxQueueSize'])
     assert.equal(config.minViews, before.minViews + 1)
     assert.equal(config.maxQueueSize, before.maxQueueSize)
   })
 
   await t.test('unknown fields are refused and never stored', async () => {
     const response = await putConfig({ notAField: 1 })
+    const body = (await response.json()) as Record<string, any>
 
-    assert.equal(response.status, 400)
+    assert.equal(response.status, 200)
+    assert.deepEqual(body.data.rejected, ['notAField'])
     assert.equal('notAField' in (await getConfig()), false)
   })
 
-  await t.test('a duration range where min >= max is a 400, not a config that silently rejects every song', async () => {
+  await t.test('a duration range where min >= max is refused, not a config that silently rejects every song', async () => {
     const before = await getConfig()
     const response = await putConfig({ minDurationSeconds: 500, maxDurationSeconds: 60 })
     const body = (await response.json()) as Record<string, any>
 
-    assert.equal(response.status, 400)
-    assert.equal(body.code, 'INVALID_CONFIG')
-    assert.deepEqual(body.params.fields.split(', ').sort(), ['maxDurationSeconds', 'minDurationSeconds'])
+    assert.equal(response.status, 200)
+    assert.deepEqual(body.data.rejected.sort(), ['maxDurationSeconds', 'minDurationSeconds'])
     assert.deepEqual(await getConfig(), before)
   })
 
@@ -93,7 +94,10 @@ test('PUT /api/config', async (t) => {
     await putConfig({ minDurationSeconds: 60, maxDurationSeconds: 480 })
 
     const response = await putConfig({ minDurationSeconds: 500 })
-    assert.equal(response.status, 400)
+    const body = (await response.json()) as Record<string, any>
+
+    assert.equal(response.status, 200)
+    assert.deepEqual(body.data.rejected, ['minDurationSeconds'])
     assert.equal((await getConfig()).minDurationSeconds, 60)
   })
 })
@@ -111,9 +115,8 @@ test('PUT /api/config and the fallback playlist', async (t) => {
     const response = await putConfig({ fallbackPlaylist: { playlistId: 'not a playlist' } })
     const body = (await response.json()) as Record<string, any>
 
-    assert.equal(response.status, 400)
-    assert.equal(body.code, 'INVALID_CONFIG')
-    assert.equal(body.params.fields, 'fallbackPlaylist.playlistId')
+    assert.equal(response.status, 200)
+    assert.deepEqual(body.data.rejected, ['fallbackPlaylist.playlistId'])
     assert.equal((await getConfig()).fallbackPlaylist.playlistId, null)
   })
 
@@ -130,8 +133,7 @@ test('PUT /api/config with a refused field (partial save)', async (t) => {
     const response = await putConfig({ minViews: 4242, maxQueueSize: -1 })
     const body = (await response.json()) as Record<string, any>
 
-    assert.equal(response.status, 400)
-    assert.equal(body.code, 'INVALID_CONFIG')
+    assert.equal(response.status, 200)
     assert.deepEqual(body.data.rejected, ['maxQueueSize'])
     assert.equal(body.data.config.minViews, 4242)
     assert.equal((await getConfig()).minViews, 4242)
@@ -160,13 +162,12 @@ test('PUT /api/settings', async (t) => {
     assert.deepEqual(await getSettings(), { showVideo: true, hideOverlayInfo: false, opacity: 100, position: 'top-left', locale: 'en' })
   })
 
-  await t.test('invalid and unknown fields are a 400 that names them, and the valid ones are still stored', async () => {
+  await t.test('invalid and unknown fields are named in the answer, and the valid ones are still stored', async () => {
     const before = await getSettings()
     const response = await putSettings({ showVideo: !before.showVideo, position: 'nowhere', locale: 'xx', extra: 1 })
     const body = (await response.json()) as Record<string, any>
 
-    assert.equal(response.status, 400)
-    assert.equal(body.code, 'INVALID_CONFIG')
+    assert.equal(response.status, 200)
     assert.deepEqual(body.data.rejected.sort(), ['extra', 'locale', 'position'])
     assert.equal(body.data.config.showVideo, !before.showVideo, 'the answer is the stored settings')
     assert.deepEqual(await getSettings(), { ...before, showVideo: !before.showVideo })
