@@ -66,30 +66,22 @@ export async function initI18n(locale = DEFAULT_LOCALE) {
   return currentLocale
 }
 
+// how a key on an element becomes text: data-i18n is the text itself, the others name the attribute they fill
+const I18N_ATTRIBUTES = {
+  'data-i18n': 'textContent',
+  'data-i18n-placeholder': 'placeholder',
+  'data-i18n-aria-label': 'aria-label',
+  'data-i18n-title': 'title'
+}
+
 export function updateDomTranslations() {
-  document.querySelectorAll('[data-i18n]').forEach((el) => {
-    const key = el.getAttribute('data-i18n')
-    if (key) {
-      el.textContent = t(key)
-    }
-  })
+  for (const [attribute, target] of Object.entries(I18N_ATTRIBUTES)) {
+    document.querySelectorAll(`[${attribute}]`).forEach((element) => {
+      const key = element.getAttribute(attribute)
+      if (!key) return
 
-  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
-    const key = el.getAttribute('data-i18n-placeholder')
-    if (key) {
-      el.placeholder = t(key)
-    }
-  })
-
-  document.querySelectorAll('[data-i18n-aria-label]').forEach((el) => {
-    const key = el.getAttribute('data-i18n-aria-label')
-    if (key) el.setAttribute('aria-label', t(key))
-  })
-
-  document.querySelectorAll('[data-i18n-title]').forEach((el) => {
-    const key = el.getAttribute('data-i18n-title')
-    if (key) {
-      el.title = t(key)
-    }
-  })
+      if (target === 'textContent') element.textContent = t(key)
+      else element.setAttribute(target, t(key))
+    })
+  }
 }

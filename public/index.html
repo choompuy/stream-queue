@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="css/fonts.css" media="print" onload="this.media = 'all'" />
+    <link rel="stylesheet" href="css/variables.css" media="print" onload="this.media = 'all'" />
+    <link rel="stylesheet" href="css/components.css" media="print" onload="this.media = 'all'" />
+    <link rel="stylesheet" href="css/toast.css" media="print" onload="this.media = 'all'" />
     <link rel="stylesheet" href="css/app.css" media="print" onload="this.media = 'all'" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <title>StreamQueue - Control Panel</title>
@@ -296,7 +299,7 @@
                       d="M12 3v9m6.361-6.36a9 9 0 1 1-12.73 0"
                     />
                   </svg>
-                  <span id="fallbackEnabledText" style="min-width: 4ch; text-align: center" data-i18n="common.off">Off</span>
+                  <span id="fallbackEnabledText" class="fallback-enabled-text" data-i18n="common.off">Off</span>
                 </button>
               </div>
             </div>
@@ -545,7 +548,7 @@
                   name="regionCode"
                   maxlength="2"
                   placeholder="US"
-                  style="text-transform: uppercase"
+                  class="settings-input-uppercase"
                 />
                 <span class="text-muted text-xs" data-i18n="settings.bot.regionCodeNote">
                   Two-letter country code (ISO 3166-1, e.g. US, RU, DE). Tracks not licensed for this region are skipped instead of being queued.

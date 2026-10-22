@@ -223,7 +223,7 @@ async function postWithRetry(url, body) {
       log(`${url} failed:`, error)
     }
 
-    await sleep(Math.min(500 * 2 ** Math.min(attempt, 6), 15000))
+    await sleep(Math.min(500 * 2 ** attempt, 15000))
   }
 }
 
