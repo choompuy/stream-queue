@@ -24,6 +24,10 @@ export type SanitizedState = {
 const text = (value: unknown): string => (typeof value === 'string' ? value : '')
 const amount = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0)
 
+// A number read from disk becomes null when it is not one (or falls under the minimum)
+const numberOrNull = (value: unknown, min = -Infinity): number | null =>
+  typeof value === 'number' && Number.isFinite(value) && value >= min ? value : null
+
 function sanitizeSong(raw: unknown): Song | null {
   if (!isPlain(raw) || !isValidVideoId(raw.videoId) || !text(raw.title)) return null
 
@@ -70,6 +74,31 @@ export function sanitizeQueueItem(raw: unknown): QueueItem | null {
   }
 }
 
+// The track list of the rotation, deduplicated: an unusable entry and a second copy of a video cost only themselves
+function sanitizeTracks(raw: unknown): { tracks: Song[]; dropped: number } {
+  const rawTracks = Array.isArray(raw) ? raw : []
+  const byId = new Map<string, Song>()
+
+  for (const item of rawTracks) {
+    const song = sanitizeSong(item)
+    if (song && !byId.has(song.videoId)) byId.set(song.videoId, song)
+  }
+
+  return { tracks: [...byId.values()], dropped: rawTracks.length - byId.size }
+}
+
+// The rotation order is kept only whole: a damaged one is dropped, and the load rebuilds it from the tracks
+function sanitizeOrder(raw: unknown): { order: string[]; clean: boolean } {
+  const rawOrder = Array.isArray(raw) ? raw : []
+  const order = [...new Set(rawOrder.filter((id): id is string => typeof id === 'string'))]
+  return { order, clean: order.length === rawOrder.length }
+}
+
+// The position survives only together with the order it points into, and only inside its bounds
+function sanitizeCursor(raw: unknown, clean: boolean, orderLength: number): number {
+  return clean && Number.isInteger(raw) && (raw as number) >= -1 && (raw as number) < orderLength ? (raw as number) : -1
+}
+
 function sanitizeFallback(raw: unknown, problems: string[]): FallbackSnapshot | undefined {
   if (raw === undefined) return undefined
   if (!isPlain(raw)) {
@@ -77,70 +106,70 @@ function sanitizeFallback(raw: unknown, problems: string[]): FallbackSnapshot | 
     return undefined
   }
 
-  const rawTracks = Array.isArray(raw.sourceTracks) ? raw.sourceTracks : []
-  const tracks = new Map<string, Song>()
-  for (const item of rawTracks) {
-    const song = sanitizeSong(item)
-    if (song && !tracks.has(song.videoId)) tracks.set(song.videoId, song)
-  }
-  if (tracks.size !== rawTracks.length) problems.push(`fallback: dropped ${rawTracks.length - tracks.size} invalid or duplicate track(s)`)
+  const { tracks, dropped } = sanitizeTracks(raw.sourceTracks)
+  if (dropped) problems.push(`fallback: dropped ${dropped} invalid or duplicate track(s)`)
 
-  const rawOrder = Array.isArray(raw.order) ? raw.order : []
-  const order = [...new Set(rawOrder.filter((id): id is string => typeof id === 'string'))]
-  const clean = order.length === rawOrder.length
-
-  // the saved order is kept only whole: a damaged one is dropped, and the load rebuilds it from the tracks
+  const { order, clean } = sanitizeOrder(raw.order)
   if (!clean) problems.push('fallback: rotation is damaged, reset')
 
-  const rawCursor = raw.cursor
-  const cursor = clean && Number.isInteger(rawCursor) && (rawCursor as number) >= -1 && (rawCursor as number) < order.length ? (rawCursor as number) : -1
-
-  const lastRefreshedAt = raw.lastRefreshedAt
-  const itemCount = raw.itemCount
-
   return {
-    sourceTracks: [...tracks.values()],
+    sourceTracks: tracks,
     order: clean ? order : [],
-    cursor,
+    cursor: sanitizeCursor(raw.cursor, clean, order.length),
     playlistId: isValidPlaylistId(raw.playlistId) ? raw.playlistId : null,
-    lastRefreshedAt: typeof lastRefreshedAt === 'number' && Number.isFinite(lastRefreshedAt) ? lastRefreshedAt : null,
-    itemCount: typeof itemCount === 'number' && Number.isFinite(itemCount) && itemCount >= 0 ? itemCount : null
+    lastRefreshedAt: numberOrNull(raw.lastRefreshedAt),
+    itemCount: numberOrNull(raw.itemCount, 0)
   }
+}
+
+// The track that is playing now: unusable when damaged, null when the state named none
+function sanitizeCurrent(raw: unknown, problems: string[]): QueueItem | null {
+  if (raw === undefined || raw === null) return null
+
+  const current = sanitizeQueueItem(raw)
+  if (!current) problems.push('current track is invalid, dropped')
+  return current
+}
+
+// The videos that already hold a place: the track playing now, unless it is one of the rotation's (a fallback
+// track playing now does not hide the same track queued by a viewer)
+function occupiedVideos(current: QueueItem | null): Set<string> {
+  return new Set(current && !current.isFallback ? [current.videoId] : [])
+}
+
+// The queue without its unusable and repeating tracks
+function sanitizeQueue(raw: unknown, current: QueueItem | null, problems: string[]): QueueItem[] {
+  if (raw !== undefined && !Array.isArray(raw)) problems.push('queue is not a list, ignored')
+
+  const seen = occupiedVideos(current)
+  const queue: QueueItem[] = []
+  let invalid = 0
+  let duplicates = 0
+
+  for (const item of Array.isArray(raw) ? raw : []) {
+    const clean = sanitizeQueueItem(item)
+    if (!clean) invalid++
+    else if (seen.has(clean.videoId)) duplicates++
+    else {
+      seen.add(clean.videoId)
+      queue.push(clean)
+    }
+  }
+
+  if (invalid) problems.push(`queue: dropped ${invalid} invalid item(s)`)
+  if (duplicates) problems.push(`queue: dropped ${duplicates} duplicate item(s)`)
+  return queue
 }
 
 // Turns whatever was read from disk into something safe to load. Every part is repaired on its own:
 // a bad queue item, a bad setting or a bad fallback entry costs only itself, never the other parts
 export function sanitizeState(raw: unknown): SanitizedState {
-  const data = isPlain(raw) ? raw : {}
   const problems: string[] = []
-
   if (!isPlain(raw)) problems.push('state file is not an object, using defaults')
+  const data = isPlain(raw) ? raw : {}
 
-  let current: QueueItem | null = null
-  if (data.current !== undefined && data.current !== null) {
-    current = sanitizeQueueItem(data.current)
-    if (!current) problems.push('current track is invalid, dropped')
-  }
-
-  const rawQueue = Array.isArray(data.queue) ? data.queue : []
-  const seen = new Set<string>(current && !current.isFallback ? [current.videoId] : [])
-  const queue: QueueItem[] = []
-  let invalid = 0
-  let duplicates = 0
-
-  for (const raw of rawQueue) {
-    const item = sanitizeQueueItem(raw)
-    if (!item) invalid++
-    else if (seen.has(item.videoId)) duplicates++
-    else {
-      seen.add(item.videoId)
-      queue.push(item)
-    }
-  }
-
-  if (data.queue !== undefined && !Array.isArray(data.queue)) problems.push('queue is not a list, ignored')
-  if (invalid) problems.push(`queue: dropped ${invalid} invalid item(s)`)
-  if (duplicates) problems.push(`queue: dropped ${duplicates} duplicate item(s)`)
+  const current = sanitizeCurrent(data.current, problems)
+  const queue = sanitizeQueue(data.queue, current, problems)
 
   return { current, queue, fallback: sanitizeFallback(data.fallback, problems), problems }
 }

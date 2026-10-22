@@ -22,6 +22,15 @@ const log = createLogger('TWITCH OAUTH')
 const TOKEN_URL = 'https://id.twitch.tv/oauth2/token'
 const REVOKE_URL = 'https://id.twitch.tv/oauth2/revoke'
 
+// The verdict of a token poll answer: keep waiting, slow down, or the failure that ends the authorization
+function pollVerdict(error: TwitchErrorResponse): AppError | 'pending' | 'slowDown' {
+  if (error.message === 'authorization_pending') return 'pending'
+  if (error.message === 'slow_down') return 'slowDown'
+  if (error.message === 'access_denied') return new AppError('TWITCH_AUTH_ERROR', 'Twitch authorization was denied')
+  if (error.message === 'expired_token') return new AppError('TWITCH_AUTH_ERROR', 'Twitch device code expired')
+  return new AppError('TWITCH_AUTH_ERROR', error.message || 'Device authorization failed')
+}
+
 function postForm(url: string, params: URLSearchParams): Promise<Response> {
   return fetchWithTimeout(
     url,
@@ -133,16 +142,15 @@ export class TwitchOAuth {
       }
 
       const error = (await response.json().catch(() => ({}))) as TwitchErrorResponse
-      if (error.message === 'authorization_pending') continue
+      const verdict = pollVerdict(error)
+      if (verdict === 'pending') continue
 
-      if (error.message === 'slow_down') {
+      if (verdict === 'slowDown') {
         pollInterval += 5000
         continue
       }
 
-      if (error.message === 'access_denied') throw new AppError('TWITCH_AUTH_ERROR', 'Twitch authorization was denied')
-      if (error.message === 'expired_token') throw new AppError('TWITCH_AUTH_ERROR', 'Twitch device code expired')
-      throw new AppError('TWITCH_AUTH_ERROR', error.message || 'Device authorization failed')
+      throw verdict
     }
 
     throw new AppError('TWITCH_AUTH_ERROR', 'Twitch device code expired')

@@ -361,34 +361,48 @@ export function getFallbackSnapshot(): FallbackSnapshot & { sourceVersion: numbe
   }
 }
 
-export function hydrateFallback(data: Partial<FallbackSnapshot> | undefined): void {
-  if (!data) return
-
+// The rotation order of the saved state, repaired: ids without a saved track are appended, a repeated id
+// keeps one place. `repaired` says whether anything had to change
+function repairedOrder(data: Partial<FallbackSnapshot>): { order: string[]; repaired: boolean } {
   const tracks = data.sourceTracks ?? []
   const savedOrder = data.order ?? []
   const known = new Set(tracks.map((track) => track.videoId))
   const kept = [...new Set(savedOrder.filter((id) => known.has(id)))]
   const keptIds = new Set(kept)
+
   const missing: string[] = []
   for (const id of known) {
     if (!keptIds.has(id)) missing.push(id)
   }
+
   const order = [...kept, ...missing]
   const repaired = savedOrder.length !== order.length || order.some((id, index) => id !== savedOrder[index])
+  return { order, repaired }
+}
 
+// The position starts over when the order was repaired, and moves under the track that is playing if it is
+// one of the rotation's
+function restoredCursor(data: Partial<FallbackSnapshot>, order: string[], repaired: boolean): number {
   let cursor = repaired ? -1 : data.cursor ?? -1
 
-  // the restored position belongs under the track that is playing, if it is one of the rotation's
   const current = getCurrent()
   if (current?.isFallback) {
     const index = order.indexOf(current.videoId)
     if (index >= 0) cursor = index
   }
 
+  return cursor
+}
+
+export function hydrateFallback(data: Partial<FallbackSnapshot> | undefined): void {
+  if (!data) return
+
+  const { order, repaired } = repairedOrder(data)
+
   rotation = {
-    tracksById: new Map(tracks.map((track) => [track.videoId, track])),
+    tracksById: new Map((data.sourceTracks ?? []).map((track) => [track.videoId, track])),
     order,
-    cursor,
+    cursor: restoredCursor(data, order, repaired),
     playlistId: data.playlistId ?? null,
     lastRefreshedAt: data.lastRefreshedAt ?? null,
     itemCount: data.itemCount ?? null,

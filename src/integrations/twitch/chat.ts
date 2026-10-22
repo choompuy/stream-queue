@@ -134,6 +134,21 @@ export class TwitchChat extends ReconnectingSocket {
     }
   }
 
+  // A JOIN of the configured channel is what makes the chat ready: the ping loop keeps the socket alive from here on
+  private handleJoin(prefix: string | null, params: string[]): void {
+    if (prefix?.split('!')[0] === this.config.channelLogin && params[0] === `#${this.config.channelLogin}`) {
+      log.info(`Joined channel #${this.config.channelLogin}`)
+      this.markReady()
+      this.startPingLoop()
+    }
+  }
+
+  // Auth failures land in NOTICE (e.g. "Login authentication failed", "Improperly formatted auth")
+  private handleNotice(trailing: string | null): void {
+    if (!this.ready) this.abort(new Error(trailing || 'Twitch chat authentication failed'))
+    log.warn(`NOTICE: ${trailing ?? ''}`)
+  }
+
   private handleLine(line: string): void {
     const { tags, prefix, command, params, trailing } = parseIrcLine(line)
 
@@ -146,16 +161,10 @@ export class TwitchChat extends ReconnectingSocket {
         // below, since a bad channel name would otherwise be reported as connected
         return
       case 'JOIN':
-        if (prefix?.split('!')[0] === this.config.channelLogin && params[0] === `#${this.config.channelLogin}`) {
-          log.info(`Joined channel #${this.config.channelLogin}`)
-          this.markReady()
-          this.startPingLoop()
-        }
+        this.handleJoin(prefix, params)
         return
       case 'NOTICE':
-        // Auth failures land here (e.g. "Login authentication failed", "Improperly formatted auth")
-        if (!this.ready) this.abort(new Error(trailing || 'Twitch chat authentication failed'))
-        log.warn(`NOTICE: ${trailing ?? ''}`)
+        this.handleNotice(trailing)
         return
       case 'PRIVMSG':
         this.handlePrivmsg(tags, prefix, params, trailing)

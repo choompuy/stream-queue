@@ -107,28 +107,51 @@ function prepareLimits(raw: unknown): Record<string, unknown> | unknown {
 }
 
 // The small camelCase to Twitch snake_case step: what the schema accepted is renamed and packed for Helix.
-// An empty prompt clears the one of an existing reward and is nothing at all for a new one; a limit's number
-// is packed only with its switch on.
-function toRewardPayload(clean: Record<string, unknown>, requireTitleAndCost: boolean): TwitchUpdateCustomReward {
-  const payload: Record<string, string | number | boolean> = {}
 
-  if (typeof clean.title === 'string') payload.title = clean.title
-  if (typeof clean.cost === 'number') payload.cost = clean.cost
-  if (typeof clean.prompt === 'string' && (clean.prompt !== '' || !requireTitleAndCost)) payload.prompt = clean.prompt
-  if (typeof clean.backgroundColor === 'string' && clean.backgroundColor !== '') payload.background_color = `#${clean.backgroundColor}`
-  if (typeof clean.isEnabled === 'boolean') payload.is_enabled = clean.isEnabled
+// The plain fields, copied only when they arrived as their type: an update changes only what it names
+function plainFields(clean: Record<string, unknown>): Record<string, string | number | boolean> {
+  const fields: Record<string, string | number | boolean> = {}
 
-  if (isPlain(clean.limits)) {
-    for (const { name, flag, value: valueKey } of LIMITS) {
-      const limit = clean.limits[name]
-      if (!isPlain(limit) || typeof limit.enabled !== 'boolean') continue
+  if (typeof clean.title === 'string') fields.title = clean.title
+  if (typeof clean.cost === 'number') fields.cost = clean.cost
+  if (typeof clean.backgroundColor === 'string' && clean.backgroundColor !== '') fields.background_color = `#${clean.backgroundColor}`
+  if (typeof clean.isEnabled === 'boolean') fields.is_enabled = clean.isEnabled
 
-      payload[flag] = limit.enabled
-      if (limit.enabled && typeof limit.value === 'number') payload[valueKey] = limit.value
-    }
+  return fields
+}
+
+// An empty prompt is the one field that still means something: it clears the prompt of an existing reward,
+// and is nothing at all for a new one
+function promptField(clean: Record<string, unknown>, requireTitleAndCost: boolean): Record<string, string | number | boolean> {
+  if (typeof clean.prompt !== 'string') return {}
+  if (clean.prompt === '' && requireTitleAndCost) return {}
+  return { prompt: clean.prompt }
+}
+
+// A limit's switch goes out as its flag, its number only with the switch on
+function limitFlags(limits: Record<string, unknown>): Record<string, string | number | boolean> {
+  const flags: Record<string, string | number | boolean> = {}
+
+  for (const { name, flag, value: valueKey } of LIMITS) {
+    const limit = limits[name]
+    if (!isPlain(limit) || typeof limit.enabled !== 'boolean') continue
+
+    flags[flag] = limit.enabled
+    if (limit.enabled && typeof limit.value === 'number') flags[valueKey] = limit.value
   }
 
-  return payload
+  return flags
+}
+
+function toRewardPayload(clean: Record<string, unknown>, requireTitleAndCost: boolean): TwitchUpdateCustomReward {
+  const payload: Record<string, string | number | boolean> = {
+    ...plainFields(clean),
+    ...promptField(clean, requireTitleAndCost)
+  }
+
+  if (isPlain(clean.limits)) Object.assign(payload, limitFlags(clean.limits))
+
+  return payload as TwitchUpdateCustomReward
 }
 
 /**

@@ -18,22 +18,33 @@ type YouTubeErrorResponse = {
 const MAX_ATTEMPTS = 3
 const RETRY_DELAY_MS = 500
 
+function buildUrl(path: string, params: Record<string, string>, key: string): URL {
+  const url = new URL(`https://www.googleapis.com/youtube/v3/${path}`)
+  for (const [name, value] of Object.entries({ ...params, key })) url.searchParams.set(name, value)
+  return url
+}
+
+// The quota is its own error: the flag markQuotaExhausted() raises keeps every further request from
+// spending its attempts on an answer that will not change today
+function youtubeError(data: YouTubeErrorResponse, status: number): AppError {
+  if (data.error?.errors?.[0]?.reason === 'quotaExceeded') {
+    markQuotaExhausted()
+    return new AppError('YOUTUBE_QUOTA')
+  }
+
+  return new AppError('YOUTUBE_ERROR', data.error?.message || `YouTube API error ${status}`)
+}
+
 export async function youtube<T>(path: string, params: Record<string, string>, { attempts = MAX_ATTEMPTS }: { attempts?: number } = {}): Promise<T> {
   const youtubeApiKey = getYoutubeApiKey()
 
   if (!youtubeApiKey) throw new AppError('NO_API_KEY')
   if (isQuotaExhausted()) throw new AppError('YOUTUBE_QUOTA')
 
-  const url = new URL(`https://www.googleapis.com/youtube/v3/${path}`)
-
-  for (const [key, value] of Object.entries({ ...params, key: youtubeApiKey })) {
-    url.searchParams.set(key, value)
-  }
-
   // a timeout, a network error, a 429 and a 5xx are tried again (with growing pauses) while attempts are left
   let response: Response
   try {
-    response = await fetchWithTimeout(url, undefined, 10_000, {
+    response = await fetchWithTimeout(buildUrl(path, params, youtubeApiKey), undefined, 10_000, {
       attempts,
       delayMs: (attempt) => RETRY_DELAY_MS * attempt,
       shouldRetry: retryableTransport
@@ -47,17 +58,7 @@ export async function youtube<T>(path: string, params: Record<string, string>, {
   const data = (await response.json().catch(() => ({}))) as T & YouTubeErrorResponse
 
   if (!isPlain(data)) throw new AppError('YOUTUBE_ERROR', 'YouTube API returned a malformed response')
-
-  if (!response.ok) {
-    const reason = data.error?.errors?.[0]?.reason
-
-    if (reason === 'quotaExceeded') {
-      markQuotaExhausted()
-      throw new AppError('YOUTUBE_QUOTA')
-    }
-
-    throw new AppError('YOUTUBE_ERROR', data.error?.message || `YouTube API error ${response.status}`)
-  }
+  if (!response.ok) throw youtubeError(data, response.status)
 
   return data
 }
