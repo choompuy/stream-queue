@@ -30,14 +30,3 @@ export function toggleMenu(toggle, event) {
 export const menuActions = {
   'toggle-menu': toggleMenu
 }
-
-export function bindMenus() {
-  document.addEventListener('click', (event) => {
-    if (event.target.closest('[data-action="toggle-menu"]')) return
-    closeAllMenus()
-  })
-
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closeAllMenus({ restoreFocus: true })
-  })
-}

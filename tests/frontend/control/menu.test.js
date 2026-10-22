@@ -15,8 +15,10 @@ document.body.insertAdjacentHTML(
     .join('')
 )
 
-const { toggleMenu, closeAllMenus, bindMenus } = await import('../../../public/js/control/menu.js')
-bindMenus()
+const { toggleMenu, closeAllMenus } = await import('../../../public/js/control/menu.js')
+// the closing of menus on a click or on Escape is part of the one listener of the whole panel (events.js)
+const { bindEvents } = await import('../../../public/js/control/events.js')
+bindEvents()
 
 const toggle = (id) => document.getElementById(`toggle-${id}`)
 const isOpen = (id) => !document.querySelector(`#menu-${id} .row-menu-dropdown`).classList.contains('hidden')
@@ -71,12 +73,13 @@ test('menus', async (t) => {
     assert.equal(document.activeElement, toggle('b'))
   })
 
-  await t.test('a click anywhere else closes the menu, a click on a toggle is left to the toggle', () => {
+  await t.test('a click anywhere else closes the menu; a click on a toggle runs the action of the toggle (as in the panel)', () => {
     toggleMenu(toggle('a'), { detail: 1 })
 
-    click(toggle('a'))
-    assert.equal(isOpen('a'), true)
+    click(toggle('a'), { detail: 1 })
+    assert.equal(isOpen('a'), false, 'the toggle closes the menu it opened')
 
+    toggleMenu(toggle('a'), { detail: 1 })
     click(document.body)
     assert.equal(isOpen('a'), false)
   })

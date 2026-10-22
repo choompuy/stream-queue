@@ -1,14 +1,16 @@
 import { escapeHtml, show, setValue } from '../shared.js'
 import { api } from './api.js'
-import { state, on, isLocalDevice } from './state.js'
+import { store, state, on, isLocalDevice } from './state.js'
 import { dom } from './dom.js'
 import { log } from './log.js'
 import { run } from './run.js'
 import { syncPlayer } from './player.js'
-import { t } from '../i18n.js'
+import { t, loadTranslations, updateDomTranslations } from '../i18n.js'
 import { toastError, toastSuccess } from './toast.js'
 import { fillForm, saveForm, toastSaveResult, formInputs, isChanged } from './form.js'
 import { renderTwitchConnection } from './twitch/twitch-connection.js'
+import { renderTwitchRewards } from './twitch/twitch-rewards.js'
+import { reportError } from './run.js'
 
 let qrCodePromise
 
@@ -34,7 +36,14 @@ function loadQRCode() {
 export function changeLocale(locale) {
   return run('changing locale', async () => {
     await api.updateSettings({ locale })
-    location.reload()
+
+    // the page is redrawn in the new language where it stands: the lists and the cards follow the store, the rest is
+    // written in data-i18n. Unsaved text (what is being typed) is not touched by any of it
+    await loadTranslations(locale)
+    document.documentElement.lang = locale
+    updateDomTranslations()
+    store.refresh()
+    renderTwitchRewards()
   })
 }
 
@@ -229,8 +238,10 @@ export async function saveConfigSetting() {
       dom.secYoutubeKey.value = ''
       await loadSecrets()
     } catch (error) {
+      // the server's own words about why the key was not stored (run would swallow the answer's code into one toast
+      // with the config's): the key is not part of the config form, so its failure is told on its own
       log('Error saving API key:', error)
-      toastError(t('toast.apiKeyNotSaved'))
+      reportError(error)
       apiKeyFailed = true
     }
   }

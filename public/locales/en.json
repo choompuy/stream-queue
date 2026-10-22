@@ -291,7 +291,6 @@
     "trackUnblocked": "Track unblocked",
     "settingsSaved": "Settings saved",
     "settingsPartiallySaved": "Saved {{saved}}, not saved {{rejected}} (invalid values)",
-    "apiKeyNotSaved": "Config saved, but API key was not",
     "nowPlaying": "Now playing: {{title}}",
     "addedToQueue": "Added to queue: {{title}} [#{{position}}]",
     "viewerRequest": "🎵 {{user}} added: {{title}}",

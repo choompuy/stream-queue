@@ -12,7 +12,16 @@ const { readActivity } = await import('../../../public/js/control/activity.js')
 await import('../../../public/js/control/stats.js')
 
 let at = 1_000
-const entry = (char, extra = {}) => ({ at: ++at, videoId: V(char), title: `Song ${char}`, query: 'q', status: 'accepted', requestedBy: 'amy', reasonCode: null, ...extra })
+const entry = (char, extra = {}) => ({
+  at: ++at,
+  videoId: V(char),
+  title: `Song ${char}`,
+  query: 'q',
+  status: 'accepted',
+  requestedBy: 'amy',
+  reasonCode: null,
+  ...extra
+})
 
 test('readActivity()', async (t) => {
   await t.test('shows the entries and their count on the tab, and never a toast about them: that is for the notices of the server', async () => {
@@ -39,16 +48,13 @@ test('readActivity()', async (t) => {
 
   await t.test('a track that came without a title shows the localized placeholder; an unresolved request keeps its query', async () => {
     panel.route('GET /api/activity', {
-      entries: [
-        entry('d', { title: '' }),
-        entry('e', { title: null, status: 'rejected', reasonCode: 'SONG_NOT_FOUND' })
-      ]
+      entries: [entry('d', { title: '' }), entry('e', { title: null, status: 'rejected', reasonCode: 'SONG_NOT_FOUND' }), entry('e')]
     })
 
     await readActivity()
 
     const titles = panel.$$('#activityListWrapper .column-info .text-primary').map((node) => node.textContent)
-    assert.deepEqual(titles, ['Unknown title', 'q'])
+    assert.deepEqual(titles, ['Unknown title', 'Could not find a suitable track', 'Song e'])
   })
 
   await t.test('a read that fails says nothing and leaves the list as it was (the watcher logs it)', async () => {
@@ -58,6 +64,6 @@ test('readActivity()', async (t) => {
     await assert.rejects(readActivity())
 
     assert.equal(panel.toasts().join('|'), before)
-    assert.equal(state.activity.length, 2)
+    assert.equal(state.activity.length, 3)
   })
 })

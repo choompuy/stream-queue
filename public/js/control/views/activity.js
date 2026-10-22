@@ -18,21 +18,21 @@ export const activityView = createListView(dom.activityListWrapper, {
     ].join('|')
   },
   renderRow: (entry) => {
-    const title = entry.title != null ? displayTitle(entry.title) : entry.query
+    const title = translateErrorCode(t, entry.reasonCode, entry.reasonParams) || displayTitle(entry.title)
     const status = STATUS_LABEL_KEYS[entry.status] ?? STATUS_LABEL_KEYS.rejected
 
     return row({
       index: formatDateTime(entry.at, '\n'),
       thumbnail: entry.videoId ? youtubeThumbnail(entry.videoId) : '',
       title,
-      subtitle: translateErrorCode(t, entry.reasonCode, entry.reasonParams),
+      subtitle: entry.query,
       extra: `
         ${statusPill(t(status.key), status.status)}
         <span class="column-requested-by text-sm text-green truncate">
           @${escapeHtml(entry.requestedBy)}
         </span>
       `,
-      actions: entry.videoId ? rowMenu([blockTrackItem(entry.videoId, title)]) : '<span class="btn-sm"></span>'
+      actions: entry.videoId ? rowMenu([blockTrackItem(entry.videoId, entry.title || entry.query)]) : '<span class="btn-sm"></span>'
     })
   }
 })

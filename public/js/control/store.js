@@ -42,5 +42,12 @@ export function createStore(initial) {
     for (const key of [].concat(keys)) subs.set(key, [...(subs.get(key) ?? []), fn])
   }
 
-  return { state, on }
+  // every drawing runs once, whatever it follows: the language of the page changed, and every drawing reads it
+  const refresh = () => {
+    const fns = new Set()
+    subs.forEach((list) => list.forEach((fn) => fns.add(fn)))
+    fns.forEach((fn) => fn())
+  }
+
+  return { state, on, refresh }
 }

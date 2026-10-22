@@ -291,7 +291,6 @@
     "trackUnblocked": "Трек разблокирован",
     "settingsSaved": "Настройки сохранены",
     "settingsPartiallySaved": "Сохранено {{saved}}, не сохранено {{rejected}} (некорректные значения)",
-    "apiKeyNotSaved": "Настройки сохранены, а API ключ нет",
     "nowPlaying": "Сейчас играет: {{title}}",
     "addedToQueue": "Добавлено в очередь: {{title}} [#{{position}}]",
     "viewerRequest": "🎵 {{user}} добавил(а): {{title}}",

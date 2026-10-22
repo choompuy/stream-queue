@@ -62,7 +62,7 @@
             />
           </svg>
           <span data-i18n="nav.language">Language</span>
-          <select id="localeSelect">
+          <select id="localeSelect" data-on-change="locale">
             <option value="en">English</option>
             <option value="ru">Русский</option>
           </select>
@@ -381,7 +381,7 @@
             Opened from another device - settings that only this machine may change (the API key and the Twitch integration) are hidden. Change them
             on the computer running the app
           </div>
-          <div id="overlaySettingsPanel" class="section-tab panel">
+          <div id="overlaySettingsPanel" class="section-tab panel" data-on-change="overlay-settings">
             <div class="section-tab-header">
               <h2 data-i18n="settings.overlay.title">Overlay</h2>
             </div>
@@ -443,7 +443,7 @@
               <label class="field">
                 <span class="field-label" data-i18n="settings.overlay.ipSelector">IP selector</span>
                 <div class="field-row">
-                  <select class="settings-input input hidden" id="selectIp"></select>
+                  <select class="settings-input input hidden" id="selectIp" data-on-change="select-ip"></select>
                   <button
                     type="button"
                     class="btn btn-secondary btn-icon"
@@ -611,7 +611,7 @@
               <label class="field">
                 <span class="field-label" data-i18n="settings.twitch.reward">Channel Points reward</span>
                 <div class="field-row">
-                  <select class="settings-input input" id="twitchRewardSelect" name="channelPointsRewardId">
+                  <select class="settings-input input" id="twitchRewardSelect" name="channelPointsRewardId" data-on-change="twitch-reward">
                     <option value="" data-i18n="settings.twitch.rewardNone">Select reward</option>
                   </select>
                   <button type="button" class="btn btn-secondary" id="twitchCreateNewRewardBtn" data-i18n="settings.twitch.createReward">

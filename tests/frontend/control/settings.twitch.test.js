@@ -716,7 +716,7 @@ test('saveConfigSetting() and the YouTube API key', async (t) => {
     assert.ok(toasts().includes(translate('toast.settingsSaved')))
   })
 
-  await t.test('a key that fails to save shows only "API key was not saved" - no green "Settings saved" after it', async () => {
+  await t.test('a key that fails to save tells the server\'s own words - no green "Settings saved" after it', async () => {
     handlers = {
       'PUT /api/config': () => ({ config: {}, rejected: [] }),
       'PUT /api/secrets': () => {
@@ -727,7 +727,7 @@ test('saveConfigSetting() and the YouTube API key', async (t) => {
 
     await configSettings.saveConfigSetting()
 
-    assert.ok(toasts().includes(translate('toast.apiKeyNotSaved')))
+    assert.ok(toasts().includes(translate('api.errors.serverError')), 'the code of the refusal reaches the person')
     assert.equal(toasts().includes(translate('toast.settingsSaved')), false)
     assert.equal(toasts().includes('not saved 0'), false, 'nothing was refused, so there is no count of refused fields either')
   })
