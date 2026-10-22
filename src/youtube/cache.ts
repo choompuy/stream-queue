@@ -1,4 +1,5 @@
 import { createLogger } from '../logger.js'
+import { notify } from '../state-events.js'
 import type { VideoItem } from './types.js'
 
 export const CACHE_LIMITS = {
@@ -39,6 +40,7 @@ export function markQuotaExhausted(): void {
   quotaExhaustedDate = today
   // the one line about it, at the moment it becomes true: every request the flag blocks afterwards stays silent
   log.warn('YouTube quota exhausted: requests are paused until midnight Pacific Time')
+  notify({ type: 'desktop', level: 'warn', code: 'YOUTUBE_QUOTA_EXHAUSTED' })
 }
 
 export function isQuotaExhausted(): boolean {

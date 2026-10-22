@@ -301,5 +301,17 @@
     "twitchDisconnectedWithOpenRewards": "Disconnected. Rewards still waiting in the Twitch rewards queue (fulfill or refund them there): {{count}}",
     "copied": "Copied",
     "copyFailed": "Could not copy: select the link and copy it by hand"
+  },
+  "desktop": {
+    "startupFailed": "StreamQueue could not start: {{message}}. Check the logs and start it again",
+    "noFreePort": "Ports {{from}}-{{to}} are all busy. Close what holds them and start StreamQueue again",
+    "dataDirNotWritable": "The data folder is not writable ({{dir}}). Nothing the app saves will survive a restart",
+    "publicDirMissing": "The interface files are missing ({{dir}}). Restore the public folder next to the app",
+    "portChanged": "Port {{from}} was busy, the server now runs on {{to}}. The overlay URL in OBS is now http://localhost:{{to}}/overlay",
+    "saveFailed": "Could not save {{file}}. The change may be lost after a restart",
+    "unexpectedError": "Something went wrong inside the server: {{message}}. It keeps running, check the logs if anything looks wrong",
+    "twitchConnectionLost": "The Twitch connection was lost for {{minutes}} min. Requests sent during the outage are gone",
+    "twitchReauthRequired": "Twitch no longer accepts the saved login. Connect the account again in the panel",
+    "youtubeQuotaExhausted": "The YouTube API quota is used up. Requests are paused until midnight Pacific Time"
   }
 }

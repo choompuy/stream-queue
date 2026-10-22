@@ -1,13 +1,14 @@
 import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
-const { getActivity, clearActivity, logRejection, logAcceptance } = await import('../../src/activity.js')
+const { getActivity, clearActivity, logActivity, logRejection, logAcceptance } = await import('../../src/activity.js')
 const { finishItem } = await import('../../src/finish.js')
+const { flushAllStores } = await import('../../src/persist.js')
 
 beforeEach(() => clearActivity())
 
@@ -82,5 +83,43 @@ test('the journal of a way out does not need a redemption', async (t) => {
     finishItem(track, 'played')
 
     assert.deepEqual(getActivity(), [])
+  })
+})
+
+const outageLine = (requestedBy: string) => ({
+  requestedBy,
+  query: 'q',
+  title: null,
+  videoId: null,
+  status: 'failed' as const,
+  reasonCode: 'TWITCH_CONNECTION_LOST' as const,
+  reasonParams: { minutes: 1 }
+})
+
+test('the handle of a journal line', async (t) => {
+  await t.test('two lines written in the same millisecond are corrected independently', () => {
+    const clock = t.mock.method(Date, 'now', () => 1_700_000_000_000)
+    const first = logActivity(outageLine('amy'))
+    const second = logActivity(outageLine('bob'))
+    clock.mock.restore()
+
+    first.update({ minutes: 7 })
+    second.update({ minutes: 2 })
+
+    assert.deepEqual(getActivity()[1].reasonParams, { minutes: 7 }, 'the first line learned its real length')
+    assert.deepEqual(getActivity()[0].reasonParams, { minutes: 2 }, 'the second line learned its own, not the first one')
+  })
+
+  await t.test('a line the limit has pushed out is corrected nowhere: no crash, no write', async () => {
+    const handle = logActivity(outageLine('amy'))
+    // the journal holds 100 lines: newer ones push the handled line out
+    for (let i = 0; i < 100; i++) logActivity(outageLine(`viewer-${i}`))
+
+    handle.update({ minutes: 9 })
+    await flushAllStores()
+
+    const onDisk: Array<{ reasonParams?: { minutes?: number } }> = JSON.parse(readFileSync(join('data', 'activity.json'), 'utf8'))
+    assert.equal(getActivity().some((entry) => entry.reasonParams?.minutes === 9), false, 'the pushed-out line stayed out')
+    assert.equal(onDisk.some((entry) => entry.reasonParams?.minutes === 9), false, 'nothing about it reached the file')
   })
 })

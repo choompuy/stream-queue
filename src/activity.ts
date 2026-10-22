@@ -31,23 +31,28 @@ const entries = createListStore<ActivityEntry>({
   topics: ['activity']
 })
 
-/** Appends one line to the journal. Returns the moment of the entry: the key it can be found by again (the outage line of the Twitch integration corrects itself with it). */
-export function logActivity(entry: Omit<ActivityEntry, 'at'>): number {
-  const at = Date.now()
+/** Appends one line to the journal. Returns a handle to that line: the outage entry of the Twitch integration corrects itself through it. */
+export function logActivity(entry: Omit<ActivityEntry, 'at'>): ActivityHandle {
+  const created = { ...entry, at: Date.now() }
   entries.update((list) => {
-    list.unshift({ ...entry, at })
+    list.unshift(created)
     if (list.length > ACTIVITY_LIMIT) list.length = ACTIVITY_LIMIT
   })
-  return at
+
+  return {
+    // the line is corrected only while it is still in the journal: once the limit has pushed it out, there is nothing to correct
+    update(reasonParams: ReasonParams): void {
+      entries.update((list) => {
+        if (!list.includes(created)) return
+        created.reasonParams = { ...created.reasonParams, ...reasonParams }
+      })
+    }
+  }
 }
 
-/** Reworks the reasonParams of one line: the outage entry states its minutes while the outage is still going on, and learns the real length when the connection returns. */
-export function updateActivityReasonParams(at: number, reasonParams: ReasonParams): void {
-  entries.update((list) => {
-    const entry = list.find((entry) => entry.at === at)
-    if (entry) entry.reasonParams = { ...entry.reasonParams, ...reasonParams }
-  })
-}
+type ReasonParams = Record<string, string | number>
+
+export type ActivityHandle = { update: (reasonParams: ReasonParams) => void }
 
 export function getActivity(): ActivityEntry[] {
   return entries.all()
@@ -59,8 +64,6 @@ export function clearActivity(): void {
   })
   log.info('cleared')
 }
-
-type ReasonParams = Record<string, string | number>
 
 export function logRejection(
   requestedBy: string,

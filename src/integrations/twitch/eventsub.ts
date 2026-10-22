@@ -3,7 +3,8 @@ import { CHANNEL_POINTS_REDEMPTION, type TwitchClient } from './client.js'
 import { ReconnectingSocket, closeQuietly } from './socket.js'
 import type { EventSubMessage, TwitchChannelPointsRedemption } from './types.js'
 import { createLogger, describeError } from '../../logger.js'
-import { logActivity, updateActivityReasonParams } from '../../activity.js'
+import { logActivity, type ActivityHandle } from '../../activity.js'
+import { notify } from '../../state-events.js'
 import { normalizeTwitchError } from './error.js'
 
 const log = createLogger('TWITCH EVENTSUB')
@@ -29,7 +30,7 @@ export class TwitchEventSub extends ReconnectingSocket {
   private hadReadySession = false
   private connectionLostAt: number | null = null
   private journalTimer: ReturnType<typeof setTimeout> | null = null
-  private journalEntryAt: number | null = null
+  private journalEntry: ActivityHandle | null = null
   protected journalAfterMs = 60_000
 
   protected markReady(): void {
@@ -45,10 +46,10 @@ export class TwitchEventSub extends ReconnectingSocket {
       clearTimeout(this.journalTimer)
       this.journalTimer = null
     }
-    if (this.connectionLostAt !== null && this.journalEntryAt !== null) {
-      updateActivityReasonParams(this.journalEntryAt, { minutes: Math.round((Date.now() - this.connectionLostAt) / 60_000) })
+    if (this.connectionLostAt !== null && this.journalEntry !== null) {
+      this.journalEntry.update({ minutes: Math.round((Date.now() - this.connectionLostAt) / 60_000) })
     }
-    this.journalEntryAt = null
+    this.journalEntry = null
     this.connectionLostAt = null
   }
 
@@ -68,15 +69,17 @@ export class TwitchEventSub extends ReconnectingSocket {
     if (this.journalTimer) clearTimeout(this.journalTimer)
     this.journalTimer = setTimeout(() => {
       this.journalTimer = null
-      this.journalEntryAt = logActivity({
+      const minutes = Math.round((Date.now() - lostAt) / 60_000)
+      this.journalEntry = logActivity({
         requestedBy: 'Twitch',
         query: 'Twitch',
         title: null,
         videoId: null,
         status: 'failed',
         reasonCode: 'TWITCH_CONNECTION_LOST',
-        reasonParams: { minutes: Math.round((Date.now() - lostAt) / 60_000) }
+        reasonParams: { minutes }
       })
+      notify({ type: 'desktop', level: 'warn', code: 'TWITCH_CONNECTION_LOST', params: { minutes } })
     }, this.journalAfterMs)
   }
 
@@ -87,7 +90,7 @@ export class TwitchEventSub extends ReconnectingSocket {
       clearTimeout(this.journalTimer)
       this.journalTimer = null
     }
-    this.journalEntryAt = null
+    this.journalEntry = null
     this.connectionLostAt = null
     await super.disconnect()
   }

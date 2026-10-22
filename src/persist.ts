@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import { getCacheDir, getDataDir } from './runtime.js'
 import { createLogger, describeError } from './logger.js'
 import { createStore } from './store.js'
-import type { Topic } from './state-events.js'
+import { notify, type Topic } from './state-events.js'
 
 const SAVE_DEBOUNCE_MS = 250
 const SAVE_ATTEMPTS = 3
@@ -65,7 +65,10 @@ export function createFileStore<T>(location: string | (() => string), options: {
 
   type SaveJob = { getData: () => T; onError?: (error: unknown) => void }
 
-  const reportError = (error: unknown): void => log.error(`Failed to save ${resolvePath()}: ${describeError(error)}`)
+  const reportError = (error: unknown): void => {
+    log.error(`Failed to save ${resolvePath()}: ${describeError(error)}`)
+    notify({ type: 'desktop', level: 'error', code: 'SAVE_FAILED', params: { file: resolvePath() } })
+  }
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null
   let saveChain: Promise<void> = Promise.resolve()
@@ -180,6 +183,7 @@ export async function ensureDataDirectory(): Promise<void> {
     log.info(`Data directory: ${dir}`)
   } catch (error) {
     log.error(`The data directory ${dir} is not writable: ${describeError(error)}. Nothing the app saves will survive a restart`)
+    notify({ type: 'desktop', level: 'error', code: 'DATA_DIR_NOT_WRITABLE', params: { dir } })
   }
 }
 

@@ -1,6 +1,7 @@
 import { flushAllStores } from './persist.js'
 import { createLogger, describeError, flushLogs } from './logger.js'
 import { closeAllStreams } from './sse.js'
+import { notify } from './state-events.js'
 
 const log = createLogger('SHUTDOWN')
 
@@ -73,6 +74,9 @@ export function installShutdownHandlers(): void {
   // a stray rejected promise must not stop the music mid-stream: log it and carry on
   process.on('unhandledRejection', (reason) => {
     log.error(`Unhandled rejection: ${describeError(reason, true)}`)
+    // the app carries on, so the desktop user learns what happened inside (no stack in the balloon: it stays readable)
+    const message = describeError(reason)
+    notify({ type: 'desktop', level: 'error', code: 'UNEXPECTED_ERROR', params: { message }, message })
   })
 
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK'] as const) {
@@ -87,5 +91,7 @@ export function installShutdownHandlers(): void {
     // stop the music mid-stream. The line is flushed so it survives even if the app dies later after all
     log.error(`Uncaught exception: ${describeError(error, true)}`)
     void flushLogs()
+    const message = describeError(error)
+    notify({ type: 'desktop', level: 'error', code: 'UNEXPECTED_ERROR', params: { message }, message })
   })
 }

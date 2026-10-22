@@ -20,9 +20,38 @@ export function on(topic: Topic, listener: Listener): () => void {
 
 // A notice is something that happened and is worth telling to whoever watches the panel, with what it is about.
 // Unlike a change it is not read again from anywhere: it exists only as long as it is being told
+export const DESKTOP_NOTICE_CODES = [
+  'STARTUP_FAILED',
+  'NO_FREE_PORT',
+  'DATA_DIR_NOT_WRITABLE',
+  'PUBLIC_DIR_MISSING',
+  'PORT_CHANGED',
+  'SAVE_FAILED',
+  'UNEXPECTED_ERROR',
+  'TWITCH_CONNECTION_LOST',
+  'TWITCH_REAUTH_REQUIRED',
+  'YOUTUBE_QUOTA_EXHAUSTED'
+] as const
+
+export type DesktopNoticeCode = (typeof DESKTOP_NOTICE_CODES)[number]
+
+// For the desktop user (the tray), not the panel: the panel skips a notice type it does not know, and the
+// tray reads these out of the server's stdout instead. Kept here, next to the bus it travels on
+export type DesktopNotice = {
+  type: 'desktop'
+  level: 'error' | 'warn' | 'info'
+  code: DesktopNoticeCode
+  params?: Record<string, string | number>
+  // the fallback text for when the locale key is missing (no locales folder next to the exe)
+  message?: string
+  // true only for a failure the server does not survive
+  fatal?: boolean
+}
+
 export type Notice =
   | { type: 'viewerRequest'; user: string; title: string }
   | { type: 'error'; level: 'error'; code: string; params?: Record<string, string | number> }
+  | DesktopNotice
 
 const noticeListeners = new Set<(notice: Notice) => void>()
 

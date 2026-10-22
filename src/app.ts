@@ -8,10 +8,24 @@ import { determineLocality } from './local-only.js'
 import { errorHandler } from './error-handler.js'
 import { apiRouter } from './routes/index.js'
 
+/** Thrown by listenOnFreePort when every candidate port is busy: the startup report turns it into the NO_FREE_PORT notice. */
+export class NoFreePortError extends Error {
+  constructor(
+    public readonly from: number,
+    public readonly to: number
+  ) {
+    super(`No free port in ${from}-${to}`)
+    this.name = 'NoFreePortError'
+  }
+}
+
+/** The folder express.static serves; the startup check looks into the same path, so the two cannot drift apart. */
+export const getPublicDir = (): string => path.join(getAppRoot(), 'public')
+
 /** The assembled app: nothing runs on import, so a test can build the app without starting it. */
 export function createApp(): express.Express {
   const app = express()
-  const publicDir = path.join(getAppRoot(), 'public')
+  const publicDir = getPublicDir()
 
   app.use(hostCheck)
   app.use(determineLocality)
@@ -40,5 +54,5 @@ export async function listenOnFreePort(
       if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error
     }
   }
-  throw new Error(`No free port in ${start}-${start + 99}`)
+  throw new NoFreePortError(start, start + 99)
 }

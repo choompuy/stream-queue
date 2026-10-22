@@ -1,7 +1,7 @@
 import { createLogger, describeError } from '../../logger.js'
 import { fetchWithTimeout } from '../../web-fetch.js'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { emit } from '../../state-events.js'
+import { emit, notify } from '../../state-events.js'
 import { AppError } from '../../types.js'
 import { normalizeTwitchError } from './error.js'
 import type {
@@ -229,6 +229,8 @@ export class TwitchOAuth {
     if (this.authFailed === failed) return
 
     this.authFailed = failed
+    // the streamer has to reconnect the account soon: the desktop warning says so the moment it becomes true
+    if (failed) notify({ type: 'desktop', level: 'warn', code: 'TWITCH_REAUTH_REQUIRED' })
     emit('twitch')
   }
 
