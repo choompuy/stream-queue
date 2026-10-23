@@ -14,7 +14,7 @@ export function buildNowPlayingMessage(state: PlayerState, locale: string): stri
 
   // a track can come without a title (YouTube gave none): the chat sees the localized placeholder, not a blank gap
   const title = state.current.title || t(locale, 'common.unknownTitle')
-  const requester = state.current.isFallback ? t(locale, 'fallback.requester') : state.current.requestedBy
+  const requester = state.current.isFallback ? t(locale, 'fallback.title') : state.current.requestedBy
   const base = t(locale, 'chat.nowPlayingWithRequester', { title, requestedBy: requester })
   const pausedSuffix = state.isPaused ? t(locale, 'chat.pausedSuffix') : ''
   return base + pausedSuffix

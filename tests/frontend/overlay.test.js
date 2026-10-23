@@ -420,6 +420,22 @@ test('which overlay plays', async (t) => {
   })
 })
 
+test('stopping the overlay', async (t) => {
+  await t.test('a report that is still retrying is given up: it must not outlive the page it belongs to', async () => {
+    const { overlay, player, sent, outcomes, settle, elapse } = await boot(t, { current: track('a') })
+    outcomes.ended.push(refused, refused, refused, refused)
+
+    player().emit('onStateChange', 0)
+    await settle()
+    assert.equal(sent.ended.length, 1)
+
+    overlay.stop()
+    await elapse(60_000)
+
+    assert.equal(sent.ended.length, 2, 'the attempt that was already waiting runs out, and nothing follows it')
+  })
+})
+
 test('reading the state', async (t) => {
   const reads = (env) => env.count('GET /api/overlay-state')
 

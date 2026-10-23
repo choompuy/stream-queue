@@ -27,7 +27,7 @@ type ReasonParams = Record<string, string | number>
 // language of that moment
 function journal(item: QueueItem, status: ActivityStatus, reasonCode: ActivityReasonCode, reasonParams?: ReasonParams): void {
   logActivity({
-    requestedBy: item.isFallback ? t(getSettings().locale, 'fallback.requester') : item.requestedBy,
+    requestedBy: item.isFallback ? t(getSettings().locale, 'fallback.title') : item.requestedBy,
     query: item.url,
     title: item.title,
     videoId: item.videoId,
