@@ -8,11 +8,9 @@ import {
   formatViews,
   translateErrorCode,
   setFieldState,
-  setError,
   setText,
   setClass,
-  setValue,
-  setChecked
+  setValue
 } from '../../public/js/shared.js'
 
 test('escapeHtml', async (t) => {
@@ -145,23 +143,16 @@ function fakeElement() {
   return { classes, classList: { toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)) } }
 }
 
-test('setFieldState / setError', async (t) => {
+test('setFieldState', async (t) => {
   await t.test('shows only one state at a time and clears it with null', () => {
     const input = fakeElement()
     setFieldState(input, 'changed')
     setFieldState(input, 'saved')
     assert.deepEqual([...input.classes], ['saved'])
+    setFieldState(input, 'error')
+    assert.deepEqual([...input.classes], ['error'])
     setFieldState(input, null)
     assert.equal(input.classes.size, 0)
-  })
-
-  await t.test('setError toggles only the error class', () => {
-    const input = fakeElement()
-    setFieldState(input, 'changed')
-    setError(input)
-    assert.deepEqual([...input.classes].sort(), ['changed', 'error'])
-    setError(input, false)
-    assert.deepEqual([...input.classes], ['changed'])
   })
 })
 
@@ -170,6 +161,5 @@ test('the helpers that write to an element', async (t) => {
     assert.throws(() => setText(null, 'x'), TypeError)
     assert.throws(() => setClass(null, 'x'), TypeError)
     assert.throws(() => setValue(null, 'x'), TypeError)
-    assert.throws(() => setChecked(null, true), TypeError)
   })
 })

@@ -5,7 +5,7 @@ import { applyChatCommands, bindChatCommandTracking, cancelChatCommandChanges, s
 import { connectTwitch, disconnectTwitch } from './twitch-connection.js'
 import { applyRewardConfig, bindTwitchRewardTracking, cancelRewardChanges, saveReward } from './twitch-rewards.js'
 
-export { connectTwitch, disconnectTwitch, refreshTwitchStatus } from './twitch-connection.js'
+export { connectTwitch, disconnectTwitch, readTwitchStatus } from './twitch-connection.js'
 export { onTwitchRewardChange, saveTwitchConfig, bindTwitchRewardFormEvents } from './twitch-rewards.js'
 export { saveTwitchChatCommands } from './twitch-chat-commands.js'
 

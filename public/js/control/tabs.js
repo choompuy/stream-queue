@@ -1,13 +1,17 @@
 import { scrollToActiveFallback } from './fallback.js'
 import { setClass, show } from '../shared.js'
 
-export let activeTab = 'dashboard'
+let activeTab = 'dashboard'
 let activeSection = 'queue'
 
-// the watcher reads again whatever the page that just became shown needs; the panel registers it here (index.js)
+// the watcher reads again whatever the page that just became shown needs; the panel registers it here (index.js).
+// Returns the unsubscribe: a later registration replaces an earlier one, and the stop of the panel takes its own off
 let refreshShown = () => {}
 export const onTabShown = (callback) => {
   refreshShown = callback
+  return () => {
+    if (refreshShown === callback) refreshShown = () => {}
+  }
 }
 
 export const isDashboardActive = () => activeTab === 'dashboard'

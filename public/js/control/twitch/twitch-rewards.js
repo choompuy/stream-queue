@@ -1,7 +1,7 @@
 import { t } from '../../i18n.js'
 import { api } from '../api.js'
 import { run } from '../run.js'
-import { state, patch } from '../state.js'
+import { state, on, patch } from '../state.js'
 import { dom } from '../dom.js'
 import { fillForm, saveForm, toastSaveResult, trackForm } from '../form.js'
 import { showRewardForm, bindRewardForm } from './twitch-reward-form.js'
@@ -14,53 +14,56 @@ function option(select, value, text, selected = false) {
   return element
 }
 
-// the select of the rewards of the channel (its form is not touched)
+// the select of the rewards of the channel (the form is not touched)
 function renderRewardOptions() {
   const select = dom.twitchRewardSelect
-  const { rewards, selectedRewardId } = state.twitch
+  const { rewards, selectedRewardId, config } = state.twitch
 
-  if (!rewards.length) {
-    select.replaceChildren(option(select, '', t('settings.twitch.noRewards')))
-  } else {
-    select.replaceChildren(
-      option(select, '', t('settings.twitch.rewardNone')),
-      ...rewards.map((reward) => option(select, reward.id, `${reward.title} (${reward.cost})`, reward.id === selectedRewardId))
-    )
-  }
+  select.replaceChildren(
+    option(select, '', t(rewards.length ? 'settings.twitch.rewardNone' : 'settings.twitch.noRewards'), selectedRewardId === ''),
+    ...rewards.map((reward) => option(select, reward.id, `${reward.title} (${reward.cost})`, reward.id === selectedRewardId))
+  )
 
   // the options are new: what is stored is what they are measured against
-  if (state.twitch.config) fillForm(dom.twitchRewardSection, state.twitch.config)
+  const stored = config?.channelPointsRewardId ?? ''
+  for (const element of select.options) element.defaultSelected = element.value === stored
 }
 
 // the reward that is selected goes into the form, no reward selected is a blank form to create one
 function showSelectedReward() {
-  showRewardForm(state.twitch.rewards.find((reward) => reward.id === state.twitch.selectedRewardId))
+  const { rewards, selectedRewardId, editingReward } = state.twitch
+
+  if (selectedRewardId === '') return showRewardForm()
+
+  const selected = rewards.find((reward) => reward.id === selectedRewardId)
+  // a refill from under the person typing is worse than a stale form: while the form edits the selected reward it is
+  // left alone, and a reward that vanished from the list keeps its form (the save will say what the server thinks)
+  if (!selected || selected.id === editingReward?.id) return
+  showRewardForm(selected)
 }
 
-export function renderTwitchRewards() {
+// the rewards follow the twitch slice: whatever part of it changes (the connection, the config, the selection) is
+// drawn by this one subscription, in the store's own turn
+on('twitch', () => {
   renderRewardOptions()
   showSelectedReward()
-}
+})
 
 async function readRewards() {
   patch('twitch', { rewards: (await api.getTwitchRewards()).rewards })
-  renderRewardOptions()
 }
 
 export async function loadTwitchRewards() {
   await readRewards()
-  showSelectedReward()
 }
 
 export function onTwitchRewardChange() {
   patch('twitch', { selectedRewardId: dom.twitchRewardSelect.value })
-  showSelectedReward()
   saveTwitchConfig()
 }
 
 export function applyRewardConfig(config) {
   patch('twitch', { selectedRewardId: config.channelPointsRewardId ?? '' })
-  renderTwitchRewards()
   fillForm(dom.twitchRewardSection, config)
 }
 
@@ -100,9 +103,10 @@ export async function saveReward() {
     return toastSaveResult(result, 'toast.twitchRewardUpdated')
   }
 
+  // the new reward is the one for the song requests: one message for both, not one for each. The select is set
+  // here as well: the save of the config reads it, and the drawing that follows the patch comes a turn later
+  dom.twitchRewardSelect.value = result.config.id
   patch('twitch', { selectedRewardId: result.config.id })
-  renderTwitchRewards()
-  // the new reward is the one for the song requests: one message for both, not one for each
   toastSaveResult(await persistTwitchConfig(), 'toast.twitchRewardCreated')
 }
 

@@ -20,7 +20,7 @@ function renderPlayerState() {
 
 on(['current', 'nextTrack', 'isPaused'], renderPlayerState)
 
-export function renderCurrent() {
+function renderCurrent() {
   const current = state.current
 
   if (!current) {
@@ -39,7 +39,7 @@ export function renderCurrent() {
   setText(dom.currentRequester, requesterName(current))
 }
 
-export function renderNext() {
+function renderNext() {
   const next = state.nextTrack
   show(dom.nextPlaying, !!next)
   if (!next) return
@@ -48,7 +48,7 @@ export function renderNext() {
   setText(dom.nextDuration, formatTrackDuration(next.duration))
 }
 
-export function renderPlayPause() {
+function renderPlayPause() {
   dom.playPauseBtn.title = state.isPaused ? t('nowPlaying.resume') : t('nowPlaying.pause')
   dom.playPauseBtn.innerHTML = state.isPaused ? PLAY_ICON(24) : PAUSE_ICON(24)
 }

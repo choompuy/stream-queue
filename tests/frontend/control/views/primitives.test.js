@@ -34,6 +34,13 @@ test('html', async (t) => {
     assert.equal(asHtml(html`<div>${null}${undefined}${false}${''}</div>`), '<div></div>')
   })
 
+  await t.test('empty markup is empty, not an object printed', () => {
+    assert.equal(asHtml(html`<div>${html``}</div>`), '<div></div>')
+    assert.equal(asHtml(html`<div>${raw('')}</div>`), '<div></div>')
+    assert.equal(asHtml(html`<div${dataAttributes({})}></div>`), '<div></div>')
+    assert.equal(asHtml(html`<div>${[html``, html``]}</div>`), '<div></div>')
+  })
+
   await t.test('raw() is markup that is already what it must be: an icon, an attribute list', () => {
     assert.equal(asHtml(html`<span>${raw('<svg></svg>')}</span>`), '<span><svg></svg></span>')
   })

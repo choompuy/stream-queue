@@ -16,7 +16,7 @@ globalThis.fetch = async (url) => {
 }
 
 const { state } = await import('../../../public/js/control/state.js')
-const { renderTwitchConnection, refreshTwitchStatus } = await import('../../../public/js/control/twitch/twitch-connection.js')
+const { renderTwitchConnection, readTwitchStatus } = await import('../../../public/js/control/twitch/twitch-connection.js')
 
 const el = (id) => document.getElementById(id)
 const hidden = (id) => el(id).classList.contains('hidden')
@@ -63,7 +63,7 @@ test('the connection warning', async (t) => {
     connected(up)
     status = { connected: true, user, health: down() }
 
-    await refreshTwitchStatus()
+    await readTwitchStatus()
     // the clock is the server's (since), so the boundary is a moment, not a tick: comfortably before it
     t.mock.timers.tick(5000)
 
@@ -71,7 +71,7 @@ test('the connection warning', async (t) => {
 
     // the re-draw belongs to this test's clock: a healthy answer takes it back, so that the next test starts clean
     status = { connected: true, user, health: up }
-    await refreshTwitchStatus()
+    await readTwitchStatus()
   })
 
   await t.test('is shown when it stays down for 6 seconds', async (t) => {
@@ -79,7 +79,7 @@ test('the connection warning', async (t) => {
     connected(up)
     status = { connected: true, user, health: down() }
 
-    await refreshTwitchStatus()
+    await readTwitchStatus()
     // comfortably past the grace period, whenever within it the answer that brought the state arrived
     t.mock.timers.tick(7000)
 
@@ -90,11 +90,11 @@ test('the connection warning', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] })
     connected(up)
     status = { connected: true, user, health: down() }
-    await refreshTwitchStatus()
+    await readTwitchStatus()
     t.mock.timers.tick(3000)
 
     status = { connected: true, user, health: up }
-    await refreshTwitchStatus()
+    await readTwitchStatus()
     t.mock.timers.tick(10000)
 
     assert.equal(hidden('twitchHealthWarning'), true)
@@ -106,7 +106,7 @@ test('the connection warning', async (t) => {
     assert.equal(hidden('twitchHealthWarning'), false)
 
     status = { connected: true, user, health: up }
-    return refreshTwitchStatus().then(() => {
+    return readTwitchStatus().then(() => {
       assert.equal(hidden('twitchHealthWarning'), true)
     })
   })
@@ -120,7 +120,7 @@ test('the connection warning', async (t) => {
   await t.test('an account disconnected elsewhere is shown as disconnected', async () => {
     connected(up)
     status = { connected: false, user: null, health: null }
-    await refreshTwitchStatus()
+    await readTwitchStatus()
     assert.equal(state.twitch.connected, false)
     assert.equal(hidden('twitchDisconnectBtn'), true)
   })
@@ -134,7 +134,7 @@ test('a connection made elsewhere', async (t) => {
     assert.equal(hidden('twitchDisconnectBtn'), true)
 
     status = { connected: true, user, health: up, connectedAt: 1700000000000 }
-    await refreshTwitchStatus()
+    await readTwitchStatus()
 
     assert.equal(state.twitch.connected, true)
     assert.equal(state.twitch.user.displayName, 'Streamer')
@@ -155,8 +155,8 @@ test('a connection made elsewhere', async (t) => {
     }
 
     try {
-      await refreshTwitchStatus()
-      await refreshTwitchStatus()
+      await readTwitchStatus()
+      await readTwitchStatus()
     } finally {
       globalThis.fetch = original
     }
@@ -175,7 +175,7 @@ test('a connection made elsewhere', async (t) => {
     }
 
     try {
-      await refreshTwitchStatus()
+      await readTwitchStatus()
     } finally {
       globalThis.fetch = original
     }
@@ -195,7 +195,7 @@ test('a connection made elsewhere', async (t) => {
     }
 
     try {
-      await refreshTwitchStatus()
+      await readTwitchStatus()
     } finally {
       globalThis.fetch = original
     }
@@ -216,14 +216,14 @@ test('a login that waits for its code', async (t) => {
   await t.test('is shown with its code and address by a page that was loaded (or reloaded) while the login waits', async () => {
     status = { connected: false, user: null, authorization: waiting(Date.now() + 60_000) }
 
-    await refreshTwitchStatus()
+    await readTwitchStatus()
   })
 
   await t.test('goes away, with a message, when nobody entered the code in time: the server says it expired', async () => {
     state.twitch.authorization = waiting(Date.now() - 1000)
     status = { connected: false, user: null, authorization: ended('expired', Date.now() - 1000) }
 
-    await refreshTwitchStatus()
+    await readTwitchStatus()
 
     assert.ok(document.getElementById('toastContainer').textContent.includes('twitchAuthExpired'))
   })
@@ -232,7 +232,7 @@ test('a login that waits for its code', async (t) => {
     state.twitch.authorization = waiting(Date.now() + 10 * 60_000)
     status = { connected: false, user: null, authorization: ended('denied', Date.now()) }
 
-    await refreshTwitchStatus()
+    await readTwitchStatus()
 
     assert.equal(document.getElementById('toastContainer').textContent, '')
   })
@@ -241,7 +241,7 @@ test('a login that waits for its code', async (t) => {
     state.twitch.authorization = waiting(Date.now() + 60_000)
     status = { connected: false, user: null, authorization: { ...waiting(Date.now() + 120_000), userCode: 'WXYZ-9876' } }
 
-    await refreshTwitchStatus()
+    await readTwitchStatus()
 
     assert.equal(document.getElementById('toastContainer').textContent, '')
   })
@@ -253,13 +253,13 @@ test('a login that waits for its code', async (t) => {
     assert.equal(button.getAttribute('data-i18n'), 'settings.twitch.connect')
 
     status = { connected: false, user: null, authorization: waiting(Date.now() + 60_000) }
-    await refreshTwitchStatus()
+    await readTwitchStatus()
     assert.equal(button.disabled, false)
     assert.equal(hidden('twitchConnectBtn'), false)
 
     state.twitch.authorization = waiting(Date.now() - 1000)
     status = { connected: false, user: null, authorization: ended('expired', Date.now() - 1000) }
-    await refreshTwitchStatus()
+    await readTwitchStatus()
     assert.equal(button.getAttribute('data-i18n'), 'settings.twitch.connect')
   })
 
@@ -267,7 +267,7 @@ test('a login that waits for its code', async (t) => {
     state.twitch.authorization = waiting(Date.now() + 60_000)
     status = { connected: true, user, health: up, authorization: waiting(Date.now() + 60_000) }
 
-    await refreshTwitchStatus()
+    await readTwitchStatus()
 
     assert.equal(state.twitch.authorization, null)
   })

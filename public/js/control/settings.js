@@ -1,6 +1,6 @@
 import { escapeHtml, show, setValue } from '../shared.js'
 import { api } from './api.js'
-import { store, state, on, isLocalDevice } from './state.js'
+import { store, state, on, patch, isLocalDevice } from './state.js'
 import { dom } from './dom.js'
 import { log } from './log.js'
 import { run, reportError } from './run.js'
@@ -8,8 +8,6 @@ import { syncPlayer } from './player.js'
 import { t, loadTranslations, updateDomTranslations } from '../i18n.js'
 import { toastError, toastSuccess } from './toast.js'
 import { fillForm, saveForm, toastSaveResult, formInputs, isChanged } from './form.js'
-import { renderTwitchConnection } from './twitch/twitch-connection.js'
-import { renderTwitchRewards } from './twitch/twitch-rewards.js'
 
 let qrCodePromise
 
@@ -42,7 +40,6 @@ export function changeLocale(locale) {
     document.documentElement.lang = locale
     updateDomTranslations()
     store.refresh()
-    renderTwitchRewards()
   })
 }
 
@@ -50,13 +47,19 @@ export function changeLocale(locale) {
 // form itself — one read serves both, so the panel never asks for the settings twice in a row
 export function applyOverlaySettings(settings) {
   state.settings = settings ?? {}
-  renderOverlayUrl()
-  fillForm(dom.overlaySettingsPanel, state.settings)
 }
 
-export function loadOverlaySettings() {
-  return run('loading settings', async () => applyOverlaySettings(await api.getSettings()))
-}
+// the drawings that follow the settings: the OBS link, the player, and the form that edits them. A field that is
+// being edited keeps what was typed (its answer would be older), and a mark survives a fill that brings the same
+// value the field holds (the echo of a save)
+on('settings', () => {
+  renderOverlayUrl()
+  const editing = formInputs(dom.overlaySettingsPanel)
+    .filter(isChanged)
+    .map((input) => input.name)
+  fillForm(dom.overlaySettingsPanel, state.settings, { skip: editing, keepMarks: true })
+  syncPlayer()
+})
 
 // the overlay settings are saved at once, whenever one of them changes
 export function saveOverlaySettings() {
@@ -71,7 +74,6 @@ export function saveOverlaySettings() {
       { changedOnly: true }
     )
 
-    syncPlayer()
     toastSaveResult(result, 'toast.settingsSaved', { successToast: false })
   })
 }
@@ -115,8 +117,7 @@ export function loadSecrets() {
     const data = await api.getSecrets()
 
     state.secrets = data
-    state.twitch = { ...state.twitch, configured: Boolean(data.twitch?.configured) }
-    renderTwitchConnection()
+    patch('twitch', { configured: Boolean(data.twitch?.configured) })
   })
 }
 
@@ -149,7 +150,7 @@ on(['network', 'selectedIp'], () => {
   renderQrUrl()
 })
 
-export function applyDeviceLocality() {
+function applyDeviceLocality() {
   document.body.classList.toggle('not-local', !isLocalDevice())
 }
 
@@ -191,7 +192,7 @@ export function onIpChange() {
   state.selectedIp = dom.selectIp.value
 }
 
-export function toggleQr() {
+function toggleQr() {
   const isHidden = dom.controlPanelQr.classList.contains('hidden')
   show(dom.controlPanelQr, isHidden)
   renderQrUrl()
@@ -199,7 +200,7 @@ export function toggleQr() {
 
 // The config topic: read while the settings page is shown. The stored values go into the form, except the fields
 // the person is editing right now — their answer would be older than what was typed since (K12)
-export function loadConfig() {
+export function readConfig() {
   return run('loading config', async () => {
     state.config = await api.getConfig()
     const editing = formInputs(dom.botSettingsPanel)

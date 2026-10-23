@@ -259,20 +259,20 @@ test('disconnectTwitch', async (t) => {
   })
 })
 
-test('refreshTwitchStatus (the twitch topic)', async (t) => {
+test('readTwitchStatus (the twitch topic)', async (t) => {
   t.beforeEach(reset)
 
   await t.test('does not ask for rewards while disconnected', async () => {
     handlers = { 'GET /api/integrations/twitch': () => ({ connected: false }) }
 
-    await settings.refreshTwitchStatus()
+    await settings.readTwitchStatus()
 
     assert.deepEqual(requests, ['GET /api/integrations/twitch'])
     assert.ok(dom.twitchRewardSection.classList.contains('hidden'))
   })
 
   await t.test('does not even ask Twitch for its status while the client id is not configured', async () => {
-    state.twitch.configured = false
+    // configured is true (reset): the loader's answer turns it false, and the drawing follows that change
     handlers = { 'GET /api/secrets': () => ({ twitch: { configured: false } }) }
 
     await configSettings.loadSecrets()
@@ -288,7 +288,7 @@ test('refreshTwitchStatus (the twitch topic)', async (t) => {
       'GET /api/integrations/twitch/rewards': () => ({ rewards: [] })
     }
 
-    await settings.refreshTwitchStatus()
+    await settings.readTwitchStatus()
 
     assert.ok(!dom.twitchConnectionControls.classList.contains('hidden'))
     assert.ok(!dom.twitchRewardSection.classList.contains('hidden'))
@@ -303,7 +303,7 @@ test('refreshTwitchStatus (the twitch topic)', async (t) => {
       'GET /api/integrations/twitch/rewards': () => ({ rewards: [] })
     }
 
-    await settings.refreshTwitchStatus()
+    await settings.readTwitchStatus()
 
     assert.equal(dom.twitchRewardSelect.textContent.trim(), translate('settings.twitch.noRewards'))
   })
@@ -315,7 +315,7 @@ test('refreshTwitchStatus (the twitch topic)', async (t) => {
       'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: 'reward-2' })
     }
 
-    await settings.refreshTwitchStatus()
+    await settings.readTwitchStatus()
     await settings.loadTwitchConfig()
 
     assert.equal(state.twitch.selectedRewardId, 'reward-2')
@@ -333,7 +333,7 @@ test('refreshTwitchStatus (the twitch topic)', async (t) => {
     // the <select> is still empty here - the id has to survive in state until the options exist
     assert.equal(dom.twitchRewardSelect.value, '')
 
-    await settings.refreshTwitchStatus()
+    await settings.readTwitchStatus()
 
     assert.equal(dom.twitchRewardSelect.value, 'reward-2')
   })
@@ -346,7 +346,7 @@ test('refreshTwitchStatus (the twitch topic)', async (t) => {
     }
 
     await settings.loadTwitchConfig()
-    await settings.refreshTwitchStatus()
+    await settings.readTwitchStatus()
 
     assert.equal(state.twitch.selectedRewardId, 'reward-gone')
   })
@@ -399,7 +399,7 @@ test('the selected reward is saved as the select shows it', async (t) => {
       }
     }
 
-    await settings.refreshTwitchStatus()
+    await settings.readTwitchStatus()
     dom.twitchRewardSelect.value = 'reward-1'
     settings.onTwitchRewardChange()
     await settings.saveTwitchConfig()

@@ -3,10 +3,10 @@ import { t } from '../../i18n.js'
 import { api, ApiError } from '../api.js'
 import { run } from '../run.js'
 import { toastError, toastInfo } from '../toast.js'
-import { state, patch, isLocalDevice } from '../state.js'
+import { state, on, patch, isLocalDevice } from '../state.js'
 import { dom } from '../dom.js'
 import { log } from '../log.js'
-import { loadTwitchRewards, renderTwitchRewards } from './twitch-rewards.js'
+import { loadTwitchRewards } from './twitch-rewards.js'
 
 // A connection that is down for a moment (a reconnect takes seconds) is not worth a red warning: it is shown only if it
 // stayed down. The server says since when the connection is in the state it is in; the redraw that decides waits for
@@ -71,29 +71,28 @@ function isOfflineWarning() {
   return Boolean(health) && health.auth !== 'reauthorize' && isUnhealthy(health) && (offlineOverdue || Date.now() - health.since > OFFLINE_WARNING_DELAY_MS)
 }
 
-// no status -> disconnected. The slice is assigned whole: the drawings (renderTwitchConnection) are called by hand
-// where the flow needs them
+// no status -> disconnected. The drawing follows the slice: every write of it (applyStatus, the patches of the
+// other Twitch modules) is drawn by the subscription below, in the store's own turn
 function applyStatus(status) {
   const connected = Boolean(status?.connected)
   const health = connected ? status.health : null
 
   scheduleOfflineRecheck(health)
 
-  state.twitch = {
-    ...state.twitch,
+  patch('twitch', {
     connected,
     user: status?.user ?? null,
     connectedAt: status?.connectedAt ?? null,
     health,
     // a login that waits for its code is only remembered while there is no account yet: the connect button is the way back to it
     authorization: connected ? null : (status?.authorization ?? null)
-  }
+  })
 }
 
 // Reads the connection again and shows it as it is now. The account changes without this page doing it: a login finished in
 // another tab, or in this one before it was reloaded (nobody here waits for it any more), or a disconnect done elsewhere.
 // The server says when (the "twitch" event), this page does not ask in between
-export function refreshTwitchStatus() {
+export function readTwitchStatus() {
   return run(
     'refreshing Twitch status',
     async () => {
@@ -105,7 +104,6 @@ export function refreshTwitchStatus() {
       const status = await api.getTwitchStatus()
 
       applyStatus(status)
-      renderTwitchConnection()
 
       if (status.connected && !wasConnected) await loadTwitchRewards()
 
@@ -148,7 +146,6 @@ export async function connectTwitch() {
         expiresAt: response.expiresAt
       }
     })
-    renderTwitchConnection()
 
     navigateAuthorizationWindow(authWindow, response.verificationUri)
     navigated = true
@@ -161,10 +158,7 @@ export async function connectTwitch() {
 export async function disconnectTwitch() {
   const result = await api.disconnectTwitch()
   applyStatus(null)
-  state.twitch = { ...state.twitch, rewards: [] }
-  show(dom.twitchRewardForm, false)
-  renderTwitchConnection()
-  renderTwitchRewards()
+  patch('twitch', { rewards: [] })
 
   // queued tracks paid with points stay UNFULFILLED on Twitch: nobody else will close them
   const open = Number(result?.openRedemptions) || 0
@@ -218,3 +212,6 @@ export function renderTwitchConnection() {
   show(dom.twitchChatCommandsPanel, isConnected)
   if (!isConnected) show(dom.twitchRewardForm, false)
 }
+
+// the connection block follows the twitch slice: whoever changes a part of it patches the slice, and this drawing runs
+on('twitch', renderTwitchConnection)

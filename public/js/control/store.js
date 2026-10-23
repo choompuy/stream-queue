@@ -49,6 +49,15 @@ export function createStore(initial) {
     }
   })
 
+  // Merges the fields into a slice and assigns it whole, so its subscribers see the change (a write into one of its
+  // fields is not). A patch that changes nothing assigns nothing: a drawing that patches its own slice would redraw,
+  // and redraw for ever
+  const patch = (key, fields) => {
+    const slice = state[key]
+    if (Object.entries(fields).every(([name, value]) => slice?.[name] === value)) return
+    state[key] = { ...slice, ...fields }
+  }
+
   // on('queue', draw) or on(['queue', 'config'], draw): the drawing runs when any of its slices changes
   const on = (keys, fn) => {
     for (const key of [].concat(keys)) subs.set(key, [...(subs.get(key) ?? []), fn])
@@ -59,11 +68,6 @@ export function createStore(initial) {
     const fns = new Set()
     subs.forEach((list) => list.forEach((fn) => fns.add(fn)))
     fns.forEach(call)
-  }
-
-  // changes a part of a slice by assigning the slice whole, which the subscribers can see
-  const patch = (key, part) => {
-    state[key] = { ...state[key], ...part }
   }
 
   return { state, on, refresh, patch }

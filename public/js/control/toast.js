@@ -29,7 +29,7 @@ function isShowing(root, message) {
   return staying(root).some((toast) => toast.querySelector('.toast-message').textContent === message)
 }
 
-export function showToast(message, options = {}) {
+function showToast(message, options = {}) {
   const root = dom.toastContainer
   if (!root || !message) return () => {}
 

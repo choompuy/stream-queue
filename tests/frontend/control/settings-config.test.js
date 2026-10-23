@@ -36,7 +36,7 @@ const fire = (id, type) => field(id).dispatchEvent(new window.Event(type, { bubb
 
 test('reading the bot settings', async (t) => {
   await t.test('fills the controls from the server', async () => {
-    await settings.loadConfig()
+    await settings.readConfig()
 
     assert.equal(field('cfgMinViews').value, '10000')
     assert.equal(field('cfgMaxQueue').value, '20')
@@ -50,7 +50,7 @@ test('reading the bot settings', async (t) => {
     assert.deepEqual(marks('cfgRegionCode'), ['changed'])
 
     // the echo of a save: the config is read again, while the field holds what the user typed
-    await settings.loadConfig()
+    await settings.readConfig()
 
     assert.equal(field('cfgRegionCode').value, 'zz')
     assert.deepEqual(marks('cfgRegionCode'), ['changed'])
@@ -60,7 +60,7 @@ test('reading the bot settings', async (t) => {
     stored = { ...stored, maxQueueSize: 30 }
     field('cfgMaxQueue').classList.add('saved')
 
-    await settings.loadConfig()
+    await settings.readConfig()
 
     assert.equal(field('cfgMaxQueue').value, '30')
     assert.deepEqual(marks('cfgMaxQueue'), [], 'the green would tell about a save that never happened here')
@@ -78,7 +78,7 @@ test('reading the bot settings', async (t) => {
 })
 
 test('saving the bot settings', async (t) => {
-  await settings.loadConfig()
+  await settings.readConfig()
 
   await t.test('the mark of a saved field survives the echo of the save', async () => {
     field('cfgMinViews').value = '15000'
@@ -89,7 +89,7 @@ test('saving the bot settings', async (t) => {
     assert.ok(panel.toasts().includes('Settings saved'))
 
     // the echo of the save arrives and reads the config: the mark must not vanish at once
-    await settings.loadConfig()
+    await settings.readConfig()
 
     assert.equal(field('cfgMinViews').value, '15000')
     assert.deepEqual(marks('cfgMinViews'), ['saved'])
@@ -105,7 +105,7 @@ test('saving the bot settings', async (t) => {
     assert.deepEqual(marks('cfgRegionCode'), ['error'])
     assert.ok(panel.toasts().includes('Saved 0, not saved 1 (invalid values)'))
 
-    await settings.loadConfig()
+    await settings.readConfig()
 
     assert.equal(field('cfgRegionCode').value, 'zz')
     assert.deepEqual(marks('cfgRegionCode'), ['error'])

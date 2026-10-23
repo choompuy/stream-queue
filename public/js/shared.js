@@ -83,15 +83,6 @@ export function show(element, show = true) {
 }
 
 /**
- * Set or remove error state on an element
- * @param {HTMLElement} element - The DOM element
- * @param {boolean} hasError - If true, add 'error'; if false, remove 'error' (default: true)
- */
-export function setError(element, hasError = true) {
-  setClass(element, 'error', hasError)
-}
-
-/**
  * Show exactly one save state on a field: 'changed' (differs from stored), 'saved', 'error', or none
  * @param {HTMLElement} element - The input element
  * @param {'changed'|'saved'|'error'|null} state - The state to show, null to clear
@@ -107,15 +98,6 @@ export function setFieldState(element, state = null) {
  */
 export function setValue(element, value) {
   element.value = value ?? ''
-}
-
-/**
- * Set checked state on a checkbox/radio element
- * @param {HTMLElement} element - The checkbox/radio element
- * @param {boolean} checked - The checked state
- */
-export function setChecked(element, checked) {
-  element.checked = Boolean(checked)
 }
 
 /**

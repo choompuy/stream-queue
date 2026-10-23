@@ -8,7 +8,7 @@ const { initI18n } = await import('../../../public/js/i18n.js')
 await initI18n('en')
 const { state, isLocalDevice } = await import('../../../public/js/control/state.js')
 const { loadNetworkInfo } = await import('../../../public/js/control/settings.js')
-const { refreshTwitchStatus } = await import('../../../public/js/control/twitch/twitch-connection.js')
+const { readTwitchStatus } = await import('../../../public/js/control/twitch/twitch-connection.js')
 const { loadTwitchConfig } = await import('../../../public/js/control/twitch/index.js')
 
 const networkInfo = (isLocal) => ({ port: 4747, ips: isLocal ? ['localhost'] : ['192.168.1.5'], isLocal })
@@ -69,7 +69,7 @@ test('another device reads nothing from the Twitch section', async (t) => {
   await t.test('the loaders the panel runs at its start ask nothing', async () => {
     const before = panel.toasts().join('|')
 
-    await refreshTwitchStatus()
+    await readTwitchStatus()
     await loadTwitchConfig()
 
     assert.deepEqual(panel.calls, [], 'no request may leave: each one would only come back refused')
@@ -83,7 +83,7 @@ test('another device reads nothing from the Twitch section', async (t) => {
     panel.calls.length = 0
 
     await loadTwitchConfig()
-    await refreshTwitchStatus()
+    await readTwitchStatus()
 
     assert.deepEqual(panel.calls, [
       'GET /api/integrations/twitch/config',
@@ -97,7 +97,7 @@ test('another device reads nothing from the Twitch section', async (t) => {
     Object.assign(state.twitch, { connected: false, user: null })
     panel.calls.length = 0
 
-    await refreshTwitchStatus()
+    await readTwitchStatus()
 
     assert.deepEqual(panel.calls, ['GET /api/integrations/twitch', 'GET /api/integrations/twitch/rewards'])
   })

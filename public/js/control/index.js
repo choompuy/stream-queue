@@ -12,21 +12,22 @@ import { readFallback } from './fallback.js'
 import { readActivity } from './activity.js'
 import { readBlocklist } from './blocklist.js'
 import { readPlaylists } from './playlists.js'
-import { loadConfig, loadSecrets, loadNetworkInfo, applyOverlaySettings } from './settings.js'
-import { loadTwitchConfig, refreshTwitchStatus } from './twitch/index.js'
+import { loadSecrets, loadNetworkInfo, applyOverlaySettings, readConfig } from './settings.js'
+import { loadTwitchConfig, readTwitchStatus } from './twitch/index.js'
 import { isDashboardActive, isPlaylistsActive, isSettingsActive, onTabShown } from './tabs.js'
 import { showNotice } from './notices.js'
 
-// What each topic reads again. Only what the person looks at is read: the rest is read when it is shown again.
-// A read writes what it learned to the store (state.js); the drawings are subscribers of the store
+// What each topic reads again: a `read*` function (the one-time loads of the startup are `load*`). Only what the
+// person looks at is read: the rest is read when it is shown again. A read writes what it learned to the store
+// (state.js); the drawings are subscribers of the store
 const TOPICS = {
   state: { read: readState, isShown: isDashboardActive },
   activity: { read: readActivity, isShown: isDashboardActive },
   fallback: { read: readFallback, isShown: isDashboardActive },
   blocklist: { read: readBlocklist, isShown: isDashboardActive },
   playlists: { read: readPlaylists, isShown: isPlaylistsActive },
-  config: { read: loadConfig, isShown: isSettingsActive },
-  twitch: { read: refreshTwitchStatus, isShown: () => document.visibilityState === 'visible' }
+  config: { read: readConfig, isShown: isSettingsActive },
+  twitch: { read: readTwitchStatus, isShown: () => document.visibilityState === 'visible' }
 }
 
 // the net under the events: while they are down the panel reads everything, slowly, as it used to
@@ -61,12 +62,12 @@ export async function startControlPanel() {
   const refreshShown = () => {
     if (document.visibilityState === 'visible') watcher.refreshAll()
   }
-  onTabShown(refreshShown)
+  const offTabShown = onTabShown(refreshShown)
   document.addEventListener('visibilitychange', refreshShown)
 
   const stop = () => {
     watcher.close()
-    onTabShown(() => {})
+    offTabShown()
     document.removeEventListener('visibilitychange', refreshShown)
     window.removeEventListener('pagehide', stop)
   }

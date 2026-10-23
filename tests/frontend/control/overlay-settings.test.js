@@ -9,6 +9,10 @@ const { initI18n } = await import('../../../public/js/i18n.js')
 await initI18n('en')
 const { state } = await import('../../../public/js/control/state.js')
 const settings = await import('../../../public/js/control/settings.js')
+const { api } = await import('../../../public/js/control/api.js')
+
+// the panel's own startup path: the settings arrive, and the drawings follow them through the store
+const loadOverlaySettings = async () => settings.applyOverlaySettings(await api.getSettings())
 
 const stored = { showVideo: true, hideOverlayInfo: false, opacity: 100, position: 'bottom-right' }
 const puts = []
@@ -24,7 +28,7 @@ const hasError = (id) => field(id).classList.contains('error')
 
 test('loading the overlay settings', async (t) => {
   await t.test('fills the controls from the server', async () => {
-    await settings.loadOverlaySettings()
+    await loadOverlaySettings()
 
     assert.equal(field('showVideo').checked, true)
     assert.equal(field('overlayOpacity').value, '100')
@@ -35,7 +39,7 @@ test('loading the overlay settings', async (t) => {
   await t.test('"video only" cannot be chosen while the video is hidden', async () => {
     panel.route('GET /api/settings', { ...stored, showVideo: false, hideOverlayInfo: true, opacity: 40, position: 'top-left' })
 
-    await settings.loadOverlaySettings()
+    await loadOverlaySettings()
 
     assert.equal(field('showVideo').checked, false)
     assert.equal(field('hideOverlayInfo').checked, true)
@@ -52,7 +56,7 @@ test('loading the overlay settings', async (t) => {
 
 test('saving the overlay settings', async (t) => {
   panel.route('GET /api/settings', { ...stored })
-  await settings.loadOverlaySettings()
+  await loadOverlaySettings()
 
   await t.test('sends only what changed, and the answer of the server becomes the state', async () => {
     field('overlayOpacity').value = '55'

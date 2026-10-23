@@ -113,6 +113,57 @@ test('createStore', async (t) => {
 
     assert.deepEqual(seen, [{ connected: false, health: 'ok' }])
   })
+
+  await t.test('a subscriber that throws does not stop the others: the panel is not left half-drawn', async () => {
+    const { state, on } = createStore({ queue: [] })
+    const order = []
+    on('queue', () => {
+      order.push('first')
+      throw new Error('a broken drawing')
+    })
+    on('queue', () => order.push('second'))
+
+    state.queue = [1]
+    await settle()
+    assert.deepEqual(order, ['first', 'second'])
+  })
+
+  await t.test('patch() merges the fields into a slice and the subscribers see it', async () => {
+    const { state, on, patch } = createStore({ twitch: { health: null, user: 'a' } })
+    let calls = 0
+    on('twitch', () => calls++)
+
+    patch('twitch', { health: 'ok' })
+    await settle()
+    assert.equal(calls, 1)
+    assert.deepEqual(state.twitch, { health: 'ok', user: 'a' }, 'the fields that are not named stay')
+  })
+
+  await t.test('a patch that changes nothing assigns nothing: a drawing that patches its own slice cannot loop', async () => {
+    const { state, on, patch } = createStore({ twitch: { health: null } })
+    let calls = 0
+    on('twitch', () => {
+      calls++
+      patch('twitch', { health: state.twitch.health })
+    })
+
+    patch('twitch', { health: 'ok' })
+    await settle()
+    assert.equal(calls, 1, 'the patch from inside the drawing changed nothing, so nothing is drawn again')
+  })
+
+  await t.test('refresh() calls a subscriber that throws and the rest as well', async () => {
+    const { on, refresh } = createStore({ queue: [] })
+    const order = []
+    on('queue', () => {
+      order.push('first')
+      throw new Error('a broken drawing')
+    })
+    on('queue', () => order.push('second'))
+
+    refresh()
+    assert.deepEqual(order, ['first', 'second'])
+  })
 })
 
 test('the panel writes into its slices only by assigning them', async () => {

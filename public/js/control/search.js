@@ -56,7 +56,7 @@ async function requestSong(query) {
   )
 }
 
-export function addSong(query) {
+function addSong(query) {
   return requestSong(query)
 }
 
