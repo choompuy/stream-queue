@@ -1,4 +1,4 @@
-import { t } from './i18n.js'
+import { t, requesterName } from './i18n.js'
 
 export const $ = (id) => document.getElementById(id)
 
@@ -115,4 +115,15 @@ export function displayTitle(title) {
 
 export function displayChannel(channelTitle) {
   return channelTitle || t('common.unknownChannel')
+}
+
+// How a track is described wherever one is shown: its title and its channel as the page names them when they are
+// missing, its length, and who asked for it
+export function describeTrack(item) {
+  return {
+    title: displayTitle(item?.title),
+    channel: displayChannel(item?.channelTitle),
+    duration: formatTrackDuration(item?.duration),
+    requester: requesterName(item)
+  }
 }

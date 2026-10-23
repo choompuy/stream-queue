@@ -45,7 +45,7 @@
     "on": "Вкл",
     "off": "Выкл",
     "more": "Ещё действия",
-    "live": "LIVE",
+    "live": "В ЭФИРЕ",
     "unknownTitle": "Неизвестное название",
     "unknownChannel": "Неизвестный канал"
   },
@@ -90,16 +90,13 @@
     "enable": "Включить плейлист",
     "info": "{{count}} треков ▪ обновлено {{datetime}}",
     "infoOf": "{{count}} из {{total}} треков ▪ обновлено {{datetime}}",
-    "addToQueue": "Добавить в очередь",
     "playNow": "Воспроизвести сейчас",
-    "playing": "Играет",
-    "requester": "Плейлист"
+    "playing": "Играет"
   },
   "activity": {
     "title": "Активность",
     "empty": "Нет запросов",
     "requests": "Запросов: {{count}}",
-    "clear": "Очистить",
     "clearConfirm": "Очистить активность?",
     "accepted": "Принято",
     "rejected": "Отклонено",
@@ -114,7 +111,6 @@
     "blockedLabel": "Заблокирован"
   },
   "playlists": {
-    "title": "Плейлисты",
     "urlLabel": "Ссылка или ID плейлиста",
     "addPlaceholder": "Вставьте ссылку на плейлист YouTube или ID...",
     "addBtn": "Добавить",
@@ -130,7 +126,6 @@
     "untitled": "Плейлист без названия"
   },
   "settings": {
-    "title": "Настройки",
     "overlay": {
       "title": "Оверлей",
       "showVideo": "Показывать видео",
@@ -209,10 +204,7 @@
       "plainCooldownNote": "Применяется к командам \"now\"/\"queue\" для предотвращения спама.",
       "commands": {
         "now": "Текущий трек",
-        "queue": "Очередь",
-        "skip": "Пропустить трек",
-        "pause": "Пауза",
-        "resume": "Продолжить"
+        "skip": "Пропустить трек"
       },
       "permission": {
         "everyone": "Все",

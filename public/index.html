@@ -17,8 +17,8 @@
   </head>
   <body>
     <header class="box-shadow">
-      <nav class="header-nav container">
-        <button type="button" class="page-tab-btn btn btn-tab btn-sm active" data-page-tab-target="dashboard">
+      <nav class="header-nav container" role="tablist">
+        <button type="button" id="tab-dashboard" class="page-tab-btn btn btn-tab btn-sm active" role="tab" aria-selected="true" aria-controls="page-dashboard" data-page-tab-target="dashboard">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
             <path
               stroke="currentColor"
@@ -31,7 +31,7 @@
           </svg>
           <span data-i18n="nav.dashboard">Dashboard</span>
         </button>
-        <button type="button" class="page-tab-btn btn btn-tab btn-sm" data-page-tab-target="playlists">
+        <button type="button" id="tab-playlists" class="page-tab-btn btn btn-tab btn-sm" role="tab" aria-selected="false" aria-controls="page-playlists" data-page-tab-target="playlists">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
             <path
               stroke="currentColor"
@@ -43,7 +43,7 @@
           </svg>
           <span data-i18n="nav.playlists">Playlists</span>
         </button>
-        <button type="button" class="page-tab-btn btn btn-tab btn-sm" data-page-tab-target="settings">
+        <button type="button" id="tab-settings" class="page-tab-btn btn btn-tab btn-sm" role="tab" aria-selected="false" aria-controls="page-settings" data-page-tab-target="settings">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
             <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0" />
             <path
@@ -73,7 +73,7 @@
       </nav>
     </header>
     <main>
-      <section class="container page-tab active" data-page-tab="dashboard">
+      <section class="container page-tab active" role="tabpanel" id="page-dashboard" aria-labelledby="tab-dashboard" data-page-tab="dashboard">
         <div class="now-playing-wrapper panel">
           <div class="player-wrapper">
             <div id="player">
@@ -173,26 +173,26 @@
         </div>
 
         <div class="section-tabs-wrapper panel column">
-          <div class="section-tabs" id="sectionTabs">
-            <button type="button" class="section-tab-btn btn btn-tab active" data-section-target="queue">
+          <div class="section-tabs" id="sectionTabs" role="tablist">
+            <button type="button" id="tab-section-queue" class="section-tab-btn btn btn-tab active" role="tab" aria-selected="true" aria-controls="section-queue" data-section-target="queue">
               <span data-i18n="queue.title">Queue</span>
               <span class="count-badge" id="tabQueueCount">0</span>
             </button>
-            <button type="button" class="section-tab-btn btn btn-tab" data-section-target="playlist">
+            <button type="button" id="tab-section-playlist" class="section-tab-btn btn btn-tab" role="tab" aria-selected="false" aria-controls="section-playlist" data-section-target="playlist">
               <span data-i18n="fallback.title">Playlist</span>
               <span class="count-badge" id="tabPlaylistCount">0</span>
             </button>
-            <button type="button" class="section-tab-btn btn btn-tab" data-section-target="activity">
+            <button type="button" id="tab-section-activity" class="section-tab-btn btn btn-tab" role="tab" aria-selected="false" aria-controls="section-activity" data-section-target="activity">
               <span data-i18n="activity.title">Activity</span>
               <span class="count-badge" id="tabActivityCount">0</span>
             </button>
-            <button type="button" class="section-tab-btn btn btn-tab" data-section-target="blocklist">
+            <button type="button" id="tab-section-blocklist" class="section-tab-btn btn btn-tab" role="tab" aria-selected="false" aria-controls="section-blocklist" data-section-target="blocklist">
               <span data-i18n="blocklist.title">Blocklist</span>
               <span class="count-badge" id="tabBlocklistCount">0</span>
             </button>
           </div>
 
-          <div class="section-tab section-tab-queue" data-section="queue">
+          <div class="section-tab section-tab-queue" role="tabpanel" id="section-queue" aria-labelledby="tab-section-queue" data-section="queue">
             <div class="section-tab-header">
               <span class="text-sm text-secondary" id="queueCount">Queue is empty</span>
               <div class="section-tab-actions">
@@ -224,7 +224,7 @@
             </div>
           </div>
 
-          <div class="section-tab section-tab-fallback hidden" data-section="playlist">
+          <div class="section-tab section-tab-fallback hidden" role="tabpanel" id="section-playlist" aria-labelledby="tab-section-playlist" data-section="playlist">
             <div class="section-tab-header">
               <span id="fallbackInfo" class="text-sm text-secondary"></span>
               <div class="section-tab-actions">
@@ -309,7 +309,7 @@
             </div>
           </div>
 
-          <div class="section-tab section-tab-activity hidden" data-section="activity">
+          <div class="section-tab section-tab-activity hidden" role="tabpanel" id="section-activity" aria-labelledby="tab-section-activity" data-section="activity">
             <div class="section-tab-header">
               <span id="activityCount" class="text-sm text-secondary"></span>
               <div class="section-tab-actions">
@@ -319,7 +319,7 @@
                   class="btn btn-secondary btn-danger"
                   data-action="clear-activity"
                   data-confirm="activity.clearConfirm"
-                  data-i18n-title="activity.clear"
+                  data-i18n-title="queue.clear"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24">
                     <path
@@ -330,7 +330,7 @@
                       d="m18 6-.8 12.013c-.071 1.052-.106 1.578-.333 1.977a2 2 0 0 1-.866.81c-.413.2-.94.2-1.995.2H9.994c-1.055 0-1.582 0-1.995-.2a2 2 0 0 1-.866-.81c-.227-.399-.262-.925-.332-1.977L6 6M4 6h16m-4 0-.27-.812c-.263-.787-.394-1.18-.637-1.471a2 2 0 0 0-.803-.578C13.939 3 13.524 3 12.695 3h-1.388c-.829 0-1.244 0-1.596.139a2 2 0 0 0-.803.578c-.243.29-.374.684-.636 1.471L8 6m6 4v7m-4-7v7"
                     />
                   </svg>
-                  <span data-i18n="activity.clear">Clear</span>
+                  <span data-i18n="queue.clear">Clear</span>
                 </button>
               </div>
             </div>
@@ -340,7 +340,7 @@
             </div>
           </div>
 
-          <div class="section-tab section-tab-blocklist hidden" data-section="blocklist">
+          <div class="section-tab section-tab-blocklist hidden" role="tabpanel" id="section-blocklist" aria-labelledby="tab-section-blocklist" data-section="blocklist">
             <div class="row-list-wrapper" id="blocklistListWrapper" data-list="blocklist">
               <div class="row-list" role="list"></div>
               <div class="empty" data-i18n="blocklist.empty">No blocked tracks</div>
@@ -349,7 +349,7 @@
         </div>
       </section>
 
-      <section class="container page-tab" data-page-tab="playlists">
+      <section class="container page-tab" role="tabpanel" id="page-playlists" aria-labelledby="tab-playlists" data-page-tab="playlists">
         <div class="playlist-add-wrapper panel section-tab flex-1">
           <div class="row">
             <input
@@ -378,7 +378,7 @@
         </div>
       </section>
 
-      <section class="container page-tab" data-page-tab="settings">
+      <section class="container page-tab" role="tabpanel" id="page-settings" aria-labelledby="tab-settings" data-page-tab="settings">
         <div class="settings-wrapper">
           <div id="remoteSettingsNote" class="remote-only remote-note text-sm" data-i18n="settings.remoteNote">
             Opened from another device - settings that only this machine may change (the API key and the Twitch integration) are hidden. Change them
@@ -653,7 +653,7 @@
                 <label class="field" for="twitchRewardBackgroundColor">
                   <span class="field-label" data-i18n="settings.twitch.createRewardBackgroundColor">Background color (hex, optional)</span>
                   <div class="field-row">
-                    <input class="settings-input input" type="color" id="twitchRewardBackgroundColorPicker" />
+                    <input class="settings-input input" type="color" id="twitchRewardBackgroundColorPicker" data-i18n-aria-label="settings.twitch.createRewardBackgroundColor" />
                     <input
                       class="settings-input input"
                       type="text"
@@ -679,6 +679,7 @@
                       id="twitchMaxPerStreamEnabled"
                       name="limits.maxPerStream.enabled"
                       data-enables="twitchMaxPerStream"
+                      data-i18n-aria-label="settings.twitch.maxPerStream"
                     />
                   </div>
                 </label>
@@ -699,6 +700,7 @@
                       id="twitchMaxPerUserPerStreamEnabled"
                       name="limits.maxPerUserPerStream.enabled"
                       data-enables="twitchMaxPerUserPerStream"
+                      data-i18n-aria-label="settings.twitch.maxPerUserPerStream"
                     />
                   </div>
                 </label>
@@ -719,6 +721,7 @@
                       id="twitchGlobalCooldownEnabled"
                       name="limits.globalCooldownSeconds.enabled"
                       data-enables="twitchGlobalCooldownSeconds"
+                      data-i18n-aria-label="settings.twitch.globalCooldown"
                     />
                   </div>
                 </label>
@@ -743,17 +746,17 @@
                 <span class="field-label" data-i18n="settings.twitchChat.commands.now">Now playing</span>
                 <div class="field-row">
                   <input class="settings-input input" type="text" id="chatCmdNowCommand" name="chatCommands.now.command" placeholder="!sg now" />
-                  <select class="settings-input input" id="chatCmdNowPermission" name="chatCommands.now.permission">
+                  <select class="settings-input input" id="chatCmdNowPermission" name="chatCommands.now.permission" data-i18n-aria-label="settings.twitchChat.commands.now">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <input class="settings-input checkbox" type="checkbox" id="chatCmdNowEnabled" name="chatCommands.now.enabled" />
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdNowEnabled" name="chatCommands.now.enabled" data-i18n-aria-label="settings.twitchChat.commands.now" />
                 </div>
               </label>
 
               <label class="field" for="chatCmdQueueCommand" data-chat-command="queue">
-                <span class="field-label" data-i18n="settings.twitchChat.commands.queue">Queue</span>
+                <span class="field-label" data-i18n="queue.title">Queue</span>
                 <div class="field-row">
                   <input
                     class="settings-input input"
@@ -762,12 +765,12 @@
                     name="chatCommands.queue.command"
                     placeholder="!sg queue"
                   />
-                  <select class="settings-input input" id="chatCmdQueuePermission" name="chatCommands.queue.permission">
+                  <select class="settings-input input" id="chatCmdQueuePermission" name="chatCommands.queue.permission" data-i18n-aria-label="queue.title">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <input class="settings-input checkbox" type="checkbox" id="chatCmdQueueEnabled" name="chatCommands.queue.enabled" />
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdQueueEnabled" name="chatCommands.queue.enabled" data-i18n-aria-label="queue.title" />
                 </div>
               </label>
 
@@ -791,17 +794,17 @@
                 <span class="field-label" data-i18n="settings.twitchChat.commands.skip">Skip track</span>
                 <div class="field-row">
                   <input class="settings-input input" type="text" id="chatCmdSkipCommand" name="chatCommands.skip.command" placeholder="!sg skip" />
-                  <select class="settings-input input" id="chatCmdSkipPermission" name="chatCommands.skip.permission">
+                  <select class="settings-input input" id="chatCmdSkipPermission" name="chatCommands.skip.permission" data-i18n-aria-label="settings.twitchChat.commands.skip">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <input class="settings-input checkbox" type="checkbox" id="chatCmdSkipEnabled" name="chatCommands.skip.enabled" />
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdSkipEnabled" name="chatCommands.skip.enabled" data-i18n-aria-label="settings.twitchChat.commands.skip" />
                 </div>
               </label>
 
               <label class="field" for="chatCmdPauseCommand" data-chat-command="pause">
-                <span class="field-label" data-i18n="settings.twitchChat.commands.pause">Pause</span>
+                <span class="field-label" data-i18n="nowPlaying.pause">Pause</span>
                 <div class="field-row">
                   <input
                     class="settings-input input"
@@ -810,17 +813,17 @@
                     name="chatCommands.pause.command"
                     placeholder="!sg pause"
                   />
-                  <select class="settings-input input" id="chatCmdPausePermission" name="chatCommands.pause.permission">
+                  <select class="settings-input input" id="chatCmdPausePermission" name="chatCommands.pause.permission" data-i18n-aria-label="nowPlaying.pause">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <input class="settings-input checkbox" type="checkbox" id="chatCmdPauseEnabled" name="chatCommands.pause.enabled" />
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdPauseEnabled" name="chatCommands.pause.enabled" data-i18n-aria-label="nowPlaying.pause" />
                 </div>
               </label>
 
               <label class="field" for="chatCmdResumeCommand" data-chat-command="resume">
-                <span class="field-label" data-i18n="settings.twitchChat.commands.resume">Resume</span>
+                <span class="field-label" data-i18n="nowPlaying.resume">Resume</span>
                 <div class="field-row">
                   <input
                     class="settings-input input"
@@ -829,12 +832,12 @@
                     name="chatCommands.resume.command"
                     placeholder="!sg resume"
                   />
-                  <select class="settings-input input" id="chatCmdResumePermission" name="chatCommands.resume.permission">
+                  <select class="settings-input input" id="chatCmdResumePermission" name="chatCommands.resume.permission" data-i18n-aria-label="nowPlaying.resume">
                     <option value="everyone" data-i18n="settings.twitchChat.permission.everyone">Everyone</option>
                     <option value="moderator" data-i18n="settings.twitchChat.permission.moderator">Moderators</option>
                     <option value="broadcaster" data-i18n="settings.twitchChat.permission.broadcaster">Broadcaster only</option>
                   </select>
-                  <input class="settings-input checkbox" type="checkbox" id="chatCmdResumeEnabled" name="chatCommands.resume.enabled" />
+                  <input class="settings-input checkbox" type="checkbox" id="chatCmdResumeEnabled" name="chatCommands.resume.enabled" data-i18n-aria-label="nowPlaying.resume" />
                 </div>
               </label>
 

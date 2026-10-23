@@ -1,9 +1,9 @@
-import { displayChannel, displayTitle, formatTrackDuration, formatViews, show, setText } from '../shared.js'
+import { describeTrack, formatViews, show, setText } from '../shared.js'
 import { PLAY_ICON, PAUSE_ICON } from '../icons.js'
 import { state, on } from './state.js'
 import { dom } from './dom.js'
 import { log } from './log.js'
-import { t, getCurrentLocale, requesterName } from '../i18n.js'
+import { t, getCurrentLocale } from '../i18n.js'
 import { loadYouTubeApi } from '../youtube-api.js'
 
 let player = null
@@ -32,11 +32,12 @@ function renderCurrent() {
   show(dom.nowPlaying)
   show(dom.noPlaying, false)
 
-  setText(dom.currentTitle, displayTitle(current.title))
-  setText(dom.currentChannel, displayChannel(current.channelTitle))
-  setText(dom.currentDuration, formatTrackDuration(current.duration))
+  const track = describeTrack(current)
+  setText(dom.currentTitle, track.title)
+  setText(dom.currentChannel, track.channel)
+  setText(dom.currentDuration, track.duration)
   setText(dom.currentViews, t('player.views', { count: formatViews(current.views, getCurrentLocale()) }))
-  setText(dom.currentRequester, requesterName(current))
+  setText(dom.currentRequester, track.requester)
 }
 
 function renderNext() {
@@ -44,8 +45,9 @@ function renderNext() {
   show(dom.nextPlaying, !!next)
   if (!next) return
 
-  setText(dom.nextTitle, displayTitle(next.title))
-  setText(dom.nextDuration, formatTrackDuration(next.duration))
+  const track = describeTrack(next)
+  setText(dom.nextTitle, track.title)
+  setText(dom.nextDuration, track.duration)
 }
 
 function renderPlayPause() {

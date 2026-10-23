@@ -90,16 +90,13 @@
     "enable": "Enable playlist",
     "info": "{{count}} tracks ▪ updated {{datetime}}",
     "infoOf": "{{count}} of {{total}} tracks ▪ updated {{datetime}}",
-    "addToQueue": "Add to queue",
     "playNow": "Play now",
-    "playing": "Playing",
-    "requester": "Playlist"
+    "playing": "Playing"
   },
   "activity": {
     "title": "Activity",
     "empty": "No requests yet",
     "requests": "Requests: {{count}}",
-    "clear": "Clear",
     "clearConfirm": "Clear Activity?",
     "accepted": "accepted",
     "rejected": "rejected",
@@ -114,7 +111,6 @@
     "blockedLabel": "Blocked"
   },
   "playlists": {
-    "title": "Playlists",
     "addPlaceholder": "Paste YouTube playlist URL or ID...",
     "urlLabel": "Playlist URL or ID",
     "addBtn": "Add",
@@ -130,7 +126,6 @@
     "untitled": "Untitled playlist"
   },
   "settings": {
-    "title": "Settings",
     "overlay": {
       "title": "Overlay",
       "showVideo": "Show video",
@@ -209,10 +204,7 @@
       "plainCooldownNote": "Applies to \"now\"/\"queue\" commands to prevent spam.",
       "commands": {
         "now": "Now playing",
-        "queue": "Queue",
-        "skip": "Skip track",
-        "pause": "Pause",
-        "resume": "Resume"
+        "skip": "Skip track"
       },
       "permission": {
         "everyone": "Everyone",

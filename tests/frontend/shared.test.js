@@ -1,5 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { JSDOM } from 'jsdom'
 import {
   escapeHtml,
   formatDuration,
@@ -10,8 +13,19 @@ import {
   setFieldState,
   setText,
   setClass,
-  setValue
+  setValue,
+  describeTrack
 } from '../../public/js/shared.js'
+
+// describeTrack names a track the way the page does, with the page's own words for what is missing: the translations
+// have to be in for that
+const dom = new JSDOM('<!doctype html><html><body></body></html>')
+globalThis.window = dom.window
+globalThis.document = dom.window.document
+globalThis.fetch = async () => ({ ok: true, json: async () => JSON.parse(readFileSync(fileURLToPath(new URL('../../public/locales/en.json', import.meta.url)), 'utf8')) })
+
+const { initI18n } = await import('../../public/js/i18n.js')
+await initI18n('en')
 
 test('escapeHtml', async (t) => {
   await t.test('escapes the 5 HTML-significant characters', () => {
@@ -56,9 +70,9 @@ test('formatTrackDuration', async (t) => {
     assert.equal(formatTrackDuration(65), '1:05')
   })
 
-  await t.test('a track without one is a live stream, and the label is translated (the key itself while no language is loaded)', () => {
-    assert.equal(formatTrackDuration(0), 'common.live')
-    assert.equal(formatTrackDuration(null), 'common.live')
+  await t.test('a track without one is a live stream, with the translated label', () => {
+    assert.equal(formatTrackDuration(0), 'LIVE')
+    assert.equal(formatTrackDuration(null), 'LIVE')
   })
 })
 
@@ -161,5 +175,29 @@ test('the helpers that write to an element', async (t) => {
     assert.throws(() => setText(null, 'x'), TypeError)
     assert.throws(() => setClass(null, 'x'), TypeError)
     assert.throws(() => setValue(null, 'x'), TypeError)
+  })
+})
+
+test('describeTrack', async (t) => {
+  await t.test('names a track the way the page does: what is missing gets the page\'s own words for it', () => {
+    assert.deepEqual(describeTrack(null), {
+      title: 'Unknown title',
+      channel: 'Unknown channel',
+      duration: 'LIVE',
+      requester: ''
+    })
+  })
+
+  await t.test('says everything a full track brings with it', () => {
+    assert.deepEqual(describeTrack({ title: 'Song', channelTitle: 'Chan', duration: 90, requestedBy: 'amy' }), {
+      title: 'Song',
+      channel: 'Chan',
+      duration: '1:30',
+      requester: '@amy'
+    })
+  })
+
+  await t.test('a playlist track is named by its localized name', () => {
+    assert.equal(describeTrack({ title: 'X', isFallback: true }).requester, 'Playlist')
   })
 })

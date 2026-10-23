@@ -29,6 +29,9 @@ onTabShown(() => {
 // lets the promises that wait for a fetch answer run
 const flush = () => new Promise((resolve) => setImmediate(resolve))
 
+// a reload re-reads tabs.js as a fresh module (the storage of the window holds what the last visit left)
+let reloads = 0
+
 const click = (element) => element.dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
 const press = (element, key) => element.dispatchEvent(new window.KeyboardEvent('keydown', { key, bubbles: true }))
 const fire = (element, type) => element.dispatchEvent(new window.Event(type, { bubbles: true }))
@@ -82,6 +85,24 @@ test('the tabs', async (t) => {
     assert.equal(hidden('[data-section="queue"]'), true)
     assert.equal(active('[data-section-target="activity"]'), true)
     assert.equal(active('[data-section-target="queue"]'), false)
+  })
+
+  await t.test('the page that was open when the panel was closed opens again', async () => {
+    window.localStorage.setItem('streamqueue:tab', 'settings')
+    await import(`../../../public/js/control/tabs.js?reload=${++reloads}`)
+
+    assert.equal(active('[data-page-tab="settings"]'), true)
+    assert.equal(active('[data-page-tab="dashboard"]'), false)
+  })
+
+  await t.test('a remembered name that is no tab at all is ignored', async () => {
+    // the live panel and the page have to agree again first: a reload that remembers nothing leaves the page as it is
+    click(panel.$('[data-page-tab-target="settings"]'))
+    click(panel.$('[data-page-tab-target="dashboard"]'))
+    window.localStorage.setItem('streamqueue:tab', 'nonsense')
+    await import(`../../../public/js/control/tabs.js?reload=${++reloads}`)
+
+    assert.equal(active('[data-page-tab="dashboard"]'), true)
   })
 })
 

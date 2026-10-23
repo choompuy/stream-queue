@@ -56,7 +56,7 @@ export function getCurrentLocale() {
 }
 
 export function requesterName(item) {
-  return item?.isFallback ? t('fallback.requester') : item?.requestedBy ? `@${item.requestedBy}` : ''
+  return item?.isFallback ? t('fallback.title') : item?.requestedBy ? `@${item.requestedBy}` : ''
 }
 
 export async function initI18n(locale = DEFAULT_LOCALE) {

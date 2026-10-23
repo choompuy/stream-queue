@@ -1,5 +1,5 @@
-import { $, createLogger, displayTitle, formatDuration, formatTrackDuration, show, setClass, setText } from './shared.js'
-import { initI18n, getCurrentLocale, requesterName } from './i18n.js'
+import { $, createLogger, describeTrack, formatDuration, formatTrackDuration, show, setClass, setText } from './shared.js'
+import { initI18n, getCurrentLocale } from './i18n.js'
 import { loadYouTubeApi } from './youtube-api.js'
 import { claimPlayback } from './playback-lock.js'
 import { watch } from './watch.js'
@@ -99,13 +99,15 @@ function renderCurrent() {
 
   dom.badge.dataset.position = settings.position
   dom.currentThumbnail.src = currentState.current.thumbnail
-  setText(dom.currentTitle, displayTitle(currentState.current.title))
-  setText(dom.currentRequester, requesterName(currentState.current))
+  const track = describeTrack(currentState.current)
+  setText(dom.currentTitle, track.title)
+  setText(dom.currentRequester, track.requester)
 
   if (currentState.nextTrack) {
-    setText(dom.nextTitle, displayTitle(currentState.nextTrack.title))
+    const next = describeTrack(currentState.nextTrack)
+    setText(dom.nextTitle, next.title)
 
-    setText(dom.nextElapsedTime, formatTrackDuration(currentState.nextTrack.duration))
+    setText(dom.nextElapsedTime, next.duration)
     show(dom.nextPlaying)
     setClass(dom.currentTitle, 'truncate-2line', false)
   } else {
