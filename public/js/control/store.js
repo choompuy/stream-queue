@@ -1,10 +1,14 @@
+import { log } from './log.js'
+
 /**
  * A store the panel draws from. Assigning a slice (`state.queue = …`) collects every slice that changed and calls
  * their subscribers once, in a single microtask: one read that changes five slices draws everything once, however
  * many subscribers those slices have, and a subscriber of two slices is not called twice for a change of both.
  *
  * A slice is assigned whole. Writing into one of its fields (`state.twitch.health = …`) is not seen: whoever changes
- * a part of a slice assigns the slice (`state.twitch = { ...state.twitch, health }`).
+ * a part of a slice assigns the slice (`state.twitch = { ...state.twitch, health }`), which is what patch() does.
+ *
+ * A drawing that fails does not stop the others: the failure is logged, and the rest of the drawings still run.
  */
 export function createStore(initial) {
   const subs = new Map()
@@ -12,6 +16,14 @@ export function createStore(initial) {
   let flushing = false
 
   // writes that arrive while the subscribers run are flushed again: nobody misses its own change
+  const call = (fn) => {
+    try {
+      fn()
+    } catch (error) {
+      log('A drawing failed:', error)
+    }
+  }
+
   const flush = () => {
     if (flushing) return
     flushing = true
@@ -21,7 +33,7 @@ export function createStore(initial) {
         queued = new Set()
         const fns = new Set()
         changed.forEach((key) => subs.get(key)?.forEach((fn) => fns.add(fn)))
-        fns.forEach((fn) => fn())
+        fns.forEach(call)
       }
     } finally {
       flushing = false
@@ -46,8 +58,13 @@ export function createStore(initial) {
   const refresh = () => {
     const fns = new Set()
     subs.forEach((list) => list.forEach((fn) => fns.add(fn)))
-    fns.forEach((fn) => fn())
+    fns.forEach(call)
   }
 
-  return { state, on, refresh }
+  // changes a part of a slice by assigning the slice whole, which the subscribers can see
+  const patch = (key, part) => {
+    state[key] = { ...state[key], ...part }
+  }
+
+  return { state, on, refresh, patch }
 }

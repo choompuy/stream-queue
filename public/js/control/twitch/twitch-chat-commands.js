@@ -1,5 +1,5 @@
 import { api } from '../api.js'
-import { state } from '../state.js'
+import { state, patch } from '../state.js'
 import { dom } from '../dom.js'
 import { fillForm, saveForm, toastSaveResult, trackForm } from '../form.js'
 
@@ -21,7 +21,7 @@ export async function saveTwitchChatCommands() {
     dom.twitchChatCommandsPanel,
     async (body) => {
       const answer = await api.updateTwitchConfig(body)
-      state.twitch.config = answer.config
+      patch('twitch', { config: answer.config })
       return answer
     },
     { changedOnly: true }

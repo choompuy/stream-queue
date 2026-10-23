@@ -20,7 +20,8 @@ export function html(strings, ...values) {
 
 const toMarkup = (value) => {
   if (value == null || value === false || value === true) return ''
-  if (typeof value === 'object' && value.html) return value.html
+  // markup that is empty (an html`` of a condition that is not met) is still markup, and not a thing to print as [object Object]
+  if (typeof value?.html === 'string') return value.html
   if (Array.isArray(value)) return value.map(toMarkup).join('')
   return escapeHtml(String(value))
 }

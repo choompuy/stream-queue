@@ -3,14 +3,13 @@ import { api } from './api.js'
 import { store, state, on, isLocalDevice } from './state.js'
 import { dom } from './dom.js'
 import { log } from './log.js'
-import { run } from './run.js'
+import { run, reportError } from './run.js'
 import { syncPlayer } from './player.js'
 import { t, loadTranslations, updateDomTranslations } from '../i18n.js'
 import { toastError, toastSuccess } from './toast.js'
 import { fillForm, saveForm, toastSaveResult, formInputs, isChanged } from './form.js'
 import { renderTwitchConnection } from './twitch/twitch-connection.js'
 import { renderTwitchRewards } from './twitch/twitch-rewards.js'
-import { reportError } from './run.js'
 
 let qrCodePromise
 

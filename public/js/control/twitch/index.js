@@ -1,6 +1,6 @@
 import { api } from '../api.js'
 import { run } from '../run.js'
-import { state, isLocalDevice } from '../state.js'
+import { patch, isLocalDevice } from '../state.js'
 import { applyChatCommands, bindChatCommandTracking, cancelChatCommandChanges, saveTwitchChatCommands } from './twitch-chat-commands.js'
 import { connectTwitch, disconnectTwitch } from './twitch-connection.js'
 import { applyRewardConfig, bindTwitchRewardTracking, cancelRewardChanges, saveReward } from './twitch-rewards.js'
@@ -20,7 +20,7 @@ export function loadTwitchConfig() {
 
     const config = await api.getTwitchConfig()
 
-    state.twitch.config = config
+    patch('twitch', { config: config })
     applyRewardConfig(config)
     applyChatCommands(config)
   })

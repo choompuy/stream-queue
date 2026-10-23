@@ -73,4 +73,65 @@ test('createStore', async (t) => {
     await settle()
     assert.deepEqual(order, ['first', 'second'])
   })
+
+  await t.test('a drawing that throws does not stop the others of the same change', async () => {
+    const { state, on } = createStore({ a: 0, b: 0 })
+    const seen = []
+    on('a', () => {
+      throw new Error('a drawing with a bug')
+    })
+    on('a', () => seen.push('second of a'))
+    on('b', () => seen.push('b'))
+
+    state.a = 1
+    state.b = 1
+    await settle()
+
+    assert.deepEqual(seen, ['second of a', 'b'])
+  })
+
+  await t.test('refresh() also runs the drawings that are left after one that throws', () => {
+    const { on, refresh } = createStore({ a: 0, b: 0 })
+    const seen = []
+    on('a', () => {
+      throw new Error('boom')
+    })
+    on('b', () => seen.push('b'))
+
+    refresh()
+
+    assert.deepEqual(seen, ['b'])
+  })
+
+  await t.test('patch() changes a part of a slice by assigning the slice whole, so the subscribers see it', async () => {
+    const { state, on, patch } = createStore({ twitch: { connected: false, health: null } })
+    const seen = []
+    on('twitch', () => seen.push({ ...state.twitch }))
+
+    patch('twitch', { health: 'ok' })
+    await settle()
+
+    assert.deepEqual(seen, [{ connected: false, health: 'ok' }])
+  })
+})
+
+test('the panel writes into its slices only by assigning them', async () => {
+  const { readdirSync, readFileSync, statSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const { fileURLToPath } = await import('node:url')
+  const root = fileURLToPath(new URL('../../../public/js/control/', import.meta.url))
+  const files = (dir) => readdirSync(dir).flatMap((name) => (statSync(join(dir, name)).isDirectory() ? files(join(dir, name)) : [join(dir, name)]))
+  const offenders = []
+
+  for (const file of files(root).filter((name) => name.endsWith('.js'))) {
+    readFileSync(file, 'utf8')
+      .split('\n')
+      .forEach((line, index) => {
+        // a comment may name the thing it forbids
+        if (/^\s*(\/\/|\*)/.test(line)) return
+        if (/\bstate\.[a-zA-Z]+\.[A-Za-z]+ = /.test(line)) offenders.push(`${file.slice(root.length + 1)}:${index + 1}`)
+      })
+  }
+
+  assert.deepEqual(offenders, [], 'a write into a field of a slice is not seen by the subscribers: assign the slice, or patch() it')
 })

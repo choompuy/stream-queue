@@ -206,3 +206,12 @@ test('createListView', async (t) => {
     assert.notEqual(wrapper.querySelector('.row-list').children[0], rowA)
   })
 })
+
+test('html', async (t) => {
+  await t.test('markup that is empty is markup, not something to print: no [object Object]', () => {
+    assert.equal(html`<p>${html``}</p>`.html, '<p></p>')
+    assert.equal(html`<p>${raw('')}</p>`.html, '<p></p>')
+    assert.equal(html`<p>${[html`a`, html``, html`b`]}</p>`.html, '<p>ab</p>')
+    assert.equal(html`<p ${dataAttributes({})}></p>`.html, '<p ></p>')
+  })
+})

@@ -1,6 +1,6 @@
 import { setText } from '../../shared.js'
 import { t } from '../../i18n.js'
-import { state } from '../state.js'
+import { patch } from '../state.js'
 import { dom } from '../dom.js'
 import { fillForm, markChanged } from '../form.js'
 
@@ -27,7 +27,7 @@ function syncColorPicker() {
 
 // shows the form filled with `reward` to edit it, or blank to create a new one
 export function showRewardForm(reward = null) {
-  state.twitch.editingReward = reward
+  patch('twitch', { editingReward: reward })
 
   setText(dom.twitchRewardForm.querySelector('h2'), t(reward ? 'settings.twitch.editReward' : 'settings.twitch.createReward'))
   fillForm(dom.twitchRewardForm, reward ?? BLANK_REWARD)

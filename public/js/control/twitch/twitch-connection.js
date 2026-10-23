@@ -3,7 +3,7 @@ import { t } from '../../i18n.js'
 import { api, ApiError } from '../api.js'
 import { run } from '../run.js'
 import { toastError, toastInfo } from '../toast.js'
-import { state, isLocalDevice } from '../state.js'
+import { state, patch, isLocalDevice } from '../state.js'
 import { dom } from '../dom.js'
 import { log } from '../log.js'
 import { loadTwitchRewards, renderTwitchRewards } from './twitch-rewards.js'
@@ -140,12 +140,14 @@ export async function connectTwitch() {
     // From here the server keeps the state of the login (and says when it ends): this page does not wait for it, and
     // after a reload the same code is still there, with the button leading back to its page. The deadline is the
     // server's own, not counted from the moment this answer arrived
-    state.twitch.authorization = {
-      state: 'pending',
-      userCode: response.userCode,
-      verificationUri: response.verificationUri,
-      expiresAt: response.expiresAt
-    }
+    patch('twitch', {
+      authorization: {
+        state: 'pending',
+        userCode: response.userCode,
+        verificationUri: response.verificationUri,
+        expiresAt: response.expiresAt
+      }
+    })
     renderTwitchConnection()
 
     navigateAuthorizationWindow(authWindow, response.verificationUri)

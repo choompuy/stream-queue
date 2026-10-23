@@ -1,7 +1,7 @@
 import { t } from '../../i18n.js'
 import { api } from '../api.js'
 import { run } from '../run.js'
-import { state } from '../state.js'
+import { state, patch } from '../state.js'
 import { dom } from '../dom.js'
 import { fillForm, saveForm, toastSaveResult, trackForm } from '../form.js'
 import { showRewardForm, bindRewardForm } from './twitch-reward-form.js'
@@ -43,7 +43,7 @@ export function renderTwitchRewards() {
 }
 
 async function readRewards() {
-  state.twitch.rewards = (await api.getTwitchRewards()).rewards
+  patch('twitch', { rewards: (await api.getTwitchRewards()).rewards })
   renderRewardOptions()
 }
 
@@ -53,13 +53,13 @@ export async function loadTwitchRewards() {
 }
 
 export function onTwitchRewardChange() {
-  state.twitch.selectedRewardId = dom.twitchRewardSelect.value
+  patch('twitch', { selectedRewardId: dom.twitchRewardSelect.value })
   showSelectedReward()
   saveTwitchConfig()
 }
 
 export function applyRewardConfig(config) {
-  state.twitch.selectedRewardId = config.channelPointsRewardId ?? ''
+  patch('twitch', { selectedRewardId: config.channelPointsRewardId ?? '' })
   renderTwitchRewards()
   fillForm(dom.twitchRewardSection, config)
 }
@@ -69,7 +69,7 @@ function persistTwitchConfig() {
     dom.twitchRewardSection,
     async (body) => {
       const answer = await api.updateTwitchConfig(body)
-      state.twitch.config = answer.config
+      patch('twitch', { config: answer.config })
       return answer
     },
     { changedOnly: true }
@@ -96,11 +96,11 @@ export async function saveReward() {
   await readRewards()
 
   if (editing) {
-    state.twitch.editingReward = result.config
+    patch('twitch', { editingReward: result.config })
     return toastSaveResult(result, 'toast.twitchRewardUpdated')
   }
 
-  state.twitch.selectedRewardId = result.config.id
+  patch('twitch', { selectedRewardId: result.config.id })
   renderTwitchRewards()
   // the new reward is the one for the song requests: one message for both, not one for each
   toastSaveResult(await persistTwitchConfig(), 'toast.twitchRewardCreated')
@@ -115,7 +115,7 @@ export function bindTwitchRewardTracking() {
 export function bindTwitchRewardFormEvents() {
   dom.twitchCreateNewRewardBtn.addEventListener('click', () => {
     dom.twitchRewardSelect.value = ''
-    state.twitch.selectedRewardId = ''
+    patch('twitch', { selectedRewardId: '' })
     showRewardForm()
   })
   bindRewardForm()
