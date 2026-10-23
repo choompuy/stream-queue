@@ -31,12 +31,24 @@ const defaultOf = (input) => {
 export const isChanged = (input) => valueOf(input) !== defaultOf(input)
 
 // `changedOnly`: only the inputs that differ from what was stored. Another panel may have changed the others since this one
-// was filled, and sending them back would put the old values over the new ones
-export function readForm(form, { changedOnly = false } = {}) {
+// was filled, and sending them back would put the old values over the new ones.
+// `groups`: paths whose fields belong together — when one of them changes, the group is sent whole (a limit of a
+// reward is its switch and its number: the server takes them as a pair, and half a pair is a refusal)
+export function readForm(form, { changedOnly = false, groups = [] } = {}) {
+  const changedGroups = new Set(
+    changedOnly
+      ? formInputs(form)
+          .filter(isChanged)
+          .map((input) => groups.find((prefix) => input.name.startsWith(`${prefix}.`)))
+          .filter(Boolean)
+      : []
+  )
+
   const body = {}
 
   for (const input of formInputs(form)) {
-    if (changedOnly && !isChanged(input)) continue
+    const group = groups.find((prefix) => input.name.startsWith(`${prefix}.`))
+    if (changedOnly && !isChanged(input) && !(group && changedGroups.has(group))) continue
 
     const keys = input.name.split('.')
     const last = keys.pop()
@@ -101,17 +113,26 @@ export function trackForm(form) {
   })
 }
 
+// The stored values go into a form, except the fields the person is editing right now — their answer would be older
+// than what was typed since. A mark survives a fill that brings the same value the field holds (the echo of a save)
+export function fillFormKeepingEdits(form, config) {
+  const editing = formInputs(form)
+    .filter(isChanged)
+    .map((input) => input.name)
+  fillForm(form, config, { skip: editing, keepMarks: true })
+}
+
 /**
  * Sends the form with `save(body)` (all its fields, or the changed ones with `changedOnly`), which answers { config, rejected },
  * then shows the stored values and marks the fields:
  * refused -> red (and keeps what was typed), stored with a new value -> green, the rest plain.
  * Returns { config, rejected, saved, refused } for toastSaveResult
  */
-export async function saveForm(form, save, { changedOnly = false } = {}) {
+export async function saveForm(form, save, { changedOnly = false, groups = [] } = {}) {
   const inputs = formInputs(form)
   const changed = new Map(inputs.map((input) => [input, isChanged(input)]))
   const sent = new Map(inputs.map((input) => [input, valueOf(input)]))
-  const { config, rejected } = await save(readForm(form, { changedOnly }))
+  const { config, rejected } = await save(readForm(form, { changedOnly, groups }))
   let saved = 0
   let refused = 0
 
@@ -138,4 +159,27 @@ export async function saveForm(form, save, { changedOnly = false } = {}) {
 export function toastSaveResult({ saved, refused }, successKey, { successToast = true } = {}) {
   if (refused > 0) toastError(t('toast.settingsPartiallySaved', { saved, rejected: refused }))
   else if (successToast) toastSuccess(t(successKey))
+}
+
+/**
+ * A settings panel with a Save and a Cancel, the way the settings pages are built. The topic that owns the data
+ * fills the form through `fill` (the fields the person is editing keep what was typed), `save(body)` sends what
+ * changed and answers { config, rejected }, and `stored()` is the object the Cancel returns to (a panel without
+ * a Cancel, one that saves itself as it changes, leaves it out).
+ */
+export function defineFormPanel(form, { save, stored = null, toastKey }) {
+  return {
+    fill: (config) => fillFormKeepingEdits(form, config),
+
+    // only the changed fields: another panel may have changed the rest since this one was filled
+    saveChanges: () => saveForm(form, save, { changedOnly: true }),
+
+    // back to what is stored: the marks go with it
+    cancel: () => {
+      const config = stored?.()
+      if (config != null) fillForm(form, config)
+    },
+
+    toastResult: (result, options = {}) => toastSaveResult(result, toastKey, options)
+  }
 }

@@ -1,7 +1,4 @@
 const COALESCE_MS = 100
-// the server pings every 25 s: a minute without any frame means the connection is dead (OBS and antivirus drop quiet ones without a word)
-const WATCHDOG_MS = 60_000
-const DOWN_AFTER_MS = 10_000
 const REOPEN_AFTER_MS = 3_000
 const CLOSED = 2
 
@@ -37,31 +34,21 @@ function createTimers() {
  *
  * onChange(topic)  at most once per 100 ms per topic. Called for every topic on each (re)connect too: what changed while
  *                  the connection was down was never announced, so the page has to compare
- * onStatus(status) 'open', or 'down' when there is no EventSource or no connection for 10 s (the page polls meanwhile)
  * onNotice(notice) something that happened and is shown as it is told (see src/state-events.ts). Told once: what is missed while the
  *                  connection is down is not told afterwards, and it is not a change to read again
  * announceFirstOpen  whether the connection's first open announces every topic. A page that read everything itself
  *                    right before (watch's `readNow`) passes false: its first open would only repeat that read
  */
-export function connectEvents({ topics, onChange, onStatus, onNotice, EventSourceImpl = globalThis.EventSource, announceFirstOpen = true }) {
+export function connectEvents({ topics, onChange, onNotice, EventSourceImpl = globalThis.EventSource, announceFirstOpen = true }) {
   if (!EventSourceImpl) {
-    onStatus('down')
     return { close() {} }
   }
 
   const url = `/api/events?topics=${topics.join(',')}`
   const timers = createTimers()
   let source = null
-  let status = null
   let closed = false
   let openedBefore = false
-
-  function setStatus(next) {
-    if (status === next) return
-
-    status = next
-    onStatus(next)
-  }
 
   // a topic that is already waiting for its turn is not asked for again
   function notify(topic) {
@@ -69,28 +56,15 @@ export function connectEvents({ topics, onChange, onStatus, onNotice, EventSourc
     if (!timers.has(name)) timers.set(name, () => onChange(topic), COALESCE_MS)
   }
 
-  const armWatchdog = () => timers.set('watchdog', reopen, WATCHDOG_MS)
-
-  function armDownTimer() {
-    if (!timers.has('down') && status !== 'down') timers.set('down', () => setStatus('down'), DOWN_AFTER_MS)
-  }
-
   function disposeSource() {
-    timers.clear('watchdog')
     source?.close()
     source = null
-  }
-
-  function reopen() {
-    disposeSource()
-    open()
   }
 
   function open() {
     if (closed) return
 
     timers.clear('reopen')
-    armDownTimer()
 
     const current = new EventSourceImpl(url)
     source = current
@@ -103,9 +77,6 @@ export function connectEvents({ topics, onChange, onStatus, onNotice, EventSourc
     }
 
     listen('open', () => {
-      timers.clear('down')
-      setStatus('open')
-      armWatchdog()
       // the page that read everything itself right before (watch's first read) skips the announcement of this first
       // open; every later one announces everything, because what changed while the connection was down was never announced
       if (announceFirstOpen || openedBefore) topics.forEach(notify)
@@ -113,8 +84,6 @@ export function connectEvents({ topics, onChange, onStatus, onNotice, EventSourc
     })
 
     listen('changed', (event) => {
-      armWatchdog()
-
       try {
         const { topic } = JSON.parse(event.data)
         if (topics.includes(topic)) notify(topic)
@@ -124,8 +93,6 @@ export function connectEvents({ topics, onChange, onStatus, onNotice, EventSourc
     })
 
     listen('notice', (event) => {
-      armWatchdog()
-
       let notice
       try {
         notice = JSON.parse(event.data)
@@ -136,11 +103,7 @@ export function connectEvents({ topics, onChange, onStatus, onNotice, EventSourc
       onNotice?.(notice)
     })
 
-    listen('ping', armWatchdog)
-
     listen('error', () => {
-      armDownTimer()
-
       // the browser reconnects by itself, unless it gave up (an error answer such as 503): then it is done here
       if (current.readyState === CLOSED) {
         disposeSource()

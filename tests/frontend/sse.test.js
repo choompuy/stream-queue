@@ -48,17 +48,15 @@ function connect(t, topics = ['state', 'activity']) {
   t.mock.timers.enable({ apis: ['setTimeout'] })
 
   const changes = []
-  const statuses = []
   const notices = []
   const connection = connectEvents({
     topics,
     onChange: (topic) => changes.push(topic),
-    onStatus: (status) => statuses.push(status),
     onNotice: (notice) => notices.push(notice),
     EventSourceImpl: FakeEventSource
   })
 
-  return { changes, statuses, notices, connection, source: () => FakeEventSource.instances.at(-1) }
+  return { changes, notices, connection, source: () => FakeEventSource.instances.at(-1) }
 }
 
 test('connectEvents()', async (t) => {
@@ -67,21 +65,17 @@ test('connectEvents()', async (t) => {
     assert.equal(source().url, '/api/events?topics=state,twitch')
   })
 
-  await t.test('without EventSource it reports "down" at once and does nothing else', () => {
-    const statuses = []
-    const connection = connectEvents({ topics: ['state'], onChange: () => {}, onStatus: (s) => statuses.push(s), EventSourceImpl: undefined })
-
-    assert.deepEqual(statuses, ['down'])
+  await t.test('without EventSource it does nothing', () => {
+    const connection = connectEvents({ topics: ['state'], onChange: () => {}, EventSourceImpl: undefined })
     assert.doesNotThrow(() => connection.close())
   })
 
-  await t.test('on open it reports "open" and asks for every topic to be read again', (t) => {
-    const { source, changes, statuses } = connect(t)
+  await t.test('on open it asks for every topic to be read again', (t) => {
+    const { source, changes } = connect(t)
 
     source().open()
     t.mock.timers.tick(100)
 
-    assert.deepEqual(statuses, ['open'])
     assert.deepEqual(changes, ['state', 'activity'])
   })
 
@@ -135,22 +129,10 @@ test('connectEvents()', async (t) => {
     assert.deepEqual(notices, [])
   })
 
-  await t.test('a notice counts as a frame for the watchdog, like a ping', (t) => {
-    const { source } = connect(t)
-    const first = source()
-    first.open()
-
-    t.mock.timers.tick(59000)
-    first.notice({ type: 'viewerRequest', user: 'amy', title: 'x' })
-    t.mock.timers.tick(59000)
-
-    assert.equal(FakeEventSource.instances.length, 1)
-  })
-
   await t.test('a page that does not ask for notices can still be told one', (t) => {
     FakeEventSource.instances = []
     t.mock.timers.enable({ apis: ['setTimeout'] })
-    connectEvents({ topics: ['state'], onChange() {}, onStatus() {}, EventSourceImpl: FakeEventSource })
+    connectEvents({ topics: ['state'], onChange() {}, EventSourceImpl: FakeEventSource })
 
     assert.doesNotThrow(() => FakeEventSource.instances[0].notice({ type: 'viewerRequest', user: 'amy', title: 'x' }))
   })
@@ -169,32 +151,6 @@ test('connectEvents()', async (t) => {
     assert.deepEqual(changes, ['state', 'activity'])
   })
 
-  await t.test('no connection for 10 seconds is "down", and a connection that comes back is "open" again', (t) => {
-    const { source, statuses } = connect(t)
-
-    t.mock.timers.tick(9999)
-    assert.deepEqual(statuses, [])
-
-    t.mock.timers.tick(1)
-    assert.deepEqual(statuses, ['down'])
-
-    source().open()
-    assert.deepEqual(statuses, ['down', 'open'])
-  })
-
-  await t.test('a short drop is not reported at all', (t) => {
-    const { source, statuses } = connect(t)
-    source().open()
-
-    source().readyState = 0
-    source().emit('error')
-    t.mock.timers.tick(5000)
-    source().open()
-    t.mock.timers.tick(20000)
-
-    assert.deepEqual(statuses, ['open'])
-  })
-
   await t.test('when the browser gives up (an error answer) it is opened again after 3 seconds', (t) => {
     const { source } = connect(t)
     const first = source()
@@ -205,21 +161,6 @@ test('connectEvents()', async (t) => {
 
     t.mock.timers.tick(3000)
 
-    assert.equal(FakeEventSource.instances.length, 2)
-    assert.equal(first.closed, true)
-  })
-
-  await t.test('a minute without a single frame (a ping counts) opens a new connection', (t) => {
-    const { source } = connect(t)
-    const first = source()
-    first.open()
-
-    t.mock.timers.tick(59000)
-    first.emit('ping')
-    t.mock.timers.tick(59000)
-    assert.equal(FakeEventSource.instances.length, 1, 'a ping keeps the connection')
-
-    t.mock.timers.tick(1000)
     assert.equal(FakeEventSource.instances.length, 2)
     assert.equal(first.closed, true)
   })
@@ -318,7 +259,7 @@ test('watch()', async (t) => {
   })
 
   // a page with three topics: what each one reads is recorded, `shown` says what anyone looks at
-  function page(t, { safetyMs = 1000, shown = {}, noEvents = false } = {}) {
+  function page(t, { shown = {}, noEvents = false } = {}) {
     FakeEventSource.instances = []
     t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
     const reads = []
@@ -326,7 +267,7 @@ test('watch()', async (t) => {
       ['a', 'b', 'c'].map((name) => [name, { read: async () => void reads.push(name), isShown: () => shown[name] ?? true }])
     )
     const notices = []
-    const watcher = watch(topics, { safetyMs, onNotice: (notice) => notices.push(notice), EventSourceImpl: noEvents ? undefined : FakeEventSource })
+    const watcher = watch(topics, { onNotice: (notice) => notices.push(notice), EventSourceImpl: noEvents ? undefined : FakeEventSource })
     t.after(() => {
       watcher.close()
       t.mock.timers.reset()
@@ -418,57 +359,20 @@ test('watch()', async (t) => {
     assert.equal(peak, 1)
   })
 
-  await t.test('while the connection is down it reads everything every safetyMs, and stops when the connection is up', async (t) => {
-    const { source, reads } = page(t, { safetyMs: 1000 })
-
-    t.mock.timers.tick(10_000)
-    await flush()
-    reads.length = 0
-
-    for (let i = 0; i < 3; i++) {
-      t.mock.timers.tick(1000)
-      await flush()
-    }
-    assert.equal(reads.length, 9, 'three topics, three times')
-
-    source().open()
-    t.mock.timers.tick(100)
-    await flush()
-    reads.length = 0
-    t.mock.timers.tick(30_000)
-    await flush()
-    assert.deepEqual(reads, [], 'with the connection up the server says when to read')
-  })
-
-  await t.test('with no EventSource at all it reads on its own from the start', async (t) => {
-    const { reads } = page(t, { safetyMs: 1000, noEvents: true })
-
-    t.mock.timers.tick(2000)
-    await flush()
-
-    assert.equal(reads.length, 6)
-  })
-
-  await t.test('passes the notices on, and isOpen() says whether the connection is up', async (t) => {
-    const { watcher, source, notices } = page(t)
-    assert.equal(watcher.isOpen(), false)
+  await t.test('passes the notices on', async (t) => {
+    const { source, notices } = page(t)
 
     source().open()
     source().notice({ type: 'viewerRequest', user: 'amy', title: 'x' })
 
-    assert.equal(watcher.isOpen(), true)
     assert.deepEqual(notices, [{ type: 'viewerRequest', user: 'amy', title: 'x' }])
   })
 
   await t.test('close() closes the connection and ends the reading', async (t) => {
-    const { watcher, source, reads } = page(t, { safetyMs: 1000 })
-    t.mock.timers.tick(10_000)
-    await flush()
+    const { watcher, source, reads } = page(t)
 
     watcher.close()
     reads.length = 0
-    t.mock.timers.tick(10_000)
-    await flush()
 
     assert.equal(source().closed, true)
     assert.deepEqual(reads, [])

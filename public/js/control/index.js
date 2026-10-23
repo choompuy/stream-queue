@@ -16,7 +16,6 @@ import { loadSecrets, loadNetworkInfo, applyOverlaySettings, readConfig } from '
 import { loadTwitchConfig, readTwitchStatus } from './twitch/index.js'
 import { isDashboardActive, isPlaylistsActive, isSettingsActive, onTabShown } from './tabs.js'
 import { showNotice } from './notices.js'
-
 // What each topic reads again: a `read*` function (the one-time loads of the startup are `load*`). Only what the
 // person looks at is read: the rest is read when it is shown again. A read writes what it learned to the store
 // (state.js); the drawings are subscribers of the store
@@ -60,7 +59,12 @@ export async function startControlPanel() {
   // a page that was hidden heard nothing (the browser may even have paused it): what it shows now is read again,
   // and so is whatever is shown on every page
   const refreshShown = () => {
-    if (document.visibilityState === 'visible') watcher.refreshAll()
+    if (document.visibilityState !== 'visible') return
+
+    watcher.refreshAll()
+    // the addresses of the machine change while the panel is open (DHCP, a VPN): the chooser of the panel's
+    // address reads them again when the settings are looked at
+    if (isSettingsActive()) loadNetworkInfo({ silent: true })
   }
   const offTabShown = onTabShown(refreshShown)
   document.addEventListener('visibilitychange', refreshShown)

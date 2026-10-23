@@ -22,30 +22,26 @@ const el = (id) => document.getElementById(id)
 const hidden = (id) => el(id).classList.contains('hidden')
 
 const user = { displayName: 'Streamer', login: 'streamer', profileImageUrl: 'https://example.com/a.png' }
-const now = Date.now()
-const up = { auth: 'ok', eventSub: true, chat: true, since: now }
-const down = (since = Date.now()) => ({ auth: 'ok', eventSub: false, chat: false, since })
 
-function connected(health) {
-  Object.assign(state.twitch, { configured: true, connected: true, user, health })
+function connected() {
+  Object.assign(state.twitch, { configured: true, connected: true, user })
 }
 
 test('without a Client ID', async (t) => {
-  await t.test('only the note is shown: no channel block, no avatar without a source, no warning', () => {
-    Object.assign(state.twitch, { configured: false, connected: false, user: null, health: null })
+  await t.test('only the note is shown: no channel block, no avatar without a source', () => {
+    Object.assign(state.twitch, { configured: false, connected: false, user: null })
     renderTwitchConnection()
 
     assert.equal(hidden('twitchNotConfigured'), false)
     assert.equal(hidden('twitchChannelField'), true)
     assert.equal(hidden('twitchChanelImg'), true)
     assert.equal(el('twitchChanelImg').hasAttribute('src'), false)
-    assert.equal(hidden('twitchHealthWarning'), true)
   })
 })
 
 test('the avatar', async (t) => {
   await t.test('has a source only while connected', () => {
-    connected(up)
+    connected()
     renderTwitchConnection()
     assert.equal(el('twitchChanelImg').getAttribute('src'), user.profileImageUrl)
     assert.equal(hidden('twitchChanelImg'), false)
@@ -57,83 +53,22 @@ test('the avatar', async (t) => {
   })
 })
 
-test('the connection warning', async (t) => {
-  await t.test('is not shown for a connection that has only just come down', async (t) => {
-    t.mock.timers.enable({ apis: ['setTimeout'] })
-    connected(up)
-    status = { connected: true, user, health: down() }
-
-    await readTwitchStatus()
-    // the clock is the server's (since), so the boundary is a moment, not a tick: comfortably before it
-    t.mock.timers.tick(5000)
-
-    assert.equal(hidden('twitchHealthWarning'), true)
-
-    // the re-draw belongs to this test's clock: a healthy answer takes it back, so that the next test starts clean
-    status = { connected: true, user, health: up }
-    await readTwitchStatus()
-  })
-
-  await t.test('is shown when it stays down for 6 seconds', async (t) => {
-    t.mock.timers.enable({ apis: ['setTimeout'] })
-    connected(up)
-    status = { connected: true, user, health: down() }
-
-    await readTwitchStatus()
-    // comfortably past the grace period, whenever within it the answer that brought the state arrived
-    t.mock.timers.tick(7000)
-
-    assert.equal(hidden('twitchHealthWarning'), false)
-  })
-
-  await t.test('a connection that comes back in time never shows it', async (t) => {
-    t.mock.timers.enable({ apis: ['setTimeout'] })
-    connected(up)
-    status = { connected: true, user, health: down() }
-    await readTwitchStatus()
-    t.mock.timers.tick(3000)
-
-    status = { connected: true, user, health: up }
-    await readTwitchStatus()
-    t.mock.timers.tick(10000)
-
-    assert.equal(hidden('twitchHealthWarning'), true)
-  })
-
-  await t.test('a state that the server says has been down for a while is a warning the moment it is drawn', () => {
-    connected(down(Date.now() - 60_000))
-    renderTwitchConnection()
-    assert.equal(hidden('twitchHealthWarning'), false)
-
-    status = { connected: true, user, health: up }
-    return readTwitchStatus().then(() => {
-      assert.equal(hidden('twitchHealthWarning'), true)
-    })
-  })
-
-  await t.test('a refused login is shown at once', () => {
-    connected({ auth: 'reauthorize', eventSub: false, chat: false, since: Date.now() })
-    renderTwitchConnection()
-    assert.equal(hidden('twitchHealthWarning'), false)
-  })
-
-  await t.test('an account disconnected elsewhere is shown as disconnected', async () => {
-    connected(up)
-    status = { connected: false, user: null, health: null }
-    await readTwitchStatus()
-    assert.equal(state.twitch.connected, false)
-    assert.equal(hidden('twitchDisconnectBtn'), true)
-  })
+test('an account disconnected elsewhere is shown as disconnected', async () => {
+  connected()
+  status = { connected: false, user: null }
+  await readTwitchStatus()
+  assert.equal(state.twitch.connected, false)
+  assert.equal(hidden('twitchDisconnectBtn'), true)
 })
 
 test('a connection made elsewhere', async (t) => {
   await t.test('shows up on the next refresh, also on a page that was reloaded in the middle of the login', async () => {
     // the panel was loaded while nobody was logged in; the login is finished later, in another tab
-    Object.assign(state.twitch, { configured: true, connected: false, user: null, health: null })
+    Object.assign(state.twitch, { configured: true, connected: false, user: null })
     renderTwitchConnection()
     assert.equal(hidden('twitchDisconnectBtn'), true)
 
-    status = { connected: true, user, health: up, connectedAt: 1700000000000 }
+    status = { connected: true, user, connectedAt: 1700000000000 }
     await readTwitchStatus()
 
     assert.equal(state.twitch.connected, true)
@@ -145,8 +80,8 @@ test('a connection made elsewhere', async (t) => {
   })
 
   await t.test('the rewards are loaded once, when the account turns up, and not on every refresh', async () => {
-    Object.assign(state.twitch, { configured: true, connected: false, user: null, health: null })
-    status = { connected: true, user, health: up }
+    Object.assign(state.twitch, { configured: true, connected: false, user: null })
+    status = { connected: true, user }
     let rewardRequests = 0
     const original = globalThis.fetch
     globalThis.fetch = async (url, ...rest) => {
@@ -166,7 +101,7 @@ test('a connection made elsewhere', async (t) => {
 
   await t.test('an account that is not connected is still asked about, so that a later login is seen', async () => {
     Object.assign(state.twitch, { configured: true, connected: false, user: null })
-    status = { connected: false, user: null, health: null }
+    status = { connected: false, user: null }
     let requested = false
     const original = globalThis.fetch
     globalThis.fetch = async (...args) => {
@@ -182,6 +117,7 @@ test('a connection made elsewhere', async (t) => {
 
     assert.equal(requested, true)
     assert.equal(state.twitch.connected, false)
+    renderTwitchConnection()
     assert.equal(hidden('twitchDisconnectBtn'), true)
   })
 
@@ -209,7 +145,7 @@ const ended = (state, expiresAt) => ({ state, expiresAt })
 
 test('a login that waits for its code', async (t) => {
   t.beforeEach(() => {
-    Object.assign(state.twitch, { configured: true, connected: false, user: null, health: null, authorization: null })
+    Object.assign(state.twitch, { configured: true, connected: false, user: null, authorization: null })
     document.getElementById('toastContainer').innerHTML = ''
   })
 
@@ -265,7 +201,7 @@ test('a login that waits for its code', async (t) => {
 
   await t.test('is not shown next to an account that is already connected', async () => {
     state.twitch.authorization = waiting(Date.now() + 60_000)
-    status = { connected: true, user, health: up, authorization: waiting(Date.now() + 60_000) }
+    status = { connected: true, user, authorization: waiting(Date.now() + 60_000) }
 
     await readTwitchStatus()
 

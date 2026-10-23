@@ -3,7 +3,8 @@ import { switchPageTab, switchSection } from './tabs.js'
 import { dispatchAction } from './actions.js'
 import { closeAllMenus } from './menu.js'
 import { saveOverlaySettings, onIpChange, changeLocale } from './settings.js'
-import { onTwitchRewardChange, bindTwitchRewardFormEvents, bindTwitchFieldTracking } from './twitch/index.js'
+import { onTwitchRewardChange, saveTwitchConfig, bindTwitchFieldTracking } from './twitch/index.js'
+import { bindRewardForm } from './twitch/twitch-reward-form.js'
 import { trackForm } from './form.js'
 
 // What a select or a panel names in data-on-change is what happens when it changes: one listener binds them all
@@ -13,6 +14,7 @@ const CHANGES = {
   },
   'select-ip': () => onIpChange(),
   'twitch-reward': () => onTwitchRewardChange(),
+  'twitch-reward-save': () => saveTwitchConfig(),
   locale: (target) => changeLocale(target.value)
 }
 
@@ -52,5 +54,5 @@ export function bindEvents() {
   trackForm(dom.overlaySettingsPanel)
   trackForm(dom.botSettingsPanel)
   bindTwitchFieldTracking()
-  bindTwitchRewardFormEvents()
+  bindRewardForm()
 }

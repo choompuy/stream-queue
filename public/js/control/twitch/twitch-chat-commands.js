@@ -1,31 +1,29 @@
 import { api } from '../api.js'
 import { state, patch } from '../state.js'
 import { dom } from '../dom.js'
-import { fillForm, saveForm, toastSaveResult, trackForm } from '../form.js'
+import { defineFormPanel } from '../form.js'
+
+// the chat commands panel: the config topic fills it (through loadTwitchConfig), the buttons save what changed
+// and put the stored values back
+const chatCommands = defineFormPanel(dom.twitchChatCommandsPanel, {
+  save: async (body) => {
+    const answer = await api.updateTwitchConfig(body)
+    patch('twitch', { config: answer.config })
+    return answer
+  },
+  stored: () => state.twitch.config,
+  toastKey: 'toast.twitchChatCommandsSaved'
+})
 
 // the chat commands are the inputs of the panel that are named chatCommands.*, see form.js
-export function bindChatCommandTracking() {
-  trackForm(dom.twitchChatCommandsPanel)
-}
-
 export function applyChatCommands(config) {
-  fillForm(dom.twitchChatCommandsPanel, config)
+  chatCommands.fill(config)
 }
 
 export function cancelChatCommandChanges() {
-  fillForm(dom.twitchChatCommandsPanel, state.twitch.config)
+  chatCommands.cancel()
 }
 
 export async function saveTwitchChatCommands() {
-  const result = await saveForm(
-    dom.twitchChatCommandsPanel,
-    async (body) => {
-      const answer = await api.updateTwitchConfig(body)
-      patch('twitch', { config: answer.config })
-      return answer
-    },
-    { changedOnly: true }
-  )
-
-  toastSaveResult(result, 'toast.twitchChatCommandsSaved')
+  chatCommands.toastResult(await chatCommands.saveChanges())
 }

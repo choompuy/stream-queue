@@ -131,8 +131,8 @@ function reset() {
   state.twitch.config = null
 
   dom.twitchRewardSelect.innerHTML = ''
-  dom.twitchAutoFulfillRedemptions.checked = false
   dom.twitchRewardSelect.classList.remove('error')
+  dom.twitchAutoFulfillRedemptions.checked = false
   dom.twitchNotConfigured.classList.add('hidden')
   dom.twitchConnectionControls.classList.add('hidden')
   dom.twitchConnectBtn.disabled = false
@@ -141,15 +141,22 @@ function reset() {
   dom.twitchRewardSection.classList.add('hidden')
   dom.twitchChatCommandsPanel.classList.add('hidden')
 
+  // the defaults go with the values: the panel counts a difference from the default as typing, so a field that was
+  // left at its old default would look edited before anything was filled into it
   for (const field of CHAT_COMMAND_FIELDS) {
-    dom[`${field.dom}Enabled`].checked = false
-    dom[`${field.dom}Command`].value = ''
-    dom[`${field.dom}Command`].classList.remove('error')
-    dom[`${field.dom}Permission`].selectedIndex = 0
+    const enabled = dom[`${field.dom}Enabled`]
+    const command = dom[`${field.dom}Command`]
+    const permission = dom[`${field.dom}Permission`]
+
+    enabled.checked = enabled.defaultChecked = false
+    command.value = command.defaultValue = ''
+    command.classList.remove('error')
+    permission.selectedIndex = 0
+    for (const option of permission.options) option.defaultSelected = option.value === 'everyone'
   }
-  dom.chatCmdCooldown.value = ''
+  dom.chatCmdCooldown.value = dom.chatCmdCooldown.defaultValue = ''
   dom.chatCmdCooldown.classList.remove('error')
-  dom.chatCmdPlainCooldown.value = ''
+  dom.chatCmdPlainCooldown.value = dom.chatCmdPlainCooldown.defaultValue = ''
   dom.chatCmdPlainCooldown.classList.remove('error')
 
   document.getElementById('toastContainer').innerHTML = ''

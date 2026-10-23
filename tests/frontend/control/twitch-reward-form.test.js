@@ -32,10 +32,13 @@ const refusal = (rejected) => ({ config: {}, rejected })
 
 const { state } = await import('../../../public/js/control/state.js')
 const { showRewardForm, bindRewardForm } = await import('../../../public/js/control/twitch/twitch-reward-form.js')
-const { saveReward, cancelRewardChanges, bindTwitchRewardTracking } = await import('../../../public/js/control/twitch/twitch-rewards.js')
+const { saveReward, cancelRewardChanges } = await import('../../../public/js/control/twitch/twitch-rewards.js')
+const { trackForm } = await import('../../../public/js/control/form.js')
 
 bindRewardForm()
-bindTwitchRewardTracking()
+// as bindEvents marks the settings panels, the reward forms are marked as they change
+trackForm(document.getElementById('twitchRewardSection'))
+trackForm(document.getElementById('twitchRewardForm'))
 
 const reward = (over = {}) => ({
   id: 'rw1',
@@ -280,6 +283,38 @@ test('saveReward()', async (t) => {
     assert.equal(state.twitch.selectedRewardId, 'rw1')
     assert.ok(document.getElementById('twitchRewardSelect').textContent.includes('Renamed (500)'), 'the select shows the new title')
     assert.ok(toasts().includes('toast.twitchRewardUpdated'))
+  })
+
+  await t.test('an edit sends only what differs: a change made on twitch.tv in the meantime survives it', async () => {
+    state.twitch.rewards = [reward()]
+    state.twitch.selectedRewardId = 'rw1'
+    showRewardForm(reward())
+    handlers = {
+      'PATCH /api/integrations/twitch/rewards/rw1': () => ({ config: reward(), rejected: [] }),
+      'GET /api/integrations/twitch/rewards': () => ({ rewards: [reward()] })
+    }
+    type('twitchRewardTitle', 'Renamed')
+
+    await saveReward()
+
+    assert.deepEqual(bodies['PATCH /api/integrations/twitch/rewards/rw1'], { title: 'Renamed' }, 'nothing else travels over the edit')
+  })
+
+  await t.test('a limit is sent whole when its number changes: the switch and the number are a pair for the server', async () => {
+    state.twitch.rewards = [reward()]
+    state.twitch.selectedRewardId = 'rw1'
+    showRewardForm(reward())
+    handlers = {
+      'PATCH /api/integrations/twitch/rewards/rw1': () => ({ config: reward(), rejected: [] }),
+      'GET /api/integrations/twitch/rewards': () => ({ rewards: [reward()] })
+    }
+    type('twitchMaxPerStream', '7')
+
+    await saveReward()
+
+    assert.deepEqual(bodies['PATCH /api/integrations/twitch/rewards/rw1'], {
+      limits: { maxPerStream: { enabled: true, value: 7 } }
+    })
   })
 })
 

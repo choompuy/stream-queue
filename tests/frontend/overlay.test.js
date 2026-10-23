@@ -457,13 +457,13 @@ test('reading the state', async (t) => {
     assert.equal(reads(env), before + 2)
   })
 
-  await t.test('without events the page reads every second', async (t) => {
+  await t.test('without events the page does not read automatically', async (t) => {
     const { env, elapse } = await boot(t, { current: track('a'), events: false })
     const before = reads(env)
 
     for (let i = 0; i < 3; i++) await elapse(1000)
 
-    assert.equal(reads(env), before + 3)
+    assert.equal(reads(env), before)
   })
 
   await t.test('with the events open it does not read on its own: the server says when', async (t) => {

@@ -30,7 +30,6 @@ export const store = createStore({
     connected: false,
     user: null,
     connectedAt: null,
-    health: null,
     authorization: null,
     rewards: [],
     config: null,

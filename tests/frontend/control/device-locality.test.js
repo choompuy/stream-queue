@@ -13,7 +13,7 @@ const { loadTwitchConfig } = await import('../../../public/js/control/twitch/ind
 
 const networkInfo = (isLocal) => ({ port: 4747, ips: isLocal ? ['localhost'] : ['192.168.1.5'], isLocal })
 
-const connected = { connected: true, user: { displayName: 'Streamer', login: 'streamer', profileImageUrl: '' }, health: null }
+const connected = { connected: true, user: { displayName: 'Streamer', login: 'streamer', profileImageUrl: '' } }
 
 test('the page knows which blocks another device may not change', async (t) => {
   await t.test('the machine-only blocks are marked in the page: the API key, the Twitch section, the chat commands', () => {

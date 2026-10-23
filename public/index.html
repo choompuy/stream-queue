@@ -606,8 +606,6 @@
                   </div>
                 </div>
               </div>
-
-              <span id="twitchHealthWarning" class="text-red text-xs hidden"></span>
             </div>
 
             <div id="twitchRewardSection" class="settings-section hidden">
@@ -617,7 +615,7 @@
                   <select class="settings-input input" id="twitchRewardSelect" name="channelPointsRewardId" data-on-change="twitch-reward">
                     <option value="" data-i18n="settings.twitch.rewardNone">Select reward</option>
                   </select>
-                  <button type="button" class="btn btn-secondary" id="twitchCreateNewRewardBtn" data-i18n="settings.twitch.createReward">
+                  <button type="button" class="btn btn-secondary" id="twitchCreateNewRewardBtn" data-action="create-twitch-reward" data-i18n="settings.twitch.createReward">
                     Create reward
                   </button>
                 </div>
@@ -627,7 +625,7 @@
               <div class="field">
                 <label class="field-row">
                   <span class="field-label" data-i18n="settings.twitch.autoFulfillRedemptions">Auto-fulfill redemptions</span>
-                  <input class="settings-input checkbox" type="checkbox" id="twitchAutoFulfillRedemptions" name="autoFulfillRedemptions" />
+                  <input class="settings-input checkbox" type="checkbox" id="twitchAutoFulfillRedemptions" name="autoFulfillRedemptions" data-on-change="twitch-reward-save" />
                 </label>
                 <div class="text-muted text-xs" data-i18n="settings.twitch.autoFulfillRedemptionsNote">
                   Automatically fulfill redemptions when the track finishes playing successfully

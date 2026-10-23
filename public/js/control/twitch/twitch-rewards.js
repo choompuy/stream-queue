@@ -3,8 +3,8 @@ import { api } from '../api.js'
 import { run } from '../run.js'
 import { state, on, patch } from '../state.js'
 import { dom } from '../dom.js'
-import { fillForm, saveForm, toastSaveResult, trackForm } from '../form.js'
-import { showRewardForm, bindRewardForm } from './twitch-reward-form.js'
+import { defineFormPanel, saveForm, toastSaveResult } from '../form.js'
+import { showRewardForm } from './twitch-reward-form.js'
 
 function option(select, value, text, selected = false) {
   const element = select.ownerDocument.createElement('option')
@@ -14,7 +14,7 @@ function option(select, value, text, selected = false) {
   return element
 }
 
-// the select of the rewards of the channel (the form is not touched)
+// the select of the rewards of the channel (its form is not touched)
 function renderRewardOptions() {
   const select = dom.twitchRewardSelect
   const { rewards, selectedRewardId, config } = state.twitch
@@ -64,24 +64,21 @@ export function onTwitchRewardChange() {
 
 export function applyRewardConfig(config) {
   patch('twitch', { selectedRewardId: config.channelPointsRewardId ?? '' })
-  fillForm(dom.twitchRewardSection, config)
-}
-
-function persistTwitchConfig() {
-  return saveForm(
-    dom.twitchRewardSection,
-    async (body) => {
-      const answer = await api.updateTwitchConfig(body)
-      patch('twitch', { config: answer.config })
-      return answer
-    },
-    { changedOnly: true }
-  )
+  rewardSelection.fill(config)
 }
 
 // the selected reward and the auto-fulfil switch are saved at once, whenever one of them changes
+const rewardSelection = defineFormPanel(dom.twitchRewardSection, {
+  save: async (body) => {
+    const answer = await api.updateTwitchConfig(body)
+    patch('twitch', { config: answer.config })
+    return answer
+  },
+  toastKey: 'toast.twitchSettingsSaved'
+})
+
 export function saveTwitchConfig() {
-  return run('saving Twitch config', async () => toastSaveResult(await persistTwitchConfig(), 'toast.twitchSettingsSaved'))
+  return run('saving Twitch config', async () => rewardSelection.toastResult(await rewardSelection.saveChanges()))
 }
 
 // back to the reward as Twitch has it (or to a blank form while a new one is being created)
@@ -89,10 +86,27 @@ export function cancelRewardChanges() {
   showRewardForm(state.twitch.editingReward)
 }
 
+// the blank form of a new reward, away from the selection (the button is a data-action like any other)
+export function createReward() {
+  dom.twitchRewardSelect.value = ''
+  patch('twitch', { selectedRewardId: '' })
+  showRewardForm()
+}
+
+// a limit of a reward is its switch and its number: the server takes them as a pair, so one of them changing sends
+// the whole limit, and a limit nobody touched is not sent at all
+const REWARD_LIMIT_GROUPS = ['limits.maxPerStream', 'limits.maxPerUserPerStream', 'limits.globalCooldownSeconds']
+
 export async function saveReward() {
   const editing = state.twitch.editingReward
 
-  const result = await saveForm(dom.twitchRewardForm, (body) => (editing ? api.updateTwitchReward(editing.id, body) : api.createTwitchReward(body)))
+  // an edit sends only what differs, so what was changed on twitch.tv in the meantime survives it; a creation sends
+  // the form as it is typed
+  const result = await saveForm(
+    dom.twitchRewardForm,
+    (body) => (editing ? api.updateTwitchReward(editing.id, body) : api.createTwitchReward(body)),
+    editing ? { changedOnly: true, groups: REWARD_LIMIT_GROUPS } : {}
+  )
 
   if (result.refused) return toastSaveResult(result, 'toast.twitchRewardUpdated')
 
@@ -107,20 +121,5 @@ export async function saveReward() {
   // here as well: the save of the config reads it, and the drawing that follows the patch comes a turn later
   dom.twitchRewardSelect.value = result.config.id
   patch('twitch', { selectedRewardId: result.config.id })
-  toastSaveResult(await persistTwitchConfig(), 'toast.twitchRewardCreated')
-}
-
-export function bindTwitchRewardTracking() {
-  trackForm(dom.twitchRewardSection)
-  trackForm(dom.twitchRewardForm)
-  dom.twitchAutoFulfillRedemptions.addEventListener('change', saveTwitchConfig)
-}
-
-export function bindTwitchRewardFormEvents() {
-  dom.twitchCreateNewRewardBtn.addEventListener('click', () => {
-    dom.twitchRewardSelect.value = ''
-    patch('twitch', { selectedRewardId: '' })
-    showRewardForm()
-  })
-  bindRewardForm()
+  toastSaveResult(await rewardSelection.saveChanges(), 'toast.twitchRewardCreated')
 }

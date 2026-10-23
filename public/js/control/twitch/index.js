@@ -1,17 +1,21 @@
-import { api } from '../api.js'
 import { run } from '../run.js'
 import { patch, isLocalDevice } from '../state.js'
-import { applyChatCommands, bindChatCommandTracking, cancelChatCommandChanges, saveTwitchChatCommands } from './twitch-chat-commands.js'
+import { dom } from '../dom.js'
+import { trackForm } from '../form.js'
+import { api } from '../api.js'
+import { applyChatCommands, cancelChatCommandChanges, saveTwitchChatCommands } from './twitch-chat-commands.js'
 import { connectTwitch, disconnectTwitch } from './twitch-connection.js'
-import { applyRewardConfig, bindTwitchRewardTracking, cancelRewardChanges, saveReward } from './twitch-rewards.js'
+import { applyRewardConfig, cancelRewardChanges, saveReward, createReward } from './twitch-rewards.js'
 
 export { connectTwitch, disconnectTwitch, readTwitchStatus } from './twitch-connection.js'
-export { onTwitchRewardChange, saveTwitchConfig, bindTwitchRewardFormEvents } from './twitch-rewards.js'
+export { onTwitchRewardChange, saveTwitchConfig } from './twitch-rewards.js'
 export { saveTwitchChatCommands } from './twitch-chat-commands.js'
 
+// the typing of the Twitch forms is marked, as bindEvents marks the settings panels
 export function bindTwitchFieldTracking() {
-  bindChatCommandTracking()
-  bindTwitchRewardTracking()
+  trackForm(dom.twitchChatCommandsPanel)
+  trackForm(dom.twitchRewardSection)
+  trackForm(dom.twitchRewardForm)
 }
 
 export function loadTwitchConfig() {
@@ -31,6 +35,7 @@ export const twitchActions = {
   'cancel-twitch-chat-commands': cancelChatCommandChanges,
   'save-twitch-reward': saveReward,
   'cancel-twitch-reward': cancelRewardChanges,
+  'create-twitch-reward': createReward,
   'connect-twitch': connectTwitch,
   'disconnect-twitch': disconnectTwitch
 }

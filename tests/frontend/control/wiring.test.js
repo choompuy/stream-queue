@@ -1,7 +1,6 @@
 import { test, mock } from 'node:test'
 import assert from 'node:assert/strict'
 import { setupPanel, installEventSource, flush, deferred, makeTrack as track, V } from './panel-env.js'
-import { api } from '../../../public/js/control/api.js'
 
 const panel = setupPanel()
 const sources = installEventSource()
@@ -9,7 +8,7 @@ mock.method(console, 'log', () => {})
 mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
 
-const twitchStatus = { connected: true, user: { displayName: 'Streamer', login: 'streamer', profileImageUrl: '' }, health: { auth: 'ok', eventSub: true, chat: true } }
+const twitchStatus = { connected: true, user: { displayName: 'Streamer', login: 'streamer', profileImageUrl: '' } }
 
 panel.route('GET /api/settings', { locale: 'en', showVideo: true, position: 'bottom-right' })
 panel.route('GET /api/config', { maxQueueSize: 20 })
@@ -125,7 +124,11 @@ test('the control panel and its events', async (t) => {
 
     switchPageTab('settings')
     await flush()
-    assert.deepEqual(panel.calls, ['GET /api/config', READ.twitch], 'opening the page reads it, and so is the Twitch status, which is shown on every page')
+    assert.deepEqual(
+      panel.calls,
+      ['GET /api/config', READ.twitch, 'GET /api/network-info'],
+      'opening the page reads it, and so is the Twitch status (shown on every page) and the addresses of the machine (the IP chooser follows them)'
+    )
 
     panel.calls.length = 0
     source().emit('changed', { topic: 'config' })
@@ -205,50 +208,6 @@ test('the control panel and its events', async (t) => {
 
     assert.equal(started, 2)
     assert.equal(peak, 1)
-  })
-
-  await t.test('while the events are down the panel polls every 10 s, and stops when they are back', async () => {
-    panel.calls.length = 0
-
-    source().emit('error')
-    await elapse(10_000)
-    panel.calls.length = 0
-
-    await elapse(10_000)
-    assert.equal(panel.count(READ.state), 1)
-    assert.equal(panel.count(READ.activity), 1)
-
-    source().emit('open')
-    await elapse(100)
-    panel.calls.length = 0
-
-    await elapse(30_000)
-    assert.deepEqual(panel.calls, [])
-  })
-
-  await t.test('a change that the panel makes is left to the events while they are open, and to the poll while they are down', async () => {
-    source().emit('open')
-    await elapse(100)
-    panel.calls.length = 0
-
-    await api.clearQueue()
-    await elapse(100)
-    assert.deepEqual(panel.calls, ['POST /api/queue/clear'], 'open: the server announces what changed')
-
-    source().emit('error')
-    await elapse(10_000)
-    panel.calls.length = 0
-
-    await api.clearQueue()
-    await elapse(0)
-    assert.deepEqual(panel.calls, ['POST /api/queue/clear'], 'down: nothing is read at once any more — the poll reads it soon')
-
-    await elapse(10_000)
-    assert.equal(panel.calls[0], 'POST /api/queue/clear')
-    for (const topic of ['state', 'activity', 'fallback', 'blocklist']) assert.equal(panel.count(READ[topic]), 1, topic)
-
-    source().emit('open')
-    await elapse(100)
   })
 
   await t.test('stop() closes the connection and nothing is read afterwards', async () => {

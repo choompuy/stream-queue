@@ -96,10 +96,10 @@ test('the scripts find the elements they look for', async (t) => {
       readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
         entry.isDirectory() ? sources(join(dir, entry.name)) : entry.name.endsWith('.js') && !['dom.js', 'fields.js'].includes(entry.name) ? [readFileSync(join(dir, entry.name), 'utf8')] : []
       )
-    const code = sources(controlDir).join('\n').replace(/^import .*$/gm, '')
+    const code = sources(controlDir).join('\n')
     const used = [...code.matchAll(/\bdom\.([A-Za-z0-9_]+)/g)].map((match) => match[1])
     assert.ok(used.length > 100, 'the scan found almost nothing')
-    assert.deepEqual([...new Set(used)].filter((id) => !pages['index.html'].getElementById(id)), [])
+    assert.deepEqual([...new Set(used)].filter((id) => id !== 'js' && !pages['index.html'].getElementById(id)), [])
   })
 
   await t.test('the overlay in overlay.html', () => {

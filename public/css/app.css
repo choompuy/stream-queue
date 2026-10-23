@@ -263,7 +263,7 @@ select {
 }
 
 .checkbox:checked {
-  background-color: var(--accent-blue);
+  background-color: var(--accent-blue) !important;
 }
 
 .checkbox:checked::after {
@@ -272,7 +272,7 @@ select {
 }
 
 .checkbox:checked:hover {
-  background-color: var(--accent-blue-hover);
+  background-color: var(--accent-blue-hover) !important;
 }
 
 input:disabled,

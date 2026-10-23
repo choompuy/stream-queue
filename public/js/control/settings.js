@@ -1,4 +1,4 @@
-import { escapeHtml, show, setValue } from '../shared.js'
+import { show, setValue, setFieldState } from '../shared.js'
 import { api } from './api.js'
 import { store, state, on, patch, isLocalDevice } from './state.js'
 import { dom } from './dom.js'
@@ -7,7 +7,7 @@ import { run, reportError } from './run.js'
 import { syncPlayer } from './player.js'
 import { t, loadTranslations, updateDomTranslations } from '../i18n.js'
 import { toastError, toastSuccess } from './toast.js'
-import { fillForm, saveForm, toastSaveResult, formInputs, isChanged } from './form.js'
+import { defineFormPanel } from './form.js'
 
 let qrCodePromise
 
@@ -49,33 +49,26 @@ export function applyOverlaySettings(settings) {
   state.settings = settings ?? {}
 }
 
-// the drawings that follow the settings: the OBS link, the player, and the form that edits them. A field that is
-// being edited keeps what was typed (its answer would be older), and a mark survives a fill that brings the same
-// value the field holds (the echo of a save)
+// the drawings that follow the settings: the OBS link, the player, and the form that edits them
 on('settings', () => {
   renderOverlayUrl()
-  const editing = formInputs(dom.overlaySettingsPanel)
-    .filter(isChanged)
-    .map((input) => input.name)
-  fillForm(dom.overlaySettingsPanel, state.settings, { skip: editing, keepMarks: true })
+  overlaySettings.fill(state.settings)
   syncPlayer()
 })
 
 // the overlay settings are saved at once, whenever one of them changes
-export function saveOverlaySettings() {
-  return run('saving settings', async () => {
-    const result = await saveForm(
-      dom.overlaySettingsPanel,
-      async (body) => {
-        const answer = await api.updateSettings(body)
-        state.settings = answer.config
-        return answer
-      },
-      { changedOnly: true }
-    )
+const overlaySettings = defineFormPanel(dom.overlaySettingsPanel, {
+  save: async (body) => {
+    const answer = await api.updateSettings(body)
+    state.settings = answer.config
+    return answer
+  },
+  toastKey: 'toast.settingsSaved'
+})
 
-    toastSaveResult(result, 'toast.settingsSaved', { successToast: false })
-  })
+export function saveOverlaySettings() {
+  // an autosave is silent: the green mark on the field is enough
+  return run('saving settings', async () => overlaySettings.toastResult(await overlaySettings.saveChanges(), { successToast: false }))
 }
 
 // The overlay only plays music when it is opened as localhost, and OBS runs on this computer: the link must say localhost
@@ -130,14 +123,18 @@ on('secrets', () => {
   dom.secretsStatus.classList.toggle('text-red', !data?.hasYoutubeApiKey)
 })
 
-export function loadNetworkInfo() {
-  return run('loading network info', async () => {
-    state.network = await api.getNetworkInfo()
-    const { ips } = state.network
+export function loadNetworkInfo({ silent = false } = {}) {
+  return run(
+    'loading network info',
+    async () => {
+      state.network = await api.getNetworkInfo()
+      const { ips } = state.network
 
-    if (!ips.length) state.selectedIp = 'localhost'
-    else if (!state.selectedIp || !ips.includes(state.selectedIp)) state.selectedIp = ips[0]
-  })
+      if (!ips.length) state.selectedIp = 'localhost'
+      else if (!state.selectedIp || !ips.includes(state.selectedIp)) state.selectedIp = ips[0]
+    },
+    { silent }
+  )
 }
 
 // the address that the QR code and the "not this computer" hints follow: the network info and whichever of its
@@ -159,9 +156,15 @@ function renderIpSelect() {
   show(dom.selectIp, ips.length > 1)
   if (ips.length <= 1) return
 
-  dom.selectIp.innerHTML = ips
-    .map((ip) => `<option value="${escapeHtml(ip)}" ${ip === state.selectedIp ? 'selected' : ''}>${escapeHtml(ip)}</option>`)
-    .join('')
+  dom.selectIp.replaceChildren(
+    ...ips.map((ip) => {
+      const element = document.createElement('option')
+      element.value = ip
+      element.textContent = ip
+      element.selected = ip === state.selectedIp
+      return element
+    })
+  )
 }
 
 export async function renderQrUrl() {
@@ -198,55 +201,53 @@ function toggleQr() {
   renderQrUrl()
 }
 
-// The config topic: read while the settings page is shown. The stored values go into the form, except the fields
-// the person is editing right now — their answer would be older than what was typed since (K12)
+// The config topic: read while the settings page is shown; the panel is filled with what it learned
+const botSettings = defineFormPanel(dom.botSettingsPanel, {
+  save: async (body) => {
+    const answer = await api.updateConfig(body)
+    state.config = answer.config
+    return answer
+  },
+  stored: () => state.config,
+  toastKey: 'toast.settingsSaved'
+})
+
 export function readConfig() {
   return run('loading config', async () => {
     state.config = await api.getConfig()
-    const editing = formInputs(dom.botSettingsPanel)
-      .filter(isChanged)
-      .map((input) => input.name)
-    fillForm(dom.botSettingsPanel, state.config, { skip: editing, keepMarks: true })
+    botSettings.fill(state.config)
   })
 }
 
 export function cancelConfigChanges() {
   if (!state.config) return
 
-  fillForm(dom.botSettingsPanel, state.config)
+  botSettings.cancel()
   setValue(dom.secYoutubeKey, '')
+}
+
+// The key is not part of the config form (the server keeps secrets apart): it is saved next to it, and its failure
+// is told on its own — with the server's own words — while the field holds the error until it is typed in again
+async function saveYoutubeApiKey(key) {
+  try {
+    await api.updateSecrets({ youtubeApiKey: key })
+    dom.secYoutubeKey.value = ''
+    setFieldState(dom.secYoutubeKey, null)
+    await loadSecrets()
+    return true
+  } catch (error) {
+    log('Error saving API key:', error)
+    setFieldState(dom.secYoutubeKey, 'error')
+    reportError(error)
+    return false
+  }
 }
 
 export async function saveConfigSetting() {
   const youtubeApiKey = dom.secYoutubeKey.value.trim()
+  const keySaved = youtubeApiKey ? await saveYoutubeApiKey(youtubeApiKey) : true
 
-  const result = await saveForm(
-    dom.botSettingsPanel,
-    async (config) => {
-      const answer = await api.updateConfig(config)
-      state.config = answer.config
-      return answer
-    },
-    { changedOnly: true }
-  )
-
-  let apiKeyFailed = false
-
-  if (youtubeApiKey) {
-    try {
-      await api.updateSecrets({ youtubeApiKey })
-      dom.secYoutubeKey.value = ''
-      await loadSecrets()
-    } catch (error) {
-      // the server's own words about why the key was not stored (run would swallow the answer's code into one toast
-      // with the config's): the key is not part of the config form, so its failure is told on its own
-      log('Error saving API key:', error)
-      reportError(error)
-      apiKeyFailed = true
-    }
-  }
-
-  toastSaveResult(result, 'toast.settingsSaved', { successToast: !apiKeyFailed })
+  botSettings.toastResult(await botSettings.saveChanges(), { successToast: keySaved })
 }
 
 export const settingsActions = {

@@ -50,15 +50,15 @@ test('createStore', async (t) => {
   })
 
   await t.test('writing into a field of a slice is not seen: a slice is assigned whole', async () => {
-    const { state, on } = createStore({ twitch: { health: null } })
+    const { state, on } = createStore({ twitch: { connected: false } })
     let calls = 0
     on('twitch', () => calls++)
 
-    state.twitch.health = { auth: 'ok' }
+    state.twitch.connected = true
     await settle()
     assert.equal(calls, 0)
 
-    state.twitch = { ...state.twitch, health: { auth: 'ok' } }
+    state.twitch = { ...state.twitch, connected: true }
     await settle()
     assert.equal(calls, 1)
   })
@@ -104,14 +104,14 @@ test('createStore', async (t) => {
   })
 
   await t.test('patch() changes a part of a slice by assigning the slice whole, so the subscribers see it', async () => {
-    const { state, on, patch } = createStore({ twitch: { connected: false, health: null } })
+    const { state, on, patch } = createStore({ twitch: { connected: false, user: null } })
     const seen = []
     on('twitch', () => seen.push({ ...state.twitch }))
 
-    patch('twitch', { health: 'ok' })
+    patch('twitch', { user: 'test' })
     await settle()
 
-    assert.deepEqual(seen, [{ connected: false, health: 'ok' }])
+    assert.deepEqual(seen, [{ connected: false, user: 'test' }])
   })
 
   await t.test('a subscriber that throws does not stop the others: the panel is not left half-drawn', async () => {
@@ -129,25 +129,25 @@ test('createStore', async (t) => {
   })
 
   await t.test('patch() merges the fields into a slice and the subscribers see it', async () => {
-    const { state, on, patch } = createStore({ twitch: { health: null, user: 'a' } })
+    const { state, on, patch } = createStore({ twitch: { connected: false, user: 'a' } })
     let calls = 0
     on('twitch', () => calls++)
 
-    patch('twitch', { health: 'ok' })
+    patch('twitch', { connected: true })
     await settle()
     assert.equal(calls, 1)
-    assert.deepEqual(state.twitch, { health: 'ok', user: 'a' }, 'the fields that are not named stay')
+    assert.deepEqual(state.twitch, { connected: true, user: 'a' }, 'the fields that are not named stay')
   })
 
   await t.test('a patch that changes nothing assigns nothing: a drawing that patches its own slice cannot loop', async () => {
-    const { state, on, patch } = createStore({ twitch: { health: null } })
+    const { state, on, patch } = createStore({ twitch: { connected: false } })
     let calls = 0
     on('twitch', () => {
       calls++
-      patch('twitch', { health: state.twitch.health })
+      patch('twitch', { connected: state.twitch.connected })
     })
 
-    patch('twitch', { health: 'ok' })
+    patch('twitch', { connected: true })
     await settle()
     assert.equal(calls, 1, 'the patch from inside the drawing changed nothing, so nothing is drawn again')
   })
