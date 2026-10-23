@@ -12,6 +12,8 @@ internal sealed class TrayContext : ApplicationContext
     private readonly ServerManager _server;
     private readonly Control _uiThread;
     private bool _exiting;
+    // true between "Restart server" and the moment the new server says it is ready: that is when the person is told
+    private bool _restartPending;
 
     public TrayContext()
     {
@@ -20,7 +22,8 @@ internal sealed class TrayContext : ApplicationContext
 
         _server = new ServerManager();
         _server.PortDiscovered += port => RunOnUiThread(() => OnPortDiscovered(port));
-        _server.Crashed += exitCode => RunOnUiThread(() => OnServerCrashed(exitCode));
+        _server.NoticeReceived += notice => RunOnUiThread(() => OnNotice(notice));
+        _server.Crashed += (exitCode, afterFatalNotice) => RunOnUiThread(() => OnServerCrashed(exitCode, afterFatalNotice));
 
         var menu = new ContextMenuStrip();
 
@@ -73,10 +76,47 @@ internal sealed class TrayContext : ApplicationContext
     {
         _statusItem.Text = $"Running - port {port}";
         _trayIcon.Text = $"StreamQueue - port {port}";
+
+        if (!_restartPending) return;
+        _restartPending = false;
+        _trayIcon.ShowBalloonTip(3000, "StreamQueue", $"The server was restarted (port {port}).", ToolTipIcon.Info);
     }
 
-    private void OnServerCrashed(int exitCode)
+    // What the server reports about itself. A fatal one ends it, so it gets a window that waits to be read: a balloon
+    // is easily missed (and silenced by "Do not disturb"). The rest is a balloon with the icon of its level
+    private void OnNotice(ServerNotice notice)
     {
+        if (notice.Fatal)
+        {
+            _statusItem.Text = "Stopped";
+            MessageBox.Show(notice.Text, "StreamQueue", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+
+        var icon = notice.Level switch
+        {
+            "error" => ToolTipIcon.Error,
+            "warn" => ToolTipIcon.Warning,
+            _ => ToolTipIcon.Info
+        };
+
+        _trayIcon.ShowBalloonTip(10000, "StreamQueue", Shorten(notice.Text), icon);
+    }
+
+    // Windows cuts the text of a balloon at 255 characters
+    private static string Shorten(string text) => text.Length <= 250 ? text : text[..247] + "...";
+
+    private void OnServerCrashed(int exitCode, bool afterFatalNotice)
+    {
+        _restartPending = false;
+
+        if (afterFatalNotice)
+        {
+            // the window of the notice already told why the server ended
+            _statusItem.Text = "Stopped";
+            return;
+        }
+
         _statusItem.Text = "Stopped unexpectedly";
         _trayIcon.ShowBalloonTip(5000, "StreamQueue",
             $"The server stopped unexpectedly (code {exitCode}). Use \"Restart server\" from the tray menu, " +
@@ -120,10 +160,12 @@ internal sealed class TrayContext : ApplicationContext
         await _server.StopAsync();
         try
         {
+            _restartPending = true;
             _server.Start();
         }
         catch (Exception ex)
         {
+            _restartPending = false;
             MessageBox.Show($"StreamQueue failed to start:\n\n{ex}", "StreamQueue", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }

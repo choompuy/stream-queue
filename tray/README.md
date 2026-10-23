@@ -70,8 +70,14 @@ if you zip and hand it to someone else.
 - Tray menu "Open panel" - should open the control panel in your default browser.
 - "Open app folder" - opens the folder next to `StreamQueue.exe`. `logs/tray.log` there has the server's
   stdout/stderr (useful when the server dies before it can log by itself), `data/logs/app.log` is the server's own rotating log.
-- "Restart server" - stops and starts the child process; check the tray tooltip
-  updates with the new port once it's back up.
+- "Restart server" - stops and starts the child process; a balloon confirms once
+  the new server is up, and the tray tooltip shows its port.
+
+Problems the server reports about itself (startup failure, busy port, missing
+`public/` folder, lost Twitch connection, ...) are shown by the tray: a fatal one
+in a window, the rest as a balloon. The server prints them to its output as
+`::notice:: {json}`; the port comes the same way, as `::ready:: {"port":N}`.
+
 - "Exit" - tray icon disappears immediately, `Service.exe` process should be
   gone from Task Manager within a couple seconds (graceful `/api/shutdown` first,
   falls back to a hard kill if the server doesn't respond in 3s - see

@@ -2,7 +2,8 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
-using System.Text.RegularExpressions;
+using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -13,9 +14,14 @@ internal sealed class ServerStartException : Exception
     public ServerStartException(string message) : base(message) { }
 }
 
+/// <summary>A problem the server reports on its own: it prints one line, "::notice:: {json}", to its output.</summary>
+internal sealed record ServerNotice(string Level, string Code, string Text, bool Fatal);
+
 internal sealed class ServerManager : IDisposable
 {
-    private static readonly Regex PortRegex = new(@"Server running on http://localhost:(\d+)", RegexOptions.Compiled);
+    // The two protocol lines of the server. They work before its HTTP part is up, so a startup failure reaches us too
+    private const string ReadyPrefix = "::ready:: ";
+    private const string NoticePrefix = "::notice:: ";
     private const long MaxLogBytes = 5 * 1024 * 1024;
 
     private sealed class ProcessState
@@ -35,9 +41,12 @@ internal sealed class ServerManager : IDisposable
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
     private ProcessState? _processState;
     private bool _disposed;
+    // set when the server announced its own fatal end: the exit that follows is no surprise, the notice already told why
+    private volatile bool _fatalNoticeSeen;
     public int? Port { get; private set; }
     public event Action<int>? PortDiscovered;
-    public event Action<int>? Crashed;
+    public event Action<ServerNotice>? NoticeReceived;
+    public event Action<int, bool>? Crashed;
 
     public ServerManager()
     {
@@ -88,6 +97,7 @@ internal sealed class ServerManager : IDisposable
         }
 
         Port = null;
+        _fatalNoticeSeen = false;
 
         var startInfo = new ProcessStartInfo
         {
@@ -96,7 +106,9 @@ internal sealed class ServerManager : IDisposable
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
-            RedirectStandardError = true
+            RedirectStandardError = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8
         };
 
         var process = new Process
@@ -185,6 +197,7 @@ internal sealed class ServerManager : IDisposable
         var process = state.Process;
         var exitCode = SafeExitCode(process);
         var stoppedIntentionally = state.StoppingIntentionally;
+        var afterFatalNotice = _fatalNoticeSeen;
 
         WriteLog($"--- StreamQueue exited (code {exitCode}) ---");
 
@@ -198,7 +211,7 @@ internal sealed class ServerManager : IDisposable
         {
             try
             {
-                Crashed?.Invoke(exitCode);
+                Crashed?.Invoke(exitCode, afterFatalNotice);
             }
             catch
             {
@@ -214,18 +227,46 @@ internal sealed class ServerManager : IDisposable
         if (line is null) return;
         WriteLog(line);
 
-        if (Port is not null) return;
+        if (line.StartsWith(ReadyPrefix, StringComparison.Ordinal)) HandleReady(line[ReadyPrefix.Length..]);
+        else if (line.StartsWith(NoticePrefix, StringComparison.Ordinal)) HandleNotice(line[NoticePrefix.Length..]);
+    }
 
-        var match = PortRegex.Match(line);
-
-        if (!match.Success) return;
-        if (!int.TryParse(match.Groups[1].Value, out var port))
+    private void HandleReady(string json)
+    {
+        try
         {
-            return;
-        }
+            using var document = JsonDocument.Parse(json);
+            if (!document.RootElement.TryGetProperty("port", out var value) || !value.TryGetInt32(out var port)) return;
 
-        Port = port;
-        PortDiscovered?.Invoke(port);
+            Port = port;
+            PortDiscovered?.Invoke(port);
+        }
+        catch (JsonException)
+        {
+            // A line that is not what we expect is already in the log; it must not break the reader.
+        }
+    }
+
+    private void HandleNotice(string json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+            var text = root.TryGetProperty("text", out var textValue) ? textValue.GetString() : null;
+            if (string.IsNullOrWhiteSpace(text)) return;
+
+            var level = root.TryGetProperty("level", out var levelValue) ? levelValue.GetString() ?? "error" : "error";
+            var code = root.TryGetProperty("code", out var codeValue) ? codeValue.GetString() ?? "" : "";
+            var fatal = root.TryGetProperty("fatal", out var fatalValue) && fatalValue.ValueKind == JsonValueKind.True;
+
+            if (fatal) _fatalNoticeSeen = true;
+            NoticeReceived?.Invoke(new ServerNotice(level, code, text, fatal));
+        }
+        catch (JsonException)
+        {
+            // See HandleReady.
+        }
     }
 
     private void CleanupProcessState(ProcessState state)
