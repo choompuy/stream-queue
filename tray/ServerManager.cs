@@ -236,6 +236,8 @@ internal sealed class ServerManager : IDisposable
         try
         {
             using var document = JsonDocument.Parse(json);
+            // TryGetProperty throws (not returns false) on a non-object root: a stray line must not kill the reader thread
+            if (document.RootElement.ValueKind != JsonValueKind.Object) return;
             if (!document.RootElement.TryGetProperty("port", out var value) || !value.TryGetInt32(out var port)) return;
 
             Port = port;
@@ -253,6 +255,8 @@ internal sealed class ServerManager : IDisposable
         {
             using var document = JsonDocument.Parse(json);
             var root = document.RootElement;
+            // See HandleReady: a non-object root must be skipped, not thrown on
+            if (root.ValueKind != JsonValueKind.Object) return;
             var text = root.TryGetProperty("text", out var textValue) ? textValue.GetString() : null;
             if (string.IsNullOrWhiteSpace(text)) return;
 
