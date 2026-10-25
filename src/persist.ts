@@ -2,7 +2,7 @@ import { existsSync, readFileSync, renameSync } from 'node:fs'
 import { mkdir, open, rename, rm } from 'node:fs/promises'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { dirname, join } from 'node:path'
-import { getCacheDir, getDataDir } from './runtime.js'
+import { getDataDir } from './runtime.js'
 import { createLogger, describeError } from './logger.js'
 import { createStore } from './store.js'
 import { notify, type Topic } from './state-events.js'
@@ -17,7 +17,6 @@ const log = createLogger('PERSIST')
 
 // Paths are resolved when they are used, never at import time, so nothing depends on the cwd of the first import
 export const dataPath = (name: string): string => join(getDataDir(), name)
-export const cachePath = (name: string): string => join(getCacheDir(), name)
 
 export type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }
 

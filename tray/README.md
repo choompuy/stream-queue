@@ -58,7 +58,7 @@ Service/
   public/           <- copy from the repo root
 ```
 
-`data/` and `cache/` are created **next to `Service.exe`** (see `src/persist.ts`),
+`data/` is created **next to `Service.exe`** (see `src/persist.ts`),
 so this whole folder is self-contained and portable - copy it as-is to move the
 whole setup, but that also means it carries your queue/settings/blocklist along
 if you zip and hand it to someone else.

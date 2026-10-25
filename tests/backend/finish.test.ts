@@ -4,7 +4,7 @@ import { cpSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
-// data/ and cache/ are read relative to the working directory: keep the test away from the real ones.
+// data/ is read relative to the working directory: keep the test away from the real ones.
 // The real locale files are copied along: the journal names the playlist through them
 // (copied, not symlinked: creating a symlink needs extra privileges on Windows)
 const workDir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))

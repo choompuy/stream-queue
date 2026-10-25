@@ -11,7 +11,6 @@ tray/bin/
 tray/obj/
 
 # Runtime data
-cache/
 data/
 
 # Logs

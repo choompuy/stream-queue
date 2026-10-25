@@ -62,5 +62,5 @@ if (process.platform === 'win32') {
   }
 }
 
-console.log(`\nRelease folder ready: ${RELEASE_DIR}/ (data/ and cache/ are created next to the exe on first run)`)
+console.log(`\nRelease folder ready: ${RELEASE_DIR}/ (data/ is created next to the exe on first run)`)
 console.log('Not code-signed: Windows SmartScreen will warn on first launch until the exe is signed.')

@@ -7,7 +7,6 @@ import { join } from 'node:path'
 // A restart of the app with a playlist playing: which track plays now and which one comes next.
 const dir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
 process.chdir(dir)
-mkdirSync(join(dir, 'cache'), { recursive: true })
 mkdirSync(join(dir, 'data'), { recursive: true })
 
 const fallback = await import('../../src/fallback.js')
@@ -52,8 +51,8 @@ function writeSavedState({ withTrackFile }: { withTrackFile: boolean }): void {
 
   writeFileSync(join(dir, 'data', 'queue-state.json'), JSON.stringify({ current: playing, queue: [], fallback: fallbackProgress }))
 
-  if (withTrackFile) writeFileSync(join(dir, 'cache', 'fallback-tracks.json'), JSON.stringify({ sourceTracks: ids.map(song) }))
-  else rmSync(join(dir, 'cache', 'fallback-tracks.json'), { force: true })
+  if (withTrackFile) writeFileSync(join(dir, 'data', 'fallback-tracks.json'), JSON.stringify({ sourceTracks: ids.map(song) }))
+  else rmSync(join(dir, 'data', 'fallback-tracks.json'), { force: true })
 }
 
 beforeEach(async () => {
@@ -130,7 +129,7 @@ test('after a restart the playlist goes on from where it was', async (t) => {
 })
 
 test('the rotation is reconciled with the track list it is saved next to', async (t) => {
-  // the order lives in data/, the tracks in cache/: they can drift apart when the cache is wiped
+  // the order and the tracks are two files: they can drift apart (a hand edit, a half-written file)
   const trackIds = ['trk00000000', 'trk00000001', 'trk00000002']
   const tracks = trackIds.map(song)
 

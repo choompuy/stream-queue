@@ -11,7 +11,6 @@ export function getAppRoot(): string {
 }
 
 export const getDataDir = (): string => path.join(getAppRoot(), 'data')
-export const getCacheDir = (): string => path.join(getAppRoot(), 'cache')
 
 // Reads `.env` from the app root (next to the exe when packaged), not from whatever cwd the process was started in
 export function loadEnvFile(): void {

@@ -4,7 +4,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-// the modules read data/ and cache/ relative to the working directory: keep the test away from the real ones
+// the modules read data/ relative to the working directory: keep the test away from the real ones
 process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
 const player = await import('../../src/player.js')

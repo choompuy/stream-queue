@@ -1,4 +1,4 @@
-import { cachePath, createFileStore, dataPath, isPlain } from './persist.js'
+import { createFileStore, dataPath, isPlain } from './persist.js'
 import { QueueItem, Song } from './types.js'
 import { isValidPlaylistId, isValidVideoId } from './youtube/url.js'
 import { getQueue, getCurrent, hydrateQueue } from './queue.js'
@@ -175,7 +175,7 @@ export function sanitizeState(raw: unknown): SanitizedState {
 }
 
 const store = createFileStore<Partial<StateFile>>(() => dataPath('queue-state.json'))
-const tracksStore = createFileStore<TracksFile>(() => cachePath('fallback-tracks.json'))
+const tracksStore = createFileStore<TracksFile>(() => dataPath('fallback-tracks.json'))
 
 const log = createLogger('STATE')
 

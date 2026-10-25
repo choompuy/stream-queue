@@ -6,7 +6,6 @@ import { join } from 'node:path'
 
 const dir = mkdtempSync(join(tmpdir(), 'streamqueue-test-'))
 process.chdir(dir)
-mkdirSync(join(dir, 'cache'), { recursive: true })
 mkdirSync(join(dir, 'data'), { recursive: true })
 const { sanitizeState, sanitizeQueueItem, initState, loadState } = await import('../../src/state-file.js')
 const queue = await import('../../src/queue.js')
@@ -269,9 +268,9 @@ test('initState()', async (t) => {
 test('loadState() with a damaged state file', async (t) => {
   await t.test('a null state file next to a non-empty track file does not crash the load', (t2) => {
     t2.mock.method(console, 'warn', () => {})
-    // the queue state lives in data/, the track file in cache/
+    // the queue state and the track file are separate files
     writeFileSync(join(dir, 'data', 'queue-state.json'), JSON.stringify(null))
-    writeFileSync(join(dir, 'cache', 'fallback-tracks.json'), JSON.stringify({ sourceTracks: [song(F1)] }))
+    writeFileSync(join(dir, 'data', 'fallback-tracks.json'), JSON.stringify({ sourceTracks: [song(F1)] }))
 
     assert.doesNotThrow(() => loadState())
 
