@@ -7,9 +7,9 @@ const panel = setupPanel()
 const { initI18n } = await import('../../../public/js/i18n.js')
 await initI18n('en')
 const { state, isLocalDevice } = await import('../../../public/js/control/state.js')
-const { loadNetworkInfo } = await import('../../../public/js/control/settings.js')
+const { readNetwork } = await import('../../../public/js/control/settings.js')
 const { readTwitchStatus } = await import('../../../public/js/control/twitch/twitch-connection.js')
-const { loadTwitchConfig } = await import('../../../public/js/control/twitch/index.js')
+const { readTwitchConfig } = await import('../../../public/js/control/twitch/index.js')
 
 const networkInfo = (isLocal) => ({ port: 4747, ips: isLocal ? ['localhost'] : ['192.168.1.5'], isLocal })
 
@@ -28,11 +28,11 @@ test('the page knows which blocks another device may not change', async (t) => {
   })
 })
 
-test('loadNetworkInfo()', async (t) => {
+test('readNetwork()', async (t) => {
   await t.test('an answer from this machine leaves the page as it is', async () => {
     panel.route('GET /api/network-info', networkInfo(true))
 
-    await loadNetworkInfo()
+    await readNetwork()
 
     assert.equal(isLocalDevice(), true)
     assert.equal(document.body.classList.contains('not-local'), false)
@@ -41,7 +41,7 @@ test('loadNetworkInfo()', async (t) => {
   await t.test('an answer from another device marks the page: the CSS hides the machine-only blocks and shows the note', async () => {
     panel.route('GET /api/network-info', networkInfo(false))
 
-    await loadNetworkInfo()
+    await readNetwork()
 
     assert.equal(isLocalDevice(), false)
     assert.equal(document.body.classList.contains('not-local'), true)
@@ -57,7 +57,7 @@ test('loadNetworkInfo()', async (t) => {
 test('another device reads nothing from the Twitch section', async (t) => {
   // the server refuses the whole section with LOCAL_ONLY, so the panel does not even ask
   panel.route('GET /api/network-info', networkInfo(false))
-  await loadNetworkInfo()
+  await readNetwork()
 
   state.twitch.configured = true
   Object.assign(state.twitch, { connected: true, user: connected.user })
@@ -70,7 +70,7 @@ test('another device reads nothing from the Twitch section', async (t) => {
     const before = panel.toasts().join('|')
 
     await readTwitchStatus()
-    await loadTwitchConfig()
+    await readTwitchConfig()
 
     assert.deepEqual(panel.calls, [], 'no request may leave: each one would only come back refused')
     assert.equal(panel.toasts().join('|'), before, 'a refusal toast on every load is what made the settings look broken')
@@ -78,11 +78,11 @@ test('another device reads nothing from the Twitch section', async (t) => {
 
   await t.test('the same loads on this machine still read as they did', async () => {
     panel.route('GET /api/network-info', networkInfo(true))
-    await loadNetworkInfo()
+    await readNetwork()
     Object.assign(state.twitch, { connected: false, user: null })
     panel.calls.length = 0
 
-    await loadTwitchConfig()
+    await readTwitchConfig()
     await readTwitchStatus()
 
     assert.deepEqual(panel.calls, [

@@ -222,3 +222,35 @@ test('the settings inputs', async (t) => {
     assert.equal(input.classList.contains('changed'), false)
   })
 })
+
+test('a change that fails is reported by the listener, not by the handler', async (t) => {
+  const refused = [500, { error: 'raw', code: 'SERVER_ERROR' }]
+  const clearToasts = () => {
+    document.getElementById('toastContainer').innerHTML = ''
+  }
+
+  await t.test('the autosave of an overlay setting', async () => {
+    panel.route('PUT /api/settings', refused)
+    clearToasts()
+    panel.$('#showVideo').defaultChecked = true
+    panel.$('#showVideo').checked = false
+
+    fire(panel.$('#showVideo'), 'change')
+    await flush()
+
+    assert.ok(panel.toasts().includes('Internal server error'))
+  })
+
+  await t.test('the choice of the language: it says so, and the page stays in the language it was in', async () => {
+    panel.route('PUT /api/settings', refused)
+    clearToasts()
+    const before = document.documentElement.lang
+
+    panel.$('#localeSelect').value = 'ru'
+    fire(panel.$('#localeSelect'), 'change')
+    await flush()
+
+    assert.ok(panel.toasts().includes('Internal server error'))
+    assert.equal(document.documentElement.lang, before)
+  })
+})

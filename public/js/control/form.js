@@ -13,7 +13,7 @@ import { toastError, toastSuccess } from './toast.js'
 
 const get = (object, path) => path.split('.').reduce((value, key) => value?.[key], object)
 
-export const formInputs = (form) => [...form.querySelectorAll('[name]')]
+const formInputs = (form) => [...form.querySelectorAll('[name]')]
 
 const valueOf = (input) => {
   if (input.type === 'checkbox') return input.checked
@@ -115,7 +115,7 @@ export function trackForm(form) {
 
 // The stored values go into a form, except the fields the person is editing right now — their answer would be older
 // than what was typed since. A mark survives a fill that brings the same value the field holds (the echo of a save)
-export function fillFormKeepingEdits(form, config) {
+function fillFormKeepingEdits(form, config) {
   const editing = formInputs(form)
     .filter(isChanged)
     .map((input) => input.name)

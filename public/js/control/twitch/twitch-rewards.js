@@ -1,6 +1,5 @@
 import { t } from '../../i18n.js'
 import { api } from '../api.js'
-import { run } from '../run.js'
 import { state, on, patch } from '../state.js'
 import { dom } from '../dom.js'
 import { defineFormPanel, saveForm, toastSaveResult } from '../form.js'
@@ -77,8 +76,8 @@ const rewardSelection = defineFormPanel(dom.twitchRewardSection, {
   toastKey: 'toast.twitchSettingsSaved'
 })
 
-export function saveTwitchConfig() {
-  return run('saving Twitch config', async () => rewardSelection.toastResult(await rewardSelection.saveChanges()))
+export async function saveTwitchConfig() {
+  rewardSelection.toastResult(await rewardSelection.saveChanges())
 }
 
 // back to the reward as Twitch has it (or to a blank form while a new one is being created)

@@ -282,7 +282,7 @@ test('readTwitchStatus (the twitch topic)', async (t) => {
     // configured is true (reset): the loader's answer turns it false, and the drawing follows that change
     handlers = { 'GET /api/secrets': () => ({ twitch: { configured: false } }) }
 
-    await configSettings.loadSecrets()
+    await configSettings.readSecrets()
 
     assert.deepEqual(requests, ['GET /api/secrets'], 'only the secrets are asked: they say the client id is not there')
     assert.ok(!dom.twitchNotConfigured.classList.contains('hidden'), 'the "not configured" notice is shown')
@@ -323,7 +323,7 @@ test('readTwitchStatus (the twitch topic)', async (t) => {
     }
 
     await settings.readTwitchStatus()
-    await settings.loadTwitchConfig()
+    await settings.readTwitchConfig()
 
     assert.equal(state.twitch.selectedRewardId, 'reward-2')
     assert.equal(dom.twitchRewardSelect.value, 'reward-2')
@@ -336,7 +336,7 @@ test('readTwitchStatus (the twitch topic)', async (t) => {
       'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: 'reward-2' })
     }
 
-    await settings.loadTwitchConfig()
+    await settings.readTwitchConfig()
     // the <select> is still empty here - the id has to survive in state until the options exist
     assert.equal(dom.twitchRewardSelect.value, '')
 
@@ -352,21 +352,21 @@ test('readTwitchStatus (the twitch topic)', async (t) => {
       'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: 'reward-gone' })
     }
 
-    await settings.loadTwitchConfig()
+    await settings.readTwitchConfig()
     await settings.readTwitchStatus()
 
     assert.equal(state.twitch.selectedRewardId, 'reward-gone')
   })
 })
 
-test('loadSecrets (the one read of the secrets)', async (t) => {
+test('readSecrets (the one read of the secrets)', async (t) => {
   t.beforeEach(reset)
 
   await t.test('remembers that a client id is configured', async () => {
     state.twitch.configured = false
     handlers = { 'GET /api/secrets': () => ({ twitch: { configured: true } }) }
 
-    await configSettings.loadSecrets()
+    await configSettings.readSecrets()
 
     assert.equal(state.twitch.configured, true)
   })
@@ -374,7 +374,7 @@ test('loadSecrets (the one read of the secrets)', async (t) => {
   await t.test('hides the connect controls and shows the notice when no client id is configured', async () => {
     handlers = { 'GET /api/secrets': () => ({ twitch: { configured: false } }) }
 
-    await configSettings.loadSecrets()
+    await configSettings.readSecrets()
 
     assert.equal(state.twitch.configured, false)
     assert.ok(!dom.twitchNotConfigured.classList.contains('hidden'))
@@ -485,13 +485,13 @@ test('saveTwitchConfig() highlights the reward select when the backend rejects i
   })
 })
 
-test('loadTwitchConfig() fills in the chat command fields', async (t) => {
+test('readTwitchConfig() fills in the chat command fields', async (t) => {
   t.beforeEach(reset)
 
   await t.test('populates enabled/command/permission for every command and the cooldown', async () => {
     handlers = { 'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }) }
 
-    await settings.loadTwitchConfig()
+    await settings.readTwitchConfig()
 
     for (const field of CHAT_COMMAND_FIELDS) {
       const expected = CHAT_COMMANDS_CONFIG[field.key]
@@ -506,7 +506,7 @@ test('loadTwitchConfig() fills in the chat command fields', async (t) => {
   await t.test('does nothing and does not throw when the config has no chatCommands yet', async () => {
     handlers = { 'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: null }) }
 
-    await assert.doesNotReject(() => settings.loadTwitchConfig())
+    await assert.doesNotReject(() => settings.readTwitchConfig())
   })
 })
 
@@ -516,7 +516,7 @@ test('saveTwitchChatCommands()', async (t) => {
   // what the panel was filled with: only what differs from it is sent
   const filledWithStoredCommands = async () => {
     handlers = { 'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }) }
-    await settings.loadTwitchConfig()
+    await settings.readTwitchConfig()
   }
 
   const recordSave = () => {
@@ -582,7 +582,7 @@ test('saveTwitchChatCommands()', async (t) => {
 
   await t.test('marks only the toggles whose value really changed as saved', async () => {
     handlers = { 'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }) }
-    await settings.loadTwitchConfig()
+    await settings.readTwitchConfig()
 
     const flipped = structuredClone(CHAT_COMMANDS_CONFIG)
     flipped.skip.enabled = !flipped.skip.enabled
@@ -598,7 +598,7 @@ test('saveTwitchChatCommands()', async (t) => {
 
   await t.test('a toggle is marked as changed while it differs from the stored value and cleared when it matches again', async () => {
     handlers = { 'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }) }
-    await settings.loadTwitchConfig()
+    await settings.readTwitchConfig()
     settings.bindTwitchFieldTracking()
 
     const toggle = dom.chatCmdSkipEnabled
@@ -614,7 +614,7 @@ test('saveTwitchChatCommands()', async (t) => {
 
   await t.test('cancelChatCommandChanges() puts the stored values back and clears the marks', async () => {
     handlers = { 'GET /api/integrations/twitch/config': () => ({ channelPointsRewardId: null, chatCommands: CHAT_COMMANDS_CONFIG }) }
-    await settings.loadTwitchConfig()
+    await settings.readTwitchConfig()
 
     dom.chatCmdSkipEnabled.checked = !CHAT_COMMANDS_CONFIG.skip.enabled
     dom.chatCmdSkipCommand.value = '!typed'

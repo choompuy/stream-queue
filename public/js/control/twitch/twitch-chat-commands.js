@@ -3,7 +3,7 @@ import { state, patch } from '../state.js'
 import { dom } from '../dom.js'
 import { defineFormPanel } from '../form.js'
 
-// the chat commands panel: the config topic fills it (through loadTwitchConfig), the buttons save what changed
+// the chat commands panel: the config topic fills it (through readTwitchConfig), the buttons save what changed
 // and put the stored values back
 const chatCommands = defineFormPanel(dom.twitchChatCommandsPanel, {
   save: async (body) => {

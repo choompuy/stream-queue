@@ -18,7 +18,7 @@ export function bindTwitchFieldTracking() {
   trackForm(dom.twitchRewardForm)
 }
 
-export function loadTwitchConfig() {
+export function readTwitchConfig() {
   return run('loading Twitch config', async () => {
     if (!isLocalDevice()) return
 

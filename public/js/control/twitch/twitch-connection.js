@@ -94,7 +94,6 @@ export async function connectTwitch() {
         expiresAt: response.expiresAt
       }
     })
-    renderTwitchConnection()
 
     navigateAuthorizationWindow(authWindow, response.verificationUri)
     navigated = true

@@ -113,7 +113,7 @@ export function displayTitle(title) {
   return title || t('common.unknownTitle')
 }
 
-export function displayChannel(channelTitle) {
+function displayChannel(channelTitle) {
   return channelTitle || t('common.unknownChannel')
 }
 

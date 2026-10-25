@@ -30,17 +30,15 @@ function loadQRCode() {
   return qrCodePromise
 }
 
-export function changeLocale(locale) {
-  return run('changing locale', async () => {
-    await api.updateSettings({ locale })
+export async function changeLocale(locale) {
+  await api.updateSettings({ locale })
 
-    // the page is redrawn in the new language where it stands: the lists and the cards follow the store, the rest is
-    // written in data-i18n. Unsaved text (what is being typed) is not touched by any of it
-    await loadTranslations(locale)
-    document.documentElement.lang = locale
-    updateDomTranslations()
-    store.refresh()
-  })
+  // the page is redrawn in the new language where it stands: the lists and the cards follow the store, the rest is
+  // written in data-i18n. Unsaved text (what is being typed) is not touched by any of it
+  await loadTranslations(locale)
+  document.documentElement.lang = locale
+  updateDomTranslations()
+  store.refresh()
 }
 
 // What the overlay settings answer is used for: the locale of the panel at startup, and the controls of the settings
@@ -66,9 +64,9 @@ const overlaySettings = defineFormPanel(dom.overlaySettingsPanel, {
   toastKey: 'toast.settingsSaved'
 })
 
-export function saveOverlaySettings() {
+export async function saveOverlaySettings() {
   // an autosave is silent: the green mark on the field is enough
-  return run('saving settings', async () => overlaySettings.toastResult(await overlaySettings.saveChanges(), { successToast: false }))
+  overlaySettings.toastResult(await overlaySettings.saveChanges(), { successToast: false })
 }
 
 // The overlay only plays music when it is opened as localhost, and OBS runs on this computer: the link must say localhost
@@ -105,7 +103,7 @@ export async function copyOverlayUrl() {
 
 // One read of the secrets for everything they answer: whether the YouTube key is set (the status under the bot
 // settings) and whether the Twitch client id is configured (the Twitch topic asks only once it is)
-export function loadSecrets() {
+export function readSecrets() {
   return run('loading secrets', async () => {
     const data = await api.getSecrets()
 
@@ -123,7 +121,7 @@ on('secrets', () => {
   dom.secretsStatus.classList.toggle('text-red', !data?.hasYoutubeApiKey)
 })
 
-export function loadNetworkInfo({ silent = false } = {}) {
+export function readNetwork({ silent = false } = {}) {
   return run(
     'loading network info',
     async () => {
@@ -233,7 +231,7 @@ async function saveYoutubeApiKey(key) {
     await api.updateSecrets({ youtubeApiKey: key })
     dom.secYoutubeKey.value = ''
     setFieldState(dom.secYoutubeKey, null)
-    await loadSecrets()
+    await readSecrets()
     return true
   } catch (error) {
     log('Error saving API key:', error)

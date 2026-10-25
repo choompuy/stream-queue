@@ -285,9 +285,9 @@ globalThis.fetch = async (url, options) => {
 const beforeNet = toasts().length
 await assert.rejects(readState())
 await check('a read that cannot reach the server says nothing', () => assert.equal(toasts().length, beforeNet))
-const { loadSecrets, loadNetworkInfo } = await import(pathToFileURL(`${ROOT}/js/control/settings.js`).href)
-const { loadTwitchConfig } = await import(pathToFileURL(`${ROOT}/js/control/twitch/index.js`).href)
-await Promise.allSettled([loadSecrets(), loadNetworkInfo(), loadTwitchConfig()])
+const { readSecrets, readNetwork } = await import(pathToFileURL(`${ROOT}/js/control/settings.js`).href)
+const { readTwitchConfig } = await import(pathToFileURL(`${ROOT}/js/control/twitch/index.js`).href)
+await Promise.allSettled([readSecrets(), readNetwork(), readTwitchConfig()])
 await check('several simultaneous manual loads that cannot reach the server show a single toast', () => {
   const netToasts = toasts().filter((m) => m === "Can't reach the server")
   assert.equal(netToasts.length, 1, JSON.stringify(toasts()))

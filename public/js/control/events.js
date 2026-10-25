@@ -2,6 +2,7 @@ import { dom } from './dom.js'
 import { switchPageTab, switchSection } from './tabs.js'
 import { dispatchAction } from './actions.js'
 import { closeAllMenus } from './menu.js'
+import { run } from './run.js'
 import { saveOverlaySettings, onIpChange, changeLocale } from './settings.js'
 import { onTwitchRewardChange, saveTwitchConfig, bindTwitchFieldTracking } from './twitch/index.js'
 import { bindRewardForm } from './twitch/twitch-reward-form.js'
@@ -9,9 +10,8 @@ import { trackForm } from './form.js'
 
 // What a select or a panel names in data-on-change is what happens when it changes: one listener binds them all
 const CHANGES = {
-  'overlay-settings': (target) => {
-    if (target.name) saveOverlaySettings()
-  },
+  // the handlers return what they do: run() waits for it, and a failure of it is the listener's to report
+  'overlay-settings': (target) => (target.name ? saveOverlaySettings() : undefined),
   'select-ip': () => onIpChange(),
   'twitch-reward': () => onTwitchRewardChange(),
   'twitch-reward-save': () => saveTwitchConfig(),
@@ -47,7 +47,10 @@ export function bindEvents() {
   // one listener for every select that names what it changes (and for the panel that saves itself as it changes)
   document.addEventListener('change', (event) => {
     const bound = event.target.closest?.('[data-on-change]')?.dataset.onChange
-    CHANGES[bound]?.(event.target)
+    const handler = CHANGES[bound]
+
+    // like an action (see dispatchAction): a failure is logged and shown here, so the handlers do not handle their own
+    if (handler) run(bound, () => handler(event.target))
   })
 
   // typing marks the field it happens in

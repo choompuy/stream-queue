@@ -12,8 +12,8 @@ import { readFallback } from './fallback.js'
 import { readActivity } from './activity.js'
 import { readBlocklist } from './blocklist.js'
 import { readPlaylists } from './playlists.js'
-import { loadSecrets, loadNetworkInfo, applyOverlaySettings, readConfig } from './settings.js'
-import { loadTwitchConfig, readTwitchStatus } from './twitch/index.js'
+import { readSecrets, readNetwork, applyOverlaySettings, readConfig } from './settings.js'
+import { readTwitchConfig, readTwitchStatus } from './twitch/index.js'
 import { isDashboardActive, isPlaylistsActive, isSettingsActive, onTabShown } from './tabs.js'
 import { showNotice } from './notices.js'
 // What each topic reads again: a `read*` function (the one-time loads of the startup are `load*`). Only what the
@@ -47,7 +47,7 @@ export async function startControlPanel() {
 
   // what the topics need to know before their first read: the Twitch topic asks only once the client id is known to be
   // configured, and its rewards are only asked for once the config of the integration is in the form
-  await Promise.allSettled([loadSecrets(), loadNetworkInfo(), loadTwitchConfig()])
+  await Promise.allSettled([readSecrets(), readNetwork(), readTwitchConfig()])
 
   const watcher = watch(TOPICS, {
     // the first read of every topic that is shown now; the first open of the connection announces nothing on top of it
@@ -64,7 +64,7 @@ export async function startControlPanel() {
     watcher.refreshAll()
     // the addresses of the machine change while the panel is open (DHCP, a VPN): the chooser of the panel's
     // address reads them again when the settings are looked at
-    if (isSettingsActive()) loadNetworkInfo({ silent: true })
+    if (isSettingsActive()) readNetwork({ silent: true })
   }
   const offTabShown = onTabShown(refreshShown)
   document.addEventListener('visibilitychange', refreshShown)
