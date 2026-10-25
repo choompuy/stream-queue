@@ -3,19 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { JSDOM } from 'jsdom'
-import {
-  escapeHtml,
-  formatDuration,
-  formatTrackDuration,
-  youtubeThumbnail,
-  formatViews,
-  translateErrorCode,
-  setFieldState,
-  setText,
-  setClass,
-  setValue,
-  describeTrack
-} from '../../public/js/shared.js'
+import { escapeHtml, formatDuration, formatTrackDuration, youtubeThumbnail, formatViews, translateErrorCode, setFieldState, describeTrack } from '../../public/js/shared.js'
 
 // describeTrack names a track the way the page does, with the page's own words for what is missing: the translations
 // have to be in for that
@@ -167,14 +155,6 @@ test('setFieldState', async (t) => {
     assert.deepEqual([...input.classes], ['error'])
     setFieldState(input, null)
     assert.equal(input.classes.size, 0)
-  })
-})
-
-test('the helpers that write to an element', async (t) => {
-  await t.test('throw when the element is missing, so a wrong id is not silently ignored', () => {
-    assert.throws(() => setText(null, 'x'), TypeError)
-    assert.throws(() => setClass(null, 'x'), TypeError)
-    assert.throws(() => setValue(null, 'x'), TypeError)
   })
 })
 

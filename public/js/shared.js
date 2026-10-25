@@ -64,22 +64,12 @@ export function translateErrorCode(t, code, params, fallback = '') {
 // UI Helper functions for DOM manipulation
 
 /**
- * Safely add or remove a class from an element
- * @param {HTMLElement} element - The DOM element
- * @param {string} className - The class name to add/remove
- * @param {boolean} condition - If true, add class; if false, remove class (default: true)
- */
-export function setClass(element, className, condition = true) {
-  element.classList.toggle(className, condition)
-}
-
-/**
  * Show or hide an element using the 'hidden' class
  * @param {HTMLElement} element - The DOM element
  * @param {boolean} show - If true, remove 'hidden'; if false, add 'hidden' (default: true)
  */
 export function show(element, show = true) {
-  setClass(element, 'hidden', !show)
+  element.classList.toggle('hidden', !show)
 }
 
 /**
@@ -88,25 +78,7 @@ export function show(element, show = true) {
  * @param {'changed'|'saved'|'error'|null} state - The state to show, null to clear
  */
 export function setFieldState(element, state = null) {
-  for (const name of ['changed', 'saved', 'error']) setClass(element, name, name === state)
-}
-
-/**
- * Set value on an input element
- * @param {HTMLElement} element - The input element
- * @param {string|number|null} value - The value to set
- */
-export function setValue(element, value) {
-  element.value = value ?? ''
-}
-
-/**
- * Set text content on an element
- * @param {HTMLElement} element - The DOM element
- * @param {string} text - The text content
- */
-export function setText(element, text) {
-  element.textContent = text
+  for (const name of ['changed', 'saved', 'error']) element.classList.toggle(name, name === state)
 }
 
 export function displayTitle(title) {

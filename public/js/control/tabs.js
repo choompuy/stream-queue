@@ -1,5 +1,5 @@
 import { scrollToActiveFallback } from './fallback.js'
-import { setClass, show } from '../shared.js'
+import { show } from '../shared.js'
 
 let activeTab = 'dashboard'
 let activeSection = 'queue'
@@ -29,11 +29,11 @@ export function switchPageTab(tabName) {
   remember(REMEMBERED_TAB, tabName)
 
   document.querySelectorAll('.page-tab').forEach((el) => {
-    setClass(el, 'active', el.dataset.pageTab === tabName)
+    el.classList.toggle('active', el.dataset.pageTab === tabName)
   })
   document.querySelectorAll('.page-tab-btn').forEach((el) => {
     const selected = el.dataset.pageTabTarget === tabName
-    setClass(el, 'active', selected)
+    el.classList.toggle('active', selected)
     el.setAttribute('aria-selected', String(selected))
   })
 
@@ -57,7 +57,7 @@ export function switchSection(sectionName) {
   if (sectionName === 'playlist') scrollToActiveFallback()
   wrapper.querySelectorAll('.section-tab-btn').forEach((el) => {
     const selected = el.dataset.sectionTarget === sectionName
-    setClass(el, 'active', selected)
+    el.classList.toggle('active', selected)
     el.setAttribute('aria-selected', String(selected))
   })
 }

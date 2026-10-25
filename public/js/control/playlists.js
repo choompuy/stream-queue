@@ -4,7 +4,6 @@ import { dom } from './dom.js'
 import { views } from './views/index.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
-import { setValue } from '../shared.js'
 
 on('playlists', () => views.playlists.render(state.playlists))
 
@@ -20,7 +19,7 @@ async function addPlaylist() {
   if (!value) return undefined
 
   await api.addPlaylist(value)
-  setValue(dom.playlistUrlInput, '')
+  dom.playlistUrlInput.value = ''
   toastSuccess(t('toast.playlistAdded'))
 }
 

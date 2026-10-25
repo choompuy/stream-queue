@@ -1,4 +1,3 @@
-import { setText } from '../shared.js'
 import { state, on } from './state.js'
 import { dom } from './dom.js'
 
@@ -6,7 +5,7 @@ import { dom } from './dom.js'
 on(['fallback', 'activity', 'blocklist'], renderStats)
 
 function renderStats() {
-  setText(dom.tabPlaylistCount, state.fallback?.sourceCount ?? 0)
-  setText(dom.tabActivityCount, state.activity.length)
-  setText(dom.tabBlocklistCount, state.blocklist.length)
+  dom.tabPlaylistCount.textContent = state.fallback?.sourceCount ?? 0
+  dom.tabActivityCount.textContent = state.activity.length
+  dom.tabBlocklistCount.textContent = state.blocklist.length
 }

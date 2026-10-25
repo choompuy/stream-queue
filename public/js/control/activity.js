@@ -3,11 +3,10 @@ import { state, on } from './state.js'
 import { dom } from './dom.js'
 import { views } from './views/index.js'
 import { t } from '../i18n.js'
-import { setText } from '../shared.js'
 
 function renderActivity() {
   views.activity.render(state.activity)
-  setText(dom.activityCount, t('activity.requests', { count: state.activity.length }))
+  dom.activityCount.textContent = t('activity.requests', { count: state.activity.length })
 }
 
 on('activity', renderActivity)

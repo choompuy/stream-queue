@@ -4,7 +4,6 @@ import { dom } from './dom.js'
 import { views } from './views/index.js'
 import { t } from '../i18n.js'
 import { toastSuccess } from './toast.js'
-import { setText } from '../shared.js'
 
 // The state topic: the data is written to the store and the drawings are its subscribers (player.js, the queue below);
 // the watcher logs a read that fails
@@ -20,8 +19,8 @@ function queueHeaderText(length, max) {
 // the counts follow the queue and the config together: the limit of the queue is a setting
 export function renderQueue() {
   const maxQueueSize = state.config?.maxQueueSize ?? 0
-  setText(dom.queueCount, queueHeaderText(state.queue.length, maxQueueSize))
-  setText(dom.tabQueueCount, state.queue.length)
+  dom.queueCount.textContent = queueHeaderText(state.queue.length, maxQueueSize)
+  dom.tabQueueCount.textContent = state.queue.length
 
   views.queue.render(state.queue)
 }

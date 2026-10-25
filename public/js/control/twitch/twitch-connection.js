@@ -1,4 +1,4 @@
-import { show, setText, setClass } from '../../shared.js'
+import { show } from '../../shared.js'
 import { t } from '../../i18n.js'
 import { api, ApiError } from '../api.js'
 import { run } from '../run.js'
@@ -128,9 +128,9 @@ export function renderTwitchConnection() {
 
   const isConnected = Boolean(connected && user)
 
-  setText(dom.twitchChanelName, isConnected ? '@' + user.displayName : t('settings.twitch.notConnected'))
-  setClass(dom.twitchChanelName, 'text-green', isConnected)
-  setClass(dom.twitchChanelName, 'text-red', !isConnected)
+  dom.twitchChanelName.textContent = isConnected ? '@' + user.displayName : t('settings.twitch.notConnected')
+  dom.twitchChanelName.classList.toggle('text-green', isConnected)
+  dom.twitchChanelName.classList.toggle('text-red', !isConnected)
   const avatar = isConnected ? user.profileImageUrl : ''
   if (avatar) dom.twitchChanelImg.src = avatar
   else dom.twitchChanelImg.removeAttribute('src')

@@ -1,4 +1,4 @@
-import { show, setValue, setFieldState } from '../shared.js'
+import { show, setFieldState } from '../shared.js'
 import { api } from './api.js'
 import { store, state, on, patch, isLocalDevice } from './state.js'
 import { dom } from './dom.js'
@@ -221,7 +221,7 @@ export function cancelConfigChanges() {
   if (!state.config) return
 
   botSettings.cancel()
-  setValue(dom.secYoutubeKey, '')
+  dom.secYoutubeKey.value = ''
 }
 
 // The key is not part of the config form (the server keeps secrets apart): it is saved next to it, and its failure

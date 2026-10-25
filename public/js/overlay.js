@@ -1,4 +1,4 @@
-import { $, createLogger, describeTrack, formatDuration, formatTrackDuration, show, setClass, setText } from './shared.js'
+import { $, createLogger, describeTrack, formatDuration, formatTrackDuration, show } from './shared.js'
 import { initI18n, getCurrentLocale } from './i18n.js'
 import { loadYouTubeApi } from './youtube-api.js'
 import { claimPlayback } from './playback-lock.js'
@@ -389,12 +389,12 @@ const playback = createPlayback({
 
 function updateMediaVisibility() {
   if (!currentState?.current || currentState.isPaused) {
-    setClass(dom.badge, 'visible', false)
+    dom.badge.classList.toggle('visible', false)
   } else {
-    setClass(dom.badge, 'with-video', settings.showVideo)
-    setClass(dom.badge, 'video-only', settings.showVideo && settings.hideOverlayInfo)
+    dom.badge.classList.toggle('with-video', settings.showVideo)
+    dom.badge.classList.toggle('video-only', settings.showVideo && settings.hideOverlayInfo)
     dom.badge.style.opacity = `${settings.opacity}%`
-    setClass(dom.badge, 'visible')
+    dom.badge.classList.add('visible')
   }
 }
 
@@ -407,19 +407,19 @@ function renderCurrent() {
   dom.badge.dataset.position = settings.position
   dom.currentThumbnail.src = currentState.current.thumbnail
   const track = describeTrack(currentState.current)
-  setText(dom.currentTitle, track.title)
-  setText(dom.currentRequester, track.requester)
+  dom.currentTitle.textContent = track.title
+  dom.currentRequester.textContent = track.requester
 
   if (currentState.nextTrack) {
     const next = describeTrack(currentState.nextTrack)
-    setText(dom.nextTitle, next.title)
+    dom.nextTitle.textContent = next.title
 
-    setText(dom.nextElapsedTime, next.duration)
+    dom.nextElapsedTime.textContent = next.duration
     show(dom.nextPlaying)
-    setClass(dom.currentTitle, 'truncate-2line', false)
+    dom.currentTitle.classList.toggle('truncate-2line', false)
   } else {
     show(dom.nextPlaying, false)
-    setClass(dom.currentTitle, 'truncate-2line', !settings.showVideo)
+    dom.currentTitle.classList.toggle('truncate-2line', !settings.showVideo)
   }
   updateMediaVisibility()
 }
@@ -439,11 +439,11 @@ function updateProgress() {
   // a live stream has no length to count the progress against
   const hasLength = duration > 0
 
-  setText(dom.elapsedTimeCurrent, formatDuration(currentTime))
+  dom.elapsedTimeCurrent.textContent = formatDuration(currentTime)
 
   if (currentTime > 0 || hasLength) {
     const slash = !hasLength || settings.showVideo ? '/ ' : ''
-    setText(dom.elapsedTimeEnd, `${slash}${formatTrackDuration(duration)}`)
+    dom.elapsedTimeEnd.textContent = `${slash}${formatTrackDuration(duration)}`
 
     if (hasLength) dom.progressBar.style.setProperty('--progress', `${Math.min(100, Math.floor((currentTime / duration) * 100))}%`)
     show(dom.progressBar, hasLength)

@@ -1,4 +1,4 @@
-import { describeTrack, formatViews, show, setText } from '../shared.js'
+import { describeTrack, formatViews, show } from '../shared.js'
 import { PLAY_ICON, PAUSE_ICON } from '../icons.js'
 import { state, on } from './state.js'
 import { dom } from './dom.js'
@@ -33,11 +33,11 @@ function renderCurrent() {
   show(dom.noPlaying, false)
 
   const track = describeTrack(current)
-  setText(dom.currentTitle, track.title)
-  setText(dom.currentChannel, track.channel)
-  setText(dom.currentDuration, track.duration)
-  setText(dom.currentViews, t('player.views', { count: formatViews(current.views, getCurrentLocale()) }))
-  setText(dom.currentRequester, track.requester)
+  dom.currentTitle.textContent = track.title
+  dom.currentChannel.textContent = track.channel
+  dom.currentDuration.textContent = track.duration
+  dom.currentViews.textContent = t('player.views', { count: formatViews(current.views, getCurrentLocale()) })
+  dom.currentRequester.textContent = track.requester
 }
 
 function renderNext() {
@@ -46,8 +46,8 @@ function renderNext() {
   if (!next) return
 
   const track = describeTrack(next)
-  setText(dom.nextTitle, track.title)
-  setText(dom.nextDuration, track.duration)
+  dom.nextTitle.textContent = track.title
+  dom.nextDuration.textContent = track.duration
 }
 
 function renderPlayPause() {

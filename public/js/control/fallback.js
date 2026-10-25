@@ -4,7 +4,6 @@ import { dom } from './dom.js'
 import { views } from './views/index.js'
 import { formatDateTime } from './ui.js'
 import { t } from '../i18n.js'
-import { setText } from '../shared.js'
 
 // The fallback topic: the data is written to the store and the drawings are its subscribers; the watcher logs a read
 // that fails
@@ -21,22 +20,20 @@ export function renderFallback() {
   dom.fallbackShuffleBtn.classList.toggle('active', Boolean(data?.shuffle))
   dom.fallbackRepeatBtn.classList.toggle('active', Boolean(data?.repeat))
   dom.fallbackEnabledBtn.classList.toggle('active', Boolean(data?.enabled))
-  setText(dom.fallbackEnabledText, data?.enabled ? t('common.on') : t('common.off'))
+  dom.fallbackEnabledText.textContent = data?.enabled ? t('common.on') : t('common.off')
 
   if (!tracks.length) {
     // the list is built again when tracks come back: it follows the playing track again then
     renderedActiveVideoId = undefined
     // an active playlist that has simply run out still counts as set; only a section with no playlist at all gets the hint
-    setText(dom.fallbackInfo, data?.playlistId ? '' : t('fallback.notSet'))
+    dom.fallbackInfo.textContent = data?.playlistId ? '' : t('fallback.notSet')
     views.fallback.render([])
     return
   }
 
   const itemCount = Number.isFinite(data?.itemCount) ? data.itemCount : null
 
-  setText(
-    dom.fallbackInfo,
-    itemCount && itemCount > 0 && tracks.length !== itemCount
+  dom.fallbackInfo.textContent = itemCount && itemCount > 0 && tracks.length !== itemCount
       ? t('fallback.infoOf', {
           count: tracks.length,
           total: itemCount,
@@ -46,7 +43,6 @@ export function renderFallback() {
           count: tracks.length,
           datetime: formatDateTime(data.lastRefreshedAt)
         })
-  )
   renderFallbackTracks()
 }
 

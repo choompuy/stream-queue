@@ -36,10 +36,17 @@ for (const [name, document] of Object.entries(pages)) {
       assert.deepEqual([...document.querySelectorAll('button:not([type])')].map((button) => button.id || button.textContent.trim()), [])
     })
 
-    await t.test('names every field: a label around it, a label for it, or an aria-label', () => {
-      const unnamed = [...document.querySelectorAll('input:not([type=hidden]), select, textarea')].filter(
-        (field) => !field.closest('label') && !field.getAttribute('aria-label') && !(field.id && document.querySelector(`label[for="${field.id}"]`))
-      )
+    await t.test('names every field: an aria-label, a label for it, or a label that has no other field in it', () => {
+      const fieldsOf = (label) => label.querySelectorAll('input:not([type=hidden]), select, textarea')
+      // a label that holds several fields (the command, who may use it, on/off) names only the one its `for` points at
+      const named = (field) =>
+        field.hasAttribute('aria-label') ||
+        field.hasAttribute('data-i18n-aria-label') ||
+        field.hasAttribute('aria-labelledby') ||
+        Boolean(field.id && document.querySelector(`label[for="${field.id}"]`)) ||
+        (field.closest('label') !== null && fieldsOf(field.closest('label')).length === 1)
+
+      const unnamed = [...document.querySelectorAll('input:not([type=hidden]), select, textarea')].filter((field) => !named(field))
 
       assert.deepEqual(
         unnamed.map((field) => field.id),

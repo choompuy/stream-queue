@@ -1,5 +1,4 @@
 import { CLOSE_ICON } from '../icons.js'
-import { setClass } from '../shared.js'
 import { t } from '../i18n.js'
 import { dom } from './dom.js'
 
@@ -11,8 +10,8 @@ const LEAVE_MS = 200
 function closeToast(toast) {
   if (!toast.isConnected || toast.classList.contains('toast-leaving')) return
 
-  setClass(toast, 'toast-entering', false)
-  setClass(toast, 'toast-leaving')
+  toast.classList.toggle('toast-entering', false)
+  toast.classList.add('toast-leaving')
   setTimeout(() => toast.remove(), LEAVE_MS)
 }
 

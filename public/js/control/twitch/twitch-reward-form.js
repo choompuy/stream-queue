@@ -1,4 +1,3 @@
-import { setText } from '../../shared.js'
 import { t } from '../../i18n.js'
 import { patch } from '../state.js'
 import { dom } from '../dom.js'
@@ -29,7 +28,7 @@ function syncColorPicker() {
 export function showRewardForm(reward = null) {
   patch('twitch', { editingReward: reward })
 
-  setText(dom.twitchRewardForm.querySelector('h2'), t(reward ? 'settings.twitch.editReward' : 'settings.twitch.createReward'))
+  dom.twitchRewardForm.querySelector('h2').textContent = t(reward ? 'settings.twitch.editReward' : 'settings.twitch.createReward')
   fillForm(dom.twitchRewardForm, reward ?? BLANK_REWARD)
   syncColorPicker()
 }
