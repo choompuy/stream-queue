@@ -127,6 +127,9 @@ internal sealed class ServerManager : IDisposable
         {
             process.Start();
             _processState = state;
+            // The server must not outlive the tray, however the tray ends. A failure is only logged: the server still runs
+            var notTied = ChildProcessJob.Add(process);
+            if (notTied is not null) WriteLog($"--- {notTied} ---");
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
             WriteLog("--- StreamQueue starting ---");
