@@ -11,6 +11,13 @@ type FilterRule = {
 // The parts the video fetch asks for: what the rules below read (plus what the mapper shows)
 export const VIDEO_DETAILS_PART = 'snippet,contentDetails,statistics,status,topicDetails'
 
+// Of those parts, only what something reads: YouTube leaves the rest (the description, the tags, the localized texts) out of
+// the answer, and it is the raw answer that the cache keeps. A field read anywhere but listed here would arrive undefined:
+// tests/backend/youtube/fields.test.ts runs the filters and the mapper on answers cut down by this very selector
+export const VIDEO_DETAILS_FIELDS =
+  'items(id,snippet(title,channelTitle,categoryId,liveBroadcastContent,thumbnails/medium/url),topicDetails/topicCategories,' +
+  'contentDetails(duration,regionRestriction,contentRating/ytRating),statistics/viewCount,status(embeddable,privacyStatus,uploadStatus))'
+
 // YouTube's own category for music
 export const MUSIC_CATEGORY_ID = '10'
 

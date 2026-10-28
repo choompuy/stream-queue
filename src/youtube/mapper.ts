@@ -29,7 +29,7 @@ export function videoToSong(video: VideoItem): Song {
 export async function fetchPlaylistMeta(playlistId: string): Promise<PlaylistMeta | null> {
   const data = await youtube<{
     items?: Array<{ id: string; snippet?: Snippet; contentDetails?: { itemCount?: number } }>
-  }>('playlists', { part: 'snippet,contentDetails', id: playlistId })
+  }>('playlists', { part: 'snippet,contentDetails', fields: 'items(id,snippet(title,thumbnails/medium/url),contentDetails/itemCount)', id: playlistId })
 
   const item = data.items?.[0]
   if (!item) return null

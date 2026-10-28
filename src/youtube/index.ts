@@ -83,6 +83,8 @@ async function performSearch(query: string, cacheKey: string): Promise<VideoItem
     'search',
     {
       part: 'snippet',
+      // only the ids are read: the titles and the rest come with the videos.list answer that follows
+      fields: 'items/id/videoId',
       q: query,
       type: 'video',
       ...(getConfig().contentMode === 'music' ? { videoCategoryId: MUSIC_CATEGORY_ID } : {}),
@@ -136,6 +138,7 @@ async function performPlaylistFetch(playlistId: string): Promise<PlaylistFetchRe
   for (let page = 1; ; page++) {
     const playlist = await youtube<{ items?: PlaylistItem[]; nextPageToken?: string }>('playlistItems', {
       part: 'snippet',
+      fields: 'nextPageToken,items/snippet/resourceId/videoId',
       playlistId,
       maxResults: String(PLAYLIST_PAGE_SIZE),
       ...(pageToken ? { pageToken } : {})

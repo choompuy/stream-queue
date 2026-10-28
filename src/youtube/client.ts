@@ -4,7 +4,7 @@ import { AppError } from '../types.js'
 import { VideoItem } from './types.js'
 import { isQuotaExhausted, markQuotaExhausted } from './cache.js'
 import { isPlain } from '../persist.js'
-import { VIDEO_DETAILS_PART } from './filters.js'
+import { VIDEO_DETAILS_FIELDS, VIDEO_DETAILS_PART } from './filters.js'
 import { fetchWithTimeout, retryableTransport } from '../web-fetch.js'
 
 type YouTubeErrorResponse = {
@@ -69,7 +69,7 @@ export async function fetchVideos(ids: string[]): Promise<VideoItem[]> {
   const found = new Map<string, VideoItem>()
 
   for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-    const { items } = await youtube<{ items?: VideoItem[] }>('videos', { part: VIDEO_DETAILS_PART, id: ids.slice(i, i + BATCH_SIZE).join(',') })
+    const { items } = await youtube<{ items?: VideoItem[] }>('videos', { part: VIDEO_DETAILS_PART, fields: VIDEO_DETAILS_FIELDS, id: ids.slice(i, i + BATCH_SIZE).join(',') })
     for (const video of items ?? []) found.set(video.id, video)
   }
 
