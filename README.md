@@ -1,6 +1,6 @@
 # StreamQueue
 
-**Self-hosted YouTube song request queue for Twitch streams.** No cloud, no `.env` editing, no config files to hand-edit - everything is set up through a web control panel.
+**Self-hosted YouTube song request queue for Twitch streams.** No cloud and no config files to hand-edit - everything is set up through a web control panel. (The Windows release needs nothing else; running from source needs one `.env` value, see [Run in development](#run-in-development).)
 
 Viewers request songs with a Channel Points reward (a title or a YouTube link typed into the reward), StreamQueue searches YouTube, filters out unwanted videos, manages the queue, and plays it through an OBS Browser Source overlay. Chat commands show what is playing and let moderators skip, pause and resume. When the queue is empty, a fallback YouTube playlist keeps music going between requests.
 
@@ -11,7 +11,7 @@ Viewers request songs with a Channel Points reward (a title or a YouTube link ty
 - 🎁 **Channel Points rewards** - create and edit request rewards, configure cost/limits/cooldowns/color, select the reward used for song requests, and control automatic fulfillment
 - 🚫 **Blocklist** - block tracks from Activity, Queue, or the fallback list; blocked tracks cannot be re-added and are skipped automatically
 - 🎛 **Web control panel** - live queue, playback controls, fallback playlist, Twitch settings, filters, overlay options, blocklist, activity, and configuration
-- 📺 **OBS overlay** - a `/overlay` Browser Source that plays the queue and shows a compact Now Playing badge with configurable position and size
+- 📺 **OBS overlay** - a `/overlay` Browser Source that plays the queue and shows a compact Now Playing badge; its position, opacity and a video-only mode are set in the control panel
 - 🔁 **Fallback playlist** - use any YouTube playlist as background music with shuffle and repeat, with automatic refresh; up to 250 tracks are loaded and kept on disk, and the panel shows how many of the playlist's tracks made it in
 - 📋 **Saved playlists** - keep a library of playlists and switch the active fallback playlist from the control panel
 - 📈 **Activity log** - see accepted, rejected, blocked, and failed requests with structured failure reasons
@@ -20,7 +20,7 @@ Viewers request songs with a Channel Points reward (a title or a YouTube link ty
 - 🖥️ **Windows standalone build** - packaged `Service.exe` runs without Node.js installed; optional .NET 10 WinForms tray launcher provides a normal double-click workflow
 - 💾 **Local storage** - queue, settings, playlists, blocklist, and the loaded fallback playlist stay on disk next to the application
 - ⚡ **Real-time updates** - Server-Sent Events (SSE) push live queue and playback changes to the control panel without polling
-- 🧠 **In-memory caching** - YouTube API responses cached in memory (search results for 24 hours) for faster searches and reduced quota usage
+- 🧠 **In-memory caching** - YouTube API responses cached in memory (search results for 24 hours, video details for 10 minutes) for faster searches and reduced quota usage
 - 🔔 **Problem notices** - the Windows tray launcher shows what the server reports about itself (startup failure, busy port, missing files, lost Twitch connection) and confirms a restart
 - 🔒 **Hardened reliability** - robust error handling, startup recovery, and state persistence for critical components
 
@@ -56,7 +56,7 @@ The easiest way to run StreamQueue on Windows is the standalone ZIP release.
 6. Connect Twitch from the **Twitch** settings.
 7. Add the StreamQueue `/overlay` URL as an OBS Browser Source.
 
-The packaged build includes the Twitch client ID, so the released Windows build does not require you to create or enter a Twitch client secret.
+The packaged build includes the Twitch client ID (baked in from `.env` or the environment when the build is made), so the released Windows build does not require you to create or enter a Twitch client secret.
 
 The application is portable: `data/` (with its `logs/` folder) is created next to the executable. No Node.js installation is required.
 
@@ -65,6 +65,7 @@ The application is portable: `data/` (with its `logs/` folder) is created next t
 - [Node.js](https://nodejs.org/) 24+
 - A [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) on Windows if you want to build the optional tray launcher
 - A [YouTube Data API v3](https://console.cloud.google.com/apis/library/youtube.googleapis.com) key
+- A Twitch application of type **Public** from the [Twitch Developer Console](https://dev.twitch.tv/console/apps), if you want to connect Twitch when running from source. Only its Client ID is needed, no client secret
 
 ### Run in development
 
@@ -72,8 +73,11 @@ The application is portable: `data/` (with its `logs/` folder) is created next t
 git clone https://github.com/choompuy/stream-queue.git
 cd stream-queue
 npm install
+cp .env.example .env   # Windows cmd: copy .env.example .env. Then put your Twitch Client ID in it: TWITCH_CLIENT_ID=...
 npm run dev
 ```
+
+`.env` is read from the application folder (the project folder in development, next to the executable in a build) when the server starts, so restart the server after changing it. Without a Client ID everything works except connecting Twitch.
 
 The server uses port `4747`; if it is busy, the next free port is taken and remembered, so the overlay link stays the same afterwards. To pick another port, edit `data/server.json`. Configure the YouTube API key from the web control panel; it is stored locally and takes effect without a restart.
 
@@ -83,7 +87,7 @@ The server uses port `4747`; if it is busy, the next free port is taken and reme
 npm run build:sea
 ```
 
-This produces `dist-sea/Service.exe`, a self-contained Node.js Single Executable Application. `npm run build:release` goes one step further and assembles the `release/` folder (exe with icon and version on Windows, `public/`, license) that is ready to run or to zip. Node.js 24 or newer is needed to build.
+This produces `dist-sea/Service.exe`, a self-contained Node.js Single Executable Application. `npm run build:release` goes one step further and assembles the `release/` folder (exe with icon and version on Windows, `public/`, license, and the tray launcher when the .NET SDK is installed) that is ready to run or to zip. Node.js 24 or newer is needed to build. Both builds take the Twitch Client ID from `.env` or the environment and warn if it is missing (a build without it starts with the Twitch integration off).
 
 For a no-terminal-window experience, build the optional .NET 10 WinForms tray launcher in `tray/`. It starts and stops the service in the background, provides shortcuts for opening the panel and the application folder, restarting the server (a balloon confirms it is back up), and exiting, and shows the problems the server reports about itself.
 
@@ -96,11 +100,28 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 
 The tray launcher is self-contained, so the published executable does not require a separate .NET runtime installation.
 
-### Running the tests
+### Checks and tests
 
 ```bash
-npm test
-npm run test:smoke
+npm run typecheck     # the sources and the tests
+npm run lint
+npm test              # backend (tsx --test) and frontend (node --test, jsdom)
+npm run test:smoke    # loads the real control panel into jsdom and drives the UI
+```
+
+GitHub Actions runs the type check, the lint and the tests on every push to `main` and on pull requests, and builds the Windows release folder, so a build that breaks only on Windows shows up before a release.
+
+### Project layout
+
+```text
+src/            the server: REST routes, queue, playback, fallback playlist, persistence
+  routes/         the HTTP API
+  youtube/        search, filters, caching, quota
+  integrations/twitch/   device-code login, EventSub, chat, rewards
+public/         the control panel (js/control), the OBS overlay (js/overlay.js), locales (en, ru), styles
+tests/          backend/ and frontend/
+scripts/        build-sea.mjs, build-release.mjs, smoke-frontend.mjs
+tray/           the optional .NET 10 WinForms launcher
 ```
 
 ## OBS setup
@@ -213,11 +234,13 @@ data/
     app.log
 ```
 
+`app.log` is rotated when it reaches 1 MB.
+
 Your YouTube API key and Twitch OAuth state are stored locally. The application communicates with external services only when needed for its integrations, primarily the YouTube Data API and Twitch APIs.
 
 ## Tech stack
 
-Node.js · TypeScript · Express · vanilla JavaScript · Server-Sent Events (SSE) · YouTube Data API v3 · YouTube IFrame Player API · Twitch APIs · Twitch EventSub WebSocket · optional C#/WinForms tray launcher for Windows (.NET 10)
+Node.js · TypeScript · Express · ws · vanilla JavaScript · Server-Sent Events (SSE) · YouTube Data API v3 · YouTube IFrame Player API · Twitch APIs · Twitch EventSub WebSocket · optional C#/WinForms tray launcher for Windows (.NET 10)
 
 ## License
 
