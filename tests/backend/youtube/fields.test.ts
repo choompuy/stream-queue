@@ -10,6 +10,7 @@ process.chdir(mkdtempSync(join(tmpdir(), 'streamqueue-test-')))
 
 const { checkFilters, VIDEO_DETAILS_FIELDS } = await import('../../../src/youtube/filters.js')
 const { videoToSong, fetchPlaylistMeta } = await import('../../../src/youtube/mapper.js')
+const { fetchVideos } = await import('../../../src/youtube/client.js')
 const { searchSongs, fetchPlaylistSongs } = await import('../../../src/youtube/index.js')
 const { updateSecrets } = await import('../../../src/secrets.js')
 const { updateConfig, getConfig } = await import('../../../src/config.js')
@@ -254,4 +255,48 @@ test('every request names the fields it reads, and the code works on exactly tho
     installYouTube()
     assert.deepEqual(await fetchPlaylistMeta('PLaaaaaaaaaaaaaaaa'), { id: 'PLaaaaaaaaaaaaaaaa', title: 'My Mix', thumbnail: 'https://img/mix.jpg', itemCount: 12 })
   })
+})
+
+test('the batches of a long list go out together, and the order of the list is kept', async (t) => {
+  t.after(() => {
+    globalThis.fetch = realFetch
+    delayFor = () => 0
+  })
+
+  // 120 ids are three batches; the first batch answers last
+  const ids = Array.from({ length: 120 }, (_, i) => `id${String(i).padStart(9, '0')}`)
+  const known = new Map(ids.map((id) => [id, fatVideo(id)]))
+  installYouTube()
+  delayFor = (index) => (3 - index) * 25
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = new URL(String(input))
+    const index = requests.push({ endpoint: 'videos', params: url.searchParams }) - 1
+    inFlight++
+    maxInFlight = Math.max(maxInFlight, inFlight)
+    await new Promise((resolve) => setTimeout(resolve, delayFor(index)))
+    inFlight--
+    const asked = (url.searchParams.get('id') ?? '').split(',')
+    return new Response(JSON.stringify({ items: asked.flatMap((id) => known.get(id) ?? []) }), { status: 200 })
+  }) as typeof fetch
+
+  const videos = await fetchVideos(ids)
+
+  assert.equal(requests.length, 3)
+  assert.equal(maxInFlight, 3, 'all three were in flight at once')
+  assert.deepEqual(videos.map((video) => video.id), ids)
+  assert.deepEqual(requests.map((r) => r.params.get('id')!.split(',').length), [50, 50, 20])
+})
+
+test('a failing batch fails the whole fetch, as the one-by-one version did', async (t) => {
+  t.after(() => {
+    globalThis.fetch = realFetch
+  })
+
+  let n = 0
+  globalThis.fetch = (async () => {
+    n++
+    return n === 2 ? new Response('{}', { status: 400 }) : new Response(JSON.stringify({ items: [] }), { status: 200 })
+  }) as typeof fetch
+
+  await assert.rejects(fetchVideos(Array.from({ length: 120 }, (_, i) => `id${String(i).padStart(9, '0')}`)), (error: { code?: string }) => error.code === 'YOUTUBE_ERROR')
 })

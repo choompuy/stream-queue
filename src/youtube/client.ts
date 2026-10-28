@@ -64,13 +64,22 @@ export async function youtube<T>(path: string, params: Record<string, string>, {
 }
 
 const BATCH_SIZE = 50
+// A playlist is five batches at most (250 tracks): they go out together, so loading it costs one round trip, not five
+const PARALLEL_BATCHES = 5
 
 export async function fetchVideos(ids: string[]): Promise<VideoItem[]> {
+  const batches: string[][] = []
+  for (let i = 0; i < ids.length; i += BATCH_SIZE) batches.push(ids.slice(i, i + BATCH_SIZE))
+
   const found = new Map<string, VideoItem>()
 
-  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-    const { items } = await youtube<{ items?: VideoItem[] }>('videos', { part: VIDEO_DETAILS_PART, fields: VIDEO_DETAILS_FIELDS, id: ids.slice(i, i + BATCH_SIZE).join(',') })
-    for (const video of items ?? []) found.set(video.id, video)
+  for (let i = 0; i < batches.length; i += PARALLEL_BATCHES) {
+    const answers = await Promise.all(
+      batches.slice(i, i + PARALLEL_BATCHES).map((batch) =>
+        youtube<{ items?: VideoItem[] }>('videos', { part: VIDEO_DETAILS_PART, fields: VIDEO_DETAILS_FIELDS, id: batch.join(',') })
+      )
+    )
+    for (const { items } of answers) for (const video of items ?? []) found.set(video.id, video)
   }
 
   // videos.list answers in no guaranteed order: the caller's order (search relevance, playlist position) is kept
