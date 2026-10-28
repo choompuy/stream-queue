@@ -24,7 +24,6 @@
     "build:release": "node scripts/build-release.mjs"
   },
   "dependencies": {
-    "dotenv": "^18.0.3",
     "express": "^5.1.0",
     "ws": "^8.21.3"
   },

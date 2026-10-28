@@ -1,7 +1,7 @@
-import 'dotenv/config'
 import { execFileSync } from 'node:child_process'
 import { copyFileSync, chmodSync, existsSync, mkdirSync, rmSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { parseEnv } from 'node:util'
 import esbuild from 'esbuild'
 import { inject } from 'postject'
 
@@ -15,6 +15,14 @@ const BLOB = path.join(OUT_DIR, 'sea-prep.blob')
 const EXE_NAME = process.platform === 'win32' ? 'Service.exe' : 'Service'
 const EXE_PATH = path.join(OUT_DIR, EXE_NAME)
 const SENTINEL_FUSE = 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2'
+
+// The values baked into the exe come from `.env` in this folder or from the environment (the environment wins; a BOM is cut off)
+try {
+  for (const [key, value] of Object.entries(parseEnv(readFileSync('.env', 'utf8').replace(/^\uFEFF/, '')))) process.env[key] ??= value
+} catch {
+  // no .env: the environment alone
+}
+
 const BAKED = Object.fromEntries(['TWITCH_CLIENT_ID'].map((key) => [key, process.env[key]?.trim() ?? '']))
 
 if (!BAKED.TWITCH_CLIENT_ID) {
