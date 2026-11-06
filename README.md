@@ -1,247 +1,222 @@
 # StreamQueue
 
-**Self-hosted YouTube song request queue for Twitch streams.** No cloud and no config files to hand-edit - everything is set up through a web control panel. (The Windows release needs nothing else; running from source needs one `.env` value, see [Run in development](#run-in-development).)
+🎵 **Self-hosted YouTube song request queue for Twitch streams.**
 
-Viewers request songs with a Channel Points reward (a title or a YouTube link typed into the reward), StreamQueue searches YouTube, filters out unwanted videos, manages the queue, and plays it through an OBS Browser Source overlay. Chat commands show what is playing and let moderators skip, pause and resume. When the queue is empty, a fallback YouTube playlist keeps music going between requests.
+StreamQueue lets your viewers request songs through Twitch Channel Points. It searches YouTube, checks videos against your filters, manages the queue, and plays music directly through an OBS Browser Source.
 
-## Features
+Everything runs locally on your computer and is managed through a web control panel. No cloud services or manual configuration files required.
 
-- 🎵 **Song request queue** - search YouTube or paste a video URL, duplicate detection, per-user request limits, queue size limits, and admin controls
-- 📺 **Native Twitch integration** - connect Twitch directly from the control panel without Streamer.bot; configurable chat commands, permissions, cooldowns, and Channel Points redemptions
-- 🎁 **Channel Points rewards** - create and edit request rewards, configure cost/limits/cooldowns/color, select the reward used for song requests, and control automatic fulfillment
-- 🚫 **Blocklist** - block tracks from Activity, Queue, or the fallback list; blocked tracks cannot be re-added and are skipped automatically
-- 🎛 **Web control panel** - live queue, playback controls, fallback playlist, Twitch settings, filters, overlay options, blocklist, activity, and configuration
-- 📺 **OBS overlay** - a `/overlay` Browser Source that plays the queue and shows a compact Now Playing badge; its position, opacity and a video-only mode are set in the control panel
-- 🔁 **Fallback playlist** - use any YouTube playlist as background music with shuffle and repeat, with automatic refresh; up to 250 tracks are loaded and kept on disk, and the panel shows how many of the playlist's tracks made it in
-- 📋 **Saved playlists** - keep a library of playlists and switch the active fallback playlist from the control panel
-- 📈 **Activity log** - see accepted, rejected, blocked, and failed requests with structured failure reasons
-- 📱 **LAN access** - QR code and local network access for managing the queue from another device; the API key and the Twitch connection can be changed only on the computer that runs StreamQueue
-- 🌍 **RU/EN interface**
-- 🖥️ **Windows standalone build** - packaged `Service.exe` runs without Node.js installed; optional .NET 10 WinForms tray launcher provides a normal double-click workflow
-- 💾 **Local storage** - queue, settings, playlists, blocklist, and the loaded fallback playlist stay on disk next to the application
-- ⚡ **Real-time updates** - Server-Sent Events (SSE) push live queue and playback changes to the control panel without polling
-- 🧠 **In-memory caching** - YouTube API responses cached in memory (search results for 24 hours, video details for 10 minutes) for faster searches and reduced quota usage
-- 🔔 **Problem notices** - the Windows tray launcher shows what the server reports about itself (startup failure, busy port, missing files, lost Twitch connection) and confirms a restart
-- 🔒 **Hardened reliability** - robust error handling, startup recovery, and state persistence for critical components
+<p align="center">
+  <a href="https://github.com/choompuy/stream-queue/releases/latest">
+    <img src="https://img.shields.io/github/v/release/choompuy/stream-queue?label=Latest%20release" alt="Latest release">
+  </a>
+  <a href="https://github.com/choompuy/stream-queue/releases">
+    <img src="https://img.shields.io/github/downloads/choompuy/stream-queue/total" alt="Downloads">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/github/license/choompuy/stream-queue" alt="License">
+  </a>
+</p>
 
-## How it works
+<p align="center">
+  <a href="https://github.com/choompuy/stream-queue/releases/latest"><strong>⬇️ Download the latest release</strong></a>
+</p>
+
+![StreamQueue dashboard](docs/screenshots/main.png)
+
+<details>
+<summary>More screenshots</summary>
+
+|                                              |                                                  |
+| -------------------------------------------- | ------------------------------------------------ |
+| Main dashboard                               | Playlists                                        |
+| ![Main dashboard](docs/screenshots/main.png) | ![Playlists](docs/screenshots/playlists.png)     |
+| Settings                                     | Mobile interface                                 |
+| ![Settings](docs/screenshots/settings.png)   | ![Mobile interface](docs/screenshots/mobile.png) |
+
+## ✨ Features
+
+- 🎵 **Song requests** – viewers can request songs by searching YouTube or submitting a video link.
+- 📺 **Twitch integration** – connect your Twitch account directly, without Streamer.bot.
+- 🎁 **Channel Points** – create and manage rewards, configure request costs, limits, cooldowns, and automatic fulfillment.
+- 📋 **Queue management** – view, reorder, skip, and manage upcoming tracks.
+- 🔁 **Fallback playlist** – keep music playing when the request queue is empty, with shuffle and repeat options.
+- 🎶 **Saved playlists** – maintain multiple playlists and switch between them.
+- 🚫 **Blocklist** – prevent unwanted tracks from being requested or played again.
+- 🎛️ **Web control panel** – manage playback, requests, playlists, settings, and Twitch integration from one place.
+- 🎬 **OBS overlay** – play music through an OBS Browser Source with a customizable Now Playing badge.
+- 📊 **Activity log** – track accepted, rejected, blocked, and failed requests.
+- 📱 **Mobile access** – manage your queue from another device over your local network.
+- 🌍 **RU/EN interface** – switch between Russian and English.
+- 💾 **Local storage** – application data and settings stay on your computer.
+- ⚡ **Real-time updates** – queue and playback changes are synchronized without manual refreshing.
+- 🖥️ **Windows standalone build** – run the application without installing Node.js.
+
+## ⚙️ How it works
+
+1. A viewer redeems your configured Channel Points reward and enters a song title or YouTube link.
+2. StreamQueue searches YouTube and checks the video against your filters.
+3. Valid requests are added to the queue.
+4. The OBS overlay plays tracks automatically.
+5. When the queue is empty, the fallback playlist takes over.
 
 ```text
-Twitch chat / Channel Points
-          │
-          ▼
-   Native Twitch integration
-          │
-          ▼
-   StreamQueue request handling
-          │
-          ▼
-   YouTube Data API ── search + filters ──▶ queue
-                                           │
-                                           ▼
-                              OBS Browser Source (/overlay)
+Twitch Channel Points
+        │
+        ▼
+   StreamQueue
+        │
+        ▼
+ YouTube search + filters
+        │
+        ▼
+      Queue
+        │
+        ▼
+   OBS Overlay
 ```
 
-## Getting started
+## 🚀 Getting started
 
-### Windows release
+### 🪟 Windows release
 
-The easiest way to run StreamQueue on Windows is the standalone ZIP release.
+The easiest way to get started is to download the prebuilt Windows release.
 
-1. Download the latest release ZIP from GitHub Releases.
-2. Extract it to a folder.
+1. Download the [latest release](https://github.com/choompuy/stream-queue/releases/latest).
+2. Extract the ZIP archive to a folder.
 3. Run `Service.exe` or the optional `StreamQueue.exe` tray launcher.
-4. Open the control panel shown by the application.
-5. Go to **Settings** and add your YouTube Data API key.
-6. Connect Twitch from the **Twitch** settings.
-7. Add the StreamQueue `/overlay` URL as an OBS Browser Source.
+4. Open the control panel.
+5. Go to **Settings** and enter your YouTube Data API key.
+6. Connect your Twitch account in the **Twitch** settings.
+7. Add the `/overlay` URL as a Browser Source in OBS.
 
-The packaged build includes the Twitch client ID (baked in from `.env` or the environment when the build is made), so the released Windows build does not require you to create or enter a Twitch client secret.
+That's it. No Node.js installation or manual build is required.
 
-The application is portable: `data/` (with its `logs/` folder) is created next to the executable. No Node.js installation is required.
+The released build already includes the Twitch Client ID, so you don't need to create a Twitch application or provide a client secret.
 
-### Requirements for development
+### 🧰 Development requirements
+
+If you want to run StreamQueue from source, you'll need:
 
 - [Node.js](https://nodejs.org/) 24+
-- A [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) on Windows if you want to build the optional tray launcher
-- A [YouTube Data API v3](https://console.cloud.google.com/apis/library/youtube.googleapis.com) key
-- A Twitch application of type **Public** from the [Twitch Developer Console](https://dev.twitch.tv/console/apps), if you want to connect Twitch when running from source. Only its Client ID is needed, no client secret
+- [YouTube Data API v3](https://console.cloud.google.com/apis/library/youtube.googleapis.com) key
+- A [Twitch application](https://dev.twitch.tv/console/apps) of type **Public** (only the Client ID is required)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) on Windows if you want to build the tray launcher
 
-### Run in development
+### 💻 Run locally
 
 ```bash
 git clone https://github.com/choompuy/stream-queue.git
 cd stream-queue
 npm install
-cp .env.example .env   # Windows cmd: copy .env.example .env. Then put your Twitch Client ID in it: TWITCH_CLIENT_ID=...
+cp .env.example .env
 npm run dev
 ```
 
-`.env` is read from the application folder (the project folder in development, next to the executable in a build) when the server starts, so restart the server after changing it. Without a Client ID everything works except connecting Twitch.
+On Windows Command Prompt, use `copy .env.example .env` instead of `cp`.
 
-The server uses port `4747`; if it is busy, the next free port is taken and remembered, so the overlay link stays the same afterwards. To pick another port, edit `data/server.json`. Configure the YouTube API key from the web control panel; it is stored locally and takes effect without a restart.
+Add your Twitch Client ID to `.env`:
 
-### Build the standalone Windows executable
-
-```bash
-npm run build:sea
+```env
+TWITCH_CLIENT_ID=your_client_id
 ```
 
-This produces `dist-sea/Service.exe`, a self-contained Node.js Single Executable Application. `npm run build:release` goes one step further and assembles the `release/` folder (exe with icon and version on Windows, `public/`, license, and the tray launcher when the .NET SDK is installed) that is ready to run or to zip. Node.js 24 or newer is needed to build. Both builds take the Twitch Client ID from `.env` or the environment and warn if it is missing (a build without it starts with the Twitch integration off).
+Without a Client ID, everything works except connecting Twitch.
 
-For a no-terminal-window experience, build the optional .NET 10 WinForms tray launcher in `tray/`. It starts and stops the service in the background, provides shortcuts for opening the panel and the application folder, restarting the server (a balloon confirms it is back up), and exiting, and shows the problems the server reports about itself.
+The server uses port `4747`. If the port is already occupied, StreamQueue automatically selects another available port and remembers it.
 
-To build the tray launcher:
+Configure your YouTube API key directly from the control panel. Changes take effect without restarting the server.
 
-```bash
-cd tray
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
-```
+## 🎬 OBS setup
 
-The tray launcher is self-contained, so the published executable does not require a separate .NET runtime installation.
+1. Open OBS and add a **Browser Source**.
+2. In StreamQueue, go to **Settings → Overlay**.
+3. Copy the OBS Browser Source URL.
+4. Paste it into the Browser Source URL field in OBS.
+5. Adjust the source dimensions to match your overlay layout. `362 × 283` is a reasonable starting point.
 
-### Checks and tests
+The overlay plays the current track and can display a compact Now Playing badge with the track title, requester, and playback progress.
 
-```bash
-npm run typecheck     # the sources and the tests
-npm run lint
-npm test              # backend (tsx --test) and frontend (node --test, jsdom)
-npm run test:smoke    # loads the real control panel into jsdom and drives the UI
-```
+## 🎮 Twitch integration
 
-GitHub Actions runs the type check, the lint and the tests on every push to `main` and on pull requests, and builds the Windows release folder, so a build that breaks only on Windows shows up before a release.
+StreamQueue connects directly to Twitch without requiring additional bots or external automation tools.
 
-### Project layout
+Available features:
 
-```text
-src/            the server: REST routes, queue, playback, fallback playlist, persistence
-  routes/         the HTTP API
-  youtube/        search, filters, caching, quota
-  integrations/twitch/   device-code login, EventSub, chat, rewards
-public/         the control panel (js/control), the OBS overlay (js/overlay.js), locales (en, ru), styles
-tests/          backend/ and frontend/
-scripts/        build-sea.mjs, build-release.mjs, smoke-frontend.mjs
-tray/           the optional .NET 10 WinForms launcher
-```
+- Connect and disconnect your Twitch account.
+- Configure chat commands for current track and queue information.
+- Allow moderators to skip, pause, and resume playback.
+- Customize command permissions and cooldowns.
+- Create and manage Channel Points rewards.
+- Configure reward costs, limits, cooldowns, and automatic fulfillment.
+- Send request and playback status messages directly to Twitch chat.
 
-## OBS setup
+Default chat commands:
 
-1. Add a **Browser Source** in OBS.
-2. Copy the URL from **Settings → Overlay → OBS Browser Source URL**.
-3. Set the Browser Source size to match your overlay layout. **362×283** is a reasonable starting size.
+| Command      | Description            | Permission |
+| ------------ | ---------------------- | ---------- |
+| `!sg now`    | Show the current track | Everyone   |
+| `!sg queue`  | Show upcoming tracks   | Everyone   |
+| `!sg skip`   | Skip the current track | Moderators |
+| `!sg pause`  | Pause playback         | Moderators |
+| `!sg resume` | Resume playback        | Moderators |
 
-The overlay can show the current video plus a compact Now Playing badge containing the title, requester, and progress. Its position can be configured in the control panel.
+Commands, permissions, and cooldowns can be customized in the control panel.
 
-## Twitch integration
+## 🎛️ Configuration
 
-StreamQueue can connect directly to Twitch without requiring Streamer.bot.
+Most settings can be managed directly from the control panel.
 
-From the control panel you can:
+| Setting            | Default            |
+| ------------------ | ------------------ |
+| Minimum views      | 10,000             |
+| Minimum duration   | 60 seconds         |
+| Maximum duration   | 480 seconds        |
+| Maximum queue size | 20 (0 = unlimited) |
+| Requests per user  | 4 (0 = unlimited)  |
+| Region             | None               |
+| Allow live streams | Disabled           |
+| Content category   | Music              |
+| Fallback playlist  | None               |
 
-- connect and disconnect a Twitch account;
-- configure chat commands for now-playing and queue information, skip, pause, and resume;
-- configure command permissions and cooldowns;
-- create and edit Channel Points rewards;
-- select which configured reward creates song requests;
-- configure reward limits, cooldowns, cost, color, and automatic fulfillment;
-- receive request and playback status messages directly in Twitch chat.
+YouTube requests are checked for availability, embeddability, duration, view count, and other configured restrictions.
 
-The released Windows build contains the Twitch client ID. Twitch OAuth tokens are stored locally with the rest of the application state.
+Fallback playlist tracks have separate availability checks and are not subject to viewer request filters.
 
-## Request flow
+## 🛡️ Moderation
 
-A viewer requests a song by redeeming the Channel Points reward you selected in the Twitch settings and typing a title or a YouTube link into it. You can also add songs from the control panel (search or URL).
+The built-in blocklist helps prevent unwanted tracks from appearing in your stream.
 
-StreamQueue searches YouTube, validates the result against the configured filters, and either adds it to the queue or starts playback when the queue is empty. The viewer gets a message in Twitch chat, and if the request is rejected the points are returned.
-
-Requests can be rejected for reasons such as duplicate tracks, queue limits, user limits, blocked videos, invalid/unavailable videos, duration/view filters, or YouTube API quota limits. When YouTube reports that the daily API quota is used up, StreamQueue says so and stops sending requests until it resets (midnight Pacific Time). Responses are localized and include a structured failure reason for the control panel and integrations.
-
-Chat commands are for information and control. By default:
-
-```text
-!sg now       what is playing        (everyone)
-!sg queue     what is coming up      (everyone)
-!sg skip      skip the current track (moderators)
-!sg pause     pause playback         (moderators)
-!sg resume    resume playback        (moderators)
-```
-
-Names, permissions and cooldowns are editable in the Twitch settings.
-
-## Configuration
-
-Most configuration is editable from the web control panel.
-
-| Setting                      | Default                   |
-| ---------------------------- | ------------------------- |
-| Minimum views                | 10,000                    |
-| Minimum duration             | 60s                       |
-| Maximum duration             | 480s (8 min)              |
-| Max queue size               | 20 (0 = unlimited)        |
-| Max active requests per user | 4 (0 = unlimited)         |
-| Region                       | none                      |
-| Allow live streams           | disabled                  |
-| Content                      | music only                |
-| Fallback playlist            | none until configured     |
-
-YouTube requests are restricted to music videos by default (a setting accepts any video), embeddable and syndicated, with additional validation for duration, availability, and other configured filters. Tracks of your own fallback playlist are checked only for availability (public, embeddable, region, age), not against these viewer filters.
-
-Configuration updates support field-level validation: valid values can be saved even when another submitted field is rejected.
-
-## Moderation
-
-Use the **Blocklist** controls from Activity, Queue, or fallback entries to block a track.
+You can block tracks directly from Activity, Queue, or fallback entries.
 
 Blocked tracks are:
 
-- rejected when requested again;
-- removed from the active queue when applicable;
-- skipped when encountered during fallback playback;
-- prevented from being selected again until they are unblocked.
+- Rejected when requested again.
+- Removed from the active queue when applicable.
+- Skipped during fallback playback.
+- Kept blocked until manually unblocked.
 
-The activity log records block and playback events so moderation actions remain visible after the fact.
+## 🔒 Data & privacy
 
-## Playback and fallback reliability
+StreamQueue runs locally on your computer. Application data, settings, playlists, queue state, and credentials are stored alongside the executable in the `data/` directory.
 
-StreamQueue handles common playback failures without leaving the queue in a stuck state.
+Your YouTube API key and Twitch OAuth tokens are stored locally. External communication is limited to the services required for YouTube and Twitch integration.
 
-- Player failures are reported with the affected video.
-- Duplicate failure reports are ignored.
-- Failed fallback tracks can advance to another track.
-- Blocked tracks are skipped during playback.
-- Playback and queue state are persisted locally.
-- The overlay reports player errors back to the local service.
+## 🧪 Tests
 
-## Data & privacy
-
-StreamQueue is designed to run locally on your own machine.
-
-Application state is stored as JSON next to the executable:
-
-```text
-data/
-  config.json
-  settings.json
-  server.json
-  twitch-config.json
-  playlists.json
-  blocklist.json
-  activity.json
-  queue-state.json
-  fallback-tracks.json
-  secrets.json
-  logs/
-    app.log
+```bash
+npm run typecheck
+npm run lint
+npm test
+npm run test:smoke
 ```
 
-`app.log` is rotated when it reaches 1 MB.
+GitHub Actions runs checks on pushes to `main` and pull requests, and builds the Windows release.
 
-Your YouTube API key and Twitch OAuth state are stored locally. The application communicates with external services only when needed for its integrations, primarily the YouTube Data API and Twitch APIs.
+## 🛠️ Tech stack
 
-## Tech stack
+Node.js · TypeScript · Express · Vanilla JavaScript · YouTube Data API v3 · YouTube IFrame Player API · Twitch APIs · Twitch EventSub WebSocket · Server-Sent Events · C# / WinForms (.NET 10)
 
-Node.js · TypeScript · Express · ws · vanilla JavaScript · Server-Sent Events (SSE) · YouTube Data API v3 · YouTube IFrame Player API · Twitch APIs · Twitch EventSub WebSocket · optional C#/WinForms tray launcher for Windows (.NET 10)
+## 📄 License
 
-## License
-
-[MIT](LICENSE) - © choompuy
+[MIT](LICENSE) – © choompuy
