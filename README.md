@@ -34,6 +34,8 @@ Everything runs locally on your computer and is managed through a web control pa
 | Settings                                     | Mobile interface                                 |
 | ![Settings](docs/screenshots/settings.png)   | ![Mobile interface](docs/screenshots/mobile.png) |
 
+</details>
+
 ## ✨ Features
 
 - 🎵 **Song requests** – viewers can request songs by searching YouTube or submitting a video link.
